@@ -3,6 +3,3 @@ plugins {
 }
 
 rootProject.name = "minecraft-neoforge-mcp"
-
-include("example-mod")
-project(":example-mod").name = "minecraft-mcp-example-mod"

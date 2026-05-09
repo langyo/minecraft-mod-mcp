@@ -80,6 +80,7 @@ fun main() {
             println(gson.toJson(jobj("jsonrpc" to "2.0", "error" to jobj("code" to -32700, "message" to (e.message ?: "parse error")), "id" to null))); System.out.flush()
         }
     }
+    ws.stop(1000)
 }
 
 fun toolObj(name: String, desc: String, schema: String): JsonObject =
@@ -115,13 +116,23 @@ fun doLaunchGame(a: JsonObject): JsonObject {
     val mcDir = a.get("mc_dir")?.asString ?: System.getenv("MC_RUN_DIR") ?: System.getProperty("user.home") + "/.mcbbs-memorial"
     val maxMem = (a.get("max_memory_gb")?.asDouble ?: 4.0).toInt()
     try {
-        val pb = ProcessBuilder(
-            "gradlew.bat", "runClient",
-            "-Porg.gradle.jvmargs=-Xmx${maxMem}G",
-            "-PmcDir=$mcDir"
-        )
+        val isWin = System.getProperty("os.name").lowercase().contains("win")
+        val pb = if (isWin) {
+            ProcessBuilder(
+                "cmd", "/c", "start", "Minecraft",
+                "gradlew.bat", "runClient",
+                "-Porg.gradle.jvmargs=-Xmx${maxMem}G",
+                "-PmcDir=$mcDir"
+            )
+        } else {
+            ProcessBuilder(
+                "gradlew", "runClient",
+                "-Porg.gradle.jvmargs=-Xmx${maxMem}G",
+                "-PmcDir=$mcDir"
+            )
+        }
         pb.directory(java.io.File(modPath))
-        pb.redirectErrorStream(true)
+        if (!isWin) pb.redirectErrorStream(true)
         pb.environment()["MC_MCP_SERVER"] = "ws://127.0.0.1:${System.getenv("MC_MCP_WS_PORT") ?: "9876"}"
         val proc = pb.start()
         println("[LAUNCH] MC process started pid=${proc.pid()} dir=$modPath")
