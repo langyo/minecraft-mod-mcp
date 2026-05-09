@@ -1,0 +1,7 @@
+.gradle/
+build/
+screenshots/
+*.bat
+test_*
+rpc_*
+t_*
