@@ -146,7 +146,7 @@ fun doPressKey(a: JsonObject, r: Robot, w: McWsServer): JsonObject {
 fun doTypeText(a: JsonObject, r: Robot, w: McWsServer): JsonObject {
     val t = a.get("text")?.asString ?: return txtObj("missing text"); val iv = ((a.get("interval")?.asDouble ?: 0.03)*1000).toLong(); val ent = a.get("press_enter")?.asBoolean ?: false
     if (w.connected()) { var o: JsonObject? = null; w.send(McCommand("type_text", hashMapOf("text" to t))) { o = if (it.success) txtObj(t) else txtObj(it.error ?: "fail") }; return o ?: txtObj("timeout") }
-    for (ch in t) { r.keyPress(ch.code); r.keyRelease(ch.code); Thread.sleep(iv) }
+    for (ch in t) { val kc = charKeyCode(ch) ?: continue; r.keyPress(kc); r.keyRelease(kc); Thread.sleep(iv) }
     if (ent) { r.keyPress(KeyEvent.VK_ENTER); r.keyRelease(KeyEvent.VK_ENTER) }; return txtObj("typed '$t'")
 }
 fun doScroll(a: JsonObject, r: Robot, w: McWsServer): JsonObject {
@@ -171,7 +171,19 @@ fun keyCode(k: String): Int? = when (k.lowercase()) {
     "backspace","bs"->259;"delete","del"->261
     "up"->265;"down"->264;"left"->263;"right"->262
     "f1"->290;"f2"->291;"f3"->292;"f4"->293;"f5"->294;"f6"->295;"f7"->296;"f8"->297;"f9"->298;"f10"->299;"f11"->300;"f12"->301
-    else -> if (k.length==1) k[0].code else null
+    else -> if (k.length==1) charKeyCode(k[0]) else null
+}
+
+fun charKeyCode(ch: Char): Int? = when (ch) {
+    in 'a'..'z' -> ch.uppercaseChar().code
+    in 'A'..'Z' -> ch.code
+    in '0'..'9' -> ch.code
+    ' ' -> 32; '!' -> 33; '@' -> 64; '#' -> 35; '$' -> 36; '%' -> 37; '^' -> 94; '&' -> 38
+    '*' -> 42; '(' -> 40; ')' -> 41; '-' -> 45; '_' -> 95; '=' -> 61; '+' -> 43
+    '[' -> 91; '{' -> 123; ']' -> 93; '}' -> 125; '\\' -> 92; '|' -> 124
+    ';' -> 59; ':' -> 58; '\'' -> 39; '"' -> 34; ',' -> 44; '<' -> 60
+    '.' -> 46; '>' -> 62; '/' -> 47; '?' -> 63; '`' -> 96; '~' -> 126
+    else -> ch.code.takeIf { it < 128 }
 }
 fun jobj(vararg pairs: Pair<String, Any?>): JsonObject {
     val o = JsonObject()
