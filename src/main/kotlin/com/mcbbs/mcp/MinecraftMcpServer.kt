@@ -59,14 +59,15 @@ fun main() {
                     "serverInfo" to jobj("name" to "minecraft-neoforge-mcp", "version" to "0.1.0")
                 ))
                 "tools/list" -> jobj("result" to jobj("tools" to jarr(
-                    toolObj("screenshot", "Take screenshot of MC window", """{"type":"object","properties":{"save_path":{"type":"string"}}}"""),
+                    toolObj("launch_game", "Launch Minecraft game (detached process)", """{"type":"object","properties":{"mod_jar_path":{"type":"string","description":"Path to mod jar or project dir"},"mc_dir":{"type":"string","description":"Minecraft run directory"},"max_memory_gb":{"type":"number","description":"Max heap in GB, default 4"}}}"""),
+                    toolObj("screenshot", "Take screenshot via WS/game-internal pipeline", """{"type":"object","properties":{"save_path":{"type":"string"}}}"""),
                     toolObj("click", "Click at position in MC window", """{"type":"object","properties":{"x":{"type":"integer"},"y":{"type":"integer"},"button":{"type":"string","enum":["left","right","middle"]}},"required":["x","y"]}"""),
                     toolObj("press_key", "Press keyboard key", """{"type":"object","properties":{"key":{"type":"string"},"hold_seconds":{"type":"number"}},"required":["key"]}"""),
                     toolObj("type_text", "Type text into MC", """{"type":"object","properties":{"text":{"type":"string"},"press_enter":{"type":"boolean"}},"required":["text"]}"""),
                     toolObj("scroll", "Scroll mouse wheel", """{"type":"object","properties":{"clicks":{"type":"integer"}},"required":["clicks"]}"""),
                     toolObj("get_window_info", "Get window info", """{"type":"object","properties":{}}"""),
-                    toolObj("wait_for_screen", "Wait for screen change", """{"type":"object","properties":{"timeout_seconds":{"type":"number"}}}"""),
-                    toolObj("hotkey", "Press key combo", """{"type":"object","properties":{"keys":{"type":"array","items":{"type":"string"}}},"required":["keys"]}""")
+                    toolObj("wait_for_screen", "Wait for MC client WS connection", """{"type":"object","properties":{"timeout_seconds":{"type":"number"}}}"""),
+                    toolObj("hotkey", "Press key combo", """{"type":"object","properties":{"keys":{"type":"array","items":{"type":"string"}},"required":["keys"]}""")
                 )))
                 "tools/call" -> { val r = handleToolCall(req.getAsJsonObject("params"), robot, ws); jobj("result" to r) }
                 else -> jobj("error" to jobj("code" to -32601, "message" to "unknown method: $method"))
@@ -87,6 +88,7 @@ fun handleToolCall(params: JsonObject?, robot: Robot, ws: McWsServer): JsonObjec
     val name = params?.get("name")?.asString ?: return txtObj("Error: missing name")
     val args = params?.getAsJsonObject("arguments") ?: JsonObject()
     return try { when (name) {
+        "launch_game" -> doLaunchGame(args)
         "screenshot" -> doScreenshot(args, robot, ws)
         "click" -> doClick(args, robot, ws)
         "press_key" -> doPressKey(args, robot, ws)
@@ -97,6 +99,27 @@ fun handleToolCall(params: JsonObject?, robot: Robot, ws: McWsServer): JsonObjec
         "hotkey" -> doHotkey(args, robot, ws)
         else -> txtObj("Error: unknown tool $name")
     }} catch (e: Exception) { txtObj("Error: ${e.message}") }
+}
+
+fun doLaunchGame(a: JsonObject): JsonObject {
+    val modPath = a.get("mod_jar_path")?.asString ?: System.getProperty("user.dir")
+    val mcDir = a.get("mc_dir")?.asString ?: System.getenv("MC_RUN_DIR") ?: System.getProperty("user.home") + "/.mcbbs-memorial"
+    val maxMem = (a.get("max_memory_gb")?.asDouble ?: 4.0).toInt()
+    try {
+        val pb = ProcessBuilder(
+            "gradlew.bat", "runClient",
+            "-Porg.gradle.jvmargs=-Xmx${maxMem}G",
+            "-PmcDir=$mcDir"
+        )
+        pb.directory(java.io.File(modPath))
+        pb.redirectErrorStream(true)
+        pb.environment()["MC_MCP_SERVER"] = "ws://127.0.0.1:${System.getenv("MC_MCP_WS_PORT") ?: "9876"}"
+        val proc = pb.start()
+        println("[LAUNCH] MC process started pid=${proc.pid()} dir=$modPath")
+        return txtObj("launched pid=${proc.pid()}, waiting for WS connection...")
+    } catch (e: Exception) {
+        return txtObj("launch failed: ${e.message}")
+    }
 }
 
 fun doScreenshot(a: JsonObject, r: Robot, w: McWsServer): JsonObject {

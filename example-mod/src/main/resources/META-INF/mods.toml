@@ -1,0 +1,36 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MIT"
+
+[[mods]]
+modId="minecraft_mcp_example"
+version="${file.jarVersion}"
+displayName="Minecraft MCP Example Mod"
+description='''Example mod for testing Minecraft NeoForge MCP integration.
+
+Provides comprehensive testing capabilities:
+- WebSocket connection to MCP server
+- In-game screenshot capture
+- Command execution and simulation
+- Keyboard/mouse input simulation
+- Full JSON-RPC 2.0 protocol support
+
+Package: minecraft-mcp.langyo.xyz
+'''
+logoFile="icon.png"
+authors="langyo"
+credits="TeaCon 2026"
+displayURL="https://langyo.xyz"
+
+[[mixins]]
+config="minecraft_mcp_example.mixins.json"
+
+[[dependencies.minecraft_mcp_example]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.0.0-beta,)"
+
+[[dependencies.minecraft_mcp_example]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.4,1.22)"
