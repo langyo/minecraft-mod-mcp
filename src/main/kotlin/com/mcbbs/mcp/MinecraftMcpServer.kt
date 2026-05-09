@@ -14,6 +14,12 @@ import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
+import com.sun.jna.Native
+import com.sun.jna.Pointer
+import com.sun.jna.platform.win32.User32
+import com.sun.jna.platform.win32.WinDef
+import com.sun.jna.platform.win32.WinUser
+import com.sun.jna.win32.W32APIOptions
 
 val gson = Gson()
 data class McCommand(val action: String, val params: Map<String, Any?> = emptyMap())
@@ -39,6 +45,55 @@ class McWsServer(port: Int) : WebSocketServer(InetSocketAddress(port)) {
     fun connected() = client?.isOpen == true
 }
 
+object McWindow {
+    data class Bounds(val x: Int, val y: Int, val width: Int, val height: Int)
+
+    private var cached: Bounds? = null
+    private var lastScan: Long = 0
+
+    fun find(): Bounds? {
+        if (cached != null && System.currentTimeMillis() - lastScan < 3000) return cached
+        try {
+            val user32 = User32.INSTANCE
+            val rect = WinDef.RECT()
+            val found = booleanArrayOf(false)
+            user32.EnumWindows(WinUser.WNDENUMPROC { hwnd, _ ->
+                val buf = CharArray(256)
+                user32.GetWindowText(hwnd, buf, buf.size)
+                val title = String(buf).trimEnd('\u0000')
+                if (title.contains("Minecraft", ignoreCase = true) ||
+                    title.contains("minecraft", ignoreCase = true)) {
+                    user32.GetWindowRect(hwnd, rect)
+                    val w = rect.right - rect.left
+                    val h = rect.bottom - rect.top
+                    if (w > 400 && h > 300) {
+                        cached = Bounds(rect.left, rect.top, w, h)
+                        lastScan = System.currentTimeMillis()
+                        found[0] = true
+                        return@WNDENUMPROC false
+                    }
+                }
+                true
+            }, null)
+            if (!found[0]) cached = null
+        } catch (_: Exception) { cached = null }
+        return cached
+    }
+
+    fun require(robot: Robot): Bounds? {
+        val w = find()
+        if (w == null) return null
+        robot.mouseMove(w.x + w.width / 2, w.y + w.height / 2)
+        Thread.sleep(30)
+        return w
+    }
+
+    fun rect(): java.awt.Rectangle? {
+        val w = find() ?: return null
+        return java.awt.Rectangle(w.x, w.y, w.width, w.height)
+    }
+}
+
 fun main() {
     val port = System.getenv("MC_MCP_WS_PORT")?.toIntOrNull() ?: 9876
     val ws = McWsServer(port); ws.start()
@@ -60,14 +115,14 @@ fun main() {
                 ))
                 "tools/list" -> jobj("result" to jobj("tools" to jarr(
                     toolObj("launch_game", "Launch Minecraft game (detached process)", """{"type":"object","properties":{"mod_jar_path":{"type":"string","description":"Path to mod jar or project dir"},"mc_dir":{"type":"string","description":"Minecraft run directory"},"max_memory_gb":{"type":"number","description":"Max heap in GB, default 4"}}}"""),
-                    toolObj("screenshot", "Take screenshot via WS/game-internal pipeline", """{"type":"object","properties":{"save_path":{"type":"string"}}}"""),
-                    toolObj("click", "Click at position in MC window", """{"type":"object","properties":{"x":{"type":"integer"},"y":{"type":"integer"},"button":{"type":"string","enum":["left","right","middle"]}},"required":["x","y"]}"""),
-                    toolObj("press_key", "Press keyboard key", """{"type":"object","properties":{"key":{"type":"string"},"hold_seconds":{"type":"number"}},"required":["key"]}"""),
-                    toolObj("type_text", "Type text into MC", """{"type":"object","properties":{"text":{"type":"string"},"press_enter":{"type":"boolean"}},"required":["text"]}"""),
-                    toolObj("scroll", "Scroll mouse wheel", """{"type":"object","properties":{"clicks":{"type":"integer"}},"required":["clicks"]}"""),
-                    toolObj("get_window_info", "Get window info", """{"type":"object","properties":{}}"""),
-                    toolObj("wait_for_screen", "Wait for MC client WS connection", """{"type":"object","properties":{"timeout_seconds":{"type":"number"}}}"""),
-                    toolObj("hotkey", "Press key combo", """{"type":"object","properties":{"keys":{"type":"array","items":{"type":"string"}},"required":["keys"]}""")
+                    toolObj("screenshot", "Take screenshot of Minecraft window only", """{"type":"object","properties":{"save_path":{"type":"string"}}}"""),
+                    toolObj("click", "Click at position inside MC window (relative coords)", """{"type":"object","properties":{"x":{"type":"integer","description":"X relative to MC window top-left"},"y":{"type":"integer","description":"Y relative to MC window top-left"},"button":{"type":"string","enum":["left","right","middle"]}},"required":["x","y"]}"""),
+                    toolObj("press_key", "Press keyboard key (MC window must be focused)", """{"type":"object","properties":{"key":{"type":"string"},"hold_seconds":{"type":"number"}},"required":["key"]}"""),
+                    toolObj("type_text", "Type text into MC (MC window must be focused)", """{"type":"object","properties":{"text":{"type":"string"},"press_enter":{"type":"boolean"}},"required":["text"]}"""),
+                    toolObj("scroll", "Scroll mouse wheel in MC window area", """{"type":"object","properties":{"clicks":{"type":"integer"}},"required":["clicks"]}"""),
+                    toolObj("get_window_info", "Get MC window info and connection status", """{"type":"object","properties":{}}"""),
+                    toolObj("wait_for_screen", "Wait for MC client WS connection from mod", """{"type":"object","properties":{"timeout_seconds":{"type":"number"}}}"""),
+                    toolObj("hotkey", "Press key combo in MC window context", """{"type":"object","properties":{"keys":{"type":"array","items":{"type":"string"}},"required":["keys"]}""")
                 )))
                 "tools/call" -> { val r = handleToolCall(req.getAsJsonObject("params"), robot, ws); jobj("result" to r) }
                 else -> jobj("error" to jobj("code" to -32601, "message" to "unknown method: $method"))
@@ -128,43 +183,72 @@ fun doScreenshot(a: JsonObject, r: Robot, w: McWsServer): JsonObject {
             out = if (res.success && res.data != null) imgObj(res.data as String) else txtObj("WS error: ${res.error}")
         }; return out ?: txtObj("timeout")
     }
-    val screen = r.createScreenCapture(java.awt.Rectangle(java.awt.Toolkit.getDefaultToolkit().screenSize))
+    val rect = McWindow.rect() ?: return txtObj("Error: Minecraft window not found. Cannot screenshot outside MC.")
+    val screen = r.createScreenCapture(rect)
     val baos = java.io.ByteArrayOutputStream(); javax.imageio.ImageIO.write(screen, "png", baos)
+    val savePath = a.get("save_path")?.asString
+    if (savePath != null) javax.imageio.ImageIO.write(screen, "png", java.io.File(savePath))
     return imgObj(Base64.getEncoder().encodeToString(baos.toByteArray()))
 }
+
 fun doClick(a: JsonObject, r: Robot, w: McWsServer): JsonObject {
     val x = a.get("x")?.asInt ?: return txtObj("missing x"); val y = a.get("y")?.asInt ?: return txtObj("missing y")
     val btn = when (a.get("button")?.asString) {"right"->InputEvent.BUTTON3_DOWN_MASK;"middle"->InputEvent.BUTTON2_DOWN_MASK;else->InputEvent.BUTTON1_DOWN_MASK}
     if (w.connected()) { var o: JsonObject? = null; w.send(McCommand("click", hashMapOf("x" to x, "y" to y))) { o = if (it.success) txtObj("clicked ($x,$y)") else txtObj(it.error ?: "fail") }; return o ?: txtObj("timeout") }
-    r.mouseMove(x,y); Thread.sleep(50); r.mousePress(btn); r.mouseRelease(btn); return txtObj("clicked ($x,$y)")
+    val win = McWindow.find() ?: return txtObj("Error: Minecraft window not found. Cannot click outside MC.")
+    val absX = win.x + x.coerceIn(0, win.width); val absY = win.y + y.coerceIn(0, win.height)
+    r.mouseMove(absX, absY); Thread.sleep(50); r.mousePress(btn); r.mouseRelease(btn)
+    return txtObj("clicked ($x,$y) in MC window [${win.x},${win.y} ${win.width}x${win.height}]")
 }
+
 fun doPressKey(a: JsonObject, r: Robot, w: McWsServer): JsonObject {
     val k = a.get("key")?.asString ?: return txtObj("missing key"); val hold = ((a.get("hold_seconds")?.asDouble ?: 0.05)*1000).toLong()
     if (w.connected()) { var o: JsonObject? = null; w.send(McCommand("press_key", hashMapOf("key" to k))) { o = if (it.success) txtObj(k) else txtObj(it.error ?: "fail") }; return o ?: txtObj("timeout") }
-    val kc = keyCode(k) ?: return txtObj("bad key: $k"); r.keyPress(kc); Thread.sleep(hold); r.keyRelease(kc); return txtObj("pressed $k")
+    if (McWindow.require(r) == null) return txtObj("Error: Minecraft window not found. Key input restricted to MC window only.")
+    val kc = keyCode(k) ?: return txtObj("bad key: $k"); r.keyPress(kc); Thread.sleep(hold); r.keyRelease(kc)
+    return txtObj("pressed $k (within MC window)")
 }
+
 fun doTypeText(a: JsonObject, r: Robot, w: McWsServer): JsonObject {
     val t = a.get("text")?.asString ?: return txtObj("missing text"); val iv = ((a.get("interval")?.asDouble ?: 0.03)*1000).toLong(); val ent = a.get("press_enter")?.asBoolean ?: false
     if (w.connected()) { var o: JsonObject? = null; w.send(McCommand("type_text", hashMapOf("text" to t))) { o = if (it.success) txtObj(t) else txtObj(it.error ?: "fail") }; return o ?: txtObj("timeout") }
+    if (McWindow.require(r) == null) return txtObj("Error: Minecraft window not found. Text input restricted to MC window only.")
     for (ch in t) { val kc = charKeyCode(ch) ?: continue; r.keyPress(kc); r.keyRelease(kc); Thread.sleep(iv) }
-    if (ent) { r.keyPress(KeyEvent.VK_ENTER); r.keyRelease(KeyEvent.VK_ENTER) }; return txtObj("typed '$t'")
+    if (ent) { r.keyPress(KeyEvent.VK_ENTER); r.keyRelease(KeyEvent.VK_ENTER) }
+    return txtObj("typed '$t' (within MC window)")
 }
+
 fun doScroll(a: JsonObject, r: Robot, w: McWsServer): JsonObject {
     val c = a.get("clicks")?.asInt ?: return txtObj("missing clicks")
     if (w.connected()) { var o: JsonObject? = null; w.send(McCommand("scroll", hashMapOf("clicks" to c))) { o = if (it.success) txtObj("$c clicks") else txtObj(it.error ?: "fail") }; return o ?: txtObj("timeout") }
-    r.mouseWheel(c); return txtObj("scrolled $c")
+    if (McWindow.require(r) == null) return txtObj("Error: Minecraft window not found. Scroll restricted to MC window only.")
+    r.mouseWheel(c); return txtObj("scrolled $c (within MC window)")
 }
-fun doWinInfo(w: McWsServer): JsonObject { val i = jobj("mcConnected" to w.connected()); return txtObj(gson.toJson(i)) }
+
+fun doWinInfo(w: McWsServer): JsonObject {
+    val win = McWindow.find()
+    val i = jobj(
+        "mcConnected" to w.connected(),
+        "windowFound" to (win != null),
+        "windowBounds" to if (win != null) jobj("x" to win.x, "y" to win.y, "width" to win.width, "height" to win.height) else null
+    )
+    return txtObj(gson.toJson(i))
+}
+
 fun doWaitScreen(a: JsonObject, w: McWsServer): JsonObject {
     val to = ((a.get("timeout_seconds")?.asDouble ?: 30.0)*1000).toLong(); val s = System.currentTimeMillis()
     while (System.currentTimeMillis()-s < to) { if (w.connected()) break; Thread.sleep(500) }
     return txtObj("connected=${w.connected()} elapsed=${(System.currentTimeMillis()-s)/1000.0}s")
 }
+
 fun doHotkey(a: JsonObject, r: Robot, w: McWsServer): JsonObject {
     val keys = a.get("keys")?.asJsonArray?.map { it.asString } ?: return txtObj("missing keys")
     if (w.connected()) { var o: JsonObject? = null; w.send(McCommand("hotkey", hashMapOf("keys" to keys))) { o = if (it.success) txtObj(keys.joinToString("+")) else txtObj(it.error ?: "fail") }; return o ?: txtObj("timeout") }
-    val codes = keys.mapNotNull { keyCode(it) }.toIntArray(); for (c in codes) r.keyPress(c); Thread.sleep(50); for (c in codes.reversed()) r.keyRelease(c); return txtObj(keys.joinToString("+"))
+    if (McWindow.require(r) == null) return txtObj("Error: Minecraft window not found. Hotkey restricted to MC window only.")
+    val codes = keys.mapNotNull { keyCode(it) }.toIntArray(); for (c in codes) r.keyPress(c); Thread.sleep(50); for (c in codes.reversed()) r.keyRelease(c)
+    return txtObj("${keys.joinToString("+")} (within MC window)")
 }
+
 fun keyCode(k: String): Int? = when (k.lowercase()) {
     "escape","esc"->256;"enter","return"->257;"tab"->258;"space"->32
     "shift"->340;"control","ctrl"->341;"alt"->342
