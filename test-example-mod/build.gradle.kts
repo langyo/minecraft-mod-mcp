@@ -5,7 +5,7 @@ plugins {
 
 group = "xyz.langyo"
 version = "1.0.0"
-base { archivesName.set("minecraft-mcp-example") }
+base { archivesName.set("minecraft-mcp-test-example") }
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
@@ -18,22 +18,14 @@ repositories {
     maven("https://maven.neoforged.net/releases/")
 }
 
-configurations {
-    compileOnly {
-        extendsFrom(configurations.minecraft.getOrCreate("neoforge"))
-    }
-}
-
 dependencies {
     compileOnly("net.neoforged:neoforge:21.0.143-beta")
-    implementation("org.java-websocket:Java-WebSocket:1.5.4")
-    implementation("com.google.code.gson:gson:2.11.0")
 }
 
 tasks.jar {
     manifest {
         attributes["ModSide"] = "BOTH"
-        attributes["Automatic-Module"] = "xyz.langyo.minecraftmcp"
+        attributes["Automatic-Module"] = "xyz.langyo.testmod"
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

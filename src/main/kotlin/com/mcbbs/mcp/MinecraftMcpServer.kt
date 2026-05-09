@@ -64,7 +64,11 @@ fun main() {
                     toolObj("scroll", "Scroll mouse wheel (via mod input system)", """{"type":"object","properties":{"clicks":{"type":"integer"}},"required":["clicks"]}"""),
                     toolObj("get_window_info", "Get connection status and mod info", """{"type":"object","properties":{}}"""),
                     toolObj("wait_for_screen", "Wait for MC mod WebSocket connection", """{"type":"object","properties":{"timeout_seconds":{"type":"number"}}}"""),
-                    toolObj("hotkey", "Press key combo (via mod input system)", """{"type":"object","properties":{"keys":{"type":"array","items":{"type":"string"}},"required":["keys"]}""")
+                    toolObj("hotkey", "Press key combo (via mod input system)", """{"type":"object","properties":{"keys":{"type":"array","items":{"type":"string"}},"required":["keys"]}}"""),
+                    toolObj("execute_command", "Execute in-game command via mod", """{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}"""),
+                    toolObj("get_player_info", "Query player state from mod", """{"type":"object","properties":{}}"""),
+                    toolObj("get_world_info", "Query world state from mod", """{"type":"object","properties":{}}"""),
+                    toolObj("ping", "Ping mod for connectivity test", """{"type":"object","properties":{}}""")
                 )))
                 "tools/call" -> { val r = handleToolCall(req.getAsJsonObject("params"), ws); jobj("result" to r) }
                 else -> jobj("error" to jobj("code" to -32601, "message" to "unknown method: $method"))
@@ -98,6 +102,10 @@ fun handleToolCall(params: JsonObject?, ws: McWsServer): JsonObject {
         "get_window_info" -> doWinInfo(ws)
         "wait_for_screen" -> doWaitScreen(args, ws)
         "hotkey" -> { val e = requireWs(ws); if (e != null) e else doHotkey(args, ws) }
+        "execute_command" -> { val e = requireWs(ws); if (e != null) e else doExecuteCommand(args, ws) }
+        "get_player_info" -> { val e = requireWs(ws); if (e != null) e else doPlayerInfo(ws) }
+        "get_world_info" -> { val e = requireWs(ws); if (e != null) e else doWorldInfo(ws) }
+        "ping" -> { val e = requireWs(ws); if (e != null) e else doPing(ws) }
         else -> txtObj("Error: unknown tool $name")
     }} catch (e: Exception) { txtObj("Error: ${e.message}") }
 }
@@ -192,6 +200,40 @@ fun doHotkey(a: JsonObject, w: McWsServer): JsonObject {
     }
     return out ?: txtObj("timeout")
 }
+
+fun doExecuteCommand(a: JsonObject, w: McWsServer): JsonObject {
+    val cmd = a.get("command")?.asString ?: return txtObj("missing command")
+    var out: JsonObject? = null
+    w.send(McCommand("execute_command", hashMapOf("command" to cmd))) { o ->
+        out = if (o.success) txtObj("command sent: $cmd") else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doPlayerInfo(w: McWsServer): JsonObject {
+    var out: JsonObject? = null
+    w.send(McCommand("get_player_info", emptyMap())) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "no data")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doWorldInfo(w: McWsServer): JsonObject {
+    var out: JsonObject? = null
+    w.send(McCommand("get_world_info", emptyMap())) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "no data")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doPing(w: McWsServer): JsonObject {
+    var out: JsonObject? = null
+    w.send(McCommand("ping", emptyMap())) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj("pong")
+    }
+    return out ?: txtObj("timeout")
+}
+
 fun jobj(vararg pairs: Pair<String, Any?>): JsonObject {
     val o = JsonObject()
     for ((k,v) in pairs) { if (v == null) o.add(k, null) else when (v) {

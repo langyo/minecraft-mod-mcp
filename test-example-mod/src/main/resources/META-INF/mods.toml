@@ -1,0 +1,36 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MIT"
+
+[[mods]]
+modId="mcp_test_example"
+version="${file.jarVersion}"
+displayName="MCP Test Example Mod"
+description='''Test mod for Minecraft MCP integration testing.
+
+Provides test content:
+- Custom block: Test Block (glowing, interactive)
+- Custom item: Test Wand (right-click interaction)
+- Custom commands: /mctest, /mcgive, /mcteleport, /mcinfo
+- Test GUI: Simple screen for input/click verification
+
+Package: minecraft-mcp.langyo.xyz (test companion)
+'''
+logoFile="icon.png"
+authors="langyo"
+credits="TeaCon 2026"
+
+[[dependencies.mcp_test_example]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.0.0-beta,)"
+
+[[dependencies.mcp_test_example]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.4,1.22)"
+
+[[dependencies.mcp_test_example]]
+    modId="minecraft_mcp_example"
+    type="required"
+    versionRange="[1.0.0,)"
