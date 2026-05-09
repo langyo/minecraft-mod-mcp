@@ -295,17 +295,21 @@ class TestRunner:
         env = os.environ.copy()
         env["MC_MCP_SERVER"] = f"ws://127.0.0.1:{self.port}"
 
+        # MC must launch from neoforge-dev/ where NeoForge MDK lives
+        mc_cwd = PROJECT_ROOT / "neoforge-dev"
+
         is_win = platform.system() == "Windows"
+        gw = "gradlew.bat" if is_win else "./gradlew"
         if is_win:
             cmd = ["cmd", "/c", "start", "Minecraft MCP Test",
-                  "gradlew.bat", "runClient",
+                  gw, "runClient",
                   "-Porg.gradle.jvmargs=-Xmx4G", f"-PmcDir={mc_dir}"]
         else:
-            cmd = [self._gw(), "runClient",
+            cmd = [gw, "runClient",
                   "-Porg.gradle.jvmargs=-Xmx4G", f"-PmcDir={mc_dir}"]
 
         flags = subprocess.CREATE_NEW_CONSOLE if is_win else 0
-        self.mc_process = subprocess.Popen(cmd, cwd=str(PROJECT_ROOT), env=env,
+        self.mc_process = subprocess.Popen(cmd, cwd=str(mc_cwd), env=env,
                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                           creationflags=flags)
         log(f"  MC launched (pid={self.mc_process.pid}), waiting for window...", Y)
