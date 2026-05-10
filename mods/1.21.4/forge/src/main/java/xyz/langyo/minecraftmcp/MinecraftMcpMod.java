@@ -1,6 +1,7 @@
 package xyz.langyo.minecraftmcp;
 
 import com.mcbbs.mcp.common.*;
+import net.minecraft.client.Minecraft;
 import net.minecraftforge.event.TickEvent.ClientTickEvent.Post;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -10,7 +11,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 public class MinecraftMcpMod {
     public static MinecraftMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
-    private ForgeInputHandler handler;
+    private ReflectedInputHandler handler;
 
     public MinecraftMcpMod(FMLJavaModLoadingContext context) {
         INSTANCE = this;
@@ -22,7 +23,7 @@ public class MinecraftMcpMod {
     private void commonSetup(final FMLCommonSetupEvent event) {
         String serverUrl = System.getenv("MC_MCP_SERVER");
         if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
-        handler = new ForgeInputHandler();
+        handler = new ReflectedInputHandler(task -> Minecraft.getInstance().execute(task));
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
     }

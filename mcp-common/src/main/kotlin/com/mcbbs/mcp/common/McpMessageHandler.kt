@@ -7,9 +7,10 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
 open class McpMessageHandler @JvmOverloads constructor(
-    protected val input: MinecraftInput? = null,
     private val gson: Gson = COMMON_GSON
 ) {
+    @JvmField
+    protected var minecraftInput: MinecraftInput? = null
     private val pending = ConcurrentHashMap<String, CompletableFuture<String>>()
     private var reqId = 0
 
@@ -48,7 +49,7 @@ open class McpMessageHandler @JvmOverloads constructor(
     }
 
     protected open fun dispatch(method: String, params: Map<String, String>, wsClient: Any?): Any? {
-        if (input == null) return "error: no input handler bound"
+        val inp = minecraftInput ?: return "error: no input handler bound"
         return when (method) {
             "screenshot" -> handleScreenshot()
             "click" -> handleClick(params)
@@ -75,7 +76,7 @@ open class McpMessageHandler @JvmOverloads constructor(
     }
 
     protected open fun handleScreenshot(): Any? = try {
-        val bytes = input?.screenshot()
+        val bytes = minecraftInput?.screenshot()
         if (bytes != null) "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(bytes)
         else "error: screenshot returned null"
     } catch (e: Exception) { "error: ${e.message}" }
@@ -83,39 +84,39 @@ open class McpMessageHandler @JvmOverloads constructor(
     protected open fun handleClick(p: Map<String, String>): Any? {
         val x = p["x"]?.toIntOrNull() ?: return "missing x"
         val y = p["y"]?.toIntOrNull() ?: return "missing y"
-        input!!.click(x, y, p["button"] ?: "left"); return "clicked($x,$y)"
+        minecraftInput!!.click(x, y, p["button"] ?: "left"); return "clicked($x,$y)"
     }
 
     protected open fun handlePressKey(p: Map<String, String>): Any? {
         val key = p["key"] ?: return "missing key"
         val hold = p["hold_seconds"]?.toFloatOrNull() ?: 0f
-        input!!.pressKey(key, hold); return key
+        minecraftInput!!.pressKey(key, hold); return key
     }
 
     protected open fun handleTypeText(p: Map<String, String>): Any? {
         val text = p["text"] ?: return "missing text"
-        input!!.typeText(text)
-        if (p["press_enter"]?.toBoolean() == true) input!!.pressKey("Enter", 0f)
+        minecraftInput!!.typeText(text)
+        if (p["press_enter"]?.toBoolean() == true) minecraftInput!!.pressKey("Enter", 0f)
         return text
     }
 
     protected open fun handleScroll(p: Map<String, String>): Any? {
         val clicks = p["clicks"]?.toIntOrNull() ?: 1
-        input!!.scroll(clicks); return "$clicks scrolls"
+        minecraftInput!!.scroll(clicks); return "$clicks scrolls"
     }
 
     protected open fun handleHotkey(p: Map<String, String>): Any? {
         val keysStr = p["keys"] ?: return "missing keys"
-        input!!.hotkey(keysStr.split(",").map { it.trim() }.toTypedArray())
+        minecraftInput!!.hotkey(keysStr.split(",").map { it.trim() }.toTypedArray())
         return keysStr
     }
 
     protected open fun handleExecuteCommand(p: Map<String, String>): Any? {
         val cmd = p["command"] ?: return "missing command"
-        return input!!.executeCommand(cmd)
+        return minecraftInput!!.executeCommand(cmd)
     }
 
-    protected open fun handleGetPlayerInfo(): Any? = input?.getPlayerInfo() ?: "no player"
+    protected open fun handleGetPlayerInfo(): Any? = minecraftInput?.getPlayerInfo() ?: "no player"
 
-    protected open fun handleGetWorldInfo(): Any? = input?.getWorldInfo() ?: "no world"
+    protected open fun handleGetWorldInfo(): Any? = minecraftInput?.getWorldInfo() ?: "no world"
 }
