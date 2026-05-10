@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "minecraftmcp",
+  "version": "${version}",
+  "name": "Minecraft MCP Bridge",
+  "description": "WebSocket bridge for AI agent interaction",
+  "authors": ["langyo"],
+  "environment": "client",
+  "entrypoints": {
+    "client": ["xyz.langyo.minecraftmcp.MinecraftMcpMod"]
+  }
+}

@@ -1,0 +1,52 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'net.minecraftforge.gradle' version '[7.0.23,8)'
+}
+
+version = '1.0.0-SNAPSHOT'
+group = 'xyz.langyo'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+minecraft {
+    runs {
+        configureEach {
+            workingDir = layout.projectDirectory.dir('run')
+            systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
+            systemProperty 'forge.enabledGameTestNamespaces', 'minecraftmcp'
+        }
+        register('client')
+    }
+}
+
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+    maven {
+        url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
+        allowInsecureProtocol = false
+    }
+}
+
+dependencies {
+    implementation minecraft.dependency('net.minecraftforge:forge:26.1-62.0.9')
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.1'
+    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.jar {
+    manifest {
+        attributes 'ModSide' : 'BOTH'
+        attributes 'Automatic-Module' : 'xyz.langyo.minecraftmcp'
+        attributes 'Implementation-Version' : project.version
+    }
+}

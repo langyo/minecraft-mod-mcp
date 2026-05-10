@@ -1,0 +1,10 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mods]]
+modId = "minecraftmcp"
+version = "${version}"
+displayName = "Minecraft MCP Bridge"
+description = "WebSocket bridge for AI agent interaction"
+authors = "langyo"
