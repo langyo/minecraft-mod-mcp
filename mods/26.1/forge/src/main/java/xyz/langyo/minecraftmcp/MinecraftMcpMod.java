@@ -1,11 +1,11 @@
 package xyz.langyo.minecraftmcp;
 
 import com.mcbbs.mcp.common.*;
-import net.minecraft.client.Minecraft;
-import net.minecraftforge.event.TickEvent.ClientTickEvent.Post;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.common.MinecraftForge;
 
 @Mod("minecraftmcp")
 public class MinecraftMcpMod {
@@ -15,20 +15,20 @@ public class MinecraftMcpMod {
 
     public MinecraftMcpMod(FMLJavaModLoadingContext context) {
         INSTANCE = this;
-        var modBusGroup = context.getModBusGroup();
-        FMLCommonSetupEvent.getBus(modBusGroup).addListener(this::commonSetup);
-        Post.BUS.addListener(this::onClientTickPost);
+        context.getModEventBus().addListener(this::commonSetup);
+        MinecraftForge.EVENT_BUS.addListener(this::onClientTickPost);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         String serverUrl = System.getenv("MC_MCP_SERVER");
         if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
-        handler = new ReflectedInputHandler(task -> Minecraft.getInstance().execute(task));
+        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
     }
 
-    private void onClientTickPost(Post event) {
-        if (wsClient != null) wsClient.handleMessages();
+    @net.minecraftforge.eventbus.api.SubscribeEvent
+    public void onClientTickPost(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
     }
 }

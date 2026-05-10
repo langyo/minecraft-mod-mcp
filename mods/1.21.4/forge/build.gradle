@@ -34,7 +34,6 @@ repositories {
 
 dependencies {
     implementation minecraft.dependency('net.minecraftforge:forge:1.21.4-54.1.16')
-    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.1'
     implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }

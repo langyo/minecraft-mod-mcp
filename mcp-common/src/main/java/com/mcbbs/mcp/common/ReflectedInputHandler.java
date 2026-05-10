@@ -1,6 +1,7 @@
 package com.mcbbs.mcp.common;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 public class ReflectedInputHandler extends McpMessageHandler implements MinecraftInput {
 
@@ -10,6 +11,21 @@ public class ReflectedInputHandler extends McpMessageHandler implements Minecraf
         super();
         this.executor = executor;
         this.minecraftInput = this;
+    }
+
+    public static void executeOnRenderThread(Runnable task) {
+        try {
+            Object mc = ReflectionHelper.getMinecraftInstance();
+            try {
+                Method execute = mc.getClass().getMethod("execute", Runnable.class);
+                execute.invoke(mc, task);
+            } catch (NoSuchMethodException e) {
+                Method sched = mc.getClass().getMethod("addScheduledTask", Runnable.class);
+                sched.invoke(mc, task);
+            }
+        } catch (Exception e) {
+            System.err.println("[ReflectedInputHandler] Failed to schedule on render thread: " + e.getMessage());
+        }
     }
 
     private Object mc() {

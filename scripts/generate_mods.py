@@ -4,7 +4,37 @@ import os, re, shutil
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS_DIR = os.path.join(BASE, "mods")
 
-FORGE_WRAPPER_JAR = os.path.join(MODS_DIR, "forge", "gradle", "wrapper", "gradle-wrapper.jar")
+FABRIC_API_VERSIONS = {
+    "1.14.4": "0.4.3+build.296-1.14.4",
+    "1.15": "0.5.0+build.294-1.15",
+    "1.15.2": "0.7.1+build.311-1.15.2",
+    "1.16.1": "0.17.1+build.360-1.16.1",
+    "1.16.3": "0.22.0+build.416-1.16",
+    "1.16.4": "0.30.0+1.16",
+    "1.16.5": "0.42.0+1.16.5",
+    "1.17.1": "0.46.1+1.17",
+    "1.18": "0.58.0+1.18.2",
+    "1.18.2": "0.58.0+1.18.2",
+    "1.19": "0.73.2+1.19.3",
+    "1.19.2": "0.77.0+1.19.2",
+    "1.19.3": "0.87.2+1.19.3",
+    "1.19.4": "0.92.2+1.19.4",
+    "1.20": "0.87.2+1.20",
+    "1.20.1": "0.91.0+1.20.1",
+    "1.20.2": "0.91.3+1.20.2",
+    "1.20.3": "0.95.4+1.20.3",
+    "1.20.4": "0.97.0+1.20.4",
+    "1.20.5": "0.100.0+1.20.5",
+    "1.20.6": "0.100.8+1.20.6",
+    "1.21": "0.100.7+1.21",
+    "1.21.1": "0.102.0+1.21.1",
+    "1.21.2": "0.103.0+1.21.2",
+    "1.21.3": "0.104.0+1.21.3",
+    "1.21.4": "0.118.0+1.21.4",
+    "1.21.5": "0.115.0+1.21.5",
+}
+
+FORGE_WRAPPER_JAR = os.path.join(os.environ.get("TEMP", "/tmp"), "opencode", "gradle-wrapper.jar")
 FORGE_GRADLEW_BAT = os.path.join(MODS_DIR, "forge", "gradlew.bat")
 FORGE_GRADLEW = os.path.join(MODS_DIR, "forge", "gradlew")
 
@@ -172,7 +202,6 @@ repositories {{
 
 dependencies {{
     implementation minecraft.dependency('net.minecraftforge:forge:{forge_ver}')
-    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.1'
     implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }}
@@ -394,6 +423,19 @@ def write_fabric_build(mc, info, path):
     yarn = info.get("fabric_yarn","")
     depth = maven_local_depth(mc, info)
     
+    fabric_api = FABRIC_API_VERSIONS.get(mc, "")
+    
+    deps = f"""    minecraft "com.mojang:minecraft:{mc}"
+    mappings "net.fabricmc:yarn:{yarn}:v2"
+    modImplementation "net.fabricmc:fabric-loader:0.16.0"
+"""
+    if fabric_api:
+        deps += f"""    modImplementation "net.fabricmc.fabric-api:fabric-api:{fabric_api}"
+"""
+    deps += """    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+"""
+
     content = f"""plugins {{
     id 'java'
     id 'fabric-loom' version '1.7-SNAPSHOT'
@@ -413,13 +455,7 @@ repositories {{
 }}
 
 dependencies {{
-    minecraft "com.mojang:minecraft:{mc}"
-    mappings "net.fabricmc:yarn:{yarn}:v2"
-    modImplementation "net.fabricmc:fabric-loader:0.16.0"
-    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
-    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
-}}
-
+{deps}}}
 tasks.withType(JavaCompile).configureEach {{
     options.encoding = 'UTF-8'
 }}
@@ -447,19 +483,18 @@ def write_fabric_mod_json(mc, info, path):
         f.write(content)
 
 
-def copy_wrapper(path):
+def copy_wrapper(path, gradle_ver="8.10"):
     gw = os.path.join(path, "gradle", "wrapper")
     os.makedirs(gw, exist_ok=True)
-    shutil.copy2(FORGE_WRAPPER_JAR, os.path.join(gw, "gradle-wrapper.jar"))
-    if os.path.exists(FORGE_GRADLEW_BAT):
-        shutil.copy2(FORGE_GRADLEW_BAT, os.path.join(path, "gradlew.bat"))
-    if os.path.exists(FORGE_GRADLEW):
-        shutil.copy2(FORGE_GRADLEW, os.path.join(path, "gradlew"))
+    dst = os.path.join(gw, "gradle-wrapper.jar")
+    try:
+        shutil.copy2(FORGE_WRAPPER_JAR, dst)
+    except (OSError, PermissionError):
+        os.remove(dst)
+        shutil.copy2(FORGE_WRAPPER_JAR, dst)
     with open(os.path.join(gw, "gradle-wrapper.properties"), "w") as f:
         f.write("distributionBase=GRADLE_USER_HOME\n")
         f.write("distributionPath=wrapper/dists\n")
-        fg = info.get("fg","")
-        gradle_ver = "9.3.1" if "[7.0" in fg else "8.10"
         f.write(f"distributionUrl=https\\://services.gradle.org/distributions/gradle-{gradle_ver}-bin.zip\n")
         f.write("networkTimeout=10000\n")
         f.write("validateDistributionUrl=true\n")
@@ -470,7 +505,15 @@ def copy_wrapper(path):
 def create_mod(mc, loader, info):
     base = os.path.join(MODS_DIR, mc, loader)
     os.makedirs(base, exist_ok=True)
-    copy_wrapper(base)
+    fg = info.get("fg","")
+    mdg = info.get("mdg","")
+    if loader == "fabric":
+        gradle_ver = "8.10"
+    elif loader == "neoforge":
+        gradle_ver = "9.3.1" if "2.0" in mdg else "8.10"
+    else:
+        gradle_ver = "9.3.1" if "[7.0" in fg else "8.10"
+    copy_wrapper(base, gradle_ver)
     
     if loader == "forge":
         write_forge_settings(mc, info, base)

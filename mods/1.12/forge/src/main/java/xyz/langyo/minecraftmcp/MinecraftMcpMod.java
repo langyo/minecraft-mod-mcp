@@ -3,7 +3,6 @@ package xyz.langyo.minecraftmcp;
 import com.mcbbs.mcp.common.*;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
-import net.minecraft.client.Minecraft;
 
 @Mod(modid = "minecraftmcp", name = "Minecraft MCP Bridge", version = "1.0")
 public class MinecraftMcpMod {
@@ -19,7 +18,7 @@ public class MinecraftMcpMod {
         INSTANCE = this;
         String serverUrl = System.getenv("MC_MCP_SERVER");
         if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
-        handler = new ReflectedInputHandler(task -> Minecraft.getMinecraft().addScheduledTask(task));
+        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
         new Thread(() -> {
