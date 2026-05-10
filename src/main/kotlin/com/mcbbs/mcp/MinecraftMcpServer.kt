@@ -22,7 +22,20 @@ class McWsServer(port: Int) : WebSocketServer(InetSocketAddress(port)) {
     private var reqId = 0
     override fun onOpen(conn: WebSocket?, h: ClientHandshake?) { client = conn; println("[WS] MC connected") }
     override fun onClose(conn: WebSocket?, c: Int, r: String?, b: Boolean) { if (conn == client) client = null }
-    override fun onMessage(conn: WebSocket?, m: String?) { if (m != null) try { val r = gson.fromJson(m, McResult::class.java); pending[r.data?.toString() ?: ""]?.invoke(r) } catch (_: Exception) {} }
+    override fun onMessage(conn: WebSocket?, m: String?) {
+        if (m != null) try {
+            val obj = gson.fromJson(m, JsonObject::class.java)
+            val respId = obj.get("id")?.asString
+            if (respId != null) {
+                val data = obj.get("result")?.asString
+                val cb = pending.remove(respId)
+                if (cb != null) {
+                    val success = data != null && !data.startsWith("error:")
+                    cb(McResult(success, data, if (!success) data else null))
+                }
+            }
+        } catch (_: Exception) {}
+    }
     override fun onError(conn: WebSocket?, e: Exception?) {}
     override fun onStart() { println("[WS] Listening on $port") }
 
@@ -56,7 +69,7 @@ fun main() {
                     "serverInfo" to jobj("name" to "minecraft-neoforge-mcp", "version" to "0.1.0")
                 ))
                 "tools/list" -> jobj("result" to jobj("tools" to jarr(
-                    toolObj("launch_game", "Launch Minecraft game with example mod (detached)", """{"type":"object","properties":{"mod_jar_path":{"type":"string","description":"Path to mod project dir"},"mc_dir":{"type":"string","description":"Minecraft run directory"},"max_memory_gb":{"type":"number","description":"Max heap in GB, default 4"}}}"""),
+                    toolObj("launch_game", "Launch Minecraft via official launcher installation", """{"type":"object","properties":{"loader_type":{"type":"string","enum":["auto","forge","neoforge","fabric"],"description":"Mod loader to use (auto-detect by default)"},"mc_dir":{"type":"string","description":"Path to .minecraft directory"},"mod_jar_path":{"type":"string","description":"Path to mod JAR to copy into mods/"},"max_memory_gb":{"type":"number","description":"Max heap in GB, default 4"}}}"""),
                     toolObj("screenshot", "Take screenshot via in-game mod pipeline", """{"type":"object","properties":{"save_path":{"type":"string"}}}"""),
                     toolObj("click", "Click at position inside MC window (via mod input system)", """{"type":"object","properties":{"x":{"type":"integer"},"y":{"type":"integer"},"button":{"type":"string","enum":["left","right","middle"]}},"required":["x","y"]}"""),
                     toolObj("press_key", "Press keyboard key (via mod input system)", """{"type":"object","properties":{"key":{"type":"string"},"hold_seconds":{"type":"number"}},"required":["key"]}"""),
@@ -112,34 +125,308 @@ fun handleToolCall(params: JsonObject?, ws: McWsServer): JsonObject {
 }
 
 fun doLaunchGame(a: JsonObject): JsonObject {
-    val modPath = a.get("mod_jar_path")?.asString ?: System.getProperty("user.dir")
-    val mcDir = a.get("mc_dir")?.asString ?: System.getenv("MC_RUN_DIR") ?: System.getProperty("user.home") + "/.mcbbs-memorial"
-    val maxMem = (a.get("max_memory_gb")?.asDouble ?: 4.0).toInt()
-    try {
-        val isWin = System.getProperty("os.name").lowercase().contains("win")
-        val pb = if (isWin) {
-            ProcessBuilder(
-                "cmd", "/c", "start", "Minecraft",
-                "gradlew.bat", "runClient",
-                "-Porg.gradle.jvmargs=-Xmx${maxMem}G",
-                "-PmcDir=$mcDir"
-            )
-        } else {
-            ProcessBuilder(
-                "gradlew", "runClient",
-                "-Porg.gradle.jvmargs=-Xmx${maxMem}G",
-                "-PmcDir=$mcDir"
-            )
+    val loaderType = a.get("loader_type")?.asString ?: "auto"
+    val mcDir = a.get("mc_dir")?.asString
+        ?: System.getenv("MC_RUN_DIR")
+        ?: run {
+            val os = System.getProperty("os.name").lowercase()
+            if (os.contains("win")) System.getenv("APPDATA") + "\\.minecraft"
+            else System.getProperty("user.home") + "/.minecraft"
         }
-        pb.directory(java.io.File(modPath))
-        if (!isWin) pb.redirectErrorStream(true)
-        pb.environment()["MC_MCP_SERVER"] = "ws://127.0.0.1:${System.getenv("MC_MCP_WS_PORT") ?: "9876"}"
-        val proc = pb.start()
-        println("[LAUNCH] MC process started pid=${proc.pid()} dir=$modPath")
-        return txtObj("launched pid=${proc.pid()}, waiting for mod WS connection...")
+    val maxMem = (a.get("max_memory_gb")?.asDouble ?: 4.0).toInt()
+    val modJarPath = a.get("mod_jar_path")?.asString
+    try {
+        val mcDirFile = java.io.File(mcDir)
+        if (!mcDirFile.isDirectory) return txtObj("Error: Minecraft directory not found: $mcDir")
+        val versionsDir = java.io.File(mcDirFile, "versions")
+        if (!versionsDir.isDirectory) return txtObj("Error: No versions folder in $mcDir - is this a valid .minecraft directory?")
+
+        val installed = detectLoaders(versionsDir)
+        if (installed.isEmpty()) return txtObj("""Error: No compatible mod loader found in $mcDir.
+Please install one via the official Minecraft launcher:
+  - NeoForge: https://neoforged.net/
+  - Forge:   https://files.minecraftforge.net/
+  - Fabric:  https://fabricmc.net/
+
+Found versions: ${versionsDir.listFiles()?.map { it.name }?.joinToString(", ") ?: "none"}""")
+
+        val target = when {
+            loaderType != "auto" -> installed.find { it.loader == loaderType }
+                ?: return txtObj("Error: '$loaderType' not installed. Available: ${installed.map { "${it.loader}@${it.version}" }.joinToString(", ")}")
+            else -> installed.firstOrNull()
+                ?: return txtObj("Error: No loader detected from installed versions")
+        }
+
+        val modsDir = java.io.File(mcDirFile, "mods"); modsDir.mkdirs()
+
+        if (modJarPath != null) {
+            val srcJar = java.io.File(modJarPath)
+            if (srcJar.exists()) {
+                val dstJar = java.io.File(modsDir, srcJar.name)
+                java.nio.file.Files.copy(srcJar.toPath(), dstJar.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                println("[LAUNCH] Copied mod: ${srcJar.name} -> mods/")
+            } else { return txtObj("Error: Mod JAR not found: $modJarPath") }
+        }
+
+        val versionJson = java.io.File(target.versionDir, "${target.version}.json")
+        if (!versionJson.exists()) return txtObj("Error: Version JSON missing: ${versionJson.path}")
+
+        val proc = launchViaVersionJson(mcDirFile, target, versionJson, maxMem)
+        println("[LAUNCH] MC launched pid=${proc?.pid()} loader=${target.loader} version=${target.version}")
+        return txtObj("launched ${target.loader}@${target.version} pid=${proc?.pid()}, waiting for mod WS connection...")
     } catch (e: Exception) {
         return txtObj("launch failed: ${e.message}")
     }
+}
+
+data class DetectedLoader(val loader: String, val version: String, val versionDir: java.io.File)
+
+private fun detectLoaders(versionsDir: java.io.File): List<DetectedLoader> {
+    val result = mutableListOf<DetectedLoader>()
+    val dirs = versionsDir.listFiles()?.filter { it.isDirectory } ?: return emptyList()
+    for (dir in dirs) {
+        val name = dir.name.lowercase()
+        val loader = when {
+            name.contains("neoforge") || name.contains("neo") && !name.contains("vanilla") -> "neoforge"
+            name.contains("forge") -> "forge"
+            name.contains("fabric") -> "fabric"
+            else -> null
+        }
+        if (loader != null) {
+            val jsonFile = java.io.File(dir, "${dir.name}.json")
+            if (jsonFile.exists()) result.add(DetectedLoader(loader, dir.name, dir))
+        }
+    }
+    return result.sortedByDescending { it.version }
+}
+
+private fun launchViaVersionJson(
+    mcDir: java.io.File,
+    target: DetectedLoader,
+    versionJson: java.io.File,
+    maxMem: Int
+): Process? {
+    val json = mergeVersionJson(versionJson, mcDir)
+
+    val mainClass = json.get("mainClass")?.asString
+        ?: return null.also { println("[LAUNCH] Error: no mainClass in JSON") }
+
+    val cp = buildFullClasspath(mcDir, json)
+    if (cp.isEmpty()) return null.also { println("[LAUNCH] Error: empty classpath") }
+
+    val jvmArgs = extractJvmArgs(json, mcDir)
+    val gameArgs = extractGameArgs(json)
+
+    val nativesDir = extractNatives(mcDir, json)
+
+    val javaHome = findJavaForMc() ?: System.getProperty("java.home")
+    val sep = java.io.File.separator
+    val javaExe = java.io.File(javaHome, "bin${sep}java.exe").takeIf { it.exists() }
+        ?: java.io.File(javaHome, "bin${sep}java")
+
+    val cmd = mutableListOf<String>().apply {
+        add(javaExe.absolutePath)
+        add("-Xmx${maxMem}G")
+        add("-Xms${maxMem/2}G")
+        add("-Djava.library.path=$nativesDir")
+        add("-Dminecraft.client.jar=${java.io.File(mcDir, "versions/${target.version}/${target.version}.jar").absolutePath}")
+        add("-Dminecraft.classpath=$cp")
+        addAll(jvmArgs)
+        add("-cp"); add(cp)
+        add(mainClass)
+        addAll(gameArgs)
+        add("--version"); add(target.version)
+        add("--gameDir"); add(mcDir.absolutePath)
+        add("--assetsDir"); add(java.io.File(mcDir, "assets").absolutePath)
+        add("--assetIndex"); add(json.get("assetIndex")?.asJsonObject?.get("id")?.asString ?: "1.21")
+    }
+
+    val isWin = System.getProperty("os.name").lowercase().contains("win")
+    println("[LAUNCH] Command: ${cmd.take(6).joinToString(" ")}... (${cmd.size} total args)")
+    println("[LAUNCH] Classpath: ${cp.split(java.io.File.pathSeparatorChar).size} entries")
+
+    val pb = if (isWin) {
+        ProcessBuilder(mutableListOf("cmd", "/c", "start", "Minecraft", "/B").also { it.addAll(cmd) })
+    } else {
+        ProcessBuilder(cmd)
+    }
+    pb.environment()["MC_MCP_SERVER"] = "ws://127.0.0.1:${System.getenv("MC_MCP_WS_PORT") ?: "9876"}"
+    pb.directory(mcDir)
+
+    val proc = try { pb.start() } catch (e: Exception) {
+        println("[LAUNCH] Start error: ${e.message}")
+        return null
+    }
+
+    Thread {
+        val err = proc.errorStream.bufferedReader().readText()
+        if (err.isNotEmpty()) println("[LAUNCH] stderr:\n$err")
+    }.start()
+
+    Thread {
+        Thread.sleep(8000)
+        if (!proc.isAlive) {
+            val out = proc.inputStream.bufferedReader().readText()
+            if (out.isNotEmpty()) println("[LAUNCH] stdout:\n$out")
+        }
+    }.start()
+
+    return proc
+}
+
+private fun mergeVersionJson(versionJson: java.io.File, mcDir: java.io.File): JsonObject {
+    var json = gson.fromJson(versionJson.readText(), JsonObject::class.java)
+    val inheritsFrom = json.get("inheritsFrom")?.asString
+    if (inheritsFrom != null) {
+        val parentFile = java.io.File(java.io.File(mcDir, "versions"), "$inheritsFrom/$inheritsFrom.json")
+        if (parentFile.exists()) {
+            val parent = gson.fromJson(parentFile.readText(), JsonObject::class.java)
+            json = mergeJsonObjects(parent, json)
+        }
+    }
+    return json
+}
+
+private fun mergeJsonObjects(base: JsonObject, override: JsonObject): JsonObject {
+    val result = JsonObject()
+    base.entrySet().forEach { result.add(it.key, it.value) }
+    override.entrySet().forEach { entry ->
+        val key = entry.key
+        val value = entry.value
+        val existing = result.get(key)
+        if (existing != null && existing.isJsonArray && value.isJsonArray) {
+            val combined = JsonArray()
+            existing.asJsonArray.forEach { combined.add(it) }
+            value.asJsonArray.forEach { combined.add(it) }
+            result.add(key, combined)
+        } else {
+            result.add(key, value)
+        }
+    }
+    return result
+}
+
+private fun buildFullClasspath(mcDir: java.io.File, json: JsonObject): String {
+    val libs = json.getAsJsonArray("libraries") ?: return ""
+    val cpParts = mutableListOf<String>()
+    for (lib in libs) {
+        val libObj = lib.asJsonObject
+        val downloads = libObj.get("downloads")?.asJsonObject ?: continue
+        val artifact = downloads.get("artifact")?.asJsonObject ?: continue
+        val path = artifact.get("path")?.asString ?: continue
+        val libFile = java.io.File(mcDir, "libraries${java.io.File.separator}$path")
+        if (libFile.exists()) cpParts.add(libFile.absolutePath)
+    }
+    return cpParts.joinToString(java.io.File.pathSeparator)
+}
+
+private fun extractNatives(mcDir: java.io.File, json: JsonObject): String {
+    val nativesDir = java.io.File(mcDir, "versions-natives-${System.currentTimeMillis()}")
+    nativesDir.mkdirs()
+    val libs = json.getAsJsonArray("libraries") ?: return nativesDir.absolutePath
+    for (lib in libs) {
+        val libObj = lib.asJsonObject
+        val downloads = libObj.get("downloads")?.asJsonObject ?: continue
+        val classifiers = downloads.get("classifiers")?.asJsonObject ?: continue
+        val nativeArtifact = classifiers.asMap().entries.firstOrNull {
+            it.key.contains("natives") && allowRulesForOS(libObj)
+        }?.value?.asJsonObject ?: continue
+        val path = nativeArtifact.get("path")?.asString ?: continue
+        val srcFile = java.io.File(mcDir, "libraries${java.io.File.separator}$path")
+        if (srcFile.exists()) {
+            try {
+                java.nio.file.Files.copy(srcFile.toPath(),
+                    java.io.File(nativesDir, srcFile.name).toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: Exception) {}
+        }
+    }
+    return nativesDir.absolutePath
+}
+
+private fun allowRulesForOS(libObj: JsonObject): Boolean {
+    val rules = libObj.get("rules")?.asJsonArray ?: return true
+    return allowRules(rules)
+}
+
+private fun findJavaForMc(): String? {
+    val candidates = listOf(
+        System.getenv("JAVA_HOME"),
+        System.getProperty("java.home"),
+        "C:\\Program Files\\Amazon Corretto\\jdk21.0.8_9",
+        "C:\\Program Files\\Java\\jdk-21"
+    ).mapNotNull { it?.let { p -> java.io.File(p).takeIf { it.isDirectory } } }
+    for (c in candidates) {
+        val sep = java.io.File.separator
+        val exe = java.io.File(c, "bin${sep}${if (System.getProperty("os.name").lowercase().contains("win")) "java.exe" else "java"}")
+        if (exe.exists()) return c.absolutePath
+    }
+    return null
+}
+
+private fun extractJvmArgs(json: JsonObject, mcDir: java.io.File): List<String> {
+    val args = mutableListOf<String>()
+    val jvmArgs = json.get("arguments")?.asJsonObject?.get("jvm")?.asJsonArray ?: return args
+    for (arg in jvmArgs) {
+        if (arg.isJsonObject) {
+            val argObj = arg.asJsonObject
+            val rules = argObj.get("rules")?.asJsonArray
+            if (rules != null && !allowRules(rules)) continue
+            val v = argObj.get("value")
+            if (v.isJsonArray) v.asJsonArray.forEach { if (it.isJsonPrimitive) args.add(it.asString) }
+            else if (v.isJsonPrimitive) args.add(v.asString)
+        } else if (arg.isJsonPrimitive) {
+            args.add(arg.asString)
+        }
+    }
+    return args.map { replaceVars(it, mcDir) }
+}
+
+private fun extractGameArgs(json: JsonObject): List<String> {
+    val gameArgs = json.get("arguments")?.asJsonObject?.get("game")?.asJsonArray
+    if (gameArgs != null) {
+        val args = mutableListOf<String>()
+        for (arg in gameArgs) {
+            if (arg.isJsonObject) {
+                val argObj = arg.asJsonObject
+                val rules = argObj.get("rules")?.asJsonArray
+                if (rules != null && !allowRules(rules)) continue
+                val v = argObj.get("value")
+            if (v.isJsonArray) v.asJsonArray.forEach { if (it.isJsonPrimitive) args.add(it.asString) }
+            else if (v.isJsonPrimitive) args.add(v.asString)
+            } else if (arg.isJsonPrimitive) args.add(arg.asString)
+        }
+        return args
+    }
+    val legacyArgs = json.getAsJsonArray("minecraftArguments")?.asString ?: ""
+    return legacyArgs.split(" ").filter { it.isNotEmpty() }
+}
+
+private fun allowRules(rules: JsonArray): Boolean {
+    for (rule in rules) {
+        val r = rule.asJsonObject
+        val action = r.get("action")?.asString ?: "allow"
+        val os = r.get("os")?.asJsonObject
+        if (os != null) {
+            val osName = os.get("name")?.asString ?: continue
+            val currentOs = System.getProperty("os.name").lowercase()
+            if (!currentOs.contains(osName.lowercase())) return action == "disallow"
+        }
+        if (action == "disallow") return false
+    }
+    return true
+}
+
+private fun replaceVars(s: String, mcDir: java.io.File): String {
+    var result = s
+        .replace("\${launcher_name}", "minecraft-mcp")
+        .replace("\${launcher_version}", "0.1.0")
+        .replace("\${classpath}", "")
+    if (result.contains("\${natives_directory}")) {
+        val nativesPath = java.io.File(mcDir, "natives").absolutePath
+        result = result.replace("\${natives_directory}", nativesPath)
+    }
+    return result
 }
 
 fun doScreenshot(a: JsonObject, w: McWsServer): JsonObject {

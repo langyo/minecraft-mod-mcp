@@ -1,0 +1,24 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MIT"
+[[mods]]
+modId="minecraftmcp"
+version="${file.jarVersion}"
+displayName="Minecraft MCP Bridge"
+description='''Bridge mod connecting Minecraft to MCP server via WebSocket'''
+authors="langyo"
+logoFile="icon.png"
+
+[[dependencies.minecraftmcp]]
+modId="forge"
+mandatory=true
+versionRange="[57.0.2,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.minecraftmcp]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.21.7,)"
+ordering="NONE"
+side="BOTH"

@@ -5,3 +5,7 @@ screenshots/
 test_*
 rpc_*
 t_*
+.maven-local/
+run/
+*.class
+neoform-cache/

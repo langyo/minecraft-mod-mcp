@@ -21,7 +21,7 @@ import platform
 from pathlib import Path
 from typing import Optional
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 JAR_PATH = PROJECT_ROOT / "build" / "libs" / "mcp-server-0.1.0.jar"
 SCREENSHOT_DIR = PROJECT_ROOT / "screenshots"
 

@@ -3,3 +3,5 @@ plugins {
 }
 
 rootProject.name = "minecraft-neoforge-mcp"
+
+includeBuild("mcp-common")
