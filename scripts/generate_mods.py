@@ -286,13 +286,13 @@ minecraft {{
 
 repositories {{
     mavenCentral()
-    flatDir {{
-        dirs "{depth}.maven-local/com/mcbbs/mcp/mcp-common/1.0.0-SNAPSHOT"
+    maven {{
+        url = "{depth}.maven-local"
     }}
 }}
 
 dependencies {{
-    implementation name: "mcp-common"
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 
@@ -341,13 +341,13 @@ minecraft {{
 
 repositories {{
     mavenCentral()
-    flatDir {{
-        dirs "{depth}.maven-local/com/mcbbs/mcp/mcp-common/1.0.0-SNAPSHOT"
+    maven {{
+        url = "{depth}.maven-local"
     }}
 }}
 
 dependencies {{
-    implementation name: "mcp-common"
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 
@@ -396,14 +396,46 @@ minecraft {{
 
 repositories {{
     mavenCentral()
-    flatDir {{
-        dirs "{depth}.maven-local/com/mcbbs/mcp/mcp-common/1.0.0-SNAPSHOT"
+    maven {{
+        url = "{depth}.maven-local"
     }}
 }}
 
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
-    implementation name: "mcp-common"
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+}}
+    dependencies {{
+        classpath "net.minecraftforge.gradle:ForgeGradle:3.+"
+    }}
+}}
+
+apply plugin: "net.minecraftforge.gradle"
+
+version = "1.0.0-SNAPSHOT"
+group = "xyz.langyo"
+archivesBaseName = "minecraft-mcp-mod"
+
+sourceCompatibility = targetCompatibility = "1.{java}"
+
+minecraft {{
+    mappings channel: "snapshot", version: "20190719-1.14.3"
+    runs {{
+        client {{ workingDirectory = file("run") }}
+    }}
+}}
+
+repositories {{
+    mavenCentral()
+    maven {{
+        url = "{depth}.maven-local"
+    }}
+}}
+
+dependencies {{
+    minecraft "net.minecraftforge:forge:{forge_ver}"
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 
@@ -452,14 +484,14 @@ minecraft {{
 
 repositories {{
     mavenCentral()
-    flatDir {{
-        dirs "{depth}.maven-local/com/mcbbs/mcp/mcp-common/1.0.0-SNAPSHOT"
+    maven {{
+        url = "{depth}.maven-local"
     }}
 }}
 
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
-    implementation name: "mcp-common"
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 
@@ -511,14 +543,14 @@ minecraft {{
 
 repositories {{
     mavenCentral()
-    flatDir {{
-        dirs "{depth}.maven-local/com/mcbbs/mcp/mcp-common/1.0.0-SNAPSHOT"
+    maven {{
+        url = "{depth}.maven-local"
     }}
 }}
 
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
-    implementation name: "mcp-common"
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 
@@ -784,7 +816,8 @@ def write_fabric_build(mc, info, path):
 version = '1.0.0-SNAPSHOT'
 group = 'xyz.langyo'
 
-java.toolchain.languageVersion = JavaLanguageVersion.of({java})
+sourceCompatibility = JavaVersion.VERSION_{java}
+targetCompatibility = JavaVersion.VERSION_{java}
 
 repositories {{
     maven {{

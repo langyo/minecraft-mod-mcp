@@ -24,13 +24,13 @@ minecraft {
 
 repositories {
     mavenCentral()
-    flatDir {
-        dirs "../../../.maven-local/com/mcbbs/mcp/mcp-common/1.0.0-SNAPSHOT"
+    maven {
+        url = "../../../.maven-local"
     }
 }
 
 dependencies {
-    implementation name: "mcp-common"
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }
 

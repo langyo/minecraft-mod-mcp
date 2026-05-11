@@ -10,9 +10,9 @@ buildscript {
 
 apply plugin: "net.minecraftforge.gradle.forge"
 
-version = "1.0"
-group = "test"
-archivesBaseName = "test"
+version = "1.0.0-SNAPSHOT"
+group = "xyz.langyo"
+archivesBaseName = "minecraft-mcp-mod"
 
 sourceCompatibility = targetCompatibility = "1.8"
 
@@ -24,6 +24,18 @@ minecraft {
 
 repositories {
     mavenCentral()
+    maven {
+        url = "../../../.maven-local"
+    }
+}
+
+dependencies {
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
 }
 
 jar {
