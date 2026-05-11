@@ -14,11 +14,12 @@ minecraft {
     mappings channel: 'official', version: '1.19.4'
     runs {
         configureEach {
-            workingDir = layout.projectDirectory.dir('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
         }
-        client {}
+        client {
+            workingDirectory = file('run')
+        }
     }
 }
 
