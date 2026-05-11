@@ -2,7 +2,6 @@ package xyz.langyo.minecraftmcp;
 
 import com.mcbbs.mcp.common.*;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
 public class MinecraftMcpMod implements ClientModInitializer {
     private McpWebSocketClient wsClient;
@@ -14,8 +13,13 @@ public class MinecraftMcpMod implements ClientModInitializer {
         ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (wsClient != null) wsClient.handleMessages();
-        });
+        new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(50);
+                    if (wsClient != null) wsClient.handleMessages();
+                } catch (Exception e) { break; }
+            }
+        }).start();
     }
 }

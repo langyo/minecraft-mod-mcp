@@ -801,9 +801,6 @@ def write_fabric_build(mc, info, path):
     mappings "net.fabricmc:yarn:{yarn}:v2"
     modImplementation "net.fabricmc:fabric-loader:{loader_ver}"
 """
-    if fabric_api:
-        deps += f"""    modImplementation "net.fabricmc.fabric-api:fabric-api:{fabric_api}"
-"""
     deps += """    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 """
