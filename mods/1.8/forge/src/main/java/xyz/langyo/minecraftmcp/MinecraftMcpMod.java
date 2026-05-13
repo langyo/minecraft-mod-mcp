@@ -1,8 +1,8 @@
 package xyz.langyo.minecraftmcp;
 
 import com.mcbbs.mcp.common.*;
-import cpw.mods.fml.common.Mod;
-import cpw.mods.fml.common.event.FMLInitializationEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 
 @Mod(modid = "minecraftmcp", name = "Minecraft MCP Bridge", version = "1.0")
 public class MinecraftMcpMod {

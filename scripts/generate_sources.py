@@ -6,44 +6,64 @@ which uses reflection to handle ALL version differences at runtime.
 
 All mod files use ReflectedInputHandler::executeOnRenderThread for MC thread
 scheduling, so NO mod file needs to import any net.minecraft.* class directly.
+
+All version/group data comes from version_config.py — nothing is hardcoded here.
 """
 import os
+import sys
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODS_DIR = os.path.join(BASE, "mods")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from version_config import ALL_VERSIONS, MODS_DIR, get_api_group, get_loaders
+
 PKG = "xyz/langyo/minecraftmcp"
-
-
-def api_group(mc):
-    if mc in ("1.7.2","1.7.10","1.8","1.8.9","1.9","1.9.4","1.10","1.10.2",
-              "1.11","1.11.2","1.12","1.12.2"):
-        return "legacy"
-    if mc == "1.13.2":
-        return "fg3"
-    if mc in ("1.14.4","1.15","1.15.2","1.16.1","1.16.3","1.16.4","1.16.5"):
-        return "fg4"
-    if mc in ("1.17.1","1.18","1.18.2","1.19","1.19.2"):
-        return "fg5"
-    if mc in ("1.19.3","1.19.4","1.20","1.20.1","1.20.2","1.20.3","1.20.4",
-              "1.20.5","1.20.6","1.21","1.21.1","1.21.2","1.21.3"):
-        return "fg6"
-    if mc in ("1.21.4","1.21.5"):
-        return "fg7"
-    if mc.startswith("26."):
-        return "mc26"
-    return "unknown"
 
 
 # ============================================================
 # FORGE MOD TEMPLATES (event registration only)
 # ============================================================
 
-def forge_mod_legacy(mc):
+def forge_mod_legacy_17(mc):
     return """package xyz.langyo.minecraftmcp;
 
 import com.mcbbs.mcp.common.*;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+
+@Mod(modid = "minecraftmcp", name = "Minecraft MCP Bridge", version = "1.0")
+public class MinecraftMcpMod {
+    public static MinecraftMcpMod INSTANCE;
+    private McpWebSocketClient wsClient;
+    private ReflectedInputHandler handler;
+
+    @Mod.Instance("minecraftmcp")
+    public static MinecraftMcpMod instance;
+
+    @Mod.EventHandler
+    public void init(FMLInitializationEvent event) {
+        INSTANCE = this;
+        String serverUrl = System.getenv("MC_MCP_SERVER");
+        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        wsClient = new McpWebSocketClient(serverUrl, handler);
+        wsClient.connectAsync();
+        new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(50);
+                    if (wsClient != null) wsClient.handleMessages();
+                } catch (Exception e) { break; }
+            }
+        }).start();
+    }
+}
+"""
+
+def forge_mod_legacy(mc):
+    return """package xyz.langyo.minecraftmcp;
+
+import com.mcbbs.mcp.common.*;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 
 @Mod(modid = "minecraftmcp", name = "Minecraft MCP Bridge", version = "1.0")
 public class MinecraftMcpMod {
@@ -364,8 +384,9 @@ def write_java(path, filename, content):
         f.write(content)
 
 def get_forge_mod_template(mc):
-    g = api_group(mc)
+    g = get_api_group(mc)
     return {
+        "legacy_17": forge_mod_legacy_17,
         "legacy": forge_mod_legacy,
         "fg3": forge_mod_fg3,
         "fg4": forge_mod_fg4,
@@ -377,8 +398,8 @@ def get_forge_mod_template(mc):
 
 if __name__ == "__main__":
     total = 0
-    for mc, loaders in ALL_VERSIONS.items():
-        for loader in loaders:
+    for mc, info in ALL_VERSIONS.items():
+        for loader in get_loaders(mc):
             path = os.path.join(MODS_DIR, mc, loader)
             if not os.path.isdir(path):
                 print(f"  SKIP (no project): {mc}/{loader}")
@@ -386,7 +407,7 @@ if __name__ == "__main__":
 
             if loader == "forge":
                 write_java(path, "MinecraftMcpMod.java", get_forge_mod_template(mc))
-                g = api_group(mc)
+                g = get_api_group(mc)
                 if g in ("fg6","fg7","mc26"):
                     res_dir = os.path.join(path, "src", "main", "resources", "META-INF")
                     os.makedirs(res_dir, exist_ok=True)

@@ -14,16 +14,16 @@ version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-mcp-mod"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(16)
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
 
 minecraft {
-    mappings channel: "official", version: "1.17.1"
-    runs {
-        client {
-            workingDirectory = file("run")
-            property "forge.logging.markers", "REGISTRIES"
-        }
-    }
+    version = "1.17.1-37.1.1"
+    mappings = "official_1.17.1"
+    runDir = "run"
 }
 
 repositories {
@@ -34,17 +34,6 @@ repositories {
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:1.17.1-37.1.1"
     implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = "UTF-8"
-}
-
-jar {
-    manifest {
-        attributes "FMLCorePluginContainsFMLMod": "true"
-    }
 }

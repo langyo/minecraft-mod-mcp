@@ -1,29 +1,24 @@
 plugins {
-    id 'java'
-    id 'fabric-loom' version '1.0-SNAPSHOT'
+    id "fabric-loom" version "1.0-SNAPSHOT"
 }
 
-version = '1.0.0-SNAPSHOT'
-group = 'xyz.langyo'
+version = "1.0.0-SNAPSHOT"
+group = "xyz.langyo"
 
-sourceCompatibility = JavaVersion.VERSION_16
-targetCompatibility = JavaVersion.VERSION_16
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_17
 
 repositories {
-    maven {
-        url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
-        allowInsecureProtocol = false
-    }
     mavenCentral()
+    maven {
+        url = "../../../.maven-local"
+    }
 }
 
 dependencies {
     minecraft "com.mojang:minecraft:1.17.1"
     mappings "net.fabricmc:yarn:1.17.1+build.65:v2"
     modImplementation "net.fabricmc:fabric-loader:0.14.9"
-    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
-    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
-}
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }

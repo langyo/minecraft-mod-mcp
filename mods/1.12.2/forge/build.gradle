@@ -17,7 +17,7 @@ archivesBaseName = "minecraft-mcp-mod"
 sourceCompatibility = targetCompatibility = "1.8"
 
 minecraft {
-    version = "1.12.2-14.23.5.2864"
+    version = "1.12.2-14.23.5.2847"
     mappings = "snapshot_20171003"
     runDir = "run"
 }
@@ -32,14 +32,4 @@ repositories {
 dependencies {
     implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
-}
-
-tasks.withType(JavaCompile) {
-    options.encoding = "UTF-8"
-}
-
-jar {
-    manifest {
-        attributes "FMLCorePluginContainsFMLMod": "true"
-    }
 }

@@ -17,10 +17,9 @@ archivesBaseName = "minecraft-mcp-mod"
 sourceCompatibility = targetCompatibility = "1.8"
 
 minecraft {
-    mappings channel: "snapshot", version: "20190719-1.14.3"
-    runs {
-        client { workingDirectory = file("run") }
-    }
+    version = "1.14.4-28.2.28"
+    mappings = "snapshot_20191207"
+    runDir = "run"
 }
 
 repositories {
@@ -31,49 +30,6 @@ repositories {
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:1.14.4-28.2.28"
     implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
-}
-    dependencies {
-        classpath "net.minecraftforge.gradle:ForgeGradle:3.+"
-    }
-}
-
-apply plugin: "net.minecraftforge.gradle"
-
-version = "1.0.0-SNAPSHOT"
-group = "xyz.langyo"
-archivesBaseName = "minecraft-mcp-mod"
-
-sourceCompatibility = targetCompatibility = "1.8"
-
-minecraft {
-    mappings channel: "snapshot", version: "20190719-1.14.3"
-    runs {
-        client { workingDirectory = file("run") }
-    }
-}
-
-repositories {
-    mavenCentral()
-    maven {
-        url = "../../../.maven-local"
-    }
-}
-
-dependencies {
-    minecraft "net.minecraftforge:forge:1.14.4-28.2.28"
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
-    implementation "org.java-websocket:Java-WebSocket:1.5.4"
-}
-
-tasks.withType(JavaCompile) {
-    options.encoding = "UTF-8"
-}
-
-jar {
-    manifest {
-        attributes "FMLCorePluginContainsFMLMod": "true"
-    }
 }

@@ -1,49 +1,39 @@
-plugins {
-    id 'java'
-    id 'idea'
-    id 'eclipse'
-    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+buildscript {
+    repositories {
+        maven { url = "https://maven.minecraftforge.net/" }
+        mavenCentral()
+    }
+    dependencies {
+        classpath "net.minecraftforge.gradle:ForgeGradle:[6.0,6.2)"
+    }
 }
 
-version = '1.0.0-SNAPSHOT'
-group = 'xyz.langyo'
+apply plugin: "net.minecraftforge.gradle"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+version = "1.0.0-SNAPSHOT"
+group = "xyz.langyo"
+archivesBaseName = "minecraft-mcp-mod"
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
 
 minecraft {
-    mappings channel: 'official', version: '1.19.3'
-    runs {
-        configureEach {
-            property 'forge.logging.markers', 'REGISTRIES'
-            property 'forge.logging.console.level', 'debug'
-        }
-        client {
-            workingDirectory = file('run')
-        }
-    }
+    version = "1.19.3-44.1.23"
+    mappings = "official_1.19.3"
+    workingDirectory = file("run")
 }
 
 repositories {
     mavenCentral()
     maven {
-        url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
-        allowInsecureProtocol = false
+        url = "../../../.maven-local"
     }
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:1.19.3-44.1.23"
-    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
-    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
-jar {
-    manifest {
-        attributes 'FMLModType': 'GAMELIB'
-        attributes 'Automatic-Module': 'xyz.langyo.minecraftmcp'
-    }
+    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }

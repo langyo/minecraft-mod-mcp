@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath "net.minecraftforge.gradle:ForgeGradle:4.1.+"
+        classpath "net.minecraftforge.gradle:ForgeGradle:4.1"
     }
 }
 
@@ -17,10 +17,9 @@ archivesBaseName = "minecraft-mcp-mod"
 sourceCompatibility = targetCompatibility = "1.8"
 
 minecraft {
-    mappings channel: "official", version: "1.15"
-    runs {
-        client { workingDirectory = file("run") }
-    }
+    version = "1.15-29.0.4"
+    mappings = "snapshot_20200126"
+    runDir = "run"
 }
 
 repositories {
@@ -31,17 +30,6 @@ repositories {
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:1.15-29.0.4"
     implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
-}
-
-tasks.withType(JavaCompile) {
-    options.encoding = "UTF-8"
-}
-
-jar {
-    manifest {
-        attributes "FMLCorePluginContainsFMLMod": "true"
-    }
 }
