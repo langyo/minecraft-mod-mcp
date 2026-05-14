@@ -167,7 +167,7 @@ apply plugin: "forge"
 
 version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
-archivesBaseName = "minecraft-mcp-mod"
+archivesBaseName = "minecraft-moddev-mcp-mod"
 
 sourceCompatibility = targetCompatibility = "1.{java}"
 
@@ -218,7 +218,7 @@ apply plugin: "net.minecraftforge.gradle.forge"
 
 version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
-archivesBaseName = "minecraft-mcp-mod"
+archivesBaseName = "minecraft-moddev-mcp-mod"
 
 sourceCompatibility = targetCompatibility = "1.{java}"
 
@@ -277,7 +277,7 @@ apply plugin: "net.minecraftforge.gradle"
 
 version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
-archivesBaseName = "minecraft-mcp-mod"
+archivesBaseName = "minecraft-moddev-mcp-mod"
 
 sourceCompatibility = targetCompatibility = "1.8"
 
@@ -336,7 +336,7 @@ apply plugin: "net.minecraftforge.gradle"
 
 version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
-archivesBaseName = "minecraft-mcp-mod"
+archivesBaseName = "minecraft-moddev-mcp-mod"
 
 sourceCompatibility = targetCompatibility = "1.8"
 
@@ -391,7 +391,7 @@ apply plugin: "net.minecraftforge.gradle"
 
 version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
-archivesBaseName = "minecraft-mcp-mod"
+archivesBaseName = "minecraft-moddev-mcp-mod"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of({java})
 
@@ -488,7 +488,7 @@ tasks.withType(JavaCompile).configureEach {{
 jar {{
     manifest {{
         attributes 'FMLModType': 'GAMELIB'
-        attributes 'Automatic-Module': 'xyz.langyo.minecraftmcp'
+        attributes 'Automatic-Module': 'moddevmcp.minecraft.xyz.langyo'
     }}
 }}
 """
@@ -525,7 +525,7 @@ minecraft {{
         configureEach {{
             workingDir = layout.projectDirectory.dir('run')
             systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
-            systemProperty 'forge.enabledGameTestNamespaces', 'minecraftmcp'
+            systemProperty 'forge.enabledGameTestNamespaces', 'moddevmcp'
         }}
         register('client')
     }}
@@ -555,7 +555,7 @@ tasks.withType(JavaCompile).configureEach {{
 tasks.jar {{
     manifest {{
         attributes 'ModSide' : 'BOTH'
-        attributes 'Automatic-Module' : 'xyz.langyo.minecraftmcp'
+        attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
         attributes 'Implementation-Version' : project.version
     }}
 }}
@@ -570,7 +570,7 @@ tasks.jar {{
 
 
 def write_forge_settings_legacy(mc, info, path):
-    content = f"""rootProject.name = 'minecraft-mcp-forge-{mc}'
+    content = f"""rootProject.name = 'minecraft-moddev-mcp-forge-{mc}'
 """
     with open(os.path.join(path, "settings.gradle"), "w") as f:
         f.write(content)
@@ -593,7 +593,7 @@ plugins {{
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.9.0'
 }}
 
-rootProject.name = 'minecraft-mcp-forge-{mc}'
+rootProject.name = 'minecraft-moddev-mcp-forge-{mc}'
 """
     with open(os.path.join(path, "settings.gradle"), "w") as f:
         f.write(content)
@@ -662,7 +662,7 @@ tasks.withType(JavaCompile).configureEach {{
 jar {{
     manifest {{
         attributes 'FMLModType': 'GAMELIB'
-        attributes 'Automatic-Module': 'xyz.langyo.minecraftmcp'
+        attributes 'Automatic-Module': 'moddevmcp.minecraft.xyz.langyo'
     }}
 }}
 """
@@ -715,7 +715,7 @@ neoForge {{
         }}
     }}
     mods {{
-        minecraftmcp {{
+        moddevmcp {{
             sourceSet sourceSets.main
         }}
     }}
@@ -728,7 +728,7 @@ tasks.withType(JavaCompile).configureEach {{
 tasks.jar {{
     manifest {{
         attributes 'ModSide' : 'CLIENT'
-        attributes 'Automatic-Module' : 'xyz.langyo.minecraftmcp'
+        attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
         attributes 'Implementation-Version' : project.version
     }}
 }}
@@ -754,7 +754,7 @@ plugins {{
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.9.0'
 }}
 
-rootProject.name = 'minecraft-mcp-neoforge-{mc}'
+rootProject.name = 'minecraft-moddev-mcp-neoforge-{mc}'
 """
     with open(os.path.join(path, "settings.gradle"), "w") as f:
         f.write(content)
@@ -822,7 +822,7 @@ def write_fabric_settings(mc, info, path):
     }}
 }}
 
-rootProject.name = 'minecraft-mcp-fabric-{mc}'
+rootProject.name = 'minecraft-moddev-mcp-fabric-{mc}'
 """
     with open(os.path.join(path, "settings.gradle"), "w") as f:
         f.write(content)
@@ -831,14 +831,14 @@ rootProject.name = 'minecraft-mcp-fabric-{mc}'
 def write_fabric_mod_json(mc, info, path):
     content = """{
   "schemaVersion": 1,
-  "id": "minecraftmcp",
+  "id": "moddevmcp",
   "version": "${version}",
-  "name": "Minecraft MCP Bridge",
+  "name": "ModDev MCP",
   "description": "WebSocket bridge for AI agent interaction",
   "authors": ["langyo"],
   "environment": "client",
   "entrypoints": {
-    "client": ["xyz.langyo.minecraftmcp.MinecraftMcpMod"]
+    "client": ["moddevmcp.minecraft.xyz.langyo.ModDevMcpMod"]
   }
 }
 """

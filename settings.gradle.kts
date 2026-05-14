@@ -1,1 +1,1 @@
-rootProject.name = "minecraft-neoforge-mcp"
+rootProject.name = "minecraft-moddev-mcp"

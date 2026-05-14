@@ -231,8 +231,8 @@ def _gen_minimal_mdk(version):
         f'org.gradle.jvmargs=-Xmx4G\n'
         f'minecraft_version=1.21.1\n'
         f'neo_version={version}\n'
-        f'mod_id=minecraftmcp\n'
-        f'mod_name=Minecraft MCP Bridge\n'
+        f'mod_id=moddevmcp\n'
+        f'mod_name=ModDev MCP\n'
         f'mod_version=1.0.0-SNAPSHOT\n'
         f'mod_group_id=xyz.langyo\n'
     )
@@ -306,7 +306,7 @@ afterEvaluate {
 tasks.jar {
     manifest {
         attributes["ModSide"] = "BOTH"
-        attributes["Automatic-Module"] = "xyz.langyo.minecraftmcp"
+        attributes["Automatic-Module"] = "moddevmcp.minecraft.xyz.langyo"
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
@@ -335,7 +335,7 @@ def build_mods(java_path=None):
     gw = "gradlew.bat" if platform.system() == "Windows" else "./gradlew"
     r = run([gw, "compileJava", "--quiet"], cwd=str(NEOFORGE_DEV), env=env, timeout=1800)
     classes = NEOFORGE_DEV / "build" / "classes" / "java" / "main"
-    has_mcp = (classes / "xyz" / "langyo" / "minecraftmcp").exists()
+    has_mcp = (classes / "moddevmcp" / "minecraft" / "xyz" / "langyo").exists()
     has_test = (classes / "xyz" / "langyo" / "testmod").exists()
     log(f"  MCP mod: {'OK' if has_mcp else 'MISS'}", G if has_mcp else R)
     log(f"  Test mod: {'OK' if has_test else 'MISS'}", G if has_test else R)

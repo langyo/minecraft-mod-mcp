@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "id": "minecraftmcp",
+  "id": "moddevmcp",
   "version": "${version}",
-  "name": "Minecraft MCP Bridge",
+  "name": "ModDev MCP",
   "description": "WebSocket bridge for AI agent interaction",
   "authors": ["langyo"],
   "environment": "client",
   "entrypoints": {
-    "client": ["xyz.langyo.minecraftmcp.MinecraftMcpMod"]
+    "client": ["moddevmcp.minecraft.xyz.langyo.ModDevMcpMod"]
   }
 }

@@ -96,7 +96,7 @@ def copy_src(src_root, dst_root):
     if not os.path.isdir(src_root):
         return False
     
-    pkg_dst = os.path.join(dst_root, "main", "java", "xyz", "langyo", "minecraftmcp")
+    pkg_dst = os.path.join(dst_root, "main", "java", "moddevmcp", "minecraft", "xyz", "langyo")
     os.makedirs(pkg_dst, exist_ok=True)
     
     src_java = os.path.join(src_root, "main", "java")

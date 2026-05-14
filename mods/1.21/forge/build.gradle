@@ -44,6 +44,6 @@ tasks.withType(JavaCompile).configureEach {
 jar {
     manifest {
         attributes 'FMLModType': 'GAMELIB'
-        attributes 'Automatic-Module': 'xyz.langyo.minecraftmcp'
+        attributes 'Automatic-Module': 'moddevmcp.minecraft.xyz.langyo'
     }
 }

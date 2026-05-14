@@ -9,4 +9,4 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.9.0'
 }
 
-rootProject.name = 'minecraft-mcp-neoforge-1.20.6'
+rootProject.name = 'minecraft-moddev-mcp-neoforge-1.20.6'

@@ -3,8 +3,8 @@ loaderVersion = "[4,)"
 license = "MIT"
 
 [[mods]]
-modId = "minecraftmcp"
+modId = "moddevmcp"
 version = "${version}"
-displayName = "Minecraft MCP Bridge"
+displayName = "ModDev MCP"
 description = "WebSocket bridge for AI agent interaction"
 authors = "langyo"

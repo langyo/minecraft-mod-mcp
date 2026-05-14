@@ -33,7 +33,7 @@ neoForge {
         }
     }
     mods {
-        minecraftmcp {
+        moddevmcp {
             sourceSet sourceSets.main
         }
     }
@@ -46,7 +46,7 @@ tasks.withType(JavaCompile).configureEach {
 tasks.jar {
     manifest {
         attributes 'ModSide' : 'CLIENT'
-        attributes 'Automatic-Module' : 'xyz.langyo.minecraftmcp'
+        attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
         attributes 'Implementation-Version' : project.version
     }
 }

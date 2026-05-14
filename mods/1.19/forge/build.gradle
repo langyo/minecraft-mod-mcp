@@ -12,7 +12,7 @@ apply plugin: "net.minecraftforge.gradle"
 
 version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
-archivesBaseName = "minecraft-mcp-mod"
+archivesBaseName = "minecraft-moddev-mcp-mod"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
