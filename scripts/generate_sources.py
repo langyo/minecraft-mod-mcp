@@ -44,8 +44,7 @@ public class ModDevMcpMod {
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         INSTANCE = this;
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
@@ -80,8 +79,7 @@ public class ModDevMcpMod {
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         INSTANCE = this;
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
@@ -112,8 +110,7 @@ public class ModDevMcpMod {
 
     public ModDevMcpMod() {
         INSTANCE = this;
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
@@ -147,8 +144,7 @@ public class ModDevMcpMod {
     }
 
     private void setup(final FMLCommonSetupEvent event) {
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
@@ -183,8 +179,7 @@ public class ModDevMcpMod {
     }
 
     private void setup(final FMLCommonSetupEvent event) {
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
@@ -226,8 +221,7 @@ public class ModDevMcpMod {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
@@ -254,8 +248,7 @@ public class ModDevMcpMod {
     public ModDevMcpMod() {
         INSTANCE = this;
         new Thread(() -> {
-            String serverUrl = System.getenv("MC_MCP_SERVER");
-            if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+            String serverUrl = McpConfig.getServerUrl();
             ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
             wsClient = new McpWebSocketClient(serverUrl, handler);
             wsClient.connectAsync();
@@ -298,8 +291,7 @@ public class ModDevMcpMod {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
@@ -335,8 +327,7 @@ public class ModDevMcpMod {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
@@ -375,8 +366,7 @@ public class ModDevMcpMod {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
@@ -404,8 +394,7 @@ public class ModDevMcpMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();

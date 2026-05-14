@@ -19,8 +19,7 @@ public class ModDevMcpMod {
     }
 
     private void setup(final FMLCommonSetupEvent event) {
-        String serverUrl = System.getenv("MC_MCP_SERVER");
-        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        String serverUrl = McpConfig.getServerUrl();
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();

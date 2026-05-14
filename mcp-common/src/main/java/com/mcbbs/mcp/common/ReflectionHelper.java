@@ -5,6 +5,8 @@ import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
 
 public final class ReflectionHelper {
@@ -129,31 +131,28 @@ public final class ReflectionHelper {
     }
 
     public static String getDimensionId(Object player) throws Exception {
-        Object level = player.getClass().getMethod("level").invoke(player);
-        Object dim = level.getClass().getMethod("dimension").invoke(level);
+        Object level = getPlayerLevel(player);
+        if (level == null) return "overworld";
+        Object provider = fieldOrNull(level, "provider");
+        if (provider != null) {
+            Object dimId = fieldOrNull(provider, "dimensionId");
+            if (dimId != null) return String.valueOf(dimId);
+        }
         try {
-            return (String) dim.getClass().getMethod("identifier").invoke(dim);
-        } catch (NoSuchMethodException e) {}
-        try {
-            Object loc = dim.getClass().getMethod("location").invoke(dim);
-            return loc.toString();
-        } catch (NoSuchMethodException e) {}
-        try {
-            Object key = dim.getClass().getMethod("getRegistryName").invoke(dim);
-            return key.toString();
-        } catch (NoSuchMethodException e) {}
+            Object dim = level.getClass().getMethod("dimension").invoke(level);
+            try { return (String) dim.getClass().getMethod("identifier").invoke(dim); } catch (NoSuchMethodException ignored) {}
+            try { Object loc = dim.getClass().getMethod("location").invoke(dim); return loc.toString(); } catch (NoSuchMethodException ignored) {}
+            try { Object key = dim.getClass().getMethod("getRegistryName").invoke(dim); return key.toString(); } catch (NoSuchMethodException ignored) {}
+        } catch (NoSuchMethodException ignored) {}
         return "overworld";
     }
 
     public static String getDifficultyKey(Object level) throws Exception {
         Object diff = level.getClass().getMethod("getDifficulty").invoke(level);
-        try {
-            return (String) diff.getClass().getMethod("getSerializedName").invoke(diff);
-        } catch (NoSuchMethodException e) {}
-        try {
-            return (String) diff.getClass().getMethod("getKey").invoke(diff);
-        } catch (NoSuchMethodException e) {}
-        return (String) diff.getClass().getMethod("getDifficultyKey").invoke(diff);
+        try { return (String) diff.getClass().getMethod("getSerializedName").invoke(diff); } catch (NoSuchMethodException ignored) {}
+        try { return (String) diff.getClass().getMethod("getName").invoke(diff); } catch (NoSuchMethodException ignored) {}
+        try { return ((Enum<?>) diff).name().toLowerCase(); } catch (ClassCastException ignored) {}
+        return "normal";
     }
 
     public static String getGameType(Object mc) throws Exception {
@@ -170,14 +169,35 @@ public final class ReflectionHelper {
         try {
             Object player = getPlayer(mc);
             if (player == null) return "{\"error\":\"no player\"}";
+            Object conn = null;
             try {
-                Object conn = player.getClass().getMethod("connection").invoke(player);
-                conn.getClass().getMethod("sendCommand", String.class).invoke(conn, cmd);
-                return "sent: " + cmd;
-            } catch (NoSuchMethodException e) {
-                player.getClass().getMethod("sendChatMessage", String.class).invoke(player, "/" + cmd);
-                return "sent: " + cmd;
+                Method m = player.getClass().getMethod("connection");
+                conn = m.invoke(player);
+            } catch (NoSuchMethodException ignored) {
+                conn = fieldOrNull(player, "connection");
+                if (conn == null) conn = fieldOrNull(player, "sendQueue");
+                if (conn == null) conn = fieldOrNull(player, "field_71174_a");
             }
+            if (conn != null) {
+                try {
+                    conn.getClass().getMethod("sendCommand", String.class).invoke(conn, cmd);
+                    return "sent: " + cmd;
+                } catch (NoSuchMethodException ignored) {}
+            }
+            try {
+                Method chatMethod = null;
+                for (Method m : player.getClass().getMethods()) {
+                    if ((m.getName().contains("chat") || m.getName().contains("Chat")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
+                        chatMethod = m;
+                        break;
+                    }
+                }
+                if (chatMethod != null) {
+                    chatMethod.invoke(player, "/" + cmd);
+                    return "sent: " + cmd;
+                }
+            } catch (Exception ignored) {}
+            return "{\"error\":\"no command method found\"}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
         }
@@ -207,7 +227,8 @@ public final class ReflectionHelper {
             final int w = width;
             final int h = height;
             final ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
-            final Object[] result = new Object[1];
+            final CountDownLatch latch = new CountDownLatch(1);
+            final Exception[] captureError = new Exception[1];
 
             Runnable captureTask = new Runnable() {
                 @Override
@@ -215,9 +236,10 @@ public final class ReflectionHelper {
                     try {
                         glReadPixels(0, 0, w, h, bb);
                         bb.rewind();
-                        result[0] = "ok";
                     } catch (Exception ex) {
-                        result[0] = ex.getMessage();
+                        captureError[0] = ex;
+                    } finally {
+                        latch.countDown();
                     }
                 }
             };
@@ -234,9 +256,8 @@ public final class ReflectionHelper {
                 }
             }
 
-            Thread.sleep(200);
-
-            if (!"ok".equals(result[0])) return null;
+            if (!latch.await(3, TimeUnit.SECONDS)) return null;
+            if (captureError[0] != null) return null;
 
             int[] raw = new int[w * h];
             for (int i = 0; i < raw.length; i++) {
@@ -374,15 +395,56 @@ public final class ReflectionHelper {
         }
     }
 
+    public static void lwjgl2SetMouseButton(int button, boolean pressed) {
+        if (LWJGL3) return;
+        try {
+            Class<?> mouse = Class.forName("org.lwjgl.input.Mouse");
+            try {
+                Field eb = mouse.getDeclaredField("eventButton");
+                eb.setAccessible(true);
+                eb.setInt(null, button);
+            } catch (NoSuchFieldException ignored) {}
+            try {
+                Field ebs = mouse.getDeclaredField("eventButtonState");
+                ebs.setAccessible(true);
+                ebs.setBoolean(null, pressed);
+            } catch (NoSuchFieldException ignored) {}
+            mouse.getMethod("next").invoke(null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private static Object getPlayer(Object mc) throws Exception {
-        return mc.getClass().getMethod("player").invoke(mc);
+        try { return mc.getClass().getMethod("player").invoke(mc); } catch (NoSuchMethodException ignored) {}
+        Object f = fieldOrNull(mc, "thePlayer");
+        if (f != null) return f;
+        return fieldOrNull(mc, "field_71439_g");
     }
 
     private static Object getLevel(Object mc) throws Exception {
+        try { return mc.getClass().getMethod("level").invoke(mc); } catch (NoSuchMethodException ignored) {}
+        try { return mc.getClass().getMethod("world").invoke(mc); } catch (NoSuchMethodException ignored) {}
+        Object f = fieldOrNull(mc, "theWorld");
+        if (f != null) return f;
+        return fieldOrNull(mc, "field_71441_f");
+    }
+
+    private static Object getPlayerLevel(Object player) throws Exception {
+        try { return player.getClass().getMethod("level").invoke(player); } catch (NoSuchMethodException ignored) {}
+        try { return player.getClass().getMethod("world").invoke(player); } catch (NoSuchMethodException ignored) {}
+        Object f = fieldOrNull(player, "theWorld");
+        if (f != null) return f;
+        return fieldOrNull(player, "field_70170_p");
+    }
+
+    private static Object fieldOrNull(Object obj, String fieldName) {
         try {
-            return mc.getClass().getMethod("level").invoke(mc);
-        } catch (NoSuchMethodException e) {
-            return mc.getClass().getMethod("world").invoke(mc);
+            Field f = obj.getClass().getDeclaredField(fieldName);
+            f.setAccessible(true);
+            return f.get(obj);
+        } catch (Exception e) {
+            return null;
         }
     }
 

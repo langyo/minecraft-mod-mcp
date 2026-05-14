@@ -179,11 +179,15 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         try {
             int b = "right".equals(button) ? 1 : "middle".equals(button) ? 2 : 0;
             Class<?> mouse = Class.forName("org.lwjgl.input.Mouse");
-            mouse.getMethod("setCursorPosition", int.class, int.class).invoke(null, x, y);
             mouse.getMethod("setGrabbed", boolean.class).invoke(null, false);
-            if (b == 0) mouse.getMethod("createEvent").invoke(null);
-            ReflectionHelper.lwjgl2MouseNext();
-        } catch (Exception e) { System.err.println("[Input] LWJGL2 Click: " + e.getMessage()); }
+            mouse.getMethod("setCursorPosition", int.class, int.class).invoke(null, x, y);
+            Thread.sleep(10);
+            ReflectionHelper.lwjgl2SetMouseButton(b, true);
+            Thread.sleep(30);
+            ReflectionHelper.lwjgl2SetMouseButton(b, false);
+        } catch (Exception e) {
+            System.err.println("[Input] LWJGL2 Click: " + e.getMessage());
+        }
     }
 
     private void lwjgl2PressKey(String key, float hold) {
