@@ -3,7 +3,7 @@ package com.mcbbs.mcp.common;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-public class ReflectedInputHandler extends McpMessageHandler implements MinecraftInput {
+public class ReflectedInputHandler extends McpMessageHandler implements McpProtocol.MinecraftInput {
 
     private final RenderThreadExecutor executor;
 

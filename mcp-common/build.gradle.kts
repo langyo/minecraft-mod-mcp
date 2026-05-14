@@ -1,5 +1,4 @@
 plugins {
-    kotlin("jvm") version "2.1.0"
     `java`
     `maven-publish`
 }
@@ -11,13 +10,6 @@ java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
     sourceCompatibility = JavaVersion.VERSION_1_8
     targetCompatibility = JavaVersion.VERSION_1_8
-}
-
-kotlin {
-    jvmToolchain(21)
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8
-    }
 }
 
 repositories {
