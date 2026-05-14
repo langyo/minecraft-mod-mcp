@@ -1,7 +1,8 @@
 """Batch build ALL mod projects and report results.
 
 Sets correct JAVA_HOME per FG era and loader.
-Legacy builds (FG 1.2–4.1) get proxy settings for Cloudflare bypass.
+FG 1.2 builds get special handling: HTTP server for versions.json,
+FG jar patch for URL redirect, MCP cache pre-population.
 
 Usage:
   python scripts/build_all.py
@@ -15,6 +16,9 @@ import os
 import time
 import json
 import argparse
+import threading
+import hashlib
+import shutil
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import (
@@ -25,9 +29,178 @@ from version_config import (
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS_DIR_ACTUAL = MODS_DIR
 
-PROXY_HOST = "127.0.0.1"
-PROXY_PORT = 7890
 BUILD_TIMEOUT = 1200
+TEMP_DIR = os.path.join(os.environ.get("TEMP", "C:\\Temp"), "opencode")
+GRADLE_USER_HOME = os.path.join(os.path.expanduser("~"), ".gradle")
+MODULES_CACHE = os.path.join(GRADLE_USER_HOME, "caches", "modules-2", "files-2.1")
+
+
+def sha1_file(path):
+    h = hashlib.sha1()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+_http_server_proc = None
+
+
+def start_fg12_http_server():
+    global _http_server_proc
+    if _http_server_proc is not None:
+        try:
+            _http_server_proc.wait(timeout=0)
+        except Exception:
+            return
+    port = 58080
+    serve_dir = os.path.join(TEMP_DIR, "fg_http")
+    os.makedirs(serve_dir, exist_ok=True)
+    versions_json_path = os.path.join(serve_dir, "versions.json")
+    if not os.path.isfile(versions_json_path):
+        import urllib.request
+        try:
+            resp = urllib.request.urlopen(
+                "https://maven.minecraftforge.net/de/oceanlabs/mcp/versions.json", timeout=30
+            )
+            data = json.loads(resp.read())
+        except Exception:
+            data = {}
+        if "1.7.2" not in data:
+            if "1.7.10" in data:
+                data["1.7.2"] = data["1.7.10"]
+        with open(versions_json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    padded_name = "a" * 32 + "v.json"
+    dst = os.path.join(serve_dir, padded_name)
+    if not os.path.isfile(dst):
+        shutil.copy2(versions_json_path, dst)
+    server_py = os.path.join(TEMP_DIR, "fg12_http_server.py")
+    if not os.path.isfile(server_py):
+        with open(server_py, "w", encoding="utf-8") as f:
+            f.write(
+                "import http.server, socketserver, os\n"
+                f"os.chdir(r'{serve_dir}')\n"
+                f"with socketserver.TCPServer(('', {port}), http.server.SimpleHTTPRequestHandler) as httpd:\n"
+                "    httpd.serve_forever()\n"
+            )
+    _http_server_proc = subprocess.Popen(
+        [sys.executable, server_py],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    time.sleep(1)
+    for _ in range(10):
+        try:
+            import urllib.request
+            urllib.request.urlopen(f"http://localhost:{port}/{padded_name}", timeout=2)
+            print(f"  FG 1.2 HTTP server started on port {port}")
+            return True
+        except Exception:
+            time.sleep(0.5)
+    print("  WARNING: FG 1.2 HTTP server failed to start")
+    return False
+
+
+def stop_fg12_http_server():
+    global _http_server_proc
+    if _http_server_proc:
+        _http_server_proc.terminate()
+        _http_server_proc = None
+
+
+def patch_fg12_jar():
+    fg12_dirs = os.path.join(MODULES_CACHE, "net.minecraftforge.gradle", "ForgeGradle", "1.2-SNAPSHOT")
+    if not os.path.isdir(fg12_dirs):
+        return None
+    jar_path = None
+    for d in os.listdir(fg12_dirs):
+        candidate = os.path.join(fg12_dirs, d, "ForgeGradle-1.2-SNAPSHOT.jar")
+        if os.path.isfile(candidate):
+            jar_path = candidate
+            break
+    if not jar_path:
+        return None
+    bak_path = jar_path + ".bak"
+    if os.path.isfile(bak_path):
+        pass
+    else:
+        shutil.copy2(jar_path, bak_path)
+    import zipfile
+    old_url = b"https://maven.minecraftforge.net/de/oceanlabs/mcp/versions.json"
+    new_url = b"http://localhost:58080/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaav.json"
+    if len(new_url) != len(old_url):
+        return None
+    patched = False
+    tmp_dir = os.path.join(TEMP_DIR, "fg_repack")
+    if os.path.isdir(tmp_dir):
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+    os.makedirs(tmp_dir, exist_ok=True)
+    with zipfile.ZipFile(bak_path, "r") as z:
+        z.extractall(tmp_dir)
+    targets = [
+        os.path.join(tmp_dir, "net", "minecraftforge", "gradle", "common", "BasePlugin.class"),
+        os.path.join(tmp_dir, "net", "minecraftforge", "gradle", "common", "Constants.class"),
+    ]
+    for cls_file in targets:
+        if not os.path.isfile(cls_file):
+            continue
+        data = bytearray(open(cls_file, "rb").read())
+        idx = data.find(old_url)
+        if idx >= 0:
+            data[idx:idx + len(new_url)] = new_url
+            with open(cls_file, "wb") as f:
+                f.write(data)
+            patched = True
+    if patched:
+        if os.path.isfile(jar_path):
+            os.remove(jar_path)
+        with zipfile.ZipFile(jar_path, "w", zipfile.ZIP_DEFLATED) as z:
+            for root, dirs, files in os.walk(tmp_dir):
+                for fn in files:
+                    fp = os.path.join(root, fn)
+                    arcname = os.path.relpath(fp, tmp_dir).replace(os.sep, "/")
+                    z.write(fp, arcname)
+        gradle_cache_214 = os.path.join(GRADLE_USER_HOME, "caches", "2.14")
+        if os.path.isdir(gradle_cache_214):
+            shutil.rmtree(gradle_cache_214, ignore_errors=True)
+        return jar_path
+    return None
+
+
+def ensure_mcp_stable_in_fg_cache(mc, info):
+    mappings = info.get("mappings", "")
+    if not mappings or "_" not in mappings:
+        return
+    channel, ver = mappings.split("_", 1)
+    forge_ver = info.get("forge", "")
+    mcp_full_ver = f"{ver}-{mc}"
+    src_dir = os.path.join(MODULES_CACHE, "de.oceanlabs.mcp", f"mcp_{channel}", mcp_full_ver)
+    src_zip = None
+    if os.path.isdir(src_dir):
+        for d in os.listdir(src_dir):
+            candidate = os.path.join(src_dir, d, f"mcp_{channel}-{mcp_full_ver}.zip")
+            if os.path.isfile(candidate):
+                src_zip = candidate
+                break
+    if not src_zip:
+        src_dir_710 = os.path.join(MODULES_CACHE, "de.oceanlabs.mcp", f"mcp_{channel}", f"{ver}-1.7.10")
+        if os.path.isdir(src_dir_710):
+            for d in os.listdir(src_dir_710):
+                candidate = os.path.join(src_dir_710, d, f"mcp_{channel}-{ver}-1.7.10.zip")
+                if os.path.isfile(candidate):
+                    src_zip = candidate
+                    break
+    if not src_zip:
+        return
+    cache_dir = os.path.join(
+        GRADLE_USER_HOME, "caches", "minecraft", "net", "minecraftforge", "forge",
+        forge_ver, channel, ver,
+    )
+    os.makedirs(cache_dir, exist_ok=True)
+    for name in (f"mcp_{channel}-{mcp_full_ver}.zip", "mcp_stable.zip"):
+        dst = os.path.join(cache_dir, name)
+        if not os.path.isfile(dst):
+            shutil.copy2(src_zip, dst)
 
 
 def resolve_java_home(mc, info, loader="forge"):
@@ -93,6 +266,18 @@ def main():
 
     total = len(tasks)
     done = 0
+
+    has_fg12 = any(info.get("fg_era") == "fg12" for _, _, info in tasks)
+    if has_fg12:
+        print("Setting up FG 1.2 environment...")
+        start_fg12_http_server()
+        patched = patch_fg12_jar()
+        if patched:
+            print(f"  Patched FG 1.2 jar: {patched}")
+        for mc, loader, info in tasks:
+            if info.get("fg_era") == "fg12":
+                ensure_mcp_stable_in_fg_cache(mc, info)
+        print()
 
     print(f"Building {total} projects...")
     if args.era:
@@ -200,6 +385,18 @@ def main():
     with open(report_path, "w") as fp:
         json.dump(results, fp, indent=2)
     print(f"\nReport saved to {report_path}")
+
+    stop_fg12_http_server()
+    fg12_jar = os.path.join(
+        MODULES_CACHE, "net.minecraftforge.gradle", "ForgeGradle", "1.2-SNAPSHOT",
+    )
+    if os.path.isdir(fg12_jar):
+        for d in os.listdir(fg12_jar):
+            bak = os.path.join(fg12_jar, d, "ForgeGradle-1.2-SNAPSHOT.jar.bak")
+            jar = os.path.join(fg12_jar, d, "ForgeGradle-1.2-SNAPSHOT.jar")
+            if os.path.isfile(bak) and os.path.isfile(jar):
+                shutil.copy2(bak, jar)
+                print(f"Restored FG 1.2 jar from backup")
 
 
 if __name__ == "__main__":
