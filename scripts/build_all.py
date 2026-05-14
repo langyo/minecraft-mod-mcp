@@ -27,16 +27,35 @@ MODS_DIR_ACTUAL = MODS_DIR
 
 PROXY_HOST = "127.0.0.1"
 PROXY_PORT = 7890
-BUILD_TIMEOUT = 600
+BUILD_TIMEOUT = 1200
 
 
-def resolve_java_home(mc, info):
+def resolve_java_home(mc, info, loader="forge"):
+    fg_era = info.get("fg_era", "")
+    if loader == "forge" and fg_era in ("fg12", "fg21", "fg22", "fg23", "fg3", "fg41"):
+        return get_jdk_home(8) or "C:\\Users\\langy\\.jdks\\jdk8"
+    if loader == "fabric":
+        java_ver = info.get("java", 17)
+        if java_ver in (21, 25):
+            jdk21 = get_jdk_home(21)
+            if jdk21:
+                return jdk21
+        jdk17 = find_jdk17()
+        if jdk17:
+            return jdk17
+        jdk21 = get_jdk_home(21)
+        if jdk21:
+            return jdk21
     java_ver = info.get("java", 8)
     jdk = get_jdk_home(java_ver)
     if jdk:
         return jdk
-    if java_ver == 17:
+    if java_ver in (16, 17):
         return find_jdk17()
+    if java_ver in (21, 25):
+        jdk21 = get_jdk_home(21)
+        if jdk21:
+            return jdk21
     return None
 
 
@@ -45,7 +64,18 @@ def main():
     parser.add_argument("--era", help="Only build specific FG era (e.g. fg51, fg6)")
     parser.add_argument("--loader", help="Only build specific loader (forge, neoforge, fabric)")
     parser.add_argument("--mc", help="Only build specific MC version")
+    parser.add_argument("--no-cache", action="store_true", help="Skip prepare_cache step")
     args = parser.parse_args()
+
+    if not args.no_cache:
+        print("Running prepare_cache.py first...")
+        ret = subprocess.run(
+            [sys.executable, os.path.join(os.path.dirname(__file__), "prepare_cache.py")],
+            cwd=BASE,
+        )
+        if ret.returncode != 0:
+            print("WARNING: prepare_cache had failures, continuing anyway...")
+        print()
 
     results = {"success": [], "fail": [], "skip": []}
     tasks = []
@@ -93,27 +123,39 @@ def main():
 
         env = os.environ.copy()
 
-        jdk = resolve_java_home(mc, info)
+        jdk = resolve_java_home(mc, info, loader)
         if jdk:
             env["JAVA_HOME"] = jdk
 
-        if is_legacy(mc):
-            proxy_args = (
-                f"-Dhttps.proxyHost={PROXY_HOST}"
-                f" -Dhttps.proxyPort={PROXY_PORT}"
-                f" -Dhttp.proxyHost={PROXY_HOST}"
-                f" -Dhttp.proxyPort={PROXY_PORT}"
-            )
-            env["JAVA_TOOL_OPTIONS"] = proxy_args
-            env["GRADLE_OPTS"] = "-Dorg.gradle.jvmargs=-Xmx3G"
-        else:
-            env.pop("JAVA_TOOL_OPTIONS", None)
-            env["GRADLE_OPTS"] = "-Dorg.gradle.jvmargs=-Xmx3G"
+        gp = os.path.join(path, "gradle.properties")
+        with open(gp, "w") as f:
+            f.write("org.gradle.jvmargs=-Xmx3G\n")
+        env.pop("JAVA_TOOL_OPTIONS", None)
+        env["GRADLE_OPTS"] = "-Xmx3G"
 
         start = time.time()
+        cmd = ["cmd", "/c", "gradlew.bat", "build", "--no-daemon"]
+        fg_era = info.get("fg_era", "")
+        if fg_era == "fg12":
+            init_script = os.path.join(
+                os.environ.get("TEMP", "C:\\Temp"),
+                "fg12_init.gradle",
+            )
+            if not os.path.isfile(init_script):
+                with open(init_script, "w") as f:
+                    f.write(
+                        "allprojects {\n"
+                        "  tasks.whenTaskAdded { task ->\n"
+                        "    if (task.name == 'downloadClient' || task.name == 'downloadServer') {\n"
+                        "      task.enabled = false\n"
+                        "    }\n"
+                        "  }\n"
+                        "}\n"
+                    )
+            cmd += ["-I", init_script]
         try:
             proc = subprocess.run(
-                ["cmd", "/c", "gradlew.bat", "build", "--no-daemon"],
+                cmd,
                 cwd=path,
                 capture_output=True,
                 text=True,
@@ -128,12 +170,11 @@ def main():
                 results["success"].append({"key": key, "time": round(elapsed, 1)})
                 print(f" OK ({elapsed:.1f}s)")
             else:
-                errs = [
-                    l for l in out.split("\n")
-                    if "Caused by" in l or ("> " in l and "at " not in l)
-                ]
-                err_msg = errs[0].strip()[:200] if errs else out[-300:]
+                err_msg = out[-2000:] if len(out) > 2000 else out
                 results["fail"].append({"key": key, "time": round(elapsed, 1), "error": err_msg})
+                log_path = os.path.join(path, "build-error.log")
+                with open(log_path, "w", encoding="utf-8") as lf:
+                    lf.write(out)
                 print(f" FAIL ({elapsed:.1f}s)")
         except subprocess.TimeoutExpired:
             elapsed = time.time() - start
@@ -151,7 +192,9 @@ def main():
     if results["fail"]:
         print("\nFAILURES:")
         for entry in results["fail"]:
-            print(f"  {entry['key']}: {entry.get('error', '')[:200]}")
+            err_text = entry.get('error', '')[:200]
+            safe = err_text.encode('ascii', errors='replace').decode('ascii')
+            print(f"  {entry['key']}: {safe}")
 
     report_path = os.path.join(BASE, "build-report.json")
     with open(report_path, "w") as fp:

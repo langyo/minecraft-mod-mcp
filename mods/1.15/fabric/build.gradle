@@ -1,12 +1,12 @@
 plugins {
-    id "fabric-loom" version "0.12-SNAPSHOT"
+    id "fabric-loom" version "0.8-SNAPSHOT"
 }
 
 version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 
-sourceCompatibility = JavaVersion.VERSION_8
-targetCompatibility = JavaVersion.VERSION_8
+sourceCompatibility = "1.8"
+targetCompatibility = "1.8"
 
 repositories {
     mavenCentral()

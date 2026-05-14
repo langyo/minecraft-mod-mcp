@@ -2,8 +2,6 @@ package xyz.langyo.minecraftmcp;
 
 import com.mcbbs.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.event.TickEvent;
 
 @Mod("minecraftmcp")
 public class MinecraftMcpMod {
@@ -13,19 +11,18 @@ public class MinecraftMcpMod {
 
     public MinecraftMcpMod() {
         INSTANCE = this;
-        net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
-    }
-
-    private void setup(final FMLCommonSetupEvent event) {
         String serverUrl = System.getenv("MC_MCP_SERVER");
         if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
-    }
-
-    @net.minecraftforge.eventbus.api.SubscribeEvent
-    public void onTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+        new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(50);
+                    if (wsClient != null) wsClient.handleMessages();
+                } catch (Exception e) { break; }
+            }
+        }).start();
     }
 }

@@ -29,6 +29,6 @@ repositories {
 }
 
 dependencies {
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
-    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    compile "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
+    compile "org.java-websocket:Java-WebSocket:1.5.4"
 }

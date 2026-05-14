@@ -17,9 +17,12 @@ archivesBaseName = "minecraft-mcp-mod"
 sourceCompatibility = targetCompatibility = "1.8"
 
 minecraft {
-    version = "1.13.2-25.0.223"
-    mappings = "snapshot_20190314"
-    runDir = "run"
+    mappings channel: "snapshot", version: "20190314-1.13.2"
+    runs {
+        client {
+            workingDirectory = file("run")
+        }
+    }
 }
 
 repositories {
@@ -30,6 +33,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
-    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    minecraft "net.minecraftforge:forge:1.13.2-25.0.223"
+    compile "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
+    compile "org.java-websocket:Java-WebSocket:1.5.4"
 }

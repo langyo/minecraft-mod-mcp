@@ -9,3 +9,8 @@ t_*
 run/
 *.class
 neoform-cache/
+build-error.log
+build-report.json
+*.hprof
+gradle.properties
+scripts/__pycache__/

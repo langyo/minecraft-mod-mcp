@@ -107,7 +107,10 @@ def _gradle_ver_for_forge(era_key):
     return FG_ERAS[era_key]["gradle"]
 
 
-def _gradle_ver_for_fabric():
+def _gradle_ver_for_fabric(mc):
+    loom = get_fabric_loom(mc)
+    if loom.startswith("0."):
+        return "7.6.4"
     return "8.10"
 
 
@@ -181,8 +184,8 @@ repositories {{
 }}
 
 dependencies {{
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
-    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    compile "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
+    compile "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
     with open(os.path.join(path, "build.gradle"), "w") as f:
@@ -233,8 +236,8 @@ repositories {{
 }}
 
 dependencies {{
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
-    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    compile "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
+    compile "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
     with open(os.path.join(path, "build.gradle"), "w") as f:
@@ -246,10 +249,19 @@ dependencies {{
 # ============================================================
 
 
+def _split_mappings(mappings_str):
+    parts = mappings_str.split("_", 1)
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    return "snapshot", mappings_str
+
+
 def write_forge_build_fg3(mc, info, path):
     java = info.get("java", 8)
     forge_ver = info.get("forge", "")
     mappings = info.get("mappings", "snapshot_20190314")
+    mchannel, mversion = _split_mappings(mappings)
+    mversion_full = mversion if (mchannel == "official" or "-" in mversion) else f"{mversion}-{mc}"
     depth = maven_local_depth()
     content = f"""buildscript {{
     repositories {{
@@ -267,12 +279,15 @@ version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-mcp-mod"
 
-sourceCompatibility = targetCompatibility = "1.{java}"
+sourceCompatibility = targetCompatibility = "1.8"
 
 minecraft {{
-    version = "{forge_ver}"
-    mappings = "{mappings}"
-    runDir = "run"
+    mappings channel: "{mchannel}", version: "{mversion_full}"
+    runs {{
+        client {{
+            workingDirectory = file("run")
+        }}
+    }}
 }}
 
 repositories {{
@@ -283,12 +298,15 @@ repositories {{
 }}
 
 dependencies {{
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
-    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    minecraft "net.minecraftforge:forge:{forge_ver}"
+    compile "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
+    compile "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
     with open(os.path.join(path, "build.gradle"), "w") as f:
         f.write(content)
+    with open(os.path.join(path, "gradle.properties"), "w") as f:
+        f.write("org.gradle.jvmargs=-Xmx3g\n")
 
 
 # ============================================================
@@ -300,14 +318,17 @@ def write_forge_build_fg41(mc, info, path):
     java = info.get("java", 8)
     forge_ver = info.get("forge", "")
     mappings = info.get("mappings", "snapshot_20200126")
+    mchannel, mversion = _split_mappings(mappings)
+    mversion_full = mversion if (mchannel == "official" or "-" in mversion) else f"{mversion}-{mc}"
     depth = maven_local_depth()
+    fg_ver = FG_ERAS["fg41"]["fg_version"]
     content = f"""buildscript {{
     repositories {{
         maven {{ url = "https://maven.minecraftforge.net/" }}
         mavenCentral()
     }}
     dependencies {{
-        classpath "net.minecraftforge.gradle:ForgeGradle:4.1"
+        classpath "net.minecraftforge.gradle:ForgeGradle:{fg_ver}"
     }}
 }}
 
@@ -317,12 +338,15 @@ version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-mcp-mod"
 
-sourceCompatibility = targetCompatibility = "1.{java}"
+sourceCompatibility = targetCompatibility = "1.8"
 
 minecraft {{
-    version = "{forge_ver}"
-    mappings = "{mappings}"
-    runDir = "run"
+    mappings channel: "{mchannel}", version: "{mversion_full}"
+    runs {{
+        client {{
+            workingDirectory = file("run")
+        }}
+    }}
 }}
 
 repositories {{
@@ -333,12 +357,15 @@ repositories {{
 }}
 
 dependencies {{
+    minecraft "net.minecraftforge:forge:{forge_ver}"
     implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
     with open(os.path.join(path, "build.gradle"), "w") as f:
         f.write(content)
+    with open(os.path.join(path, "gradle.properties"), "w") as f:
+        f.write("org.gradle.jvmargs=-Xmx3g\n")
 
 
 # ============================================================
@@ -349,7 +376,6 @@ dependencies {{
 def write_forge_build_fg51(mc, info, path):
     java = info.get("java", 17)
     forge_ver = info.get("forge", "")
-    mappings = info.get("mappings", "official_" + mc)
     depth = maven_local_depth()
     content = f"""buildscript {{
     repositories {{
@@ -367,16 +393,16 @@ version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-mcp-mod"
 
-java {{
-    toolchain {{
-        languageVersion = JavaLanguageVersion.of({java})
-    }}
-}}
+java.toolchain.languageVersion = JavaLanguageVersion.of({java})
 
 minecraft {{
-    version = "{forge_ver}"
-    mappings = "{mappings}"
-    runDir = "run"
+    mappings channel: "official", version: "{mc}"
+    runs {{
+        client {{
+            workingDirectory = file("run")
+            property "forge.logging.markers", "REGISTRIES"
+        }}
+    }}
 }}
 
 repositories {{
@@ -387,8 +413,19 @@ repositories {{
 }}
 
 dependencies {{
+    minecraft "net.minecraftforge:forge:{forge_ver}"
     implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
+}}
+
+tasks.withType(JavaCompile).configureEach {{
+    options.encoding = "UTF-8"
+}}
+
+jar {{
+    manifest {{
+        attributes "FMLCorePluginContainsFMLMod": "true"
+    }}
 }}
 """
     with open(os.path.join(path, "build.gradle"), "w") as f:
@@ -403,46 +440,56 @@ dependencies {{
 def write_forge_build_fg6(mc, info, path):
     java = info.get("java", 17)
     forge_ver = info.get("forge", "")
-    mappings = info.get("mappings", "official_" + mc)
+    fg = FG_ERAS[info.get("fg_era", "fg6")]["fg_version"]
     depth = maven_local_depth()
-    content = f"""buildscript {{
-    repositories {{
-        maven {{ url = "https://maven.minecraftforge.net/" }}
-        mavenCentral()
-    }}
-    dependencies {{
-        classpath "net.minecraftforge.gradle:ForgeGradle:[6.0,6.2)"
-    }}
+    content = f"""plugins {{
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'net.minecraftforge.gradle' version '{fg}'
 }}
 
-apply plugin: "net.minecraftforge.gradle"
+version = '1.0.0-SNAPSHOT'
+group = 'xyz.langyo'
 
-version = "1.0.0-SNAPSHOT"
-group = "xyz.langyo"
-archivesBaseName = "minecraft-mcp-mod"
-
-java {{
-    toolchain {{
-        languageVersion = JavaLanguageVersion.of({java})
-    }}
-}}
+java.toolchain.languageVersion = JavaLanguageVersion.of({java})
 
 minecraft {{
-    version = "{forge_ver}"
-    mappings = "{mappings}"
-    workingDirectory = file("run")
+    mappings channel: 'official', version: '{mc}'
+    runs {{
+        configureEach {{
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+        }}
+        client {{
+            workingDirectory = file('run')
+        }}
+    }}
 }}
 
 repositories {{
     mavenCentral()
     maven {{
-        url = "{depth}.maven-local"
+        url = rootProject.projectDir.toPath().resolve('{depth}.maven-local').toUri()
+        allowInsecureProtocol = false
     }}
 }}
 
 dependencies {{
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
-    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    minecraft "net.minecraftforge:forge:{forge_ver}"
+    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+}}
+
+tasks.withType(JavaCompile).configureEach {{
+    options.encoding = 'UTF-8'
+}}
+
+jar {{
+    manifest {{
+        attributes 'FMLModType': 'GAMELIB'
+        attributes 'Automatic-Module': 'xyz.langyo.minecraftmcp'
+    }}
 }}
 """
     with open(os.path.join(path, "build.gradle"), "w") as f:
@@ -553,7 +600,78 @@ rootProject.name = 'minecraft-mcp-forge-{mc}'
 
 
 # ============================================================
-# NEOFORGE BUILD.GRADL
+# NEOFORGE BUILD.GRADL — FG 6 style (MC 1.20.1 only)
+# ============================================================
+
+
+def write_neoforge_build_fg6(mc, info, path):
+    java = info.get("java", 17)
+    nf_ver = info.get("neoforge", "")
+    fg = FG_ERAS["fg6"]["fg_version"]
+    depth = maven_local_depth()
+    if nf_ver.startswith("1.20.1-"):
+        nf_group = "net.neoforged:forge"
+    else:
+        nf_group = "net.neoforged:neoforge"
+    content = f"""plugins {{
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'net.minecraftforge.gradle' version '{fg}'
+}}
+
+version = '1.0.0-SNAPSHOT'
+group = 'xyz.langyo'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of({java})
+
+minecraft {{
+    mappings channel: 'official', version: '{mc}'
+    runs {{
+        configureEach {{
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+        }}
+        client {{
+            workingDirectory = file('run')
+        }}
+    }}
+}}
+
+repositories {{
+    mavenCentral()
+    maven {{
+        url = 'https://maven.neoforged.net/releases'
+    }}
+    maven {{
+        url = rootProject.projectDir.toPath().resolve('{depth}.maven-local').toUri()
+        allowInsecureProtocol = false
+    }}
+}}
+
+dependencies {{
+    minecraft "{nf_group}:{nf_ver}"
+    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+}}
+
+tasks.withType(JavaCompile).configureEach {{
+    options.encoding = 'UTF-8'
+}}
+
+jar {{
+    manifest {{
+        attributes 'FMLModType': 'GAMELIB'
+        attributes 'Automatic-Module': 'xyz.langyo.minecraftmcp'
+    }}
+}}
+"""
+    with open(os.path.join(path, "build.gradle"), "w") as f:
+        f.write(content)
+
+
+# ============================================================
+# NEOFORGE BUILD.GRADL — MDG style (MC 1.20.2+)
 # ============================================================
 
 
@@ -653,6 +771,13 @@ def write_fabric_build(mc, info, path):
     depth = maven_local_depth()
     loom_ver = get_fabric_loom(mc)
     loader_ver = FABRIC_LOADER_VERSIONS.get(mc, "0.16.0")
+    if loom_ver.startswith("0."):
+        mod_cfg = "modImplementation"
+        yarn_suffix = ":v2"
+    else:
+        mod_cfg = "modImplementation"
+        yarn_suffix = ":v2"
+    java_str = f"1.{java}" if java <= 11 else str(java)
     content = f"""plugins {{
     id "fabric-loom" version "{loom_ver}"
 }}
@@ -660,8 +785,8 @@ def write_fabric_build(mc, info, path):
 version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 
-sourceCompatibility = JavaVersion.VERSION_{java}
-targetCompatibility = JavaVersion.VERSION_{java}
+sourceCompatibility = "{java_str}"
+targetCompatibility = "{java_str}"
 
 repositories {{
     mavenCentral()
@@ -672,14 +797,16 @@ repositories {{
 
 dependencies {{
     minecraft "com.mojang:minecraft:{mc}"
-    mappings "net.fabricmc:yarn:{yarn}:v2"
-    modImplementation "net.fabricmc:fabric-loader:{loader_ver}"
+    mappings "net.fabricmc:yarn:{yarn}{yarn_suffix}"
+    {mod_cfg} "net.fabricmc:fabric-loader:{loader_ver}"
     implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
     with open(os.path.join(path, "build.gradle"), "w") as f:
         f.write(content)
+    with open(os.path.join(path, "gradle.properties"), "w") as f:
+        f.write("org.gradle.jvmargs=-Xmx4g\n")
 
 
 # ============================================================
@@ -743,7 +870,7 @@ _FORGE_SETTINGS_LEGACY_ERAS = {"fg12", "fg21", "fg22", "fg23", "fg3", "fg41"}
 
 def _get_gradle_ver(mc, loader, info):
     if loader == "fabric":
-        return _gradle_ver_for_fabric()
+        return _gradle_ver_for_fabric(mc)
     if loader == "neoforge":
         return _gradle_ver_for_neoforge(mc)
     era_key = info.get("fg_era", "")
@@ -768,8 +895,17 @@ def create_mod(mc, loader, info):
         if build_fn:
             build_fn(mc, info, base)
     elif loader == "neoforge":
-        write_neoforge_settings(mc, info, base)
-        write_neoforge_build(mc, info, base)
+        style = info.get("neoforge_style", "mdg")
+        if style == "fg6":
+            era_key = info.get("fg_era", "fg6")
+            if era_key in _FORGE_SETTINGS_LEGACY_ERAS:
+                write_forge_settings_legacy(mc, info, base)
+            else:
+                write_forge_settings_modern(mc, info, base)
+            write_neoforge_build_fg6(mc, info, base)
+        else:
+            write_neoforge_settings(mc, info, base)
+            write_neoforge_build(mc, info, base)
     elif loader == "fabric":
         write_fabric_settings(mc, info, base)
         write_fabric_build(mc, info, base)

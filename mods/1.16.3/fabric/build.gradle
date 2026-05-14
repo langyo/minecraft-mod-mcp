@@ -5,8 +5,8 @@ plugins {
 version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 
-sourceCompatibility = JavaVersion.VERSION_16
-targetCompatibility = JavaVersion.VERSION_16
+sourceCompatibility = "16"
+targetCompatibility = "16"
 
 repositories {
     mavenCentral()

@@ -1,11 +1,11 @@
 package xyz.langyo.minecraftmcp;
 
 import com.mcbbs.mcp.common.*;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
 
 @Mod("minecraftmcp")
 public class MinecraftMcpMod {
@@ -16,7 +16,7 @@ public class MinecraftMcpMod {
     public MinecraftMcpMod(IEventBus modBus) {
         INSTANCE = this;
         modBus.addListener(this::commonSetup);
-        NeoForge.EVENT_BUS.addListener(this::onClientTickPost);
+        MinecraftForge.EVENT_BUS.addListener(this::onClientTick);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
@@ -27,7 +27,7 @@ public class MinecraftMcpMod {
         wsClient.connectAsync();
     }
 
-    private void onClientTickPost(ClientTickEvent.Post event) {
-        if (wsClient != null) wsClient.handleMessages();
+    private void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
     }
 }

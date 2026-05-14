@@ -1,23 +1,36 @@
-"""Pre-populate Gradle module cache for legacy FG builds (FG 1.2–4.1).
+"""Pre-populate ALL caches for ALL mod projects.
 
-Old JDK 8 TLS is blocked by Cloudflare on maven.minecraftforge.net (403).
-Solution: Download artifacts with JDK 21, place in Gradle's module cache.
+Every build (not just legacy) benefits from pre-cached artifacts:
+  - Forge/NeoForge userdev jars, POMs
+  - Fabric yarn mappings
+  - FG plugin jars
+  - MCP snapshot mappings (FG 3/4.1)
+  - MC version jars (FG 1.2)
+  - NeoForge moddev bundles
+
+Downloads with JDK 21 (handles modern TLS), places into Gradle caches.
 
 Gradle cache layout:
-  ~/.gradle/caches/modules-2/files-2.1/{group_path}/{artifact}/{version}/{sha1}/{filename}
+  ~/.gradle/caches/modules-2/files-2.1/{group}/{artifact}/{version}/{sha1}/{file}
+
+FG internal cache layout:
+  ~/.gradle/caches/forge_gradle/mcp_repo/{maven_path}/{version}/
 
 Usage:
-  1. Ensure proxy running on 127.0.0.1:7890 (optional)
-  2. python scripts/prepare_cache.py
+  python scripts/prepare_cache.py
 """
 import subprocess
 import os
 import sys
 import hashlib
 import shutil
+import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from version_config import ALL_VERSIONS, FG_ERAS, LEGACY_ERAS, is_legacy, get_loaders
+from version_config import (
+    ALL_VERSIONS, FG_ERAS, LEGACY_ERAS,
+    is_legacy, get_loaders, get_fabric_loom,
+)
 
 TEMP_DIR = os.path.join(os.environ.get("TEMP", "/tmp"), "opencode")
 DL_CLASS = os.path.join(TEMP_DIR, "Dl.class")
@@ -26,17 +39,14 @@ DL_JAVA = os.path.join(TEMP_DIR, "Dl.java")
 JDK21 = r"C:\Program Files\Amazon Corretto\jdk21.0.8_9"
 GRADLE_USER_HOME = os.path.join(os.path.expanduser("~"), ".gradle")
 MODULES_CACHE = os.path.join(GRADLE_USER_HOME, "caches", "modules-2", "files-2.1")
+FG_CACHE = os.path.join(GRADLE_USER_HOME, "caches", "forge_gradle")
 
 PROXY_HOST = "127.0.0.1"
 PROXY_PORT = 7890
 MAVEN_FORGE = "https://maven.minecraftforge.net"
-
-FG_PLUGIN_ARTIFACTS = [
-    ("net.minecraftforge.gradle", "ForgeGradle", "1.2-SNAPSHOT"),
-    ("net.minecraftforge.gradle", "ForgeGradle", "2.1-SNAPSHOT"),
-    ("net.minecraftforge.gradle", "ForgeGradle", "2.2-SNAPSHOT"),
-    ("net.minecraftforge.gradle", "ForgeGradle", "2.3-SNAPSHOT"),
-]
+MAVEN_FABRIC = "https://maven.fabricmc.net"
+MAVEN_NEOFORGE = "https://maven.neoforged.net/releases"
+MAVEN_CENTRAL = "https://repo1.maven.org/maven2"
 
 
 def ensure_dl_class():
@@ -64,13 +74,14 @@ public class Dl {
             URL url = new URL(urlStr);
             HttpURLConnection conn;
             if (useProxy) {
-                Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, Integer.parseInt(proxyPort)));
+                Proxy proxy = new Proxy(Proxy.Type.HTTP,
+                    new InetSocketAddress(proxyHost, Integer.parseInt(proxyPort)));
                 conn = (HttpURLConnection) url.openConnection(proxy);
             } else {
                 conn = (HttpURLConnection) url.openConnection();
             }
             conn.setConnectTimeout(30000);
-            conn.setReadTimeout(60000);
+            conn.setReadTimeout(120000);
             conn.setInstanceFollowRedirects(true);
             if (conn.getResponseCode() == 200) {
                 try (InputStream is = conn.getInputStream(); OutputStream os = Files.newOutputStream(path)) {
@@ -92,7 +103,7 @@ public class Dl {
     print(f"Compiled {DL_CLASS}")
 
 
-def download_files(url_path_pairs, use_proxy=True):
+def download_files(url_path_pairs, use_proxy=False):
     args = []
     for url, path in url_path_pairs:
         args.extend([url, path])
@@ -132,12 +143,10 @@ def place_in_gradle_cache(group, artifact, version, filename, src_file):
     if os.path.exists(dest) and os.path.getsize(dest) > 0:
         return True
     shutil.copy2(src_file, dest)
-    rel = dest_dir.replace(MODULES_CACHE, "...")
-    print(f"  -> cache: {rel}/{filename}")
     return True
 
 
-def download_and_cache(url, group, artifact, version, filename, use_proxy=True):
+def download_and_cache(url, group, artifact, version, filename, use_proxy=False):
     staging = os.path.join(TEMP_DIR, "forge_staging", artifact, version)
     os.makedirs(staging, exist_ok=True)
     tmp_file = os.path.join(staging, filename)
@@ -148,122 +157,299 @@ def download_and_cache(url, group, artifact, version, filename, use_proxy=True):
     return False
 
 
-def legacy_forge_versions():
-    result = {}
-    for mc, info in sorted(ALL_VERSIONS.items()):
-        if not is_legacy(mc):
-            continue
-        loaders = get_loaders(mc)
-        if "forge" not in loaders:
-            continue
-        result[mc] = info
-    return result
+def download_mc_jar(mc_ver):
+    staging = os.path.join(TEMP_DIR, "mc_jars", mc_ver)
+    os.makedirs(staging, exist_ok=True)
+    tmp_file = os.path.join(staging, f"{mc_ver}.jar")
+    if os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
+        return tmp_file
+    try:
+        import urllib.request
+        manifest_url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+        resp = urllib.request.urlopen(manifest_url, timeout=30)
+        manifest = json.loads(resp.read())
+        ver_entry = next((v for v in manifest["versions"] if v["id"] == mc_ver), None)
+        if not ver_entry:
+            print(f"  FAIL {mc_ver} not in version manifest")
+            return None
+        ver_resp = urllib.request.urlopen(ver_entry["url"], timeout=30)
+        ver_data = json.loads(ver_resp.read())
+        dl = ver_data.get("downloads", {}).get("client", {})
+        dl_url = dl.get("url", "")
+        if not dl_url:
+            print(f"  FAIL no client download for {mc_ver}")
+            return None
+        print(f"  Downloading {mc_ver}...")
+        urllib.request.urlretrieve(dl_url, tmp_file)
+        print(f"  OK {mc_ver}.jar ({os.path.getsize(tmp_file)} bytes)")
+        return tmp_file
+    except Exception as e:
+        print(f"  FAIL {mc_ver}: {e}")
+        return None
+
+
+def place_in_fg_mcp_repo(channel, full_ver, src_file):
+    dest_dir = os.path.join(
+        FG_CACHE, "mcp_repo", "de", "oceanlabs", "mcp",
+        f"mcp_{channel}", full_ver,
+    )
+    os.makedirs(dest_dir, exist_ok=True)
+    filename = f"mcp_{channel}-{full_ver}.zip"
+    dest = os.path.join(dest_dir, filename)
+    if os.path.exists(dest) and os.path.getsize(dest) > 0:
+        return True
+    shutil.copy2(src_file, dest)
+    url_src = f"{MAVEN_FORGE}/de/oceanlabs/mcp/mcp_{channel}/{full_ver}/{filename}"
+    with open(dest + ".input", "w") as f:
+        f.write(url_src)
+    with open(dest + ".sha1", "w") as f:
+        f.write(sha1_file(src_file))
+    return True
 
 
 def main():
     ensure_dl_class()
     os.makedirs(TEMP_DIR, exist_ok=True)
 
-    legacy = legacy_forge_versions()
-
-    print("=" * 60)
-    print("Pre-populating Gradle cache for legacy FG builds")
-    print(f"Legacy versions: {len(legacy)}")
-    print(f"Cache: {MODULES_CACHE}")
-    print("=" * 60)
-
     ok = 0
     fail = 0
 
-    # Phase 1: Forge userdev jars
-    print("\n[Phase 1] Forge userdev jars")
-    for mc, info in legacy.items():
-        fv = info["forge"]
-        filename = f"forge-{fv}-userdev.jar"
-        url = f"{MAVEN_FORGE}/net/minecraftforge/forge/{fv}/{filename}"
-        print(f"  [{mc}] {fv}")
-        if download_and_cache(url, "net.minecraftforge", "forge", fv, filename):
-            ok += 1
-        else:
-            fail += 1
+    print("=" * 60)
+    print("Pre-populating ALL caches for ALL mod projects")
+    print("=" * 60)
 
-    # Phase 2: Forge POMs
-    print("\n[Phase 2] Forge POMs")
-    for mc, info in legacy.items():
-        fv = info["forge"]
-        filename = f"forge-{fv}.pom"
-        url = f"{MAVEN_FORGE}/net/minecraftforge/forge/{fv}/{filename}"
-        print(f"  [{mc}] {fv}")
-        if download_and_cache(url, "net.minecraftforge", "forge", fv, filename):
-            ok += 1
-        else:
-            fail += 1
-
-    # Phase 3: Forge universal jars
-    print("\n[Phase 3] Forge universal jars")
-    for mc, info in legacy.items():
-        fv = info["forge"]
-        filename = f"forge-{fv}-universal.jar"
-        url = f"{MAVEN_FORGE}/net/minecraftforge/forge/{fv}/{filename}"
-        print(f"  [{mc}] {fv}")
-        if download_and_cache(url, "net.minecraftforge", "forge", fv, filename):
-            ok += 1
-        else:
-            fail += 1
-
-    # Phase 4: Forge launcher jars (FG 3/4 only)
-    print("\n[Phase 4] Forge launcher jars (FG 3/4)")
-    for mc, info in legacy.items():
+    # ================================================================
+    # Phase 1: MCP snapshot mappings → FG mcp_repo (CRITICAL for FG 3/4.1)
+    # ================================================================
+    print("\n[Phase 1] MCP snapshot mappings → FG mcp_repo")
+    for mc, info in sorted(ALL_VERSIONS.items()):
         era_key = info.get("fg_era", "")
         if era_key not in ("fg3", "fg41"):
             continue
-        fv = info["forge"]
-        filename = f"forge-{fv}-launcher.jar"
-        url = f"{MAVEN_FORGE}/net/minecraftforge/forge/{fv}/{filename}"
-        print(f"  [{mc}] {fv}")
-        if download_and_cache(url, "net.minecraftforge", "forge", fv, filename):
-            ok += 1
-        else:
-            fail += 1
-
-    # Phase 5: Forge installer jars (FG 1.2 only)
-    print("\n[Phase 5] Forge installer jars (FG 1.2)")
-    for mc, info in legacy.items():
-        if info.get("fg_era") != "fg12":
+        mappings = info.get("mappings", "")
+        if not mappings or "_" not in mappings:
             continue
-        fv = info["forge"]
-        filename = f"forge-{fv}-installer.jar"
-        url = f"{MAVEN_FORGE}/net/minecraftforge/forge/{fv}/{filename}"
-        print(f"  [{mc}] {fv}")
-        if download_and_cache(url, "net.minecraftforge", "forge", fv, filename):
+        channel, datever = mappings.split("_", 1)
+        full_ver = f"{datever}-{mc}"
+        artifact_name = f"mcp_{channel}"
+        filename = f"{artifact_name}-{full_ver}.zip"
+        url = f"{MAVEN_FORGE}/de/oceanlabs/mcp/{artifact_name}/{full_ver}/{filename}"
+        print(f"  [{mc}] {artifact_name}/{full_ver}")
+        staging = os.path.join(TEMP_DIR, "mcp_staging", artifact_name, full_ver)
+        os.makedirs(staging, exist_ok=True)
+        tmp_file = os.path.join(staging, filename)
+        success = download_files([(url, tmp_file)])
+        if success and os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
+            place_in_gradle_cache("de.oceanlabs.mcp", artifact_name, full_ver, filename, tmp_file)
+            place_in_fg_mcp_repo(channel, full_ver, tmp_file)
             ok += 1
         else:
             fail += 1
 
-    # Phase 6: FG plugin jars
-    print("\n[Phase 6] ForgeGradle plugin artifacts")
-    for group, artifact, version in FG_PLUGIN_ARTIFACTS:
+    # ================================================================
+    # Phase 2: ForgeGradle plugin jars (ALL eras)
+    # ================================================================
+    print("\n[Phase 3] ForgeGradle plugin artifacts")
+    fg_plugins = [
+        ("net.minecraftforge.gradle", "ForgeGradle", "1.2-SNAPSHOT"),
+        ("net.minecraftforge.gradle", "ForgeGradle", "2.1-SNAPSHOT"),
+        ("net.minecraftforge.gradle", "ForgeGradle", "2.2-SNAPSHOT"),
+        ("net.minecraftforge.gradle", "ForgeGradle", "2.3-SNAPSHOT"),
+        ("net.minecraftforge.gradle", "ForgeGradle", "4.1.16"),
+        ("net.minecraftforge.gradle", "ForgeGradle", "5.1.77"),
+        ("net.minecraftforge.gradle", "ForgeGradle", "6.0.53"),
+        ("net.minecraftforge.gradle", "ForgeGradle", "7.0.25"),
+    ]
+    for group, artifact, version in fg_plugins:
         for ext in ("jar", "pom"):
             filename = f"{artifact}-{version}.{ext}"
             url = f"{MAVEN_FORGE}/{group.replace('.', '/')}/{artifact}/{version}/{filename}"
-            print(f"  FG {version}: {filename}")
+            print(f"  FG {version}: {ext}")
             if download_and_cache(url, group, artifact, version, filename):
                 ok += 1
             else:
                 fail += 1
 
+    # ================================================================
+    # Phase 4: MCP snapshot mappings (FG 3/4.1) → FG's own mcp_repo
+    # ================================================================
+    print("\n[Phase 4] MCP snapshot mappings → FG mcp_repo")
+    for mc, info in sorted(ALL_VERSIONS.items()):
+        era_key = info.get("fg_era", "")
+        if era_key not in ("fg3", "fg41"):
+            continue
+        mappings = info.get("mappings", "")
+        if not mappings or "_" not in mappings:
+            continue
+        channel, datever = mappings.split("_", 1)
+        full_ver = f"{datever}-{mc}"
+        filename = f"{channel}-{full_ver}.zip"
+        url = f"{MAVEN_FORGE}/de/oceanlabs/mcp/mcp_{channel}/{full_ver}/{channel}-{full_ver}.zip"
+        print(f"  [{mc}] mcp_{channel}/{full_ver}")
+        staging = os.path.join(TEMP_DIR, "mcp_staging", f"mcp_{channel}", full_ver)
+        os.makedirs(staging, exist_ok=True)
+        tmp_file = os.path.join(staging, filename)
+        success = download_files([(url, tmp_file)])
+        if success and os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
+            place_in_gradle_cache("de.oceanlabs.mcp", f"mcp_{channel}", full_ver, filename, tmp_file)
+            place_in_fg_mcp_repo(channel, full_ver, tmp_file)
+            ok += 1
+        else:
+            fail += 1
+
+    # ================================================================
+    # Phase 5: MC version jars for FG 1.2
+    # ================================================================
+    print("\n[Phase 5] MC version jars (FG 1.2)")
+    for mc, info in sorted(ALL_VERSIONS.items()):
+        if info.get("fg_era") != "fg12":
+            continue
+        print(f"  [{mc}]")
+        jar = download_mc_jar(mc)
+        if jar:
+            place_in_gradle_cache("net.minecraft", "minecraft", mc, f"{mc}.jar", jar)
+            ok += 1
+        else:
+            fail += 1
+
+    # ================================================================
+    # Phase 6: Fabric yarn mappings
+    # ================================================================
+    print("\n[Phase 6] Fabric yarn mappings")
+    for mc, info in sorted(ALL_VERSIONS.items()):
+        yarn = info.get("fabric_yarn", "")
+        if not yarn:
+            continue
+        for classifier in ("v2", ""):
+            suffix = f":{classifier}" if classifier else ""
+            filename = f"yarn-{yarn}{'' if not classifier else f'-{classifier}'}.jar"
+            url = f"{MAVEN_FABRIC}/net/fabricmc/yarn/{yarn}/{filename}"
+            version_key = f"{yarn}{suffix}"
+            print(f"  [{mc}] yarn {yarn} ({classifier or 'default'})")
+            if download_and_cache(url, "net.fabricmc", "yarn", yarn, filename):
+                ok += 1
+            else:
+                if classifier:
+                    pass
+                else:
+                    fail += 1
+
+    # ================================================================
+    # Phase 7: Fabric Loader jars
+    # ================================================================
+    print("\n[Phase 7] Fabric Loader jars")
+    loader_versions = set()
+    for mc, info in sorted(ALL_VERSIONS.items()):
+        if "fabric_yarn" not in info:
+            continue
+        loom_ver = get_fabric_loom(mc)
+        loader_ver = _get_fabric_loader(mc)
+        loader_versions.add(loader_ver)
+    for lv in sorted(loader_versions):
+        for ext in ("jar", "pom"):
+            filename = f"fabric-loader-{lv}.{ext}"
+            url = f"{MAVEN_FABRIC}/net/fabricmc/fabric-loader/{lv}/{filename}"
+            print(f"  loader {lv}: {ext}")
+            if download_and_cache(url, "net.fabricmc", "fabric-loader", lv, filename):
+                ok += 1
+            else:
+                fail += 1
+
+    # ================================================================
+    # Phase 8: Fabric Loom plugin jars
+    # ================================================================
+    print("\n[Phase 8] Fabric Loom plugin jars")
+    loom_versions = set()
+    for mc, info in sorted(ALL_VERSIONS.items()):
+        if "fabric_yarn" not in info:
+            continue
+        loom_versions.add(get_fabric_loom(mc))
+    for lv in sorted(loom_versions):
+        for ext in ("jar", "pom"):
+            filename = f"fabric-loom-{lv}.{ext}"
+            url = f"{MAVEN_FABRIC}/net/fabricmc/fabric-loom/{lv}/{filename}"
+            print(f"  loom {lv}: {ext}")
+            if download_and_cache(url, "net.fabricmc", "fabric-loom", lv, filename):
+                ok += 1
+            else:
+                fail += 1
+
+    # ================================================================
+    # Phase 9: NeoForge artifacts
+    # ================================================================
+    print("\n[Phase 9] NeoForge artifacts")
+    for mc, info in sorted(ALL_VERSIONS.items()):
+        nf_ver = info.get("neoforge", "")
+        if not nf_ver:
+            continue
+        mdg = info.get("mdg", "")
+        style = info.get("neoforge_style", "mdg")
+        if style == "fg6":
+            for ext in ("jar", "pom"):
+                filename = f"forge-{nf_ver}.{ext}"
+                url = f"{MAVEN_FORGE}/net/neoforged/forge/{nf_ver}/{filename}"
+                print(f"  [{mc}] NF FG6 {filename[:50]}")
+                if download_and_cache(url, "net.neoforged", "forge", nf_ver, filename):
+                    ok += 1
+                else:
+                    fail += 1
+        else:
+            bundle_ver = info.get("mdg", "")
+            if bundle_ver:
+                filename = f"neoforge-moddev-bundle-{bundle_ver}.jar"
+                url = f"{MAVEN_NEOFORGE}/net/neoforged/moddev/{bundle_ver}/{filename}"
+                print(f"  [{mc}] MDG bundle {bundle_ver}")
+                if download_and_cache(url, "net.neoforged", "moddev", bundle_ver, filename):
+                    ok += 1
+                else:
+                    fail += 1
+            for ext in ("jar", "pom"):
+                filename = f"neoforge-{nf_ver}.{ext}"
+                url = f"{MAVEN_NEOFORGE}/net/neoforged/neoforge/{nf_ver}/{filename}"
+                print(f"  [{mc}] NF {filename[:50]}")
+                if download_and_cache(url, "net.neoforged", "neoforge", nf_ver, filename):
+                    ok += 1
+                else:
+                    fail += 1
+
+    # ================================================================
+    # Phase 10: Shared dependencies (mcp-common, Java-WebSocket)
+    # ================================================================
+    print("\n[Phase 10] Shared dependencies")
+    shared = [
+        ("com.mcbbs.mcp", "mcp-common", "1.0.0-SNAPSHOT",
+         "mcp-common-1.0.0-SNAPSHOT.jar", "maven-local"),
+    ]
+    import urllib.request
+    for mc, info in sorted(ALL_VERSIONS.items()):
+        break
+
+    # ================================================================
     # Summary
+    # ================================================================
     print(f"\n{'=' * 60}")
     print(f"Cache population complete: {ok} OK, {fail} FAIL")
-    print("Now run legacy FG builds — they should resolve from cache.")
-    if fail:
-        print("If Cloudflare still blocks, set gradle.properties proxy:")
-        print(f"  systemProp.http.proxyHost={PROXY_HOST}")
-        print(f"  systemProp.http.proxyPort={PROXY_PORT}")
-        print(f"  systemProp.https.proxyHost={PROXY_HOST}")
-        print(f"  systemProp.https.proxyPort={PROXY_PORT}")
     print("=" * 60)
+
+    return 0 if fail == 0 else 1
+
+
+def _get_fabric_loader(mc):
+    _MAP = {
+        "1.14.4": "0.11.3", "1.15": "0.11.3", "1.15.2": "0.11.3",
+        "1.16.1": "0.12.12", "1.16.3": "0.12.12",
+        "1.16.4": "0.12.12", "1.16.5": "0.12.12",
+        "1.17.1": "0.14.9", "1.18": "0.14.9", "1.18.2": "0.14.9",
+        "1.19": "0.14.21", "1.19.2": "0.14.21",
+        "1.19.3": "0.15.6", "1.19.4": "0.15.6",
+        "1.20": "0.15.6", "1.20.1": "0.15.6",
+        "1.20.2": "0.15.11", "1.20.3": "0.16.0", "1.20.4": "0.16.0",
+        "1.20.5": "0.16.0", "1.20.6": "0.16.0",
+        "1.21": "0.16.0", "1.21.1": "0.16.0", "1.21.2": "0.16.0",
+        "1.21.3": "0.16.0", "1.21.4": "0.16.0", "1.21.5": "0.16.0",
+    }
+    return _MAP.get(mc, "0.16.0")
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -95,6 +95,36 @@ public class MinecraftMcpMod {
 """
 
 def forge_mod_fg3(mc):
+    if mc == "1.13.2":
+        return """package xyz.langyo.minecraftmcp;
+
+import com.mcbbs.mcp.common.*;
+import net.minecraftforge.fml.common.Mod;
+
+@Mod("minecraftmcp")
+public class MinecraftMcpMod {
+    public static MinecraftMcpMod INSTANCE;
+    private McpWebSocketClient wsClient;
+    private ReflectedInputHandler handler;
+
+    public MinecraftMcpMod() {
+        INSTANCE = this;
+        String serverUrl = System.getenv("MC_MCP_SERVER");
+        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        wsClient = new McpWebSocketClient(serverUrl, handler);
+        wsClient.connectAsync();
+        new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(50);
+                    if (wsClient != null) wsClient.handleMessages();
+                } catch (Exception e) { break; }
+            }
+        }).start();
+    }
+}
+"""
     return """package xyz.langyo.minecraftmcp;
 
 import com.mcbbs.mcp.common.*;
@@ -212,10 +242,45 @@ def forge_mod_mc26(mc):
 
 import com.mcbbs.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.client.event.TickEvent;
+
+@Mod("minecraftmcp")
+public class MinecraftMcpMod {
+    public static MinecraftMcpMod INSTANCE;
+    private McpWebSocketClient wsClient;
+
+    public MinecraftMcpMod() {
+        INSTANCE = this;
+        new Thread(() -> {
+            String serverUrl = System.getenv("MC_MCP_SERVER");
+            if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+            ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+            wsClient = new McpWebSocketClient(serverUrl, handler);
+            wsClient.connectAsync();
+            while (true) {
+                try {
+                    Thread.sleep(50);
+                    if (wsClient != null) wsClient.handleMessages();
+                } catch (Exception e) { break; }
+            }
+        }).start();
+    }
+}
+"""
+
+
+# ============================================================
+# NEOFORGE MOD TEMPLATE — MC 1.20.1 (Forge-style API with neoforged namespace)
+# ============================================================
+
+def neoforge_mod_1201(mc):
+    return """package xyz.langyo.minecraftmcp;
+
+import com.mcbbs.mcp.common.*;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
 
 @Mod("minecraftmcp")
 public class MinecraftMcpMod {
@@ -223,12 +288,10 @@ public class MinecraftMcpMod {
     private McpWebSocketClient wsClient;
     private ReflectedInputHandler handler;
 
-    public MinecraftMcpMod(FMLJavaModLoadingContext context) {
+    public MinecraftMcpMod(IEventBus modBus) {
         INSTANCE = this;
-        context.getModEventBus().addListener(this::commonSetup);
-        MinecraftForge.EVENT_BUS.addListener(TickEvent.ClientTick::new, event -> {
-            if (wsClient != null) wsClient.handleMessages();
-        });
+        modBus.addListener(this::commonSetup);
+        MinecraftForge.EVENT_BUS.addListener(this::onClientTick);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
@@ -238,12 +301,52 @@ public class MinecraftMcpMod {
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
     }
+
+    private void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+    }
 }
 """
 
 
-# ============================================================
-# NEOFORGE MOD TEMPLATE
+def neoforge_mod_1204(mc):
+    return """package xyz.langyo.minecraftmcp;
+
+import com.mcbbs.mcp.common.*;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+
+@Mod("minecraftmcp")
+public class MinecraftMcpMod {
+    public static MinecraftMcpMod INSTANCE;
+    private McpWebSocketClient wsClient;
+    private ReflectedInputHandler handler;
+
+    public MinecraftMcpMod(IEventBus modBus) {
+        INSTANCE = this;
+        modBus.addListener(this::commonSetup);
+        NeoForge.EVENT_BUS.addListener(this::onClientTick);
+    }
+
+    private void commonSetup(final FMLCommonSetupEvent event) {
+        String serverUrl = System.getenv("MC_MCP_SERVER");
+        if (serverUrl == null || serverUrl.isEmpty()) serverUrl = "ws://127.0.0.1:9876";
+        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        wsClient = new McpWebSocketClient(serverUrl, handler);
+        wsClient.connectAsync();
+    }
+
+    private void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+    }
+}
+"""
+
+
+# NEOFORGE MOD TEMPLATE — MC 1.20.2+ (modern NeoForge API)
 # ============================================================
 
 def neoforge_mod(mc):
@@ -320,39 +423,6 @@ public class MinecraftMcpMod implements ClientModInitializer {
 # WRITE TO PROJECTS
 # ============================================================
 
-ALL_VERSIONS = {
-    "1.7.2": ["forge"], "1.7.10": ["forge"],
-    "1.8": ["forge"], "1.8.9": ["forge"],
-    "1.9": ["forge"], "1.9.4": ["forge"],
-    "1.10": ["forge"], "1.10.2": ["forge"],
-    "1.11": ["forge"], "1.11.2": ["forge"],
-    "1.12": ["forge"], "1.12.2": ["forge"],
-    "1.13.2": ["forge"],
-    "1.14.4": ["forge","fabric"], "1.15": ["forge","fabric"], "1.15.2": ["forge","fabric"],
-    "1.16.1": ["forge","fabric"], "1.16.3": ["forge","fabric"],
-    "1.16.4": ["forge","fabric"], "1.16.5": ["forge","fabric"],
-    "1.17.1": ["forge","fabric"],
-    "1.18": ["forge","fabric"], "1.18.2": ["forge","fabric"],
-    "1.19": ["forge","fabric"], "1.19.2": ["forge","fabric"],
-    "1.19.3": ["forge","fabric"], "1.19.4": ["forge","fabric"],
-    "1.20": ["forge","fabric"],
-    "1.20.1": ["forge","neoforge","fabric"],
-    "1.20.2": ["forge","neoforge","fabric"],
-    "1.20.3": ["forge","neoforge","fabric"],
-    "1.20.4": ["forge","neoforge","fabric"],
-    "1.20.5": ["neoforge","fabric"],
-    "1.20.6": ["forge","neoforge","fabric"],
-    "1.21": ["forge","fabric"],
-    "1.21.1": ["forge","neoforge","fabric"],
-    "1.21.2": ["neoforge","fabric"],
-    "1.21.3": ["forge","neoforge","fabric"],
-    "1.21.4": ["forge","neoforge","fabric"],
-    "1.21.5": ["forge","neoforge","fabric"],
-    "26.1": ["forge"],
-    "26.1.1": ["forge","neoforge"],
-    "26.1.2": ["forge","neoforge"],
-}
-
 MODS_TOML = """modLoader="javafml"
 loaderVersion="[4,)"
 license="MIT"
@@ -415,7 +485,13 @@ if __name__ == "__main__":
                         f.write(MODS_TOML)
                 total += 1
             elif loader == "neoforge":
-                write_java(path, "MinecraftMcpMod.java", neoforge_mod(mc))
+                nf_style = info.get("neoforge_style", "mdg")
+                if nf_style == "fg6":
+                    write_java(path, "MinecraftMcpMod.java", neoforge_mod_1201(mc))
+                elif mc == "1.20.4":
+                    write_java(path, "MinecraftMcpMod.java", neoforge_mod_1204(mc))
+                else:
+                    write_java(path, "MinecraftMcpMod.java", neoforge_mod(mc))
                 res_dir = os.path.join(path, "src", "main", "resources", "META-INF")
                 os.makedirs(res_dir, exist_ok=True)
                 with open(os.path.join(res_dir, "neoforge.mods.toml"), "w") as f:
