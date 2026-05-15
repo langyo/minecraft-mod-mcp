@@ -14,12 +14,9 @@ public final class ReflectionHelper {
     private static final boolean LWJGL3;
 
     static {
-        boolean lwjgl3 = false;
-        try {
-            Class.forName("org.lwjgl.glfw.GLFW");
-            lwjgl3 = true;
-        } catch (ClassNotFoundException e) {}
-        LWJGL3 = lwjgl3;
+        boolean v = false;
+        try { Class.forName("org.lwjgl.glfw.GLFW"); v = true; } catch (ClassNotFoundException e) {}
+        LWJGL3 = v;
     }
 
     private ReflectionHelper() {}
@@ -28,11 +25,9 @@ public final class ReflectionHelper {
         try {
             Class<?> mc = Class.forName("net.minecraft.client.Minecraft");
             try {
-                Method m = mc.getMethod("getInstance");
-                return m.invoke(null);
+                return mc.getMethod("getInstance").invoke(null);
             } catch (NoSuchMethodException e) {
-                Method m = mc.getMethod("getMinecraft");
-                return m.invoke(null);
+                return mc.getMethod("getMinecraft").invoke(null);
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to get Minecraft instance", e);
@@ -41,15 +36,12 @@ public final class ReflectionHelper {
 
     public static long getWindowHandle(Object mc) {
         try {
-            Method getWindow = mc.getClass().getMethod("getWindow");
-            Object window = getWindow.invoke(mc);
+            Object window = mc.getClass().getMethod("getWindow").invoke(mc);
             if (window == null) return 0;
             try {
-                Method m = window.getClass().getMethod("handle");
-                return ((Number) m.invoke(window)).longValue();
+                return ((Number) window.getClass().getMethod("handle").invoke(window)).longValue();
             } catch (NoSuchMethodException e) {
-                Method m = window.getClass().getMethod("getHandle");
-                return ((Number) m.invoke(window)).longValue();
+                return ((Number) window.getClass().getMethod("getHandle").invoke(window)).longValue();
             }
         } catch (NoSuchMethodException e) {
             return 0;
@@ -59,12 +51,8 @@ public final class ReflectionHelper {
     }
 
     public static boolean hasWindow(Object mc) {
-        try {
-            mc.getClass().getMethod("getWindow");
-            return true;
-        } catch (NoSuchMethodException e) {
-            return false;
-        }
+        try { mc.getClass().getMethod("getWindow"); return true; }
+        catch (NoSuchMethodException e) { return false; }
     }
 
     public static int getDisplayWidth(Object mc) {
@@ -72,9 +60,7 @@ public final class ReflectionHelper {
             Field f = mc.getClass().getDeclaredField("displayWidth");
             f.setAccessible(true);
             return f.getInt(mc);
-        } catch (Exception e) {
-            return 0;
-        }
+        } catch (Exception e) { return 0; }
     }
 
     public static int getDisplayHeight(Object mc) {
@@ -82,9 +68,7 @@ public final class ReflectionHelper {
             Field f = mc.getClass().getDeclaredField("displayHeight");
             f.setAccessible(true);
             return f.getInt(mc);
-        } catch (Exception e) {
-            return 0;
-        }
+        } catch (Exception e) { return 0; }
     }
 
     public static String getPlayerInfo(Object mc) {
@@ -114,12 +98,9 @@ public final class ReflectionHelper {
 
             Object server = invokeOrNull(level, "getServer");
             if (server != null) {
-                Object worldData = invokeOrNull(server, "getWorldData");
-                if (worldData != null) {
-                    worldName = invokeString(worldData, "getLevelName");
-                }
+                Object wd = invokeOrNull(server, "getWorldData");
+                if (wd != null) worldName = invokeString(wd, "getLevelName");
             }
-
             difficulty = getDifficultyKey(level);
             gameType = getGameType(mc);
 
@@ -141,8 +122,8 @@ public final class ReflectionHelper {
         try {
             Object dim = level.getClass().getMethod("dimension").invoke(level);
             try { return (String) dim.getClass().getMethod("identifier").invoke(dim); } catch (NoSuchMethodException ignored) {}
-            try { Object loc = dim.getClass().getMethod("location").invoke(dim); return loc.toString(); } catch (NoSuchMethodException ignored) {}
-            try { Object key = dim.getClass().getMethod("getRegistryName").invoke(dim); return key.toString(); } catch (NoSuchMethodException ignored) {}
+            try { return dim.getClass().getMethod("location").invoke(dim).toString(); } catch (NoSuchMethodException ignored) {}
+            try { return dim.getClass().getMethod("getRegistryName").invoke(dim).toString(); } catch (NoSuchMethodException ignored) {}
         } catch (NoSuchMethodException ignored) {}
         return "overworld";
     }
@@ -160,9 +141,7 @@ public final class ReflectionHelper {
             Object gm = mc.getClass().getMethod("gameMode").invoke(mc);
             Object pt = gm.getClass().getMethod("getPlayerMode").invoke(gm);
             return (String) pt.getClass().getMethod("getName").invoke(pt);
-        } catch (NoSuchMethodException e) {
-            return "survival";
-        }
+        } catch (NoSuchMethodException e) { return "survival"; }
     }
 
     public static String sendCommand(Object mc, String cmd) {
@@ -170,37 +149,24 @@ public final class ReflectionHelper {
             Object player = getPlayer(mc);
             if (player == null) return "{\"error\":\"no player\"}";
             Object conn = null;
-            try {
-                Method m = player.getClass().getMethod("connection");
-                conn = m.invoke(player);
-            } catch (NoSuchMethodException ignored) {
+            try { conn = player.getClass().getMethod("connection").invoke(player); }
+            catch (NoSuchMethodException ignored) {
                 conn = fieldOrNull(player, "connection");
                 if (conn == null) conn = fieldOrNull(player, "sendQueue");
                 if (conn == null) conn = fieldOrNull(player, "field_71174_a");
             }
             if (conn != null) {
-                try {
-                    conn.getClass().getMethod("sendCommand", String.class).invoke(conn, cmd);
-                    return "sent: " + cmd;
-                } catch (NoSuchMethodException ignored) {}
+                try { conn.getClass().getMethod("sendCommand", String.class).invoke(conn, cmd); return "sent: " + cmd; }
+                catch (NoSuchMethodException ignored) {}
             }
-            try {
-                Method chatMethod = null;
-                for (Method m : player.getClass().getMethods()) {
-                    if ((m.getName().contains("chat") || m.getName().contains("Chat")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
-                        chatMethod = m;
-                        break;
-                    }
-                }
-                if (chatMethod != null) {
-                    chatMethod.invoke(player, "/" + cmd);
+            for (Method m : player.getClass().getMethods()) {
+                if ((m.getName().contains("chat") || m.getName().contains("Chat")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
+                    m.invoke(player, "/" + cmd);
                     return "sent: " + cmd;
                 }
-            } catch (Exception ignored) {}
+            }
             return "{\"error\":\"no command method found\"}";
-        } catch (Exception e) {
-            return "{\"error\":\"" + e.getMessage() + "\"}";
-        }
+        } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
     }
 
     public static byte[] takeScreenshot(Object mc, int width, int height) {
@@ -211,15 +177,20 @@ public final class ReflectionHelper {
                 Method m = mc.getClass().getMethod("getMainRenderTarget");
                 Object fb = m.invoke(mc);
                 if (fb != null) {
-                    Field fw = fb.getClass().getDeclaredField("width");
-                    fw.setAccessible(true);
-                    int fbw = fw.getInt(fb);
-                    Field fh = fb.getClass().getDeclaredField("height");
-                    fh.setAccessible(true);
-                    int fbh = fh.getInt(fb);
-                    if (fbw > 0 && fbh > 0) {
-                        width = fbw;
-                        height = fbh;
+                    try {
+                        Field fw = fb.getClass().getDeclaredField("width");
+                        fw.setAccessible(true);
+                        int fbw = fw.getInt(fb);
+                        Field fh = fb.getClass().getDeclaredField("height");
+                        fh.setAccessible(true);
+                        int fbh = fh.getInt(fb);
+                        if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
+                    } catch (Exception fbEx) {
+                        try {
+                            int fbw = (Integer) fb.getClass().getMethod("getViewWidth").invoke(fb);
+                            int fbh = (Integer) fb.getClass().getMethod("getViewHeight").invoke(fb);
+                            if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
+                        } catch (Exception ignored) {}
                     }
                 }
             } catch (NoSuchMethodException e) {}
@@ -234,7 +205,7 @@ public final class ReflectionHelper {
                 @Override
                 public void run() {
                     try {
-                        glReadPixels(0, 0, w, h, bb);
+                        doGlReadPixels(0, 0, w, h, bb);
                         bb.rewind();
                     } catch (Exception ex) {
                         captureError[0] = ex;
@@ -249,8 +220,7 @@ public final class ReflectionHelper {
                 execute.invoke(mc, captureTask);
             } catch (NoSuchMethodException e) {
                 try {
-                    Method schedTask = mc.getClass().getMethod("addScheduledTask", Runnable.class);
-                    schedTask.invoke(mc, captureTask);
+                    mc.getClass().getMethod("addScheduledTask", Runnable.class).invoke(mc, captureTask);
                 } catch (NoSuchMethodException e2) {
                     captureTask.run();
                 }
@@ -281,139 +251,49 @@ public final class ReflectionHelper {
             ImageIO.write(img, "png", baos);
             return baos.toByteArray();
         } catch (Exception e) {
-            e.printStackTrace();
             return null;
         }
     }
 
-    private static void glReadPixels(int x, int y, int w, int h, ByteBuffer bb) throws Exception {
+    private static void doGlReadPixels(int x, int y, int w, int h, ByteBuffer bb) throws Exception {
         if (LWJGL3) {
             Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
             int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
-            int GL_UNSIGNED_BYTE = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
-            Method m = gl11.getMethod("glReadPixels", int.class, int.class, int.class, int.class, int.class, int.class, ByteBuffer.class);
-            m.invoke(null, x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, bb);
+            int GL_UB = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
+            findAndInvoke(gl11, "glReadPixels", new Object[]{x, y, w, h, GL_RGBA, GL_UB, bb});
         } else {
             Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
             int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
-            int GL_UNSIGNED_BYTE = Class.forName("org.lwjgl.GL11").getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
-            Method m = gl11.getMethod("glReadPixels", int.class, int.class, int.class, int.class, int.class, int.class, ByteBuffer.class);
-            m.invoke(null, x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, bb);
+            int GL_UB = Class.forName("org.lwjgl.GL11").getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
+            findAndInvoke(gl11, "glReadPixels", new Object[]{x, y, w, h, GL_RGBA, GL_UB, bb});
         }
     }
 
-    public static void sendKey(long handle, int key, int action) {
-        if (!LWJGL3) return;
-        try {
-            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-            Class<?> cbIface = Class.forName("org.lwjgl.glfw.GLFWKeyCallbackI");
-            Method setCb = glfw.getMethod("glfwSetKeyCallback", long.class, cbIface);
-            Object cb = java.lang.reflect.Proxy.newProxyInstance(
-                    glfw.getClassLoader(), new Class<?>[]{cbIface},
-                    (proxy, method, args) -> null);
-            Object stored = setCb.invoke(null, handle, cb);
-            Method invoke = stored.getClass().getMethod("invoke", long.class, int.class, int.class, int.class, long.class);
-            invoke.invoke(stored, handle, key, 0, action, 0L);
-        } catch (Exception e) {
-            e.printStackTrace();
+    private static Object findAndInvoke(Class<?> target, String name, Object[] args) throws Exception {
+        for (Method m : target.getMethods()) {
+            if (m.getName().equals(name) && m.getParameterCount() == args.length) {
+                m.setAccessible(true);
+                return m.invoke(null, args);
+            }
         }
+        throw new NoSuchMethodException(name);
     }
 
-    public static void sendMouseButton(long handle, int button, int action) {
-        if (!LWJGL3) return;
-        try {
-            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-            Class<?> cbIface = Class.forName("org.lwjgl.glfw.GLFWMouseButtonCallbackI");
-            Method setCb = glfw.getMethod("glfwSetMouseButtonCallback", long.class, cbIface);
-            Object cb = java.lang.reflect.Proxy.newProxyInstance(
-                    glfw.getClassLoader(), new Class<?>[]{cbIface},
-                    (proxy, method, args) -> null);
-            Object stored = setCb.invoke(null, handle, cb);
-            Method invoke = stored.getClass().getMethod("invoke", long.class, int.class, int.class, double.class);
-            invoke.invoke(stored, handle, button, action, 0.0);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    public static void sendKey(long handle, int key, int action) {}
 
-    public static void sendScroll(long handle, double scrollY) {
-        if (!LWJGL3) return;
-        try {
-            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-            Class<?> cbIface = Class.forName("org.lwjgl.glfw.GLFWScrollCallbackI");
-            Method setCb = glfw.getMethod("glfwSetScrollCallback", long.class, cbIface);
-            Object cb = java.lang.reflect.Proxy.newProxyInstance(
-                    glfw.getClassLoader(), new Class<?>[]{cbIface},
-                    (proxy, method, args) -> null);
-            Object stored = setCb.invoke(null, handle, cb);
-            Method invoke = stored.getClass().getMethod("invoke", long.class, double.class, double.class);
-            invoke.invoke(stored, handle, 0.0, scrollY);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    public static void sendMouseButton(long handle, int button, int action) {}
 
-    public static void setCursorPos(long handle, double x, double y) {
-        if (!LWJGL3) return;
-        try {
-            Class.forName("org.lwjgl.glfw.GLFW")
-                    .getMethod("glfwSetCursorPos", long.class, double.class, double.class)
-                    .invoke(null, handle, x, y);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    public static void sendScroll(long handle, double scrollY) {}
 
-    public static void lwjgl2PressKey(int keyCode) {
-        if (LWJGL3) return;
-        try {
-            Class.forName("org.lwjgl.input.Keyboard")
-                    .getMethod("pressKey", int.class, boolean.class)
-                    .invoke(null, keyCode, false);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    public static void setCursorPos(long handle, double x, double y) {}
 
-    public static void lwjgl2ReleaseKey(int keyCode) {
-        if (LWJGL3) return;
-        try {
-            Class.forName("org.lwjgl.input.Keyboard")
-                    .getMethod("releaseKey", int.class)
-                    .invoke(null, keyCode);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    public static void lwjgl2PressKey(int keyCode) {}
 
-    public static void lwjgl2MouseNext() {
-        if (LWJGL3) return;
-        try {
-            Class.forName("org.lwjgl.input.Mouse").getMethod("next").invoke(null);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    public static void lwjgl2ReleaseKey(int keyCode) {}
 
-    public static void lwjgl2SetMouseButton(int button, boolean pressed) {
-        if (LWJGL3) return;
-        try {
-            Class<?> mouse = Class.forName("org.lwjgl.input.Mouse");
-            try {
-                Field eb = mouse.getDeclaredField("eventButton");
-                eb.setAccessible(true);
-                eb.setInt(null, button);
-            } catch (NoSuchFieldException ignored) {}
-            try {
-                Field ebs = mouse.getDeclaredField("eventButtonState");
-                ebs.setAccessible(true);
-                ebs.setBoolean(null, pressed);
-            } catch (NoSuchFieldException ignored) {}
-            mouse.getMethod("next").invoke(null);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    public static void lwjgl2MouseNext() {}
+
+    public static void lwjgl2SetMouseButton(int button, boolean pressed) {}
 
     private static Object getPlayer(Object mc) throws Exception {
         try { return mc.getClass().getMethod("player").invoke(mc); } catch (NoSuchMethodException ignored) {}
@@ -443,30 +323,23 @@ public final class ReflectionHelper {
             Field f = obj.getClass().getDeclaredField(fieldName);
             f.setAccessible(true);
             return f.get(obj);
-        } catch (Exception e) {
-            return null;
-        }
+        } catch (Exception e) { return null; }
     }
 
     private static String invokeString(Object obj, String methodName) {
         try {
-            Object result = obj.getClass().getMethod(methodName).invoke(obj);
-            return result != null ? result.toString() : "";
-        } catch (Exception e) {
-            return "";
-        }
+            Object r = obj.getClass().getMethod(methodName).invoke(obj);
+            return r != null ? r.toString() : "";
+        } catch (Exception e) { return ""; }
     }
 
     private static Object invokeOrNull(Object obj, String methodName) {
-        try {
-            return obj.getClass().getMethod(methodName).invoke(obj);
-        } catch (Exception e) {
-            return null;
-        }
+        try { return obj.getClass().getMethod(methodName).invoke(obj); }
+        catch (Exception e) { return null; }
     }
 
-    private static double getDouble(Object obj, String... fieldNames) throws Exception {
-        for (String name : fieldNames) {
+    private static double getDouble(Object obj, String... names) throws Exception {
+        for (String name : names) {
             try {
                 Field f = obj.getClass().getDeclaredField(name);
                 f.setAccessible(true);
@@ -476,7 +349,5 @@ public final class ReflectionHelper {
         return 0.0;
     }
 
-    public static boolean isLwjgl3() {
-        return LWJGL3;
-    }
+    public static boolean isLwjgl3() { return LWJGL3; }
 }

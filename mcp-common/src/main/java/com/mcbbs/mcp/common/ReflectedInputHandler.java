@@ -20,23 +20,18 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 Method execute = mc.getClass().getMethod("execute", Runnable.class);
                 execute.invoke(mc, task);
             } catch (NoSuchMethodException e) {
-                Method sched = mc.getClass().getMethod("addScheduledTask", Runnable.class);
-                sched.invoke(mc, task);
+                mc.getClass().getMethod("addScheduledTask", Runnable.class).invoke(mc, task);
             }
         } catch (Exception e) {
-            System.err.println("[ReflectedInputHandler] Failed to schedule on render thread: " + e.getMessage());
+            System.err.println("[ReflectedInputHandler] Failed to schedule: " + e.getMessage());
         }
     }
 
-    private Object mc() {
-        return ReflectionHelper.getMinecraftInstance();
-    }
+    private Object mc() { return ReflectionHelper.getMinecraftInstance(); }
 
     private long getWindowHandle() {
         Object mc = mc();
-        if (ReflectionHelper.hasWindow(mc)) {
-            return ReflectionHelper.getWindowHandle(mc);
-        }
+        if (ReflectionHelper.hasWindow(mc)) return ReflectionHelper.getWindowHandle(mc);
         return 0;
     }
 
@@ -48,9 +43,7 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 Field w = window.getClass().getDeclaredField("width");
                 w.setAccessible(true);
                 return w.getInt(window);
-            } catch (Exception e) {
-                return ReflectionHelper.getDisplayWidth(mc);
-            }
+            } catch (Exception e) { return ReflectionHelper.getDisplayWidth(mc); }
         }
         return ReflectionHelper.getDisplayWidth(mc);
     }
@@ -63,9 +56,7 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 Field h = window.getClass().getDeclaredField("height");
                 h.setAccessible(true);
                 return h.getInt(window);
-            } catch (Exception e) {
-                return ReflectionHelper.getDisplayHeight(mc);
-            }
+            } catch (Exception e) { return ReflectionHelper.getDisplayHeight(mc); }
         }
         return ReflectionHelper.getDisplayHeight(mc);
     }
@@ -75,10 +66,8 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         executor.executeOnRenderThread(() -> {
             try {
                 long h = getWindowHandle();
-                if (h == 0) { lwjgl2Click(x, y, button); return; }
-                int b = "right".equals(button) ? 1
-                    : "middle".equals(button) ? 2
-                    : 0;
+                if (h == 0) return;
+                int b = "right".equals(button) ? 1 : "middle".equals(button) ? 2 : 0;
                 ReflectionHelper.setCursorPos(h, x, y);
                 Thread.sleep(10);
                 ReflectionHelper.sendMouseButton(h, b, 1);
@@ -93,7 +82,7 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         executor.executeOnRenderThread(() -> {
             try {
                 long h = getWindowHandle();
-                if (h == 0) { lwjgl2PressKey(key, holdSeconds); return; }
+                if (h == 0) return;
                 int c = GlfwKeys.keyCode(key);
                 if (c < 0) return;
                 ReflectionHelper.sendKey(h, c, 1);
@@ -108,7 +97,7 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         executor.executeOnRenderThread(() -> {
             try {
                 long h = getWindowHandle();
-                if (h == 0) { lwjgl2TypeText(text); return; }
+                if (h == 0) return;
                 for (char ch : text.toCharArray()) {
                     int code = GlfwKeys.charCode(ch);
                     if (code > 0) {
@@ -127,11 +116,8 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     @Override
     public void scroll(int clicks) {
         executor.executeOnRenderThread(() -> {
-            try {
-                long h = getWindowHandle();
-                if (h == 0) { lwjgl2Scroll(clicks); return; }
-                ReflectionHelper.sendScroll(h, clicks * 1.0);
-            } catch (Exception ignored) {}
+            try { ReflectionHelper.sendScroll(getWindowHandle(), clicks * 1.0); }
+            catch (Exception ignored) {}
         });
     }
 
@@ -140,7 +126,7 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         executor.executeOnRenderThread(() -> {
             try {
                 long h = getWindowHandle();
-                if (h == 0) { lwjgl2Hotkey(keys); return; }
+                if (h == 0) return;
                 int[] codes = new int[keys.length];
                 for (int i = 0; i < keys.length; i++) codes[i] = GlfwKeys.keyCode(keys[i]);
                 for (int c : codes) { ReflectionHelper.sendKey(h, c, 1); Thread.sleep(5); }
@@ -155,89 +141,23 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         try {
             int w = getWidth();
             int h = getHeight();
-            if (w <= 0 || h <= 0) return null;
-            return ReflectionHelper.takeScreenshot(mc(), w, h);
-        } catch (Exception e) { e.printStackTrace(); return null; }
+            if (w <= 0 || h <= 0) throw new RuntimeException("bad dims w=" + w + " h=" + h);
+            byte[] result = ReflectionHelper.takeScreenshot(mc(), w, h);
+            if (result == null) throw new RuntimeException("takeScreenshot returned null");
+            return result;
+        } catch (Exception e) { throw new RuntimeException("screenshot failed", e); }
     }
 
     @Override
-    public String executeCommand(String command) {
-        return ReflectionHelper.sendCommand(mc(), command);
-    }
+    public String executeCommand(String command) { return ReflectionHelper.sendCommand(mc(), command); }
 
     @Override
-    public String getPlayerInfo() {
-        return ReflectionHelper.getPlayerInfo(mc());
-    }
+    public String getPlayerInfo() { return ReflectionHelper.getPlayerInfo(mc()); }
 
     @Override
-    public String getWorldInfo() {
-        return ReflectionHelper.getWorldInfo(mc());
-    }
-
-    private void lwjgl2Click(int x, int y, String button) {
-        try {
-            int b = "right".equals(button) ? 1 : "middle".equals(button) ? 2 : 0;
-            Class<?> mouse = Class.forName("org.lwjgl.input.Mouse");
-            mouse.getMethod("setGrabbed", boolean.class).invoke(null, false);
-            mouse.getMethod("setCursorPosition", int.class, int.class).invoke(null, x, y);
-            Thread.sleep(10);
-            ReflectionHelper.lwjgl2SetMouseButton(b, true);
-            Thread.sleep(30);
-            ReflectionHelper.lwjgl2SetMouseButton(b, false);
-        } catch (Exception e) {
-            System.err.println("[Input] LWJGL2 Click: " + e.getMessage());
-        }
-    }
-
-    private void lwjgl2PressKey(String key, float hold) {
-        try {
-            int c = Lwjgl2Keys.keyCode(key);
-            if (c < 0) return;
-            ReflectionHelper.lwjgl2PressKey(c);
-            Thread.sleep(hold > 0 ? (long)(hold * 1000) : 30);
-            ReflectionHelper.lwjgl2ReleaseKey(c);
-        } catch (Exception e) { System.err.println("[Input] LWJGL2 Key: " + e.getMessage()); }
-    }
-
-    private void lwjgl2TypeText(String text) {
-        try {
-            Class<?> kb = Class.forName("org.lwjgl.input.Keyboard");
-            for (char ch : text.toCharArray()) {
-                if (ch >= 32 && ch < 127) {
-                    try {
-                        kb.getMethod("typeKey", int.class).invoke(null, (int) ch);
-                    } catch (NoSuchMethodException e) {
-                        ReflectionHelper.lwjgl2PressKey((int) ch);
-                        Thread.sleep(25);
-                        ReflectionHelper.lwjgl2ReleaseKey((int) ch);
-                    }
-                }
-                Thread.sleep(20);
-            }
-        } catch (Exception e) { System.err.println("[Input] LWJGL2 Type: " + e.getMessage()); }
-    }
-
-    private void lwjgl2Scroll(int clicks) {
-        try {
-            Class<?> mouse = Class.forName("org.lwjgl.input.Mouse");
-            mouse.getMethod("setEventDWheel", int.class).invoke(null, clicks * 120);
-        } catch (Exception ignored) {}
-    }
-
-    private void lwjgl2Hotkey(String[] keys) {
-        try {
-            int[] codes = new int[keys.length];
-            for (int i = 0; i < keys.length; i++) codes[i] = Lwjgl2Keys.keyCode(keys[i]);
-            for (int c : codes) { ReflectionHelper.lwjgl2PressKey(c); Thread.sleep(5); }
-            Thread.sleep(80);
-            for (int i = codes.length - 1; i >= 0; i--) ReflectionHelper.lwjgl2ReleaseKey(codes[i]);
-        } catch (Exception e) { System.err.println("[Input] LWJGL2 Hotkey: " + e.getMessage()); }
-    }
+    public String getWorldInfo() { return ReflectionHelper.getWorldInfo(mc()); }
 
     private static final String SHIFT_CHARS = "!@#$%^&*()_+{}|:<>?~";
 
-    private static boolean isShiftChar(char ch) {
-        return SHIFT_CHARS.indexOf(ch) >= 0;
-    }
+    private static boolean isShiftChar(char ch) { return SHIFT_CHARS.indexOf(ch) >= 0; }
 }

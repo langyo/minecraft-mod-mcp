@@ -183,8 +183,9 @@ repositories {{
     }}
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
-    compile "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     compile "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
@@ -235,8 +236,9 @@ repositories {{
     }}
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
-    compile "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     compile "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
@@ -297,9 +299,10 @@ repositories {{
     }}
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
-    compile "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     compile "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
@@ -356,9 +359,10 @@ repositories {{
     }}
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
@@ -412,9 +416,10 @@ repositories {{
     }}
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 
@@ -475,9 +480,10 @@ repositories {{
     }}
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
-    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }}
 
@@ -542,9 +548,10 @@ repositories {{
     }}
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
     implementation minecraft.dependency('net.minecraftforge:forge:{forge_ver}')
-    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }}
 
@@ -552,7 +559,7 @@ tasks.withType(JavaCompile).configureEach {{
     options.encoding = 'UTF-8'
 }}
 
-tasks.jar {{
+jar {{
     manifest {{
         attributes 'ModSide' : 'BOTH'
         attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
@@ -649,9 +656,10 @@ repositories {{
     }}
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
     minecraft "{nf_group}:{nf_ver}"
-    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }}
 
@@ -699,8 +707,9 @@ repositories {{
     mavenCentral()
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
-    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }}
 
@@ -725,7 +734,7 @@ tasks.withType(JavaCompile).configureEach {{
     options.encoding = 'UTF-8'
 }}
 
-tasks.jar {{
+jar {{
     manifest {{
         attributes 'ModSide' : 'CLIENT'
         attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
@@ -795,11 +804,12 @@ repositories {{
     }}
 }}
 
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 dependencies {{
     minecraft "com.mojang:minecraft:{mc}"
     mappings "net.fabricmc:yarn:{yarn}{yarn_suffix}"
     {mod_cfg} "net.fabricmc:fabric-loader:{loader_ver}"
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """

@@ -7,10 +7,15 @@ import org.java_websocket.WebSocket
 import org.java_websocket.handshake.ClientHandshake
 import org.java_websocket.server.WebSocketServer
 import java.io.BufferedReader
+import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.net.InetSocketAddress
+import java.text.SimpleDateFormat
 import java.util.Base64
+import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 val gson = Gson()
 data class McCommand(val action: String, val params: Map<String, Any?> = emptyMap())
@@ -28,13 +33,17 @@ class McWsServer(port: Int) : WebSocketServer(InetSocketAddress(port)) {
             val respId = obj.get("id")?.asString
             if (respId != null) {
                 val data = obj.get("result")?.asString
+                println("[SRV-DBG] onMessage id=$respId hasData=${data != null} dataLen=${data?.length ?: 0} pendingKeys=${pending.keys}")
                 val cb = pending.remove(respId)
                 if (cb != null) {
+                    println("[SRV-DBG] CALLBACK FIRED for $respId")
                     val success = data != null && !data.startsWith("error:")
                     cb(McResult(success, data, if (!success) data else null))
+                } else {
+                    println("[SRV-DBG] NO callback for $respId (already removed or never registered)")
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) { e.printStackTrace() }
     }
     override fun onError(conn: WebSocket?, e: Exception?) {}
     override fun onStart() { println("[WS] Listening on $port") }
@@ -43,17 +52,93 @@ class McWsServer(port: Int) : WebSocketServer(InetSocketAddress(port)) {
         if (!connected()) { cb(McResult(false, error="MC not connected via WebSocket")); return }
         val id = "r_${reqId++}"; pending[id] = cb
         val p = HashMap(cmd.params); p["requestId"] = id
-        client?.send(gson.toJson(McCommand(cmd.action, p)))
+        val obj = JsonObject().apply { addProperty("method", cmd.action); add("params", gson.toJsonTree(p)) }
+        client?.send(gson.toJson(obj))
         Thread.sleep(200)
         if (pending.remove(id) != null) cb(McResult(false, error="timeout"))
     }
     fun connected() = client?.isOpen == true
+
+    fun sendAndWait(cmd: McCommand, timeoutMs: Long = 200): JsonObject? {
+        if (!connected()) { println("[SRV-DBG] sendAndWait: not connected"); return null }
+        val id = "r_${reqId++}"
+        var result: JsonObject? = null
+        pending[id] = { res ->
+            println("[SRV-DBG] callback for $id: success=${res.success} data=${if (res.data != null) res.data.toString().take(80) else "null"}")
+            result = if (res.success && res.data != null)
+                imgObj(res.data as String)
+            else txtObj(res.error ?: "fail")
+        }
+        val p = HashMap(cmd.params); p["requestId"] = id
+        val obj = JsonObject().apply { addProperty("method", cmd.action); add("params", gson.toJsonTree(p)) }
+        val json = gson.toJson(obj)
+        println("[SRV-DBG] sending ${cmd.action} id=$id json=$json clientOpen=${client?.isOpen} conn=${client}")
+        try {
+            client?.send(json)
+            println("[SRV-DBG] send() returned OK")
+        } catch (e: Exception) {
+            println("[SRV-DBG] send() FAILED: ${e.message}")
+        }
+        for (i in 0..(timeoutMs / 100)) {
+            Thread.sleep(100)
+            if (result != null) return result
+        }
+        println("[SRV-DBG] TIMEOUT for $id after ${timeoutMs}ms")
+        pending.remove(id)
+        return null
+    }
+}
+
+lateinit var screenshotStore: ScreenshotStore
+
+class ScreenshotStore(
+    private val dir: File = File("screenshots"),
+    private val maxKeep: Int = 20,
+    private val dateFormat: SimpleDateFormat = SimpleDateFormat("yyyyMMdd_HHmmss_SSS")
+) {
+    val history = CopyOnWriteArrayList<ScreenshotEntry>()
+
+    data class ScreenshotEntry(
+        val path: String,
+        val timestamp: Long,
+        val sizeBytes: Long
+    )
+
+    init { dir.mkdirs() }
+
+    fun save(b64data: String): ScreenshotEntry {
+        cleanOld()
+        val ts = System.currentTimeMillis()
+        val name = "mc_${dateFormat.format(Date(ts))}.png"
+        val file = File(dir, name)
+        val raw = if (b64data.startsWith("data:image/png;base64,"))
+            b64data.substringAfter(",")
+        else b64data
+        FileOutputStream(file).use { it.write(Base64.getDecoder().decode(raw)) }
+        val entry = ScreenshotEntry(file.absolutePath, ts, file.length())
+        history.add(0, entry)
+        println("[SCREENSHOT] saved ${file.name} (${file.length()/1024}KB) [${history.size}/$maxKeep]")
+        return entry
+    }
+
+    fun list(): List<ScreenshotEntry> = history.toList()
+
+    private fun cleanOld() {
+        while (history.size >= maxKeep) {
+            val old = history.removeAt(history.lastIndex)
+            File(old.path).delete()
+            println("[SCREENSHOT] cleaned ${File(old.path).name}")
+        }
+    }
 }
 
 fun main() {
     val port = System.getenv("MC_MCP_WS_PORT")?.toIntOrNull() ?: 9876
+    val screenshotDir = System.getenv("MCP_SCREENSHOT_DIR") ?: "screenshots"
+    val maxScreenshots = System.getenv("MCP_SCREENSHOT_MAX")?.toIntOrNull() ?: 20
+    screenshotStore = ScreenshotStore(File(screenshotDir), maxScreenshots)
     val ws = McWsServer(port); ws.start()
-    println("Minecraft MCP Server ready WS:$port")
+    println("Minecraft MCP Server ready WS:$port  screenshots->$screenshotDir (keep=$maxScreenshots)")
     val reader = BufferedReader(InputStreamReader(System.`in`))
     while (true) {
         val line = reader.readLine() ?: break
@@ -81,7 +166,8 @@ fun main() {
                     toolObj("execute_command", "Execute in-game command via mod", """{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}"""),
                     toolObj("get_player_info", "Query player state from mod", """{"type":"object","properties":{}}"""),
                     toolObj("get_world_info", "Query world state from mod", """{"type":"object","properties":{}}"""),
-                    toolObj("ping", "Ping mod for connectivity test", """{"type":"object","properties":{}}""")
+                    toolObj("ping", "Ping mod for connectivity test", """{"type":"object","properties":{}}"""),
+                    toolObj("list_screenshots", "List recent screenshots saved to disk", """{"type":"object","properties":{"limit":{"type":"number"}}}""")
                 )))
                 "tools/call" -> { val r = handleToolCall(req.getAsJsonObject("params"), ws); jobj("result" to r) }
                 else -> jobj("error" to jobj("code" to -32601, "message" to "unknown method: $method"))
@@ -108,7 +194,7 @@ fun handleToolCall(params: JsonObject?, ws: McWsServer): JsonObject {
     val args = params?.getAsJsonObject("arguments") ?: JsonObject()
     return try { when (name) {
         "launch_game" -> doLaunchGame(args)
-        "screenshot" -> { val e = requireWs(ws); if (e != null) e else doScreenshot(args, ws) }
+        "screenshot" -> { val e = requireWs(ws); if (e != null) e else doScreenshot(args, ws, screenshotStore) }
         "click" -> { val e = requireWs(ws); if (e != null) e else doClick(args, ws) }
         "press_key" -> { val e = requireWs(ws); if (e != null) e else doPressKey(args, ws) }
         "type_text" -> { val e = requireWs(ws); if (e != null) e else doTypeText(args, ws) }
@@ -120,6 +206,7 @@ fun handleToolCall(params: JsonObject?, ws: McWsServer): JsonObject {
         "get_player_info" -> { val e = requireWs(ws); if (e != null) e else doPlayerInfo(ws) }
         "get_world_info" -> { val e = requireWs(ws); if (e != null) e else doWorldInfo(ws) }
         "ping" -> { val e = requireWs(ws); if (e != null) e else doPing(ws) }
+        "list_screenshots" -> doListScreenshots(args, screenshotStore)
         else -> txtObj("Error: unknown tool $name")
     }} catch (e: Exception) { txtObj("Error: ${e.message}") }
 }
@@ -338,7 +425,7 @@ private fun extractNatives(mcDir: java.io.File, json: JsonObject): String {
                 java.nio.file.Files.copy(srcFile.toPath(),
                     java.io.File(nativesDir, srcFile.name).toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {}
         }
     }
     return nativesDir.absolutePath
@@ -429,12 +516,30 @@ private fun replaceVars(s: String, mcDir: java.io.File): String {
     return result
 }
 
-fun doScreenshot(a: JsonObject, w: McWsServer): JsonObject {
-    var out: JsonObject? = null
-    w.send(McCommand("screenshot", hashMapOf("save_path" to a.get("save_path")?.asString))) { res ->
-        out = if (res.success && res.data != null) imgObj(res.data as String) else txtObj("mod error: ${res.error}")
+fun doScreenshot(a: JsonObject, w: McWsServer, store: ScreenshotStore): JsonObject {
+    val result = w.sendAndWait(McCommand("screenshot", hashMapOf("save_path" to a.get("save_path")?.asString)), 5000)
+        ?: return txtObj("timeout")
+    if (result.has("content")) {
+        val content = result.getAsJsonArray("content")
+        if (content != null) {
+            for (elem in content) {
+                val obj = elem.asJsonObject
+                if (obj.get("type")?.asString == "image") {
+                    val b64 = obj.get("data")?.asString ?: continue
+                    try { store.save(b64) } catch (_: Exception) {}
+                }
+            }
+        }
     }
-    return out ?: txtObj("timeout")
+    return result
+}
+
+fun doListScreenshots(a: JsonObject, store: ScreenshotStore): JsonObject {
+    val limit = a.get("limit")?.asInt ?: 20
+    val entries = store.list().take(limit)
+    val lines = entries.map { "${File(it.path).name} | ${it.sizeBytes/1024}KB | ${java.text.SimpleDateFormat("HH:mm:ss").format(Date(it.timestamp))}" }
+    val text = if (lines.isEmpty()) "No screenshots yet." else "Recent screenshots (${entries.size}):\n" + lines.joinToString("\n")
+    return txtObj(text)
 }
 
 fun doClick(a: JsonObject, w: McWsServer): JsonObject {

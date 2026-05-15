@@ -28,6 +28,8 @@ repositories {
     maven {
         url = 'https://maven.neoforged.net/releases'
     }
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
     maven {
         url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
         allowInsecureProtocol = false
@@ -36,7 +38,6 @@ repositories {
 
 dependencies {
     minecraft "net.neoforged:neoforge:20.2.93"
-    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }
 

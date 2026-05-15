@@ -10,17 +10,20 @@ public class ModDevMcpMod {
 
     public ModDevMcpMod() {
         INSTANCE = this;
+        ReflectedInputHandler inputHandler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        McpMessageHandler msgHandler = new McpMessageHandler() {
+            { minecraftInput = inputHandler; }
+        };
         new Thread(() -> {
-            String serverUrl = McpConfig.getServerUrl();
-            ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-            wsClient = new McpWebSocketClient(serverUrl, handler);
-            wsClient.connectAsync();
-            while (true) {
-                try {
+            try {
+                String serverUrl = McpConfig.getServerUrl();
+                wsClient = new McpWebSocketClient(serverUrl, msgHandler);
+                wsClient.connectAsync();
+                while (true) {
                     Thread.sleep(50);
                     if (wsClient != null) wsClient.handleMessages();
-                } catch (Exception e) { break; }
-            }
-        }).start();
+                }
+            } catch (Exception e) { /* thread exit */ }
+        }, "MCP-Main").start();
     }
 }

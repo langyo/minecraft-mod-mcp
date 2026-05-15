@@ -12,6 +12,7 @@ public class McpMessageHandler {
 
     public McpMessageHandler() {}
 
+
     public void sendInit(Object wsClient) {
         McpWebSocketClient ws = castClient(wsClient);
         if (ws != null && ws.isOpen()) {
@@ -40,7 +41,7 @@ public class McpMessageHandler {
                 }
             }
             Object result = dispatch(method, params, wsClient);
-            sendResponse(method, result, wsClient);
+            sendResponse(method, result, wsClient, params.get("requestId"));
         } catch (Exception e) {
             System.err.println("[MCP-Handler] Error: " + e.getMessage());
         }
@@ -64,13 +65,13 @@ public class McpMessageHandler {
         return "unknown: " + method;
     }
 
-    private void sendResponse(String method, Object result, Object wsClient) {
+    private void sendResponse(String method, Object result, Object wsClient, String requestId) {
         McpWebSocketClient ws = castClient(wsClient);
         if (ws == null || !ws.isOpen()) return;
         JsonObject resp = new JsonObject();
         resp.addProperty("jsonrpc", "2.0");
         resp.add("result", GSON.toJsonTree(result));
-        resp.addProperty("id", String.valueOf(reqId++));
+        resp.addProperty("id", requestId != null ? requestId : String.valueOf(reqId++));
         ws.send(GSON.toJson(resp));
     }
 

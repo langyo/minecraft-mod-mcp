@@ -393,6 +393,25 @@ def main():
     java_exe = args.java or find_java(java_ver)
     print(f"[LAUNCH] Java: {java_exe} (MC wants {java_ver})")
 
+    ws_jar = os.path.join(mc_dir, "libraries", "org", "java-websocket",
+                           "Java-WebSocket", "1.5.4", "Java-WebSocket-1.5.4.jar")
+    if not os.path.isfile(ws_jar):
+        gradle_cache = os.path.join(os.path.expanduser("~"), ".gradle", "caches",
+                                     "modules-2", "files-2.1", "org.java-websocket",
+                                     "Java-WebSocket", "1.5.4")
+        if os.path.isdir(gradle_cache):
+            for root, dirs, files in os.walk(gradle_cache):
+                for f in files:
+                    if f.endswith(".jar"):
+                        src = os.path.join(root, f)
+                        os.makedirs(os.path.dirname(ws_jar), exist_ok=True)
+                        shutil.copy2(src, ws_jar)
+                        print(f"[LAUNCH] Copied Java-WebSocket to {ws_jar}")
+                        break
+    if os.path.isfile(ws_jar):
+        cp.append(ws_jar)
+        print(f"[LAUNCH] Added Java-WebSocket to classpath")
+
     sep = ";" if platform.system() == "Windows" else ":"
     cp_str = sep.join(cp)
 

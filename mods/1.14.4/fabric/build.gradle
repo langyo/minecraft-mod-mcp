@@ -13,12 +13,13 @@ repositories {
     maven {
         url = "../../../.maven-local"
     }
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
 }
 
 dependencies {
     minecraft "com.mojang:minecraft:1.14.4"
     mappings "net.fabricmc:yarn:1.14.4+build.18:v2"
     modImplementation "net.fabricmc:fabric-loader:0.11.3"
-    implementation "com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }

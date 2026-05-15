@@ -32,42 +32,21 @@ repositories {
     }
 }
 
-configurations {
-    shade
-    implementation.extendsFrom shade
-}
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
 dependencies {
     implementation minecraft.dependency('net.minecraftforge:forge:1.21.7-57.0.2')
-    shade 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
-    shade('org.java-websocket:Java-WebSocket:1.5.4') {
-        transitive = false
-    }
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+    implementation 'org.slf4j:slf4j-api:1.7.36'
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-tasks.jar {
+jar {
     manifest {
         attributes 'ModSide' : 'BOTH'
-        attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
         attributes 'Implementation-Version' : project.version
     }
-    from {
-        configurations.shade.collect { it.isDirectory() ? it : zipTree(it) }
-    }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    exclude 'META-INF/versions/**'
-    exclude 'module-info.class'
-    exclude 'META-INF/maven/**'
-    exclude 'META-INF/MANIFEST.MF'
-    exclude 'META-INF/*.SF'
-    exclude 'META-INF/*.DSA'
-    exclude 'META-INF/*.RSA'
-    exclude 'org/slf4j/**'
-    exclude 'javax/**'
-    exclude 'net/jcip/**'
-    exclude 'com/google/**'
 }

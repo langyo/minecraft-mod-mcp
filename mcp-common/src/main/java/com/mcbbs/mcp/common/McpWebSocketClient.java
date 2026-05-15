@@ -18,11 +18,7 @@ public class McpWebSocketClient extends WebSocketClient {
 
     public void connectAsync() {
         new Thread(() -> {
-            try {
-                connect();
-            } catch (Exception e) {
-                System.err.println("[MCP-WS] Connect failed: " + e.getMessage());
-            }
+            try { connect(); } catch (Exception e) { }
         }, "MCP-WS-Connect").start();
     }
 
@@ -34,9 +30,7 @@ public class McpWebSocketClient extends WebSocketClient {
 
     @Override
     public void onMessage(String message) {
-        if (message != null) {
-            messageQueue.add(message);
-        }
+        if (message != null) messageQueue.add(message);
     }
 
     @Override
@@ -51,19 +45,14 @@ public class McpWebSocketClient extends WebSocketClient {
 
     @Override
     public void send(String msg) {
-        if (isOpen()) {
-            super.send(msg);
-        }
+        if (isOpen()) super.send(msg);
     }
 
     public void handleMessages() {
         String msg;
         while ((msg = messageQueue.poll()) != null) {
-            try {
-                handler.handleMessage(msg, this);
-            } catch (Exception e) {
-                System.err.println("[MCP-WS] Handle error: " + e.getMessage());
-            }
+            try { handler.handleMessage(msg, this); }
+            catch (Exception e) { e.printStackTrace(); }
         }
     }
 }

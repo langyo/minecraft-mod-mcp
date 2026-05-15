@@ -14,11 +14,12 @@ repositories {
         url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
         allowInsecureProtocol = false
     }
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+
     mavenCentral()
 }
 
 dependencies {
-    implementation 'com.mcbbs.mcp:mcp-common:1.0.0-SNAPSHOT'
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }
 
@@ -43,7 +44,7 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-tasks.jar {
+jar {
     manifest {
         attributes 'ModSide' : 'CLIENT'
         attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
