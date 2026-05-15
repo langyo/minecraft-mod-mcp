@@ -832,7 +832,7 @@ def write_fabric_mod_json(mc, info, path):
     content = """{
   "schemaVersion": 1,
   "id": "moddevmcp",
-  "version": "${version}",
+  "version": "1.0.0",
   "name": "ModDev MCP",
   "description": "WebSocket bridge for AI agent interaction",
   "authors": ["langyo"],

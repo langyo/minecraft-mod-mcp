@@ -19,6 +19,7 @@ import argparse
 import threading
 import hashlib
 import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import (
@@ -232,12 +233,87 @@ def resolve_java_home(mc, info, loader="forge"):
     return None
 
 
+_print_lock = threading.Lock()
+
+
+def _build_one(task_info):
+    mc, loader, info = task_info
+    path = os.path.join(MODS_DIR_ACTUAL, mc, loader)
+    key = f"{mc}/{loader}"
+
+    if not os.path.isdir(path):
+        return key, "skip", {"key": key, "reason": "no project dir"}
+
+    gradlew = os.path.join(path, "gradlew.bat")
+    if not os.path.isfile(gradlew):
+        return key, "skip", {"key": key, "reason": "no gradlew"}
+
+    env = os.environ.copy()
+    jdk = resolve_java_home(mc, info, loader)
+    if jdk:
+        env["JAVA_HOME"] = jdk
+
+    gp = os.path.join(path, "gradle.properties")
+    with open(gp, "w") as f:
+        f.write("org.gradle.jvmargs=-Xmx3G\n")
+    env.pop("JAVA_TOOL_OPTIONS", None)
+    env["GRADLE_OPTS"] = "-Xmx3G"
+
+    start = time.time()
+    cmd = ["cmd", "/c", "gradlew.bat", "build", "--no-daemon"]
+    fg_era = info.get("fg_era", "")
+    if fg_era == "fg12":
+        init_script = os.path.join(
+            os.environ.get("TEMP", "C:\\Temp"),
+            "fg12_init.gradle",
+        )
+        if not os.path.isfile(init_script):
+            with open(init_script, "w") as f:
+                f.write(
+                    "allprojects {\n"
+                    "  tasks.whenTaskAdded { task ->\n"
+                    "    if (task.name == 'downloadClient' || task.name == 'downloadServer') {\n"
+                    "      task.enabled = false\n"
+                    "    }\n"
+                    "  }\n"
+                    "}\n"
+                )
+        cmd += ["-I", init_script]
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=path,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=BUILD_TIMEOUT,
+            env=env,
+        )
+        elapsed = time.time() - start
+        out = (proc.stdout or "") + (proc.stderr or "")
+        if proc.returncode == 0 and "BUILD SUCCESSFUL" in out:
+            return key, "success", {"key": key, "time": round(elapsed, 1)}
+        else:
+            err_msg = out[-2000:] if len(out) > 2000 else out
+            log_path = os.path.join(path, "build-error.log")
+            with open(log_path, "w", encoding="utf-8") as lf:
+                lf.write(out)
+            return key, "fail", {"key": key, "time": round(elapsed, 1), "error": err_msg}
+    except subprocess.TimeoutExpired:
+        elapsed = time.time() - start
+        return key, "fail", {"key": key, "time": round(elapsed, 1), "error": "TIMEOUT"}
+    except Exception as e:
+        return key, "fail", {"key": key, "error": str(e)}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Batch build all mod projects")
     parser.add_argument("--era", help="Only build specific FG era (e.g. fg51, fg6)")
     parser.add_argument("--loader", help="Only build specific loader (forge, neoforge, fabric)")
     parser.add_argument("--mc", help="Only build specific MC version")
     parser.add_argument("--no-cache", action="store_true", help="Skip prepare_cache step")
+    parser.add_argument("-j", "--jobs", type=int, default=4, help="Parallel workers (default: 4)")
     args = parser.parse_args()
 
     if not args.no_cache:
@@ -265,7 +341,6 @@ def main():
             tasks.append((mc, loader, info))
 
     total = len(tasks)
-    done = 0
 
     has_fg12 = any(info.get("fg_era") == "fg12" for _, _, info in tasks)
     if has_fg12:
@@ -279,7 +354,7 @@ def main():
                 ensure_mcp_stable_in_fg_cache(mc, info)
         print()
 
-    print(f"Building {total} projects...")
+    print(f"Building {total} projects with {args.jobs} workers...")
     if args.era:
         print(f"  Filter era: {args.era}")
     if args.loader:
@@ -288,90 +363,25 @@ def main():
         print(f"  Filter mc: {args.mc}")
     print()
 
-    for mc, loader, info in tasks:
-        done += 1
-        path = os.path.join(MODS_DIR_ACTUAL, mc, loader)
-        key = f"{mc}/{loader}"
+    done = 0
+    start_all = time.time()
 
-        if not os.path.isdir(path):
-            results["skip"].append({"key": key, "reason": "no project dir"})
-            print(f"[{done}/{total}] SKIP {key}: no project dir")
-            continue
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        future_map = {pool.submit(_build_one, t): t for t in tasks}
+        for future in as_completed(future_map):
+            done += 1
+            key, status, entry = future.result()
+            elapsed = entry.get("time", 0)
+            with _print_lock:
+                tag = {"success": "OK", "fail": "FAIL", "skip": "SKIP"}[status]
+                print(f"[{done}/{total}] {tag} {key} ({elapsed:.1f}s)")
+            results[status].append(entry)
 
-        gradlew = os.path.join(path, "gradlew.bat")
-        if not os.path.isfile(gradlew):
-            results["skip"].append({"key": key, "reason": "no gradlew"})
-            print(f"[{done}/{total}] SKIP {key}: no gradlew")
-            continue
-
-        print(f"[{done}/{total}] BUILD {key}...", end="", flush=True)
-
-        env = os.environ.copy()
-
-        jdk = resolve_java_home(mc, info, loader)
-        if jdk:
-            env["JAVA_HOME"] = jdk
-
-        gp = os.path.join(path, "gradle.properties")
-        with open(gp, "w") as f:
-            f.write("org.gradle.jvmargs=-Xmx3G\n")
-        env.pop("JAVA_TOOL_OPTIONS", None)
-        env["GRADLE_OPTS"] = "-Xmx3G"
-
-        start = time.time()
-        cmd = ["cmd", "/c", "gradlew.bat", "build", "--no-daemon"]
-        fg_era = info.get("fg_era", "")
-        if fg_era == "fg12":
-            init_script = os.path.join(
-                os.environ.get("TEMP", "C:\\Temp"),
-                "fg12_init.gradle",
-            )
-            if not os.path.isfile(init_script):
-                with open(init_script, "w") as f:
-                    f.write(
-                        "allprojects {\n"
-                        "  tasks.whenTaskAdded { task ->\n"
-                        "    if (task.name == 'downloadClient' || task.name == 'downloadServer') {\n"
-                        "      task.enabled = false\n"
-                        "    }\n"
-                        "  }\n"
-                        "}\n"
-                    )
-            cmd += ["-I", init_script]
-        try:
-            proc = subprocess.run(
-                cmd,
-                cwd=path,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=BUILD_TIMEOUT,
-                env=env,
-            )
-            elapsed = time.time() - start
-            out = (proc.stdout or "") + (proc.stderr or "")
-            if proc.returncode == 0 and "BUILD SUCCESSFUL" in out:
-                results["success"].append({"key": key, "time": round(elapsed, 1)})
-                print(f" OK ({elapsed:.1f}s)")
-            else:
-                err_msg = out[-2000:] if len(out) > 2000 else out
-                results["fail"].append({"key": key, "time": round(elapsed, 1), "error": err_msg})
-                log_path = os.path.join(path, "build-error.log")
-                with open(log_path, "w", encoding="utf-8") as lf:
-                    lf.write(out)
-                print(f" FAIL ({elapsed:.1f}s)")
-        except subprocess.TimeoutExpired:
-            elapsed = time.time() - start
-            results["fail"].append({"key": key, "time": round(elapsed, 1), "error": "TIMEOUT"})
-            print(f" TIMEOUT ({elapsed:.1f}s)")
-        except Exception as e:
-            results["fail"].append({"key": key, "error": str(e)})
-            print(f" ERROR: {e}")
-
+    total_time = time.time() - start_all
     print(f"\n{'=' * 60}")
     s, f, sk = len(results["success"]), len(results["fail"]), len(results["skip"])
     print(f"Results: {s} OK, {f} FAIL, {sk} SKIP / {total} total")
+    print(f"Total time: {total_time:.0f}s ({total_time / 60:.1f}min) with {args.jobs} workers")
     print(f"{'=' * 60}")
 
     if results["fail"]:

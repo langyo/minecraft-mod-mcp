@@ -415,13 +415,21 @@ public class ModDevMcpMod implements ClientModInitializer {
 # WRITE TO PROJECTS
 # ============================================================
 
+PACK_MCMETA = """{
+  "pack": {
+    "description": "ModDev MCP resources",
+    "pack_format": 34
+  }
+}
+"""
+
 MODS_TOML = """modLoader="javafml"
 loaderVersion="[4,)"
 license="MIT"
 
 [[mods]]
 modId="moddevmcp"
-version="${version}"
+version="1.0.0"
 displayName="ModDev MCP"
 description="WebSocket bridge for AI agent interaction"
 authors="langyo"
@@ -433,7 +441,7 @@ license = "MIT"
 
 [[mods]]
 modId = "moddevmcp"
-version = "${version}"
+version = "1.0.0"
 displayName = "ModDev MCP"
 description = "WebSocket bridge for AI agent interaction"
 authors = "langyo"
@@ -470,11 +478,15 @@ if __name__ == "__main__":
             if loader == "forge":
                 write_java(path, "ModDevMcpMod.java", get_forge_mod_template(mc))
                 g = get_api_group(mc)
+                res_dir = os.path.join(path, "src", "main", "resources")
+                os.makedirs(res_dir, exist_ok=True)
                 if g in ("fg6","fg7","mc26"):
-                    res_dir = os.path.join(path, "src", "main", "resources", "META-INF")
-                    os.makedirs(res_dir, exist_ok=True)
-                    with open(os.path.join(res_dir, "mods.toml"), "w") as f:
+                    meta_dir = os.path.join(res_dir, "META-INF")
+                    os.makedirs(meta_dir, exist_ok=True)
+                    with open(os.path.join(meta_dir, "mods.toml"), "w") as f:
                         f.write(MODS_TOML)
+                with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:
+                    f.write(PACK_MCMETA)
                 total += 1
             elif loader == "neoforge":
                 nf_style = info.get("neoforge_style", "mdg")
@@ -484,10 +496,13 @@ if __name__ == "__main__":
                     write_java(path, "ModDevMcpMod.java", neoforge_mod_1204(mc))
                 else:
                     write_java(path, "ModDevMcpMod.java", neoforge_mod(mc))
-                res_dir = os.path.join(path, "src", "main", "resources", "META-INF")
-                os.makedirs(res_dir, exist_ok=True)
-                with open(os.path.join(res_dir, "neoforge.mods.toml"), "w") as f:
+                res_dir = os.path.join(path, "src", "main", "resources")
+                meta_dir = os.path.join(res_dir, "META-INF")
+                os.makedirs(meta_dir, exist_ok=True)
+                with open(os.path.join(meta_dir, "neoforge.mods.toml"), "w") as f:
                     f.write(NEOFORGE_MODS_TOML)
+                with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:
+                    f.write(PACK_MCMETA)
                 total += 1
             elif loader == "fabric":
                 write_java(path, "ModDevMcpMod.java", fabric_mod(mc))

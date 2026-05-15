@@ -202,6 +202,7 @@ ALL_VERSIONS = {
     "1.21.5": {"forge": "1.21.5-55.1.10",            "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.5",
                "neoforge": "21.5.97", "mdg": "2.0.141",
                "fabric_yarn": "1.21.5+build.1"},
+    "1.21.7": {"forge": "1.21.7-57.0.2",             "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.7"},
 
     # --- FG 7.x (MC 26.x) ---
     "26.1":   {"forge": "26.1-62.0.9",               "fg_era": "fg7",  "java": 25, "mappings": "official_26.1"},
@@ -242,7 +243,7 @@ def get_api_group(mc):
         "1.20.3": "fg6", "1.20.4": "fg6", "1.20.6": "fg6",
         "1.21": "fg6", "1.21.1": "fg6", "1.21.2": "fg6", "1.21.3": "fg6",
         # 1.21.4+: new event system
-        "1.21.4": "fg7", "1.21.5": "fg7",
+        "1.21.4": "fg7", "1.21.5": "fg7", "1.21.7": "mc26",
         # 26.x: @SubscribeEvent removed
         "26.1": "mc26", "26.1.1": "mc26", "26.1.2": "mc26",
     }
