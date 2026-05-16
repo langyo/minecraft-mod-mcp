@@ -1,7 +1,6 @@
 buildscript {
     repositories {
         maven { url = "https://maven.minecraftforge.net/" }
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
         mavenCentral()
     }
@@ -33,6 +32,8 @@ repositories {
         url = "../../../.maven-local"
     }
 }
+
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
 dependencies {
     minecraft "net.minecraftforge:forge:1.16.5-36.2.42"
