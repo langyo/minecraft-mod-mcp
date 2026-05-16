@@ -16,16 +16,20 @@ public class McpWebSocketClient extends WebSocketClient {
         this.setConnectionLostTimeout(0);
     }
 
+    @Override
+    public void onOpen(ServerHandshake handshake) {
+        try {
+            java.lang.reflect.Method setMax = this.getClass().getMethod("setMaxTextMessageSize", int.class);
+            setMax.invoke(this, 10 * 1024 * 1024);
+        } catch (Exception ignored) {}
+        System.out.println("[MCP-WS] Connected to MCP server");
+        handler.sendInit(this);
+    }
+
     public void connectAsync() {
         new Thread(() -> {
             try { connect(); } catch (Exception e) { }
         }, "MCP-WS-Connect").start();
-    }
-
-    @Override
-    public void onOpen(ServerHandshake handshake) {
-        System.out.println("[MCP-WS] Connected to MCP server");
-        handler.sendInit(this);
     }
 
     @Override

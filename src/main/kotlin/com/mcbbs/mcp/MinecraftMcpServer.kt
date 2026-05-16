@@ -25,7 +25,14 @@ class McWsServer(port: Int) : WebSocketServer(InetSocketAddress(port)) {
     private var client: WebSocket? = null
     private val pending = ConcurrentHashMap<String, (McResult) -> Unit>()
     private var reqId = 0
-    override fun onOpen(conn: WebSocket?, h: ClientHandshake?) { client = conn; println("[WS] MC connected") }
+    override fun onOpen(conn: WebSocket?, h: ClientHandshake?) {
+        client = conn
+        try {
+            val method = conn?.javaClass?.getMethod("setMaxTextMessageSize", Int::class.javaPrimitiveType)
+            method?.invoke(conn, 10 * 1024 * 1024)
+        } catch (_: Exception) {}
+        println("[WS] MC connected")
+    }
     override fun onClose(conn: WebSocket?, c: Int, r: String?, b: Boolean) { if (conn == client) client = null }
     override fun onMessage(conn: WebSocket?, m: String?) {
         if (m != null) try {

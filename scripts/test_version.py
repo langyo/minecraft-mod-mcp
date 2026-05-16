@@ -205,14 +205,18 @@ def _download_from_maven(group: str, artifact: str, ver: str, target: str):
     urllib.request.urlretrieve(url, target)
 
 
-def _ensure_websocket_deps(mc_dir: Path) -> list:
+def _ensure_websocket_deps(mc_dir: Path, mc_version: str = "") -> list:
     import shutil as _shutil
     jars = []
     deps = [
         ("org.java-websocket", "Java-WebSocket", "1.5.4"),
-        ("org.slf4j", "slf4j-api", "2.0.7"),
-        ("org.slf4j", "slf4j-simple", "2.0.7"),
     ]
+    mc_key = _resolve_mc_key(mc_version) if mc_version else ""
+    era = get_fg_era(mc_key) if mc_key else None
+    needs_slf4j = era and era.get("java", 21) <= 8
+    if needs_slf4j:
+        deps.append(("org.slf4j", "slf4j-api", "1.7.36"))
+        deps.append(("org.slf4j", "slf4j-simple", "1.7.36"))
     lib_base = mc_dir / "libraries"
     for group, artifact, ver in deps:
         rel = os.path.join(*group.split("."), artifact, ver, f"{artifact}-{ver}.jar")
@@ -267,7 +271,7 @@ def _start_mc(version: str) -> subprocess.Popen:
         for a in jvm_args
     )
 
-    extra_jars = _ensure_websocket_deps(MC_DIR)
+    extra_jars = _ensure_websocket_deps(MC_DIR, version)
 
     cmd = [java_exe, "-Xmx4G", "-Xms1G", "-Dmcp.server=ws://127.0.0.1:9876"]
     cmd.extend(jvm_args)
@@ -460,11 +464,19 @@ def test_single(version: str, loader: str, timeout: int = 300) -> TestResult:
             if stdout_log.exists():
                 try:
                     content = stdout_log.read_text(encoding="utf-8", errors="replace")
-                    if "saved:" in content or "SCREENSHOT" in content:
+                    if "saved:" in content or "SCREENSHOT" in content or "screenshot success" in content:
                         result.screenshot_method = "mod_pipeline"
                         print(f"  Screenshot via mod pipeline")
                 except Exception:
                     pass
+            if not getattr(result, "screenshot_method", None):
+                ss_lines = [l for l in _server_output_lines if "[SCREENSHOT] saved" in l]
+                if ss_lines:
+                    result.screenshot_method = "mod_pipeline"
+                    print(f"  Screenshot via mod pipeline (server)")
+                elif any("screenshot success" in l for l in _server_output_lines):
+                    result.screenshot_method = "mod_pipeline"
+                    print(f"  Screenshot via mod pipeline (server-gl)")
         if not getattr(result, "screenshot_method", None):
             try:
                 wc = WindowController()

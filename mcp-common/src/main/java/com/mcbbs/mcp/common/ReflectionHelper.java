@@ -1,5 +1,11 @@
 package com.mcbbs.mcp.common;
 
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
+import java.awt.Robot;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
@@ -12,11 +18,17 @@ import javax.imageio.ImageIO;
 public final class ReflectionHelper {
 
     private static final boolean LWJGL3;
+    private static final boolean HAS_VULKAN;
+    private static Robot awtRobot;
 
     static {
         boolean v = false;
         try { Class.forName("org.lwjgl.glfw.GLFW"); v = true; } catch (ClassNotFoundException e) {}
         LWJGL3 = v;
+        boolean vk = false;
+        try { Class.forName("org.lwjgl.vulkan.VK"); vk = true; } catch (ClassNotFoundException e) {}
+        HAS_VULKAN = vk;
+        try { awtRobot = new Robot(); awtRobot.setAutoDelay(10); } catch (Exception e) {}
     }
 
     private ReflectionHelper() {}
@@ -27,7 +39,16 @@ public final class ReflectionHelper {
             try {
                 return mc.getMethod("getInstance").invoke(null);
             } catch (NoSuchMethodException e) {
-                return mc.getMethod("getMinecraft").invoke(null);
+                try {
+                    return mc.getMethod("getMinecraft").invoke(null);
+                } catch (NoSuchMethodException e2) {
+                    for (Method m : mc.getMethods()) {
+                        if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) && m.getReturnType() == mc && m.getParameterCount() == 0) {
+                            return m.invoke(null);
+                        }
+                    }
+                    throw new RuntimeException("No static getter found on " + mc.getName());
+                }
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to get Minecraft instance", e);
@@ -55,20 +76,26 @@ public final class ReflectionHelper {
         catch (NoSuchMethodException e) { return false; }
     }
 
+    private static int getIntFieldByNames(Object obj, String... names) {
+        Class<?> cl = obj.getClass();
+        for (String name : names) {
+            try {
+                Field f = cl.getDeclaredField(name);
+                f.setAccessible(true);
+                return f.getInt(obj);
+            } catch (Exception ignored) {}
+        }
+        return -1;
+    }
+
     public static int getDisplayWidth(Object mc) {
-        try {
-            Field f = mc.getClass().getDeclaredField("displayWidth");
-            f.setAccessible(true);
-            return f.getInt(mc);
-        } catch (Exception e) { return 0; }
+        int v = getIntFieldByNames(mc, "displayWidth", "field_71443_c", "width");
+        return v > 0 ? v : 0;
     }
 
     public static int getDisplayHeight(Object mc) {
-        try {
-            Field f = mc.getClass().getDeclaredField("displayHeight");
-            f.setAccessible(true);
-            return f.getInt(mc);
-        } catch (Exception e) { return 0; }
+        int v = getIntFieldByNames(mc, "displayHeight", "field_71440_d", "height");
+        return v > 0 ? v : 0;
     }
 
     public static String getPlayerInfo(Object mc) {
@@ -170,6 +197,10 @@ public final class ReflectionHelper {
     }
 
     public static byte[] takeScreenshot(Object mc, int width, int height) {
+        if (HAS_VULKAN) {
+            byte[] vk = takeWindowScreenshot();
+            if (vk != null) return vk;
+        }
         try {
             if (width <= 0 || height <= 0) return null;
 
@@ -215,19 +246,27 @@ public final class ReflectionHelper {
                 }
             };
 
-            try {
-                Method execute = mc.getClass().getMethod("execute", Runnable.class);
-                execute.invoke(mc, captureTask);
-            } catch (NoSuchMethodException e) {
-                try {
-                    mc.getClass().getMethod("addScheduledTask", Runnable.class).invoke(mc, captureTask);
-                } catch (NoSuchMethodException e2) {
-                    captureTask.run();
+            boolean scheduled = false;
+            for (Method m : mc.getClass().getMethods()) {
+                if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(mc, captureTask);
+                        scheduled = true;
+                        break;
+                    } catch (Exception ignored) {}
                 }
             }
+            if (!scheduled) {
+                captureTask.run();
+            }
 
-            if (!latch.await(3, TimeUnit.SECONDS)) return null;
-            if (captureError[0] != null) return null;
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                return takeWindowScreenshot();
+            }
+            if (captureError[0] != null) {
+                return takeWindowScreenshot();
+            }
 
             int[] raw = new int[w * h];
             for (int i = 0; i < raw.length; i++) {
@@ -251,22 +290,30 @@ public final class ReflectionHelper {
             ImageIO.write(img, "png", baos);
             return baos.toByteArray();
         } catch (Exception e) {
-            return null;
+            return takeWindowScreenshot();
         }
     }
 
     private static void doGlReadPixels(int x, int y, int w, int h, ByteBuffer bb) throws Exception {
-        if (LWJGL3) {
-            Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
-            int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
-            int GL_UB = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
-            findAndInvoke(gl11, "glReadPixels", new Object[]{x, y, w, h, GL_RGBA, GL_UB, bb});
-        } else {
-            Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
-            int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
-            int GL_UB = Class.forName("org.lwjgl.GL11").getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
-            findAndInvoke(gl11, "glReadPixels", new Object[]{x, y, w, h, GL_RGBA, GL_UB, bb});
+        Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
+        int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
+        int GL_UB = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glReadPixels") && m.getParameterCount() == 7) {
+                Class<?>[] pts = m.getParameterTypes();
+                if (pts[6] == java.nio.ByteBuffer.class) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(null, x, y, w, h, GL_RGBA, GL_UB, bb);
+                        return;
+                    } catch (java.lang.reflect.InvocationTargetException ite) {
+                        System.err.println("[MCP-GL] ByteBuffer invoke failed: " + ite.getCause());
+                        throw ite;
+                    }
+                }
+            }
         }
+        throw new NoSuchMethodException("glReadPixels(int,int,int,int,int,int,ByteBuffer)");
     }
 
     private static Object findAndInvoke(Class<?> target, String name, Object[] args) throws Exception {
@@ -279,13 +326,138 @@ public final class ReflectionHelper {
         throw new NoSuchMethodException(name);
     }
 
-    public static void sendKey(long handle, int key, int action) {}
+    public static void sendKey(long handle, int key, int action) {
+        try {
+            Robot r = awtRobot;
+            if (r == null) return;
+            int vk = glfwToAwt(key);
+            if (vk < 0) return;
+            if (action == 1) r.keyPress(vk);
+            else r.keyRelease(vk);
+        } catch (Exception e) { System.err.println("[Input] sendKey: " + e.getMessage()); }
+    }
 
-    public static void sendMouseButton(long handle, int button, int action) {}
+    public static void sendMouseButton(long handle, int button, int action) {
+        try {
+            Robot r = awtRobot;
+            if (r == null) return;
+            int mask = button == 1 ? InputEvent.BUTTON2_DOWN_MASK
+                     : button == 2 ? InputEvent.BUTTON3_DOWN_MASK
+                     : InputEvent.BUTTON1_DOWN_MASK;
+            if (action == 1) r.mousePress(mask);
+            else r.mouseRelease(mask);
+        } catch (Exception e) { System.err.println("[Input] sendMouseButton: " + e.getMessage()); }
+    }
 
-    public static void sendScroll(long handle, double scrollY) {}
+    public static void sendScroll(long handle, double scrollY) {
+        try {
+            Robot r = awtRobot;
+            if (r == null) return;
+            r.mouseWheel((int) scrollY);
+        } catch (Exception e) { System.err.println("[Input] sendScroll: " + e.getMessage()); }
+    }
 
-    public static void setCursorPos(long handle, double x, double y) {}
+    public static void setCursorPos(long handle, double x, double y) {
+        try {
+            Robot r = awtRobot;
+            if (r == null) return;
+            int wx = 0, wy = 0;
+            try {
+                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                Method getX = glfwClass.getMethod("glfwGetWindowPosX", long.class);
+                Method getY = glfwClass.getMethod("glfwGetWindowPosY", long.class);
+                wx = ((Number) getX.invoke(null, handle)).intValue();
+                wy = ((Number) getY.invoke(null, handle)).intValue();
+            } catch (Exception ignored) {}
+            r.mouseMove(wx + (int) x, wy + (int) y);
+        } catch (Exception e) { System.err.println("[Input] setCursorPos: " + e.getMessage()); }
+    }
+
+    private static int glfwToAwt(int glfwKey) {
+        if (glfwKey >= 'A' && glfwKey <= 'Z') return KeyEvent.VK_A + (glfwKey - 'A');
+        if (glfwKey >= '0' && glfwKey <= '9') return KeyEvent.VK_0 + (glfwKey - '0');
+        switch (glfwKey) {
+            case 0xFF0D: return KeyEvent.VK_ENTER;
+            case 0xFF1B: return KeyEvent.VK_ESCAPE;
+            case 0xFF09: return KeyEvent.VK_TAB;
+            case 0x0020: return KeyEvent.VK_SPACE;
+            case 0xFF08: return KeyEvent.VK_BACK_SPACE;
+            case 0xFFFF: return KeyEvent.VK_DELETE;
+            case 0xFF52: return KeyEvent.VK_UP;
+            case 0xFF54: return KeyEvent.VK_DOWN;
+            case 0xFF51: return KeyEvent.VK_LEFT;
+            case 0xFF53: return KeyEvent.VK_RIGHT;
+            case 0xFFE1: return KeyEvent.VK_SHIFT;
+            case 0xFFE3: return KeyEvent.VK_CONTROL;
+            case 0xFFE9: return KeyEvent.VK_ALT;
+            case 0xFFBE: return KeyEvent.VK_F1;
+            case 0xFFBF: return KeyEvent.VK_F2;
+            case 0xFFC0: return KeyEvent.VK_F3;
+            case 0xFFC1: return KeyEvent.VK_F4;
+            case 0xFFC2: return KeyEvent.VK_F5;
+            case 0xFFC3: return KeyEvent.VK_F6;
+            case 0xFFC4: return KeyEvent.VK_F7;
+            case 0xFFC5: return KeyEvent.VK_F8;
+            case 0xFFC6: return KeyEvent.VK_F9;
+            case 0xFFC7: return KeyEvent.VK_F10;
+            case 0xFFC8: return KeyEvent.VK_F11;
+            case 0xFFC9: return KeyEvent.VK_F12;
+            case 0x002E: return KeyEvent.VK_PERIOD;
+            case 0x002C: return KeyEvent.VK_COMMA;
+            case 0x002D: return KeyEvent.VK_MINUS;
+            case 0x003D: return KeyEvent.VK_EQUALS;
+            case 0x005B: return KeyEvent.VK_OPEN_BRACKET;
+            case 0x005D: return KeyEvent.VK_CLOSE_BRACKET;
+            case 0x003B: return KeyEvent.VK_SEMICOLON;
+            case 0x0060: return KeyEvent.VK_BACK_QUOTE;
+            default: return -1;
+        }
+    }
+
+    public static byte[] takeWindowScreenshot() {
+        try {
+            Robot r = awtRobot;
+            if (r == null) return null;
+            Object mc = getMinecraftInstance();
+            if (!hasWindow(mc)) return null;
+            long handle = getWindowHandle(mc);
+            if (handle == 0) return null;
+            int wx = 0, wy = 0, ww = 800, wh = 600;
+            try {
+                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                wx = ((Number) glfwClass.getMethod("glfwGetWindowPosX", long.class).invoke(null, handle)).intValue();
+                wy = ((Number) glfwClass.getMethod("glfwGetWindowPosY", long.class).invoke(null, handle)).intValue();
+                int[] wArr = {0}, hArr = {0};
+                try {
+                    Class<?> intBufClass = Class.forName("org.lwjgl.system.MemoryUtil");
+                    Object wBuf = intBufClass.getMethod("memAllocInt", int.class).invoke(null, 1);
+                    Object hBuf = intBufClass.getMethod("memAllocInt", int.class).invoke(null, 1);
+                    glfwClass.getMethod("glfwGetWindowSize", long.class, Class.forName("java.nio.IntBuffer"), Class.forName("java.nio.IntBuffer"))
+                            .invoke(null, handle, wBuf, hBuf);
+                    ww = ((java.nio.IntBuffer) wBuf).get(0);
+                    wh = ((java.nio.IntBuffer) hBuf).get(0);
+                } catch (Exception e2) {
+                    Object window = mc.getClass().getMethod("getWindow").invoke(mc);
+                    Field wf = window.getClass().getDeclaredField("width");
+                    wf.setAccessible(true);
+                    ww = wf.getInt(window);
+                    Field hf = window.getClass().getDeclaredField("height");
+                    hf.setAccessible(true);
+                    wh = hf.getInt(window);
+                }
+            } catch (Exception e) {
+                return null;
+            }
+            if (ww <= 0 || wh <= 0) return null;
+            Rectangle rect = new Rectangle(wx, wy, ww, wh);
+            BufferedImage img = r.createScreenCapture(rect);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(img, "png", baos);
+            return baos.toByteArray();
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     public static void lwjgl2PressKey(int keyCode) {}
 

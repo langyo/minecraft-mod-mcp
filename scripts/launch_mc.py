@@ -419,8 +419,11 @@ _FLAGS_REQUIRING_JDK22 = {
     "--sun-misc-unsafe-memory-access",
 }
 
-_EXPERIMENTAL_FLAGS = {
+_FLAGS_REQUIRING_JDK24 = {
     "-XX:+UseCompactObjectHeaders",
+}
+
+_EXPERIMENTAL_FLAGS = {
     "-XX:+UseObjectPreBlockEncryption",
 }
 
@@ -446,6 +449,7 @@ def build_jvm_args(vj, natives_dir, mc_dir=None, java_exe="java"):
     mc_dir = mc_dir or MC_DIR
     java_ver = _java_major_version(java_exe)
     strip_jdk22_flags = java_ver < 22
+    strip_jdk24_flags = java_ver < 24
     args = []
     jvm_raw = vj.get("arguments", {}).get("jvm", [])
     needs_unlock = False
@@ -464,6 +468,8 @@ def build_jvm_args(vj, natives_dir, mc_dir=None, java_exe="java"):
             flag = arg.split("=")[0] if "=" in arg else arg.split(" ")[0]
             if strip_jdk22_flags and flag in _FLAGS_REQUIRING_JDK22:
                 continue
+            if strip_jdk24_flags and flag in _FLAGS_REQUIRING_JDK24:
+                continue
             if arg in _EXPERIMENTAL_FLAGS:
                 needs_unlock = True
             args.append(replace_vars(arg, natives_dir, mc_dir))
@@ -476,6 +482,8 @@ def build_jvm_args(vj, natives_dir, mc_dir=None, java_exe="java"):
                         continue
                     v_flag = v.split("=")[0] if "=" in v else v.split(" ")[0]
                     if strip_jdk22_flags and v_flag in _FLAGS_REQUIRING_JDK22:
+                        continue
+                    if strip_jdk24_flags and v_flag in _FLAGS_REQUIRING_JDK24:
                         continue
                     if v in _EXPERIMENTAL_FLAGS:
                         needs_unlock = True
