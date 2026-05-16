@@ -36,6 +36,7 @@ repositories {
 
 sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
+
 dependencies {
     minecraft "net.minecraftforge:forge:1.18.2-40.3.12"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"

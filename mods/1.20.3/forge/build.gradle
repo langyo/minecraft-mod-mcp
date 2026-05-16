@@ -29,9 +29,10 @@ repositories {
         url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
         allowInsecureProtocol = false
     }
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
 }
+
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
 dependencies {
     minecraft "net.minecraftforge:forge:1.20.3-49.0.2"

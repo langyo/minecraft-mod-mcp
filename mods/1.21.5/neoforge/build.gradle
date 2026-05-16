@@ -14,10 +14,11 @@ repositories {
         url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
         allowInsecureProtocol = false
     }
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
     mavenCentral()
 }
+
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
 dependencies {
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'

@@ -28,13 +28,14 @@ repositories {
     maven {
         url = 'https://maven.neoforged.net/releases'
     }
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
     maven {
         url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
         allowInsecureProtocol = false
     }
 }
+
+sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
 dependencies {
     minecraft "net.neoforged:neoforge:20.2.93"
