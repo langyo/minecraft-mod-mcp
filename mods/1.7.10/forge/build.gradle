@@ -4,7 +4,9 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath "net.minecraftforge.gradle:ForgeGradle:1.2-SNAPSHOT"
+        classpath("com.anatawa12.forge:ForgeGradle:1.2-1.1.+") {
+            changing = true
+        }
     }
 }
 
@@ -32,5 +34,15 @@ sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
 
 dependencies {
-    compile "org.java-websocket:Java-WebSocket:1.5.4"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
+
+jar {
+    manifest {
+        attributes "FMLCorePluginContainsFMLMod": "true"
+    }
 }

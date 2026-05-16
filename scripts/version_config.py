@@ -114,8 +114,7 @@ FG_ERAS = {
 #                              neoforge?, mdg?, fabric_yarn?}
 
 ALL_VERSIONS = {
-    # --- FG 1.2 (MC 1.7.x) — needs pre-cached artifacts ---
-    "1.7.2":  {"forge": "1.7.2-10.12.2.1161-mc172",  "fg_era": "fg12", "java": 8, "mappings": "stable_12"},
+    # --- FG 1.2 (MC 1.7.10) — anatawa12 fork ---
     "1.7.10": {"forge": "1.7.10-10.13.4.1614-1.7.10", "fg_era": "fg12", "java": 8, "mappings": "stable_12"},
 
     # --- FG 2.1 (MC 1.8.x) ---
@@ -171,7 +170,7 @@ ALL_VERSIONS = {
 def get_api_group(mc):
     """Return the API group for source code generation."""
     _MAP = {
-        "1.7.2": "legacy_17", "1.7.10": "legacy_17",
+        "1.7.10": "legacy_17",
         "1.8.9": "legacy",
         "1.9.4": "legacy", "1.10.2": "legacy", "1.11.2": "legacy",
         "1.12.2": "legacy",
