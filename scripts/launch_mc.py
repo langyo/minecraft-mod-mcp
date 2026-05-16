@@ -40,6 +40,13 @@ def merge_version_json(version_name, mc_dir=None):
     return vj
 
 
+def _lib_key(lib):
+    name = lib.get("name", "")
+    has_natives = "natives" in lib
+    classifiers = list(lib.get("downloads", {}).get("classifiers", {}).keys())
+    return (name, has_natives, tuple(sorted(classifiers)))
+
+
 def merge_dicts(base, override):
     result = dict(base)
     for key, val in override.items():
@@ -47,14 +54,14 @@ def merge_dicts(base, override):
             seen = set()
             merged = []
             for lib in result[key]:
-                name = lib.get("name", "")
-                if name not in seen:
-                    seen.add(name)
+                k = _lib_key(lib)
+                if k not in seen:
+                    seen.add(k)
                     merged.append(lib)
             for lib in val:
-                name = lib.get("name", "")
-                if name not in seen:
-                    seen.add(name)
+                k = _lib_key(lib)
+                if k not in seen:
+                    seen.add(k)
                     merged.append(lib)
             result[key] = merged
         elif key == "arguments" and key in result:
@@ -69,6 +76,82 @@ def merge_dicts(base, override):
         else:
             result[key] = val
     return result
+
+
+def download_libraries(vj, mc_dir=None):
+    import urllib.request
+    mc_dir = mc_dir or MC_DIR
+    lib_dir = os.path.join(mc_dir, "libraries")
+    missing = 0
+    downloaded = 0
+    for lib in vj.get("libraries", []):
+        if not should_include_lib(lib):
+            continue
+        dl = lib.get("downloads", {})
+        artifact = dl.get("artifact", {})
+        path = artifact.get("path")
+        url = artifact.get("url", "")
+        if path and url:
+            full = os.path.join(lib_dir, path)
+            if not os.path.isfile(full):
+                missing += 1
+                try:
+                    os.makedirs(os.path.dirname(full), exist_ok=True)
+                    req = urllib.request.Request(url, headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                    })
+                    with urllib.request.urlopen(req, timeout=60) as resp:
+                        data = resp.read()
+                    with open(full, "wb") as f:
+                        f.write(data)
+                    downloaded += 1
+                except Exception:
+                    pass
+        for classifier_key in ("natives-windows", "natives-windows-arm64"):
+            native = dl.get("classifiers", {}).get(classifier_key, {})
+            npath = native.get("path")
+            nurl = native.get("url", "")
+            if npath and nurl:
+                nfull = os.path.join(lib_dir, npath)
+                if not os.path.isfile(nfull):
+                    try:
+                        os.makedirs(os.path.dirname(nfull), exist_ok=True)
+                        req = urllib.request.Request(nurl, headers={
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                        })
+                        with urllib.request.urlopen(req, timeout=60) as resp:
+                            data = resp.read()
+                        with open(nfull, "wb") as f:
+                            f.write(data)
+                    except Exception:
+                        pass
+        name = lib.get("name", "")
+        parts = name.split(":")
+        if len(parts) >= 3 and not path:
+            group, artifact_id, ver = parts[0], parts[1], parts[2]
+            repo_url = lib.get("url", "")
+            if repo_url:
+                group_path = group.replace(".", "/")
+                jar_name = f"{artifact_id}-{ver}.jar"
+                jar_path = os.path.join(lib_dir, group_path, artifact_id, ver, jar_name)
+                if not os.path.isfile(jar_path):
+                    jar_url = f"{repo_url}{group_path}/{artifact_id}/{ver}/{jar_name}"
+                    try:
+                        os.makedirs(os.path.dirname(jar_path), exist_ok=True)
+                        req = urllib.request.Request(jar_url, headers={
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                           "AppleWebKit/537.36",
+                        })
+                        with urllib.request.urlopen(req, timeout=60) as resp:
+                            data = resp.read()
+                        with open(jar_path, "wb") as f:
+                            f.write(data)
+                        downloaded += 1
+                    except Exception:
+                        pass
+    if missing or downloaded:
+        print(f"  Libraries: {downloaded} downloaded, {missing - downloaded} failed")
+    return downloaded
 
 
 def build_classpath(vj, mc_dir=None):
@@ -208,6 +291,11 @@ def extract_natives(vj, mc_dir=None):
     return natives_dir
 
 
+_UNSUPPORTED_JVM_FLAGS = {
+    "--sun-misc-unsafe-memory-access",
+}
+
+
 def build_jvm_args(vj, natives_dir, mc_dir=None):
     mc_dir = mc_dir or MC_DIR
     args = []
@@ -224,15 +312,22 @@ def build_jvm_args(vj, natives_dir, mc_dir=None):
                 continue
             if "${classpath}" in arg:
                 continue
+            flag = arg.split("=")[0] if "=" in arg else arg.split(" ")[0]
+            if flag in _UNSUPPORTED_JVM_FLAGS:
+                continue
             args.append(replace_vars(arg, natives_dir, mc_dir))
         elif isinstance(arg, dict):
             if should_include_arg(arg):
                 val = arg.get("value")
                 if isinstance(val, list):
                     for v in val:
-                        args.append(replace_vars(v, natives_dir, mc_dir))
+                        v_flag = v.split("=")[0] if "=" in v else v.split(" ")[0]
+                        if v_flag not in _UNSUPPORTED_JVM_FLAGS:
+                            args.append(replace_vars(v, natives_dir, mc_dir))
                 elif isinstance(val, str):
-                    args.append(replace_vars(val, natives_dir, mc_dir))
+                    val_flag = val.split("=")[0] if "=" in val else val.split(" ")[0]
+                    if val_flag not in _UNSUPPORTED_JVM_FLAGS:
+                        args.append(replace_vars(val, natives_dir, mc_dir))
     return args
 
 
@@ -329,11 +424,21 @@ def build_game_args(vj, version_name, mc_dir=None, username="Player", uuid="0000
 
 
 def replace_vars(s, natives_dir, mc_dir):
+    cp_sep = ";" if platform.system() == "Windows" else ":"
+    lib_dir = os.path.join(mc_dir, "libraries")
     return (
         s.replace("${natives_directory}", natives_dir)
         .replace("${launcher_name}", "minecraft-mcp")
         .replace("${launcher_version}", "1.0")
         .replace("${game_directory}", mc_dir)
+        .replace("${library_directory}", lib_dir)
+        .replace("${classpath_separator}", cp_sep)
+        .replace("${version_name}", "")
+        .replace("${auth_player_name}", "Player")
+        .replace("${auth_uuid}", "00000000-00000000-00000000-00000000")
+        .replace("${auth_access_token}", "0")
+        .replace("${user_type}", "msa")
+        .replace("${version_type}", "release")
     )
 
 

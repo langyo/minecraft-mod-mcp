@@ -2,9 +2,8 @@
 build/
 screenshots/
 *.bat
-test_*
+test_results.json
 rpc_*
-t_*
 .maven-local/
 run/
 *.class
@@ -14,3 +13,5 @@ build-report.json
 *.hprof
 gradle.properties
 scripts/__pycache__/
+.cache/
+*.log
