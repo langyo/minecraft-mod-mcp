@@ -197,10 +197,97 @@ public final class ReflectionHelper {
     }
 
     public static byte[] takeScreenshot(Object mc, int width, int height) {
-        if (HAS_VULKAN) {
-            byte[] vk = takeWindowScreenshot();
-            if (vk != null) return vk;
+        byte[] nativeResult = takeMcNativeScreenshot(mc);
+        if (nativeResult != null) return nativeResult;
+        byte[] glResult = takeGlScreenshot(mc, width, height);
+        if (glResult != null) return glResult;
+        return takeWindowScreenshot();
+    }
+
+    private static byte[] takeMcNativeScreenshot(Object mc) {
+        try {
+            Class<?> screenshotClass = Class.forName("net.minecraft.client.Screenshot");
+            Object renderTarget = mc.getClass().getMethod("getMainRenderTarget").invoke(mc);
+            if (renderTarget == null) return null;
+
+            Class<?> nativeImageClass = Class.forName("com.mojang.blaze3d.platform.NativeImage");
+            Class<?> consumerClass = java.util.function.Consumer.class;
+            Method takeScreenshot = null;
+            for (Method m : screenshotClass.getDeclaredMethods()) {
+                if (m.getName().equals("takeScreenshot") && m.getParameterCount() == 2
+                        && m.getParameterTypes()[1] == consumerClass) {
+                    takeScreenshot = m;
+                    break;
+                }
+            }
+            if (takeScreenshot == null) return null;
+
+            final CountDownLatch latch = new CountDownLatch(1);
+            final Object[] imageHolder = new Object[1];
+            final Exception[] errorHolder = new Exception[1];
+            java.util.function.Consumer<Object> consumer = new java.util.function.Consumer<Object>() {
+                @Override
+                public void accept(Object nativeImage) {
+                    try {
+                        java.io.File tmpFile = java.io.File.createTempFile("mcp_screenshot_", ".png");
+                        tmpFile.deleteOnExit();
+                        nativeImageClass.getMethod("writeToFile", java.io.File.class).invoke(nativeImage, tmpFile);
+                        byte[] data = new byte[(int) tmpFile.length()];
+                        java.io.FileInputStream fis = new java.io.FileInputStream(tmpFile);
+                        try { fis.read(data); } finally { fis.close(); }
+                        tmpFile.delete();
+                        imageHolder[0] = data;
+                    } catch (Exception e) {
+                        errorHolder[0] = e;
+                    } finally {
+                        latch.countDown();
+                    }
+                }
+            };
+
+            final Method tsMethod = takeScreenshot;
+            final Object rt = renderTarget;
+            Runnable captureTask = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        tsMethod.invoke(null, rt, consumer);
+                    } catch (Exception e) {
+                        errorHolder[0] = e;
+                        latch.countDown();
+                    }
+                }
+            };
+
+            boolean scheduled = false;
+            for (Method m : mc.getClass().getMethods()) {
+                if (m.getName().equals("execute") && m.getParameterCount() == 1) {
+                    Class<?> pt = m.getParameterTypes()[0];
+                    if (pt == Runnable.class || pt.isAssignableFrom(Runnable.class)) {
+                        try {
+                            m.setAccessible(true);
+                            m.invoke(mc, captureTask);
+                            scheduled = true;
+                            break;
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (!scheduled) captureTask.run();
+
+            if (!latch.await(15, TimeUnit.SECONDS)) return null;
+            if (errorHolder[0] != null) {
+                System.err.println("[MCP-Native] Screenshot error: " + errorHolder[0].getMessage());
+                return null;
+            }
+            return (byte[]) imageHolder[0];
+        } catch (Exception e) {
+            System.err.println("[MCP-Native] MC native screenshot failed: " + e.getMessage());
+            return null;
         }
+    }
+
+    private static byte[] takeGlScreenshot(Object mc, int width, int height) {
         try {
             if (width <= 0 || height <= 0) return null;
 
@@ -248,24 +335,25 @@ public final class ReflectionHelper {
 
             boolean scheduled = false;
             for (Method m : mc.getClass().getMethods()) {
-                if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) {
-                    try {
-                        m.setAccessible(true);
-                        m.invoke(mc, captureTask);
-                        scheduled = true;
-                        break;
-                    } catch (Exception ignored) {}
+                if (m.getName().equals("execute") && m.getParameterCount() == 1) {
+                    Class<?> pt = m.getParameterTypes()[0];
+                    if (pt == Runnable.class || pt.isAssignableFrom(Runnable.class)) {
+                        try {
+                            m.setAccessible(true);
+                            m.invoke(mc, captureTask);
+                            scheduled = true;
+                            break;
+                        } catch (Exception ignored) {}
+                    }
                 }
             }
-            if (!scheduled) {
-                captureTask.run();
-            }
+            if (!scheduled) captureTask.run();
 
             if (!latch.await(10, TimeUnit.SECONDS)) {
-                return takeWindowScreenshot();
+                return null;
             }
             if (captureError[0] != null) {
-                return takeWindowScreenshot();
+                return null;
             }
 
             int[] raw = new int[w * h];
@@ -290,7 +378,7 @@ public final class ReflectionHelper {
             ImageIO.write(img, "png", baos);
             return baos.toByteArray();
         } catch (Exception e) {
-            return takeWindowScreenshot();
+            return null;
         }
     }
 

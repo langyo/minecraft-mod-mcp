@@ -257,11 +257,15 @@ def _start_mc(version: str) -> subprocess.Popen:
     cp = build_classpath(vj, mc_dir=str(MC_DIR))
     natives_dir = extract_natives(vj, mc_dir=str(MC_DIR))
     mc_key = _resolve_mc_key(version)
-    era_config = get_fg_era(mc_key) if mc_key else None
-    if era_config:
-        java_ver = era_config.get("java", 8)
+    mc_info = ALL_VERSIONS.get(mc_key, {})
+    if "java" in mc_info:
+        java_ver = mc_info["java"]
     else:
-        java_ver = vj.get("javaVersion", {}).get("majorVersion", 21)
+        era_config = get_fg_era(mc_key) if mc_key else None
+        if era_config:
+            java_ver = era_config.get("java", 8)
+        else:
+            java_ver = vj.get("javaVersion", {}).get("majorVersion", 21)
     java_exe = find_java(java_ver)
     jvm_args = build_jvm_args(vj, natives_dir, mc_dir=str(MC_DIR), java_exe=java_exe)
     game_args = build_game_args(vj, version, mc_dir=str(MC_DIR))
@@ -339,13 +343,17 @@ def test_single(version: str, loader: str, timeout: int = 300) -> TestResult:
     era_config = get_fg_era(mc_key)
 
     env = os.environ.copy()
-    if era_config:
+    if "java" in mc_info:
+        java_ver = mc_info["java"]
+    elif era_config:
         java_ver = era_config.get("java", 8)
-        jdk = get_jdk_home(java_ver)
-        if not jdk and java_ver == 17:
-            jdk = find_jdk17()
-        if jdk:
-            env["JAVA_HOME"] = jdk
+    else:
+        java_ver = 8
+    jdk = get_jdk_home(java_ver)
+    if not jdk and java_ver == 17:
+        jdk = find_jdk17()
+    if jdk:
+        env["JAVA_HOME"] = jdk
     env.pop("JAVA_TOOL_OPTIONS", None)
     env["GRADLE_OPTS"] = "-Xmx3G"
 
@@ -356,7 +364,7 @@ def test_single(version: str, loader: str, timeout: int = 300) -> TestResult:
     try:
         build = subprocess.run(
             [gradlew, "jar", "--no-daemon"],
-            cwd=str(mod_dir), capture_output=True, text=True, timeout=300,
+            cwd=str(mod_dir), capture_output=True, timeout=300,
             env=env,
         )
         if build.returncode == 0:

@@ -10,7 +10,8 @@ FG Era Definitions:
   FG 4.1  → MC 1.15-1.16 → Gradle 6.9   → JDK 8  → buildscript + apply "net.minecraftforge.gradle"
   FG 5.1  → MC 1.17-1.19 → Gradle 7.6   → JDK 17 → buildscript + apply "net.minecraftforge.gradle"
   FG 6.x  → MC 1.19.3-1.21.3 → Gradle 8.5 → JDK 17/21 → buildscript + apply "net.minecraftforge.gradle"
-  FG 7.x  → MC 1.21.4+   → Gradle 9.3   → JDK 21 → buildscript + apply "net.minecraftforge.gradle"
+  FG 7.x  → MC 1.21.4+   → Gradle 9.3   → JDK 21/25 → buildscript + apply "net.minecraftforge.gradle"
+    Note: MC 26.x requires JDK 25; override per-version in ALL_VERSIONS
 """
 
 import os
