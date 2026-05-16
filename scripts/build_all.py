@@ -131,7 +131,7 @@ def _build_one(task_info):
     env["GRADLE_OPTS"] = "-Xmx3G"
 
     start = time.time()
-    cmd = ["cmd", "/c", "gradlew.bat", "build", "--no-daemon"]
+    cmd = ["cmd", "/c", "gradlew.bat", "build", "--no-daemon", "--rerun-tasks"]
     try:
         proc = subprocess.run(
             cmd,

@@ -59,12 +59,22 @@ public final class ReflectionHelper {
         try {
             Object window = mc.getClass().getMethod("getWindow").invoke(mc);
             if (window == null) return 0;
-            try {
-                return ((Number) window.getClass().getMethod("handle").invoke(window)).longValue();
-            } catch (NoSuchMethodException e) {
-                return ((Number) window.getClass().getMethod("getHandle").invoke(window)).longValue();
+            for (String methodName : new String[]{"handle", "getHandle", "getWindow"}) {
+                try {
+                    Object result = window.getClass().getMethod(methodName).invoke(window);
+                    if (result instanceof Number) {
+                        long val = ((Number) result).longValue();
+                        if (val != 0) return val;
+                    }
+                } catch (NoSuchMethodException ignored) {}
             }
-        } catch (NoSuchMethodException e) {
+            for (Field f : window.getClass().getDeclaredFields()) {
+                if (f.getType() == long.class) {
+                    f.setAccessible(true);
+                    long val = f.getLong(window);
+                    if (val != 0) return val;
+                }
+            }
             return 0;
         } catch (Exception e) {
             return 0;
@@ -415,6 +425,27 @@ public final class ReflectionHelper {
     }
 
     public static void sendKey(long handle, int key, int action) {
+        if (LWJGL3) {
+            try {
+                Object mc = getMinecraftInstance();
+                Object kbHandler = mc.getClass().getField("keyboardHandler").get(mc);
+                kbHandler.getClass().getMethod("keyPress", long.class, int.class, int.class, int.class, int.class)
+                    .invoke(kbHandler, handle, key, 0, action, 0);
+                return;
+            } catch (NoSuchFieldException nsfe) {
+                try {
+                    Object mc = getMinecraftInstance();
+                    Object kbHandler = mc.getClass().getMethod("keyboardHandler").invoke(mc);
+                    kbHandler.getClass().getMethod("keyPress", long.class, int.class, int.class, int.class, int.class)
+                        .invoke(kbHandler, handle, key, 0, action, 0);
+                    return;
+                } catch (Exception e2) {
+                    System.err.println("[Input] sendKey GLFW: " + e2.getMessage());
+                }
+            } catch (Exception e) {
+                System.err.println("[Input] sendKey GLFW: " + e.getMessage());
+            }
+        }
         try {
             Robot r = awtRobot;
             if (r == null) return;
@@ -425,7 +456,36 @@ public final class ReflectionHelper {
         } catch (Exception e) { System.err.println("[Input] sendKey: " + e.getMessage()); }
     }
 
+    static void dbg(String msg) {
+        try {
+            String home = System.getProperty("user.home");
+            java.io.FileWriter fw = new java.io.FileWriter(home + java.io.File.separator + "mcp_debug.log", true);
+            fw.write(System.currentTimeMillis() + " " + msg + "\n");
+            fw.close();
+        } catch (Exception e) {
+            try {
+                System.err.println("[MCP-DBG] " + msg + " (write err: " + e.getMessage() + ")");
+            } catch (Exception ignored2) {}
+        }
+    }
+
     public static void sendMouseButton(long handle, int button, int action) {
+        if (LWJGL3 && handle != 0) {
+            try {
+                Object mc = getMinecraftInstance();
+                Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
+                for (Method m : mouseHandler.getClass().getDeclaredMethods()) {
+                    Class<?>[] pt = m.getParameterTypes();
+                    if (pt.length == 4 && pt[0] == long.class && pt[1] == int.class && pt[2] == int.class && pt[3] == int.class) {
+                        m.setAccessible(true);
+                        m.invoke(mouseHandler, handle, button, action, 0);
+                        return;
+                    }
+                }
+            } catch (Exception e) {
+                dbg("sendMouseButton GLFW: " + e.getMessage());
+            }
+        }
         try {
             Robot r = awtRobot;
             if (r == null) return;
@@ -438,6 +498,26 @@ public final class ReflectionHelper {
     }
 
     public static void sendScroll(long handle, double scrollY) {
+        if (LWJGL3) {
+            try {
+                Object mc = getMinecraftInstance();
+                Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
+                for (Method m : mouseHandler.getClass().getDeclaredMethods()) {
+                    String name = m.getName();
+                    if ((name.equals("lambda$setup$2") || name.equals("lambda$setup$3") || name.contains("scroll"))
+                        && !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+                        Class<?>[] pt = m.getParameterTypes();
+                        if (pt.length == 3 && pt[0] == long.class && pt[1] == double.class && pt[2] == double.class) {
+                            m.setAccessible(true);
+                            m.invoke(mouseHandler, handle, 0.0, scrollY);
+                            return;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[Input] sendScroll GLFW: " + e.getMessage());
+            }
+        }
         try {
             Robot r = awtRobot;
             if (r == null) return;
@@ -446,6 +526,31 @@ public final class ReflectionHelper {
     }
 
     public static void setCursorPos(long handle, double x, double y) {
+        if (LWJGL3) {
+            try {
+                Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+                Method setPos = glfw.getMethod("glfwSetCursorPos", long.class, double.class, double.class);
+                setPos.invoke(null, handle, x, y);
+
+                Object mc = getMinecraftInstance();
+                Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
+                for (Field f : mouseHandler.getClass().getDeclaredFields()) {
+                    if (f.getType() == double.class) {
+                        String name = f.getName().toLowerCase();
+                        if (name.contains("xpos") || name.equals("x")) {
+                            f.setAccessible(true);
+                            f.setDouble(mouseHandler, x);
+                        } else if (name.contains("ypos") || name.equals("y")) {
+                            f.setAccessible(true);
+                            f.setDouble(mouseHandler, y);
+                        }
+                    }
+                }
+                return;
+            } catch (Exception e) {
+                System.err.println("[Input] setCursorPos GLFW: " + e.getMessage());
+            }
+        }
         try {
             Robot r = awtRobot;
             if (r == null) return;

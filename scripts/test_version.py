@@ -363,7 +363,7 @@ def test_single(version: str, loader: str, timeout: int = 300) -> TestResult:
 
     try:
         build = subprocess.run(
-            [gradlew, "jar", "--no-daemon"],
+            [gradlew, "jar", "--no-daemon", "--rerun-tasks"],
             cwd=str(mod_dir), capture_output=True, timeout=300,
             env=env,
         )

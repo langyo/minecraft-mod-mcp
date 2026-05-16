@@ -73,7 +73,7 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 ReflectionHelper.sendMouseButton(h, b, 1);
                 Thread.sleep(30);
                 ReflectionHelper.sendMouseButton(h, b, 0);
-            } catch (Exception e) { System.err.println("[Input] Click: " + e.getMessage()); }
+            } catch (Exception e) { ReflectionHelper.dbg("click err: " + e.getMessage()); }
         });
     }
 
