@@ -42,6 +42,9 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 jar {
+    from {
+        configurations.runtimeClasspath.findAll { it.name.contains('Java-WebSocket') }.collect { zipTree(it) }
+    }
     manifest {
         attributes "FMLCorePluginContainsFMLMod": "true"
     }

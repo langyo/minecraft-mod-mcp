@@ -531,6 +531,7 @@ def build_game_args(vj, version_name, mc_dir=None, username="Player", uuid="0000
         "${auth_access_token}": access_token,
         "${clientid}": "00000000-0000-0000-0000-000000000000",
         "${auth_xuid}": "",
+        "${user_properties}": "{}",
         "${user_type}": "msa",
         "${version_type}": "release",
     }
