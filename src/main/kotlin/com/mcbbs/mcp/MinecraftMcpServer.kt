@@ -154,7 +154,7 @@ fun main() {
                     "serverInfo" to jobj("name" to "minecraft-neoforge-mcp", "version" to "0.1.0")
                 ))
                 "tools/list" -> jobj("result" to jobj("tools" to jarr(
-                    toolObj("launch_game", "Launch Minecraft via official launcher installation", """{"type":"object","properties":{"loader_type":{"type":"string","enum":["auto","forge","neoforge","fabric"],"description":"Mod loader to use (auto-detect by default)"},"mc_dir":{"type":"string","description":"Path to .minecraft directory"},"mod_jar_path":{"type":"string","description":"Path to mod JAR to copy into mods/"},"max_memory_gb":{"type":"number","description":"Max heap in GB, default 4"}}}"""),
+                    toolObj("launch_game", "Launch Minecraft via official launcher installation", """{"type":"object","properties":{"version":{"type":"string","description":"MC version to launch (e.g. 1.7.10, 1.21.7, 26.1.2). Required - must match an installed Forge/NeoForge/Fabric profile."},"loader_type":{"type":"string","enum":["auto","forge","neoforge","fabric"],"description":"Mod loader to use (auto-detect by default)"},"mc_dir":{"type":"string","description":"Path to .minecraft directory"},"mod_jar_path":{"type":"string","description":"Path to mod JAR to copy into mods/"},"max_memory_gb":{"type":"number","description":"Max heap in GB, default 4"}}}"""),
                     toolObj("screenshot", "Take screenshot via in-game mod pipeline", """{"type":"object","properties":{"save_path":{"type":"string"}}}"""),
                     toolObj("click", "Click at position inside MC window (via mod input system)", """{"type":"object","properties":{"x":{"type":"integer"},"y":{"type":"integer"},"button":{"type":"string","enum":["left","right","middle"]}},"required":["x","y"]}"""),
                     toolObj("press_key", "Press keyboard key (via mod input system)", """{"type":"object","properties":{"key":{"type":"string"},"hold_seconds":{"type":"number"}},"required":["key"]}"""),
@@ -212,6 +212,7 @@ fun handleToolCall(params: JsonObject?, ws: McWsServer): JsonObject {
 }
 
 fun doLaunchGame(a: JsonObject): JsonObject {
+    val requestedVersion = a.get("version")?.asString?.trim()
     val loaderType = a.get("loader_type")?.asString ?: "auto"
     val mcDir = a.get("mc_dir")?.asString
         ?: System.getenv("MC_RUN_DIR")
@@ -238,10 +239,13 @@ Please install one via the official Minecraft launcher:
 Found versions: ${versionsDir.listFiles()?.map { it.name }?.joinToString(", ") ?: "none"}""")
 
         val target = when {
+            requestedVersion != null -> {
+                installed.find { it.mcBase == requestedVersion && (loaderType == "auto" || it.loader == loaderType) }
+                    ?: return txtObj("Error: '$requestedVersion' with ${if (loaderType == "auto") "any loader" else loaderType} not installed. Available: ${installed.map { "${it.mcBase}@${it.loader}" }.distinct().joinToString(", ")}")
+            }
             loaderType != "auto" -> installed.find { it.loader == loaderType }
                 ?: return txtObj("Error: '$loaderType' not installed. Available: ${installed.map { "${it.loader}@${it.version}" }.joinToString(", ")}")
-            else -> installed.firstOrNull()
-                ?: return txtObj("Error: No loader detected from installed versions")
+            else -> return txtObj("Error: 'version' parameter is required. Available: ${installed.map { "${it.mcBase}@${it.loader}" }.distinct().joinToString(", ")}")
         }
 
         val modsDir = java.io.File(mcDirFile, "mods"); modsDir.mkdirs()
@@ -266,22 +270,33 @@ Found versions: ${versionsDir.listFiles()?.map { it.name }?.joinToString(", ") ?
     }
 }
 
-data class DetectedLoader(val loader: String, val version: String, val versionDir: java.io.File)
+data class DetectedLoader(val loader: String, val version: String, val versionDir: java.io.File) {
+    val mcBase: String
+        get() {
+            val v = version.lowercase()
+            val idx = sequenceOf("-forge", "-neoforge", "-fabric")
+                .map { v.indexOf(it) }
+                .filter { it > 0 }
+                .minOrNull()
+            return if (idx != null) version.substring(0, idx) else version
+        }
+}
 
 private fun detectLoaders(versionsDir: java.io.File): List<DetectedLoader> {
     val result = mutableListOf<DetectedLoader>()
     val dirs = versionsDir.listFiles()?.filter { it.isDirectory } ?: return emptyList()
     for (dir in dirs) {
-        val name = dir.name.lowercase()
+        val name = dir.name
+        val nameLower = name.lowercase()
         val loader = when {
-            name.contains("neoforge") || name.contains("neo") && !name.contains("vanilla") -> "neoforge"
-            name.contains("forge") -> "forge"
-            name.contains("fabric") -> "fabric"
+            nameLower.contains("neoforge") || (nameLower.contains("neo") && !nameLower.contains("vanilla")) -> "neoforge"
+            nameLower.contains("forge") -> "forge"
+            nameLower.contains("fabric") -> "fabric"
             else -> null
         }
         if (loader != null) {
-            val jsonFile = java.io.File(dir, "${dir.name}.json")
-            if (jsonFile.exists()) result.add(DetectedLoader(loader, dir.name, dir))
+            val jsonFile = java.io.File(dir, "$name.json")
+            if (jsonFile.exists()) result.add(DetectedLoader(loader, name, dir))
         }
     }
     return result.sortedByDescending { it.version }
@@ -302,7 +317,7 @@ private fun launchViaVersionJson(
     if (cp.isEmpty()) return null.also { println("[LAUNCH] Error: empty classpath") }
 
     val jvmArgs = extractJvmArgs(json, mcDir)
-    val gameArgs = extractGameArgs(json)
+    val gameArgs = extractGameArgs(json, mcDir, target)
 
     val nativesDir = extractNatives(mcDir, json)
 
@@ -404,6 +419,18 @@ private fun buildFullClasspath(mcDir: java.io.File, json: JsonObject): String {
         val libFile = java.io.File(mcDir, "libraries${java.io.File.separator}$path")
         if (libFile.exists()) cpParts.add(libFile.absolutePath)
     }
+    val inheritsFrom = json.get("inheritsFrom")?.asString
+    if (inheritsFrom != null) {
+        val parentJar = java.io.File(mcDir, "versions/$inheritsFrom/$inheritsFrom.jar")
+        if (parentJar.exists()) cpParts.add(parentJar.absolutePath)
+    }
+    val versionId = json.get("id")?.asString
+    if (versionId != null) {
+        val versionJar = java.io.File(mcDir, "versions/$versionId/$versionId.jar")
+        if (versionJar.exists() && !cpParts.contains(versionJar.absolutePath)) {
+            cpParts.add(versionJar.absolutePath)
+        }
+    }
     return cpParts.joinToString(java.io.File.pathSeparator)
 }
 
@@ -469,7 +496,7 @@ private fun extractJvmArgs(json: JsonObject, mcDir: java.io.File): List<String> 
     return args.map { replaceVars(it, mcDir) }
 }
 
-private fun extractGameArgs(json: JsonObject): List<String> {
+private fun extractGameArgs(json: JsonObject, mcDir: java.io.File, target: DetectedLoader): List<String> {
     val gameArgs = json.get("arguments")?.asJsonObject?.get("game")?.asJsonArray
     if (gameArgs != null) {
         val args = mutableListOf<String>()
@@ -483,10 +510,10 @@ private fun extractGameArgs(json: JsonObject): List<String> {
             else if (v.isJsonPrimitive) args.add(v.asString)
             } else if (arg.isJsonPrimitive) args.add(arg.asString)
         }
-        return args
+        return args.map { replaceGameVars(it, mcDir, json, target) }
     }
-    val legacyArgs = json.getAsJsonArray("minecraftArguments")?.asString ?: ""
-    return legacyArgs.split(" ").filter { it.isNotEmpty() }
+    val legacyArgs = json.get("minecraftArguments")?.asString ?: ""
+    return legacyArgs.split(" ").filter { it.isNotEmpty() }.map { replaceGameVars(it, mcDir, json, target) }
 }
 
 private fun allowRules(rules: JsonArray): Boolean {
@@ -513,6 +540,22 @@ private fun replaceVars(s: String, mcDir: java.io.File): String {
         val nativesPath = java.io.File(mcDir, "natives").absolutePath
         result = result.replace("\${natives_directory}", nativesPath)
     }
+    return result
+}
+
+private fun replaceGameVars(s: String, mcDir: java.io.File, json: JsonObject, target: DetectedLoader): String {
+    var result = s
+        .replace("\${auth_player_name}", "Player")
+        .replace("\${version_name}", target.version)
+        .replace("\${game_directory}", mcDir.absolutePath)
+        .replace("\${assets_root}", java.io.File(mcDir, "assets").absolutePath)
+        .replace("\${assets_index_name}", json.get("assetIndex")?.asJsonObject?.get("id")?.asString ?: "")
+        .replace("\${auth_uuid}", "00000000-0000-0000-0000-000000000000")
+        .replace("\${auth_access_token}", "0")
+        .replace("\${clientid}", "00000000-0000-0000-0000-000000000000")
+        .replace("\${auth_xuid}", "")
+        .replace("\${user_type}", "msa")
+        .replace("\${version_type}", "release")
     return result
 }
 

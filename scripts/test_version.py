@@ -22,7 +22,7 @@ SERVER_JAR = ROOT / "build" / "libs" / "mcp-server-0.1.0.jar"
 MC_DIR = Path(os.environ.get("APPDATA", os.path.expanduser("~"))) / ".minecraft"
 
 sys.path.insert(0, str(SCRIPTS))
-from version_config import ALL_VERSIONS, get_loaders
+from version_config import ALL_VERSIONS, get_loaders, get_fg_era, get_jdk_home, find_jdk17
 
 
 @dataclass
@@ -65,7 +65,8 @@ def find_mod_jar(version: str, loader: str) -> Path:
     mod_dir = _resolve_mod_dir(version, loader)
     if not mod_dir.exists():
         return None
-    jars = list(mod_dir.glob("build/libs/*.jar"))
+    jars = [j for j in mod_dir.glob("build/libs/*.jar")
+            if not (j.name.endswith("-sources.jar") or j.name.endswith("-javadoc.jar"))]
     return jars[0] if jars else None
 
 
@@ -107,7 +108,11 @@ def kill_all_java():
     time.sleep(3)
 
 
+_server_output_lines: list = []
+
+
 def _start_mcp_server() -> subprocess.Popen:
+    global _server_output_lines
     from launch_mc import find_java
     java = find_java(21)
     proc = subprocess.Popen(
@@ -116,9 +121,13 @@ def _start_mcp_server() -> subprocess.Popen:
         text=True, bufsize=1,
     )
 
+    _server_output_lines = []
+
     def reader(p):
         for line in p.stdout:
-            print(f"  [SRV] {line.strip()}")
+            stripped = line.strip()
+            _server_output_lines.append(stripped)
+            print(f"  [SRV] {stripped}")
 
     __import__("threading").Thread(target=reader, args=(proc,), daemon=True).start()
     return proc
@@ -136,6 +145,30 @@ def _send_server_cmd(server: subprocess.Popen, tool: str, args: dict):
         print(f"  [SRV] >>> {tool}")
     except Exception:
         pass
+    return rid
+
+
+def _drain_server_stdout(server: subprocess.Popen, timeout: float = 5.0) -> str:
+    lines = []
+    deadline = time.time() + timeout
+    try:
+        while time.time() < deadline:
+            import select
+            if hasattr(select, 'select'):
+                r, _, _ = select.select([server.stdout], [], [], 0.5)
+            else:
+                r = [True]
+            if r:
+                line = server.stdout.readline()
+                if line:
+                    lines.append(line)
+                else:
+                    break
+            else:
+                break
+    except Exception:
+        pass
+    return "".join(lines)
 
 
 def _find_in_gradle_cache(group: str, artifact: str, version: str) -> str:
@@ -163,11 +196,22 @@ def _strip_module_info(jar_path: str) -> str:
     return stripped
 
 
+def _download_from_maven(group: str, artifact: str, ver: str, target: str):
+    import urllib.request
+    path = "/".join(group.split(".") + [artifact, ver, f"{artifact}-{ver}.jar"])
+    url = f"https://repo1.maven.org/maven2/{path}"
+    print(f"  Downloading {url}")
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    urllib.request.urlretrieve(url, target)
+
+
 def _ensure_websocket_deps(mc_dir: Path) -> list:
     import shutil as _shutil
     jars = []
     deps = [
         ("org.java-websocket", "Java-WebSocket", "1.5.4"),
+        ("org.slf4j", "slf4j-api", "2.0.7"),
+        ("org.slf4j", "slf4j-simple", "2.0.7"),
     ]
     lib_base = mc_dir / "libraries"
     for group, artifact, ver in deps:
@@ -178,6 +222,11 @@ def _ensure_websocket_deps(mc_dir: Path) -> list:
             if src:
                 os.makedirs(os.path.dirname(target), exist_ok=True)
                 _shutil.copy2(src, target)
+        if not os.path.isfile(target):
+            try:
+                _download_from_maven(group, artifact, ver, target)
+            except Exception as e:
+                print(f"  WARNING: Failed to download {artifact}-{ver}: {e}")
         if os.path.isfile(target):
             stripped = _strip_module_info(target)
             jars.append(stripped)
@@ -196,15 +245,22 @@ def _is_mc_jar(path: str, mc_dir: Path) -> bool:
 
 
 def _start_mc(version: str) -> subprocess.Popen:
-    from launch_mc import merge_version_json, build_classpath, extract_natives, build_jvm_args, build_game_args, find_java, download_libraries
+    from launch_mc import merge_version_json, build_classpath, extract_natives, build_jvm_args, build_game_args, find_java, download_libraries, ensure_version_jar, ensure_asset_index
     vj = merge_version_json(version, mc_dir=str(MC_DIR))
     download_libraries(vj, mc_dir=str(MC_DIR))
+    ensure_version_jar(vj, mc_dir=str(MC_DIR))
+    ensure_asset_index(vj, mc_dir=str(MC_DIR))
     cp = build_classpath(vj, mc_dir=str(MC_DIR))
     natives_dir = extract_natives(vj, mc_dir=str(MC_DIR))
-    jvm_args = build_jvm_args(vj, natives_dir, mc_dir=str(MC_DIR))
-    game_args = build_game_args(vj, version, mc_dir=str(MC_DIR))
-    java_ver = vj.get("javaVersion", {}).get("majorVersion", 21)
+    mc_key = _resolve_mc_key(version)
+    era_config = get_fg_era(mc_key) if mc_key else None
+    if era_config:
+        java_ver = era_config.get("java", 8)
+    else:
+        java_ver = vj.get("javaVersion", {}).get("majorVersion", 21)
     java_exe = find_java(java_ver)
+    jvm_args = build_jvm_args(vj, natives_dir, mc_dir=str(MC_DIR), java_exe=java_exe)
+    game_args = build_game_args(vj, version, mc_dir=str(MC_DIR))
 
     uses_module_path = any(
         a in ("-p", "--module-path")
@@ -244,11 +300,16 @@ def _start_mc(version: str) -> subprocess.Popen:
     return proc
 
 
-def _resolve_mod_dir(version: str, loader: str) -> Path:
+def _resolve_mc_key(version: str) -> str:
     for mc_ver in sorted(ALL_VERSIONS.keys(), key=len, reverse=True):
         if version.startswith(mc_ver):
-            return ROOT / "mods" / mc_ver / loader
-    return ROOT / "mods" / version / loader
+            return mc_ver
+    return version
+
+
+def _resolve_mod_dir(version: str, loader: str) -> Path:
+    mc_key = _resolve_mc_key(version)
+    return ROOT / "mods" / mc_key / loader
 
 
 def test_single(version: str, loader: str, timeout: int = 300) -> TestResult:
@@ -268,10 +329,31 @@ def test_single(version: str, loader: str, timeout: int = 300) -> TestResult:
         return result
 
     gradlew = str(mod_dir / "gradlew.bat") if sys.platform == "win32" else str(mod_dir / "gradlew")
+
+    mc_key = _resolve_mc_key(version)
+    mc_info = ALL_VERSIONS.get(mc_key, {})
+    era_config = get_fg_era(mc_key)
+
+    env = os.environ.copy()
+    if era_config:
+        java_ver = era_config.get("java", 8)
+        jdk = get_jdk_home(java_ver)
+        if not jdk and java_ver == 17:
+            jdk = find_jdk17()
+        if jdk:
+            env["JAVA_HOME"] = jdk
+    env.pop("JAVA_TOOL_OPTIONS", None)
+    env["GRADLE_OPTS"] = "-Xmx3G"
+
+    gp = str(mod_dir / "gradle.properties")
+    with open(gp, "w") as f:
+        f.write("org.gradle.jvmargs=-Xmx3G\n")
+
     try:
         build = subprocess.run(
             [gradlew, "jar", "--no-daemon"],
             cwd=str(mod_dir), capture_output=True, text=True, timeout=300,
+            env=env,
         )
         if build.returncode == 0:
             result.build_ok = True
@@ -345,19 +427,26 @@ def test_single(version: str, loader: str, timeout: int = 300) -> TestResult:
         # Phase 4: Ping via server stdin
         print(f"[4/5] Testing ping...")
         if result.mod_connected and server_proc:
+            pre_count = len(_server_output_lines)
             _send_server_cmd(server_proc, "ping", {})
-            time.sleep(5)
-            stdout_log = MC_DIR / "mcp-launch-stdout.log"
-            if stdout_log.exists():
-                try:
-                    content = stdout_log.read_text(encoding="utf-8", errors="replace")
-                    if "pong" in content.lower():
-                        result.ping_ok = True
-                        print(f"  PING OK")
-                except Exception:
-                    pass
+            time.sleep(3)
+            new_lines = _server_output_lines[pre_count:]
+            new_output = "\n".join(new_lines).lower()
+            if "pong" in new_output:
+                result.ping_ok = True
+                print(f"  PING OK (server)")
+            else:
+                stdout_log = MC_DIR / "mcp-launch-stdout.log"
+                if stdout_log.exists():
+                    try:
+                        content = stdout_log.read_text(encoding="utf-8", errors="replace")
+                        if "pong" in content.lower():
+                            result.ping_ok = True
+                            print(f"  PING OK (game log)")
+                    except Exception:
+                        pass
             if not result.ping_ok:
-                result.errors.append("Ping response not found in game log")
+                result.errors.append("Ping response not found")
 
         # Phase 5: Screenshot via MCP server -> game mod pipeline
         print(f"[5/5] Testing screenshot...")

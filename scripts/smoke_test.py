@@ -215,46 +215,41 @@ def launch_game(mc_dir, version_json_path, mod_jar_path, mc, loader):
     shutil.copy2(mod_jar_path, dst)
     print(f"[OK] Copied mod: {mod_name} -> {mods_dir}")
 
-    java = find_java()
     version_name = os.path.basename(os.path.dirname(version_json_path))
+
+    from launch_mc import (
+        merge_version_json, build_classpath, extract_natives,
+        build_jvm_args, build_game_args, find_java as find_java_launch,
+        download_libraries, ensure_version_jar,
+    )
+
+    vj = merge_version_json(version_name, mc_dir=mc_dir)
+    download_libraries(vj, mc_dir=mc_dir)
+    ensure_version_jar(vj, mc_dir=mc_dir)
+    main_class = vj.get("mainClass", "")
+    cp = build_classpath(vj, mc_dir=mc_dir)
+    natives_dir = extract_natives(vj, mc_dir=mc_dir)
+    java_ver = vj.get("javaVersion", {}).get("majorVersion", 21)
+    java_exe = find_java_launch(java_ver)
+    jvm_args = build_jvm_args(vj, natives_dir, mc_dir=mc_dir, java_exe=java_exe)
+    game_args = build_game_args(vj, version_name, mc_dir=mc_dir)
+
+    sep = ";" if sys.platform == "win32" else ":"
+    cp_str = sep.join(cp)
+
+    cmd = [java_exe, "-Xmx4G", "-Xms2G", f"-Dmcp.server=ws://127.0.0.1:{WS_PORT}"]
+    cmd.extend(jvm_args)
+    cmd.extend(["-cp", cp_str])
+    cmd.append(main_class)
+    cmd.extend(game_args)
 
     env = os.environ.copy()
     env["MC_MCP_SERVER"] = f"ws://127.0.0.1:{WS_PORT}"
 
-    jvm_args = f"-Xmx4G -Xms2G -Dmcp.server=ws://127.0.0.1:{WS_PORT}"
-
-    try:
-        with open(version_json_path, "r", encoding="utf-8") as f:
-            vj = json.load(f)
-        main_class = vj.get("mainClass", "")
-        inherits = vj.get("inheritsFrom", "")
-        if inherits and main_class:
-            parent_dir = os.path.join(mc_dir, "versions", inherits)
-            parent_jar = os.path.join(parent_dir, inherits + ".jar")
-            version_jar_dir = os.path.dirname(version_json_path)
-            version_jar = os.path.join(version_jar_dir, version_name + ".jar")
-        else:
-            version_jar = os.path.join(mc_dir, "versions", version_name, version_name + ".jar")
-    except Exception:
-        pass
-
-    if sys.platform == "win32":
-        cmd = [
-            "cmd", "/c", "start",
-            f"Minecraft {mc} ({loader})",
-            "/B",
-            java,
-            "-Xmx4G", "-Xms2G",
-            f"-Dmcp.server=ws://127.0.0.1:{WS_PORT}",
-            "-jar", version_jar if os.path.isfile(version_jar) else "",
-        ]
-        print(f"[LAUNCH] Starting Minecraft {version_name} ...")
-        proc = subprocess.Popen(cmd, env=env, cwd=mc_dir)
-        print(f"[OK] Game launched (pid={proc.pid})")
-        return proc
-    else:
-        print("[WARN] Auto-launch only supported on Windows. Please launch manually.")
-        return None
+    print(f"[LAUNCH] Starting Minecraft {version_name} (mainClass={main_class}) ...")
+    proc = subprocess.Popen(cmd, env=env, cwd=mc_dir)
+    print(f"[OK] Game launched (pid={proc.pid})")
+    return proc
 
 
 def main():

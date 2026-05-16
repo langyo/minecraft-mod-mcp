@@ -1,0 +1,10 @@
+[
+  {
+    "modid": "moddevmcp",
+    "name": "ModDev MCP",
+    "description": "WebSocket bridge for AI agent interaction",
+    "version": "1.0.0",
+    "authorList": ["langyo"],
+    "credits": ""
+  }
+]

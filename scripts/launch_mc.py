@@ -47,6 +47,16 @@ def _lib_key(lib):
     return (name, has_natives, tuple(sorted(classifiers)))
 
 
+def _lib_base_key(lib):
+    name = lib.get("name", "")
+    parts = name.split(":")
+    if len(parts) >= 2:
+        base = parts[0] + ":" + parts[1]
+        classifier = parts[3] if len(parts) > 3 else ""
+        return base + (":" + classifier if classifier else "")
+    return name
+
+
 def merge_dicts(base, override):
     result = dict(base)
     for key, val in override.items():
@@ -58,12 +68,20 @@ def merge_dicts(base, override):
                 if k not in seen:
                     seen.add(k)
                     merged.append(lib)
+            override_bases = {}
             for lib in val:
-                k = _lib_key(lib)
-                if k not in seen:
-                    seen.add(k)
-                    merged.append(lib)
-            result[key] = merged
+                bk = _lib_base_key(lib)
+                override_bases[bk] = lib
+            filtered = []
+            for lib in merged:
+                bk = _lib_base_key(lib)
+                if bk in override_bases:
+                    filtered.append(override_bases.pop(bk))
+                else:
+                    filtered.append(lib)
+            for lib in override_bases.values():
+                filtered.append(lib)
+            result[key] = filtered
         elif key == "arguments" and key in result:
             ba = result.get("arguments", {})
             merged_args = dict(ba)
@@ -129,29 +147,114 @@ def download_libraries(vj, mc_dir=None):
         parts = name.split(":")
         if len(parts) >= 3 and not path:
             group, artifact_id, ver = parts[0], parts[1], parts[2]
+            group_path = group.replace(".", "/")
+            jar_name = f"{artifact_id}-{ver}.jar"
+            jar_dir = os.path.join(lib_dir, group_path, artifact_id, ver)
+            jar_path = os.path.join(jar_dir, jar_name)
+            if os.path.isfile(jar_path):
+                continue
+            is_forge = "minecraftforge" in group or "net.minecraftforge" in group
+            suffixes = [""]
+            if is_forge:
+                suffixes = ["", "-universal", "-client"]
             repo_url = lib.get("url", "")
+            fallback_repos = []
             if repo_url:
-                group_path = group.replace(".", "/")
-                jar_name = f"{artifact_id}-{ver}.jar"
-                jar_path = os.path.join(lib_dir, group_path, artifact_id, ver, jar_name)
-                if not os.path.isfile(jar_path):
-                    jar_url = f"{repo_url}{group_path}/{artifact_id}/{ver}/{jar_name}"
+                fallback_repos.append(repo_url)
+            fallback_repos.append("https://libraries.minecraft.net/")
+            fallback_repos.append("https://repo.maven.apache.org/maven2/")
+            found = False
+            for suffix in suffixes:
+                if found:
+                    break
+                candidate_name = f"{artifact_id}-{ver}{suffix}.jar"
+                candidate_path = os.path.join(jar_dir, candidate_name)
+                if os.path.isfile(candidate_path):
+                    found = True
+                    break
+                for base_url in fallback_repos:
+                    jar_url = f"{base_url}{group_path}/{artifact_id}/{ver}/{candidate_name}"
                     try:
-                        os.makedirs(os.path.dirname(jar_path), exist_ok=True)
+                        os.makedirs(jar_dir, exist_ok=True)
                         req = urllib.request.Request(jar_url, headers={
                             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                            "AppleWebKit/537.36",
                         })
                         with urllib.request.urlopen(req, timeout=60) as resp:
                             data = resp.read()
-                        with open(jar_path, "wb") as f:
+                        with open(candidate_path, "wb") as f:
                             f.write(data)
                         downloaded += 1
+                        found = True
+                        break
                     except Exception:
-                        pass
+                        continue
     if missing or downloaded:
         print(f"  Libraries: {downloaded} downloaded, {missing - downloaded} failed")
     return downloaded
+
+
+def ensure_version_jar(vj, mc_dir=None):
+    import urllib.request
+    mc_dir = mc_dir or MC_DIR
+    parent = vj.get("_parent") or vj.get("inheritsFrom")
+    targets = []
+    if parent:
+        targets.append(parent)
+    version_name = vj.get("id", "")
+    if version_name and version_name not in targets:
+        targets.append(version_name)
+    for ver_name in targets:
+        jar_path = os.path.join(mc_dir, "versions", ver_name, f"{ver_name}.jar")
+        if os.path.isfile(jar_path):
+            continue
+        json_path = os.path.join(mc_dir, "versions", ver_name, f"{ver_name}.json")
+        if not os.path.isfile(json_path):
+            continue
+        with open(json_path, "r", encoding="utf-8") as f:
+            vdata = json.load(f)
+        client_dl = vdata.get("downloads", {}).get("client", {})
+        url = client_dl.get("url", "")
+        if not url:
+            continue
+        print(f"  Downloading {ver_name}.jar ...", flush=True)
+        os.makedirs(os.path.dirname(jar_path), exist_ok=True)
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        })
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = resp.read()
+        with open(jar_path, "wb") as f:
+            f.write(data)
+        print(f"  Downloaded {ver_name}.jar ({len(data)} bytes)")
+
+
+def ensure_asset_index(vj, mc_dir=None):
+    import urllib.request
+    mc_dir = mc_dir or MC_DIR
+    ai = vj.get("assetIndex")
+    if not ai:
+        return
+    aid = vj.get("assets", ai.get("id", ""))
+    if not aid:
+        return
+    indexes_dir = os.path.join(mc_dir, "assets", "indexes")
+    index_path = os.path.join(indexes_dir, f"{aid}.json")
+    if os.path.isfile(index_path):
+        return
+    url = ai.get("url", "")
+    if not url:
+        return
+    print(f"  Downloading asset index {aid}.json ...", flush=True)
+    os.makedirs(indexes_dir, exist_ok=True)
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    })
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        data = resp.read()
+    with open(index_path, "wb") as f:
+        f.write(data)
+    print(f"  Downloaded asset index {aid}.json ({len(data)} bytes)")
 
 
 def build_classpath(vj, mc_dir=None):
@@ -183,6 +286,27 @@ def build_classpath(vj, mc_dir=None):
         path = artifact.get("path")
         if path:
             full = os.path.join(mc_dir, "libraries", path)
+            if os.path.isfile(full):
+                cp.append(full)
+        elif len(parts) >= 3:
+            group_path = parts[0].replace(".", "/")
+            artifact_id = parts[1]
+            ver = parts[2]
+            jar_dir = os.path.join(mc_dir, "libraries", group_path, artifact_id, ver)
+            is_forge = "minecraftforge" in parts[0] or "net.minecraftforge" in parts[0]
+            suffixes = [""] if not is_forge else ["", "-universal", "-client"]
+            found = False
+            for suffix in suffixes:
+                jar_name = f"{artifact_id}-{ver}{suffix}.jar"
+                full = os.path.join(jar_dir, jar_name)
+                if os.path.isfile(full):
+                    cp.append(full)
+                    found = True
+                    break
+            if found:
+                continue
+            jar_name = f"{artifact_id}-{ver}.jar"
+            full = os.path.join(jar_dir, jar_name)
             if os.path.isfile(full):
                 cp.append(full)
     parent = vj.get("_parent")
@@ -291,15 +415,40 @@ def extract_natives(vj, mc_dir=None):
     return natives_dir
 
 
-_UNSUPPORTED_JVM_FLAGS = {
+_FLAGS_REQUIRING_JDK22 = {
     "--sun-misc-unsafe-memory-access",
 }
 
+_EXPERIMENTAL_FLAGS = {
+    "-XX:+UseCompactObjectHeaders",
+    "-XX:+UseObjectPreBlockEncryption",
+}
 
-def build_jvm_args(vj, natives_dir, mc_dir=None):
+
+def _java_major_version(java_exe):
+    try:
+        out = subprocess.check_output(
+            [java_exe, "-version"], stderr=subprocess.STDOUT, text=True, timeout=10
+        )
+        for line in out.splitlines():
+            if "version" in line:
+                part = line.split('"')[1] if '"' in line else ""
+                if part.startswith("1."):
+                    return int(part.split(".")[1])
+                main = part.split(".")[0]
+                return int(main) if main.isdigit() else 0
+    except Exception:
+        pass
+    return 0
+
+
+def build_jvm_args(vj, natives_dir, mc_dir=None, java_exe="java"):
     mc_dir = mc_dir or MC_DIR
+    java_ver = _java_major_version(java_exe)
+    strip_jdk22_flags = java_ver < 22
     args = []
     jvm_raw = vj.get("arguments", {}).get("jvm", [])
+    needs_unlock = False
     skip_next = False
     for i, arg in enumerate(jvm_raw):
         if skip_next:
@@ -313,21 +462,28 @@ def build_jvm_args(vj, natives_dir, mc_dir=None):
             if "${classpath}" in arg:
                 continue
             flag = arg.split("=")[0] if "=" in arg else arg.split(" ")[0]
-            if flag in _UNSUPPORTED_JVM_FLAGS:
+            if strip_jdk22_flags and flag in _FLAGS_REQUIRING_JDK22:
                 continue
+            if arg in _EXPERIMENTAL_FLAGS:
+                needs_unlock = True
             args.append(replace_vars(arg, natives_dir, mc_dir))
         elif isinstance(arg, dict):
             if should_include_arg(arg):
                 val = arg.get("value")
-                if isinstance(val, list):
-                    for v in val:
-                        v_flag = v.split("=")[0] if "=" in v else v.split(" ")[0]
-                        if v_flag not in _UNSUPPORTED_JVM_FLAGS:
-                            args.append(replace_vars(v, natives_dir, mc_dir))
-                elif isinstance(val, str):
-                    val_flag = val.split("=")[0] if "=" in val else val.split(" ")[0]
-                    if val_flag not in _UNSUPPORTED_JVM_FLAGS:
-                        args.append(replace_vars(val, natives_dir, mc_dir))
+                items = val if isinstance(val, list) else [val]
+                for v in items:
+                    if not isinstance(v, str):
+                        continue
+                    v_flag = v.split("=")[0] if "=" in v else v.split(" ")[0]
+                    if strip_jdk22_flags and v_flag in _FLAGS_REQUIRING_JDK22:
+                        continue
+                    if v in _EXPERIMENTAL_FLAGS:
+                        needs_unlock = True
+                    args.append(replace_vars(v, natives_dir, mc_dir))
+    if needs_unlock:
+        args.insert(0, "-XX:+UnlockExperimentalVMOptions")
+    if not args and not jvm_raw:
+        args.append(replace_vars("-Djava.library.path=${natives_directory}", natives_dir, mc_dir))
     return args
 
 
@@ -402,6 +558,17 @@ def build_game_args(vj, version_name, mc_dir=None, username="Player", uuid="0000
                         a = a.replace(k2, r)
                     if not (a.startswith("${") and a.endswith("}")):
                         args.append(a)
+    if not args:
+        mc_args_str = vj.get("minecraftArguments", "")
+        if mc_args_str:
+            import shlex
+            for tok in shlex.split(mc_args_str):
+                a = tok
+                for k, v in replacements.items():
+                    a = a.replace(k, v)
+                if a.startswith("${") and a.endswith("}"):
+                    continue
+                args.append(a)
     args = [a for a in args if a]
     clean = []
     skip_next = False
@@ -442,11 +609,21 @@ def replace_vars(s, natives_dir, mc_dir):
     )
 
 
+_JDK_LOOKUP = {
+    8:  r"C:\Users\langy\.jdks\jdk8",
+    21: r"C:\Program Files\Amazon Corretto\jdk21.0.8_9",
+    24: r"C:\Users\langy\.jdks\openjdk-24.0.2+12-54",
+    25: r"C:\Program Files\Amazon Corretto\jdk25.0.3_9",
+}
+
+
 def find_java(version_java=None):
-    if version_java and "21" in str(version_java):
-        jdk21 = r"C:\Program Files\Amazon Corretto\jdk21.0.8_9"
-        if os.path.isfile(os.path.join(jdk21, "bin", "java.exe")):
-            return os.path.join(jdk21, "bin", "java.exe")
+    ver = int(version_java) if version_java else None
+    if ver and ver in _JDK_LOOKUP:
+        home = _JDK_LOOKUP[ver]
+        exe = os.path.join(home, "bin", "java.exe" if platform.system() == "Windows" else "java")
+        if os.path.isfile(exe):
+            return exe
     for env_key in ("JAVA_HOME", "JDK_21"):
         home = os.environ.get(env_key)
         if home:
@@ -491,12 +668,12 @@ def main():
                 native_files.append(f)
     print(f"[LAUNCH] Natives: {len(native_files)} files in {natives_dir}")
 
-    jvm_args = build_jvm_args(vj, natives_dir, mc_dir)
-    game_args = build_game_args(vj, version_name, mc_dir, args.username)
-
     java_ver = vj.get("javaVersion", {}).get("majorVersion", 21)
     java_exe = args.java or find_java(java_ver)
     print(f"[LAUNCH] Java: {java_exe} (MC wants {java_ver})")
+
+    jvm_args = build_jvm_args(vj, natives_dir, mc_dir, java_exe)
+    game_args = build_game_args(vj, version_name, mc_dir, args.username)
 
     ws_jar = os.path.join(mc_dir, "libraries", "org", "java-websocket",
                            "Java-WebSocket", "1.5.4", "Java-WebSocket-1.5.4.jar")

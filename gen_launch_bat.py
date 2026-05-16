@@ -6,7 +6,9 @@ mc = os.environ["APPDATA"] + r"\.minecraft"
 vj = merge_version_json("1.21.7-forge-57.0.2", mc)
 cp = build_classpath(vj, mc)
 natives = extract_natives(vj, mc)
-jvm = build_jvm_args(vj, natives, mc)
+java_ver = vj.get("javaVersion", {}).get("majorVersion", 21)
+java_exe = find_java(java_ver)
+jvm = build_jvm_args(vj, natives, mc, java_exe=java_exe)
 game = build_game_args(vj, "1.21.7-forge-57.0.2", mc)
 
 sep = ";"

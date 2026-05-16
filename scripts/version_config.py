@@ -259,7 +259,8 @@ JDK_PATHS = {
     16: None,  # Auto-downloaded by Gradle toolchain
     17: None,  # Auto-downloaded to ~/.gradle/jdks/
     21: r"C:\Program Files\Amazon Corretto\jdk21.0.8_9",
-    25: r"C:\Program Files\Amazon Corretto\jdk21.0.8_9",  # Use JDK 21 for now
+    24: r"C:\Users\langy\.jdks\openjdk-24.0.2+12-54",
+    25: r"C:\Program Files\Amazon Corretto\jdk25.0.3_9",
 }
 
 def get_jdk_home(java_version):

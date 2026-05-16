@@ -435,6 +435,18 @@ description="WebSocket bridge for AI agent interaction"
 authors="langyo"
 """
 
+MCMOD_INFO = """[
+  {
+    "modid": "moddevmcp",
+    "name": "ModDev MCP",
+    "description": "WebSocket bridge for AI agent interaction",
+    "version": "1.0.0",
+    "authorList": ["langyo"],
+    "credits": ""
+  }
+]
+"""
+
 NEOFORGE_MODS_TOML = """modLoader = "javafml"
 loaderVersion = "[4,)"
 license = "MIT"
@@ -480,11 +492,14 @@ if __name__ == "__main__":
                 g = get_api_group(mc)
                 res_dir = os.path.join(path, "src", "main", "resources")
                 os.makedirs(res_dir, exist_ok=True)
-                if g in ("fg6","fg7","mc26"):
+                if g in ("fg3","fg4","fg5","fg6","fg7","mc26"):
                     meta_dir = os.path.join(res_dir, "META-INF")
                     os.makedirs(meta_dir, exist_ok=True)
                     with open(os.path.join(meta_dir, "mods.toml"), "w") as f:
                         f.write(MODS_TOML)
+                elif g in ("legacy", "legacy_17"):
+                    with open(os.path.join(res_dir, "mcmod.info"), "w") as f:
+                        f.write(MCMOD_INFO)
                 with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:
                     f.write(PACK_MCMETA)
                 total += 1

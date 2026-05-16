@@ -493,7 +493,6 @@ tasks.withType(JavaCompile).configureEach {{
 
 jar {{
     manifest {{
-        attributes 'FMLModType': 'GAMELIB'
         attributes 'Automatic-Module': 'moddevmcp.minecraft.xyz.langyo'
     }}
 }}
@@ -669,7 +668,6 @@ tasks.withType(JavaCompile).configureEach {{
 
 jar {{
     manifest {{
-        attributes 'FMLModType': 'GAMELIB'
         attributes 'Automatic-Module': 'moddevmcp.minecraft.xyz.langyo'
     }}
 }}
