@@ -25,41 +25,6 @@ PKG_DOTTED = "moddevmcp.minecraft.xyz.langyo"
 # FORGE MOD TEMPLATES (event registration only)
 # ============================================================
 
-def forge_mod_legacy_17(mc):
-    return """package moddevmcp.minecraft.xyz.langyo;
-
-import com.mcbbs.mcp.common.*;
-import cpw.mods.fml.common.Mod;
-import cpw.mods.fml.common.event.FMLInitializationEvent;
-
-@Mod(modid = "moddevmcp", name = "ModDev MCP", version = "1.0")
-public class ModDevMcpMod {
-    public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
-
-    @Mod.Instance("moddevmcp")
-    public static ModDevMcpMod instance;
-
-    @Mod.EventHandler
-    public void init(FMLInitializationEvent event) {
-        INSTANCE = this;
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
-        new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(50);
-                    if (wsClient != null) wsClient.handleMessages();
-                } catch (Exception e) { break; }
-            }
-        }).start();
-    }
-}
-"""
-
 def forge_mod_legacy(mc):
     return """package moddevmcp.minecraft.xyz.langyo;
 
@@ -468,7 +433,6 @@ def write_java(path, filename, content):
 def get_forge_mod_template(mc):
     g = get_api_group(mc)
     return {
-        "legacy_17": forge_mod_legacy_17,
         "legacy": forge_mod_legacy,
         "fg3": forge_mod_fg3,
         "fg4": forge_mod_fg4,
@@ -497,7 +461,7 @@ if __name__ == "__main__":
                     os.makedirs(meta_dir, exist_ok=True)
                     with open(os.path.join(meta_dir, "mods.toml"), "w") as f:
                         f.write(MODS_TOML)
-                elif g in ("legacy", "legacy_17"):
+                elif g in ("legacy",):
                     with open(os.path.join(res_dir, "mcmod.info"), "w") as f:
                         f.write(MCMOD_INFO)
                 with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:

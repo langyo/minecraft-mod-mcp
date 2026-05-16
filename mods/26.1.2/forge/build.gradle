@@ -30,7 +30,6 @@ repositories {
         url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
         allowInsecureProtocol = false
     }
-
 }
 
 sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'

@@ -13,7 +13,6 @@ repositories {
     maven {
         url = "../../../.maven-local"
     }
-
 }
 
 sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'

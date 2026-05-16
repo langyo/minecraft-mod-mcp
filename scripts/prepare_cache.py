@@ -298,21 +298,6 @@ def main():
             fail += 1
 
     # ================================================================
-    # Phase 5: MC version jars for FG 1.2
-    # ================================================================
-    print("\n[Phase 5] MC version jars (FG 1.2)")
-    for mc, info in sorted(ALL_VERSIONS.items()):
-        if info.get("fg_era") != "fg12":
-            continue
-        print(f"  [{mc}]")
-        jar = download_mc_jar(mc)
-        if jar:
-            place_in_gradle_cache("net.minecraft", "minecraft", mc, f"{mc}.jar", jar)
-            ok += 1
-        else:
-            fail += 1
-
-    # ================================================================
     # Phase 6: Fabric yarn mappings
     # ================================================================
     print("\n[Phase 6] Fabric yarn mappings")
@@ -411,46 +396,6 @@ def main():
                     ok += 1
                 else:
                     fail += 1
-
-    # ================================================================
-    # Phase 10: MCP stable mappings for FG 1.2 (1.7.x)
-    # ================================================================
-    print("\n[Phase 10] MCP stable mappings for FG 1.2")
-    for mc, info in sorted(ALL_VERSIONS.items()):
-        if info.get("fg_era") != "fg12":
-            continue
-        mappings = info.get("mappings", "")
-        if not mappings or "_" not in mappings:
-            continue
-        channel, ver = mappings.split("_", 1)
-        ref_mc = "1.7.10"
-        ref_full = f"{ver}-{ref_mc}"
-        full_ver = f"{ver}-{mc}"
-        artifact = f"mcp_{channel}"
-        ref_filename = f"{artifact}-{ref_full}.zip"
-        filename = f"{artifact}-{full_ver}.zip"
-        ref_url = f"{MAVEN_FORGE}/de/oceanlabs/mcp/{artifact}/{ref_full}/{ref_filename}"
-        print(f"  [{mc}] {artifact}/{full_ver} (via {ref_full})")
-        staging = os.path.join(TEMP_DIR, "mcp_staging", artifact, full_ver)
-        os.makedirs(staging, exist_ok=True)
-        tmp_file = os.path.join(staging, filename)
-        success = download_files([(ref_url, tmp_file)])
-        if success and os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
-            place_in_gradle_cache("de.oceanlabs.mcp", artifact, full_ver, filename, tmp_file)
-            place_in_gradle_cache("de.oceanlabs.mcp", artifact, ref_full, ref_filename, tmp_file)
-            forge_ver = info.get("forge", "")
-            fg_cache_dir = os.path.join(
-                GRADLE_USER_HOME, "caches", "minecraft", "net", "minecraftforge", "forge",
-                forge_ver, channel, ver,
-            )
-            os.makedirs(fg_cache_dir, exist_ok=True)
-            for name in (filename, "mcp_stable.zip"):
-                dst = os.path.join(fg_cache_dir, name)
-                if not os.path.isfile(dst):
-                    shutil.copy2(tmp_file, dst)
-            ok += 2
-        else:
-            fail += 1
 
     # ================================================================
     # Phase 11: Generate srg_to_snapshot tsrg files (FG 4.1)

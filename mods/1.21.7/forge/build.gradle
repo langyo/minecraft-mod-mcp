@@ -34,11 +34,9 @@ repositories {
 
 sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
 
-
 dependencies {
     implementation minecraft.dependency('net.minecraftforge:forge:1.21.7-57.0.2')
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
-    implementation 'org.slf4j:slf4j-api:1.7.36'
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -48,6 +46,7 @@ tasks.withType(JavaCompile).configureEach {
 jar {
     manifest {
         attributes 'ModSide' : 'BOTH'
+        attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
         attributes 'Implementation-Version' : project.version
     }
 }

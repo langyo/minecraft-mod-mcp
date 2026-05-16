@@ -148,53 +148,9 @@ def copy_wrapper(path, gradle_ver):
 # ============================================================
 
 
-def write_forge_build_fg12(mc, info, path):
-    java = info.get("java", 8)
-    forge_ver = info.get("forge", "")
-    mappings = info.get("mappings", "stable_12")
-    depth = maven_local_depth()
-    content = f"""buildscript {{
-    repositories {{
-        maven {{ url = "https://maven.minecraftforge.net/" }}
-        mavenCentral()
-    }}
-    dependencies {{
-        classpath "net.minecraftforge.gradle:ForgeGradle:1.2-SNAPSHOT"
-    }}
-}}
-
-apply plugin: "forge"
-
-version = "1.0.0-SNAPSHOT"
-group = "xyz.langyo"
-archivesBaseName = "minecraft-moddev-mcp-mod"
-
-sourceCompatibility = targetCompatibility = "1.{java}"
-
-minecraft {{
-    version = "{forge_ver}"
-    mappings = "{mappings}"
-}}
-
-repositories {{
-    mavenCentral()
-    maven {{
-        url = "{depth}.maven-local"
-    }}
-}}
-
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
-
-dependencies {{
-    compile "org.java-websocket:Java-WebSocket:1.5.4"
-}}
-"""
-    with open(os.path.join(path, "build.gradle"), "w") as f:
-        f.write(content)
-
 
 # ============================================================
-# FORGE BUILD.GRADL — FG 2.1 / 2.2 / 2.3
+# FORGE BUILD.GRADLE — FG 2.1 / 2.2 / 2.3
 # ============================================================
 
 
@@ -862,7 +818,6 @@ def write_fabric_mod_json(mc, info, path):
 # ============================================================
 
 _FORGE_BUILD_FNS = {
-    "fg12": write_forge_build_fg12,
     "fg21": write_forge_build_fg2,
     "fg22": write_forge_build_fg2,
     "fg23": write_forge_build_fg2,
@@ -873,7 +828,7 @@ _FORGE_BUILD_FNS = {
     "fg7":  write_forge_build_fg7,
 }
 
-_FORGE_SETTINGS_LEGACY_ERAS = {"fg12", "fg21", "fg22", "fg23", "fg3", "fg41"}
+_FORGE_SETTINGS_LEGACY_ERAS = {"fg21", "fg22", "fg23", "fg3", "fg41"}
 
 
 def _get_gradle_ver(mc, loader, info):

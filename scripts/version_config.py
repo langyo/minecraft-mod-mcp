@@ -3,7 +3,6 @@
 Every script imports from this module. No version strings hardcoded elsewhere.
 
 FG Era Definitions:
-  FG 1.2  → MC 1.7.x     → Gradle 2.14  → JDK 8  → buildscript + apply "forge"
   FG 2.1  → MC 1.8-1.8.9 → Gradle 2.14  → JDK 8  → buildscript + apply "net.minecraftforge.gradle.forge"
   FG 2.2  → MC 1.9-1.11  → Gradle 2.14  → JDK 8  → buildscript + apply "net.minecraftforge.gradle.forge"
   FG 2.3  → MC 1.12.x    → Gradle 4.10  → JDK 8  → buildscript + apply "net.minecraftforge.gradle.forge"
@@ -24,15 +23,6 @@ MODS_DIR = os.path.join(BASE_DIR, "mods")
 # ============================================================
 
 FG_ERAS = {
-    "fg12": {
-        "fg_version": "1.2-SNAPSHOT",
-        "gradle": "2.14",
-        "plugin_id": "forge",
-        "apply_method": "buildscript",
-        "java": 8,
-        "min_mc": "1.7.2",
-        "max_mc": "1.7.10",
-    },
     "fg21": {
         "fg_version": "2.1-SNAPSHOT",
         "gradle": "2.14",
@@ -114,9 +104,6 @@ FG_ERAS = {
 #                              neoforge?, mdg?, fabric_yarn?}
 
 ALL_VERSIONS = {
-    # --- FG 1.2 (MC 1.7.10) — anatawa12 fork ---
-    "1.7.10": {"forge": "1.7.10-10.13.4.1614-1.7.10", "fg_era": "fg12", "java": 8, "mappings": "stable_12"},
-
     # --- FG 2.1 (MC 1.8.x) ---
     "1.8.9": {"forge": "1.8.9-11.15.1.2318-1.8.9",  "fg_era": "fg21", "java": 8, "mappings": "snapshot_20160113"},
 
@@ -170,7 +157,6 @@ ALL_VERSIONS = {
 def get_api_group(mc):
     """Return the API group for source code generation."""
     _MAP = {
-        "1.7.10": "legacy_17",
         "1.8.9": "legacy",
         "1.9.4": "legacy", "1.10.2": "legacy", "1.11.2": "legacy",
         "1.12.2": "legacy",
@@ -285,7 +271,7 @@ def find_jdk17():
 # LEGACY BUILD ERAS (need pre-cache due to Cloudflare TLS)
 # ============================================================
 
-LEGACY_ERAS = {"fg12", "fg21", "fg22", "fg23", "fg3", "fg41"}
+LEGACY_ERAS = {"fg21", "fg22", "fg23", "fg3", "fg41"}
 
 
 def is_legacy(mc):

@@ -1,7 +1,6 @@
 buildscript {
     repositories {
         maven { url = "https://maven.minecraftforge.net/" }
-
         mavenCentral()
     }
     dependencies {
@@ -31,7 +30,6 @@ repositories {
 }
 
 sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
-
 
 dependencies {
     compile "org.java-websocket:Java-WebSocket:1.5.4"

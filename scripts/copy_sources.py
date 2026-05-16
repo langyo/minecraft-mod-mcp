@@ -82,8 +82,8 @@ def get_template_dir(mc, loader):
         if loader == "forge":
             return "template_forge_fg3"
     
-    # 1.7.2 - 1.12.2 (very old, LWJGL 2)
-    if mc in ("1.7.2","1.7.10","1.8","1.8.9","1.9","1.9.4","1.10","1.10.2","1.11","1.11.2","1.12","1.12.2"):
+    # 1.8 - 1.12.2 (very old, LWJGL 2)
+    if mc in ("1.8","1.8.9","1.9","1.9.4","1.10","1.10.2","1.11","1.11.2","1.12","1.12.2"):
         return "template_forge_legacy"
     
     return None
@@ -128,7 +128,6 @@ def copy_src(src_root, dst_root):
 
 # MC versions with their loaders
 ALL_VERSIONS = {
-    "1.7.2": ["forge"], "1.7.10": ["forge"],
     "1.8": ["forge"], "1.8.9": ["forge"],
     "1.9": ["forge"], "1.9.4": ["forge"],
     "1.10": ["forge"], "1.10.2": ["forge"],
