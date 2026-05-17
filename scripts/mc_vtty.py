@@ -33,6 +33,16 @@ import time
 import traceback
 from pathlib import Path
 
+
+def _log(msg):
+    try:
+        print(msg, flush=True)
+    except OSError:
+        try:
+            print(msg)
+        except Exception:
+            pass
+
 import websockets
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -63,7 +73,7 @@ class McVtty:
         t = threading.Thread(target=self._run_ws_loop, daemon=True)
         t.start()
         time.sleep(0.5)
-        print(f"[VTTY] WS server on port {WS_PORT}", flush=True)
+        _log(f"[VTTY] WS server on port {WS_PORT}")
 
     def _run_ws_loop(self):
         asyncio.set_event_loop(self._ws_loop)
@@ -79,7 +89,7 @@ class McVtty:
         await self._ws_server.wait_closed()
 
     async def _ws_handler(self, ws):
-        print(f"[WS] MC mod connected", flush=True)
+        _log(f"[WS] MC mod connected")
         self._mc_ws = ws
         self._ws_connected = True
         try:
@@ -101,7 +111,7 @@ class McVtty:
 
                 rid = str(msg.get("id", ""))
                 if rid == "init":
-                    print(f"[WS] Init OK", flush=True)
+                    _log(f"[WS] Init OK")
                     continue
 
                 if rid in self._pending:
@@ -110,13 +120,13 @@ class McVtty:
                 else:
                     result = str(msg.get("result", ""))
                     if result.startswith("data:image"):
-                        print(f"[WS] unsolicited image ({len(result)} chars)", flush=True)
+                        _log(f"[WS] unsolicited image ({len(result)} chars)")
                     else:
-                        print(f"[WS] msg: {result[:200]}", flush=True)
+                        _log(f"[WS] msg: {result[:200]}")
         except websockets.ConnectionClosed:
             pass
         finally:
-            print(f"[WS] MC mod disconnected", flush=True)
+            _log(f"[WS] MC mod disconnected")
             if self._mc_ws is ws:
                 self._mc_ws = None
                 self._ws_connected = False
@@ -175,17 +185,17 @@ class McVtty:
         if self.mc_proc:
             self.kill()
 
-        print(f"[VTTY] Installing mod {version}/{loader}...", flush=True)
+        _log(f"[VTTY] Installing mod {version}/{loader}...")
         clear_mods()
         install_mod(version, loader)
         time.sleep(1)
 
-        print(f"[VTTY] Launching MC {version}...", flush=True)
+        _log(f"[VTTY] Launching MC {version}...")
         self.mc_proc = _start_mc(version)
         if not self.mc_proc:
             return {"error": "MC launch failed"}
 
-        print(f"[VTTY] MC pid={self.mc_proc.pid}, waiting for mod WS...", flush=True)
+        _log(f"[VTTY] MC pid={self.mc_proc.pid}, waiting for mod WS...")
         for i in range(80):
             if self.mc_proc.poll() is not None:
                 return {"error": f"MC exited code={self.mc_proc.returncode}"}
@@ -480,7 +490,7 @@ def run_tcp_server(vtty):
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(("127.0.0.1", VTTY_PORT))
     sock.listen(5)
-    print(f"[VTTY] TCP control server on 127.0.0.1:{VTTY_PORT}", flush=True)
+    _log(f"[VTTY] TCP control server on 127.0.0.1:{VTTY_PORT}")
     while True:
         conn, addr = sock.accept()
         threading.Thread(target=_handle_tcp, args=(vtty, conn), daemon=True).start()
@@ -623,14 +633,14 @@ def main():
 
     threading.Thread(target=run_tcp_server, args=(vtty,), daemon=True).start()
 
-    print(f"[VTTY] Daemon ready. WS={WS_PORT} TCP={VTTY_PORT}", flush=True)
-    print(f"[VTTY] Commands: launch, status, screenshot, click, pyclick, focus, window_rect, press_key, type_text, scroll, hotkey, command, wait, kill", flush=True)
+    _log(f"[VTTY] Daemon ready. WS={WS_PORT} TCP={VTTY_PORT}")
+    _log(f"[VTTY] Commands: launch, status, screenshot, click, pyclick, focus, window_rect, press_key, type_text, scroll, hotkey, command, wait, kill")
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n[VTTY] Shutting down...", flush=True)
+        _log("\n[VTTY] Shutting down...")
         vtty.kill()
 
 
