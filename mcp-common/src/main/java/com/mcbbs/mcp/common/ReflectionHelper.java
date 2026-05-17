@@ -57,7 +57,20 @@ public final class ReflectionHelper {
 
     public static long getWindowHandle(Object mc) {
         try {
-            Object window = mc.getClass().getMethod("getWindow").invoke(mc);
+            Object window = null;
+            try { window = mc.getClass().getMethod("getWindow").invoke(mc); }
+            catch (NoSuchMethodException e) {
+                try { window = mc.getClass().getMethod("getMainWindow").invoke(mc); }
+                catch (NoSuchMethodException e2) {
+                    for (Field f : mc.getClass().getDeclaredFields()) {
+                        if (f.getType().getSimpleName().contains("Window") || f.getType().getSimpleName().contains("MainWindow")) {
+                            f.setAccessible(true);
+                            window = f.get(mc);
+                            break;
+                        }
+                    }
+                }
+            }
             if (window == null) return 0;
             for (String methodName : new String[]{"handle", "getHandle", "getWindow"}) {
                 try {
@@ -82,8 +95,14 @@ public final class ReflectionHelper {
     }
 
     public static boolean hasWindow(Object mc) {
-        try { mc.getClass().getMethod("getWindow"); return true; }
-        catch (NoSuchMethodException e) { return false; }
+        for (String name : new String[]{"getWindow", "getMainWindow"}) {
+            try { mc.getClass().getMethod(name); return true; } catch (NoSuchMethodException ignored) {}
+        }
+        for (Field f : mc.getClass().getDeclaredFields()) {
+            String tn = f.getType().getSimpleName();
+            if (tn.contains("Window") || tn.contains("MainWindow")) return true;
+        }
+        return false;
     }
 
     private static int getIntFieldByNames(Object obj, String... names) {
@@ -106,6 +125,32 @@ public final class ReflectionHelper {
     public static int getDisplayHeight(Object mc) {
         int v = getIntFieldByNames(mc, "displayHeight", "field_71440_d", "height");
         return v > 0 ? v : 0;
+    }
+
+    public static int getGlfwWindowSize(Object mc, boolean isWidth) {
+        if (!LWJGL3) return 0;
+        try {
+            long handle = getWindowHandle(mc);
+            if (handle == 0) return 0;
+            try {
+                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                Class<?> intBufClass = Class.forName("java.nio.IntBuffer");
+                Object wBuf = java.nio.IntBuffer.allocate(1);
+                Object hBuf = java.nio.IntBuffer.allocate(1);
+                try {
+                    glfwClass.getMethod("glfwGetFramebufferSize", long.class, intBufClass, intBufClass)
+                        .invoke(null, handle, wBuf, hBuf);
+                } catch (NoSuchMethodException e) {
+                    glfwClass.getMethod("glfwGetWindowSize", long.class, intBufClass, intBufClass)
+                        .invoke(null, handle, wBuf, hBuf);
+                }
+                return isWidth ? ((java.nio.IntBuffer)wBuf).get(0) : ((java.nio.IntBuffer)hBuf).get(0);
+            } catch (Exception e) {
+                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                String getter = isWidth ? "glfwGetWindowWidth" : "glfwGetWindowHeight";
+                return ((Number) glfwClass.getMethod(getter, long.class).invoke(null, handle)).intValue();
+            }
+        } catch (Exception e) { return 0; }
     }
 
     public static String getPlayerInfo(Object mc) {
@@ -207,41 +252,63 @@ public final class ReflectionHelper {
     }
 
     public static byte[] takeScreenshot(Object mc, int width, int height) {
-        byte[] nativeResult = takeMcNativeScreenshot(mc);
-        if (nativeResult != null) return nativeResult;
-        byte[] glResult = takeGlScreenshot(mc, width, height);
-        if (glResult != null) return glResult;
-        return takeWindowScreenshot();
+        try {
+            byte[] nativeResult = takeMcNativeScreenshot(mc);
+            if (nativeResult != null) return nativeResult;
+        } catch (Exception e) {
+            System.err.println("[MCP-SS] native failed: " + e.getMessage());
+        }
+        try {
+            byte[] winResult = takeWindowScreenshot();
+            if (winResult != null) return winResult;
+        } catch (Exception e) {
+            System.err.println("[MCP-SS] window failed: " + e.getMessage());
+        }
+        try {
+            byte[] glResult = takeGlScreenshot(mc, width, height);
+            if (glResult != null) return glResult;
+        } catch (Exception e) {
+            System.err.println("[MCP-SS] gl failed: " + e.getMessage());
+        }
+        System.err.println("[MCP-SS] ALL screenshot methods failed (w=" + width + " h=" + height + ")");
+        return null;
     }
 
     private static byte[] takeMcNativeScreenshot(Object mc) {
         try {
-            Class<?> screenshotClass = Class.forName("net.minecraft.client.Screenshot");
-            Object renderTarget = mc.getClass().getMethod("getMainRenderTarget").invoke(mc);
-            if (renderTarget == null) return null;
+            Class<?> screenshotClass;
+            try { screenshotClass = Class.forName("net.minecraft.client.Screenshot"); }
+            catch (ClassNotFoundException e) { return null; }
 
-            Class<?> nativeImageClass = Class.forName("com.mojang.blaze3d.platform.NativeImage");
-            Class<?> consumerClass = java.util.function.Consumer.class;
+            Object renderTarget;
+            try { renderTarget = mc.getClass().getMethod("getMainRenderTarget").invoke(mc); }
+            catch (Exception e) { System.err.println("[MCP-Native] no getMainRenderTarget: " + e.getMessage()); return null; }
+            if (renderTarget == null) { System.err.println("[MCP-Native] renderTarget is null"); return null; }
+
+            Class<?> nativeImageClass;
+            try { nativeImageClass = Class.forName("com.mojang.blaze3d.platform.NativeImage"); }
+            catch (ClassNotFoundException e) { return null; }
+
             Method takeScreenshot = null;
             for (Method m : screenshotClass.getDeclaredMethods()) {
                 if (m.getName().equals("takeScreenshot") && m.getParameterCount() == 2
-                        && m.getParameterTypes()[1] == consumerClass) {
+                        && m.getParameterTypes()[1] == java.util.function.Consumer.class) {
                     takeScreenshot = m;
                     break;
                 }
             }
             if (takeScreenshot == null) return null;
 
-            final CountDownLatch latch = new CountDownLatch(1);
             final Object[] imageHolder = new Object[1];
             final Exception[] errorHolder = new Exception[1];
+            final Class<?> niClass = nativeImageClass;
             java.util.function.Consumer<Object> consumer = new java.util.function.Consumer<Object>() {
                 @Override
                 public void accept(Object nativeImage) {
                     try {
                         java.io.File tmpFile = java.io.File.createTempFile("mcp_screenshot_", ".png");
                         tmpFile.deleteOnExit();
-                        nativeImageClass.getMethod("writeToFile", java.io.File.class).invoke(nativeImage, tmpFile);
+                        niClass.getMethod("writeToFile", java.io.File.class).invoke(nativeImage, tmpFile);
                         byte[] data = new byte[(int) tmpFile.length()];
                         java.io.FileInputStream fis = new java.io.FileInputStream(tmpFile);
                         try { fis.read(data); } finally { fis.close(); }
@@ -249,147 +316,93 @@ public final class ReflectionHelper {
                         imageHolder[0] = data;
                     } catch (Exception e) {
                         errorHolder[0] = e;
-                    } finally {
-                        latch.countDown();
                     }
                 }
             };
 
-            final Method tsMethod = takeScreenshot;
-            final Object rt = renderTarget;
-            Runnable captureTask = new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        tsMethod.invoke(null, rt, consumer);
-                    } catch (Exception e) {
-                        errorHolder[0] = e;
-                        latch.countDown();
-                    }
-                }
-            };
+            takeScreenshot.setAccessible(true);
+            takeScreenshot.invoke(null, renderTarget, consumer);
 
-            boolean scheduled = false;
-            for (Method m : mc.getClass().getMethods()) {
-                if (m.getName().equals("execute") && m.getParameterCount() == 1) {
-                    Class<?> pt = m.getParameterTypes()[0];
-                    if (pt == Runnable.class || pt.isAssignableFrom(Runnable.class)) {
-                        try {
-                            m.setAccessible(true);
-                            m.invoke(mc, captureTask);
-                            scheduled = true;
-                            break;
-                        } catch (Exception ignored) {}
-                    }
-                }
-            }
-            if (!scheduled) captureTask.run();
-
-            if (!latch.await(15, TimeUnit.SECONDS)) return null;
             if (errorHolder[0] != null) {
-                System.err.println("[MCP-Native] Screenshot error: " + errorHolder[0].getMessage());
+                System.err.println("[MCP-Native] consumer error: " + errorHolder[0].getMessage());
                 return null;
             }
             return (byte[]) imageHolder[0];
         } catch (Exception e) {
-            System.err.println("[MCP-Native] MC native screenshot failed: " + e.getMessage());
+            System.err.println("[MCP-Native] failed: " + e.getMessage());
             return null;
         }
     }
 
     private static byte[] takeGlScreenshot(Object mc, int width, int height) {
         try {
-            if (width <= 0 || height <= 0) return null;
-
-            try {
-                Method m = mc.getClass().getMethod("getMainRenderTarget");
-                Object fb = m.invoke(mc);
-                if (fb != null) {
-                    try {
-                        Field fw = fb.getClass().getDeclaredField("width");
-                        fw.setAccessible(true);
-                        int fbw = fw.getInt(fb);
-                        Field fh = fb.getClass().getDeclaredField("height");
-                        fh.setAccessible(true);
-                        int fbh = fh.getInt(fb);
-                        if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
-                    } catch (Exception fbEx) {
-                        try {
-                            int fbw = (Integer) fb.getClass().getMethod("getViewWidth").invoke(fb);
-                            int fbh = (Integer) fb.getClass().getMethod("getViewHeight").invoke(fb);
-                            if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
-                        } catch (Exception ignored) {}
-                    }
-                }
-            } catch (NoSuchMethodException e) {}
-
-            final int w = width;
-            final int h = height;
-            final ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
-            final CountDownLatch latch = new CountDownLatch(1);
-            final Exception[] captureError = new Exception[1];
-
-            Runnable captureTask = new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        doGlReadPixels(0, 0, w, h, bb);
-                        bb.rewind();
-                    } catch (Exception ex) {
-                        captureError[0] = ex;
-                    } finally {
-                        latch.countDown();
-                    }
-                }
-            };
-
-            boolean scheduled = false;
-            for (Method m : mc.getClass().getMethods()) {
-                if (m.getName().equals("execute") && m.getParameterCount() == 1) {
-                    Class<?> pt = m.getParameterTypes()[0];
-                    if (pt == Runnable.class || pt.isAssignableFrom(Runnable.class)) {
-                        try {
-                            m.setAccessible(true);
-                            m.invoke(mc, captureTask);
-                            scheduled = true;
-                            break;
-                        } catch (Exception ignored) {}
-                    }
-                }
-            }
-            if (!scheduled) captureTask.run();
-
-            if (!latch.await(10, TimeUnit.SECONDS)) {
-                return null;
-            }
-            if (captureError[0] != null) {
-                return null;
-            }
-
-            int[] raw = new int[w * h];
-            for (int i = 0; i < raw.length; i++) {
-                int r = bb.get() & 0xFF;
-                int g = bb.get() & 0xFF;
-                int b = bb.get() & 0xFF;
-                int a = bb.get() & 0xFF;
-                raw[i] = (a << 24) | (r << 16) | (g << 8) | b;
-            }
-
-            int[] flipped = new int[w * h];
-            for (int y2 = 0; y2 < h; y2++) {
-                for (int x2 = 0; x2 < w; x2++) {
-                    flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
-                }
-            }
-
-            BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-            img.setRGB(0, 0, w, h, flipped, 0, w);
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(img, "png", baos);
-            return baos.toByteArray();
+            return takeGlScreenshot0(mc, width, height);
         } catch (Exception e) {
+            System.err.println("[MCP-GL] failed: " + e.getMessage());
             return null;
         }
+    }
+
+    private static byte[] takeGlScreenshot0(Object mc, int width, int height) throws Exception {
+        if (width <= 0 || height <= 0) {
+            System.err.println("[MCP-GL] bad dims: " + width + "x" + height);
+            return null;
+        }
+
+        try {
+            Method m = mc.getClass().getMethod("getMainRenderTarget");
+            Object fb = m.invoke(mc);
+            if (fb != null) {
+                try {
+                    Field fw = fb.getClass().getDeclaredField("width");
+                    fw.setAccessible(true);
+                    int fbw = fw.getInt(fb);
+                    Field fh = fb.getClass().getDeclaredField("height");
+                    fh.setAccessible(true);
+                    int fbh = fh.getInt(fb);
+                    if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
+                } catch (Exception fbEx) {
+                    try {
+                        int fbw = (Integer) fb.getClass().getMethod("getViewWidth").invoke(fb);
+                        int fbh = (Integer) fb.getClass().getMethod("getViewHeight").invoke(fb);
+                        if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (NoSuchMethodException e) {}
+
+        int w = width;
+        int h = height;
+        ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
+        try {
+            doGlReadPixels(0, 0, w, h, bb);
+        } catch (Exception e) {
+            System.err.println("[MCP-GL] glReadPixels failed: " + e.getMessage());
+            return null;
+        }
+        bb.rewind();
+
+        int[] raw = new int[w * h];
+        for (int i = 0; i < raw.length; i++) {
+            int r = bb.get() & 0xFF;
+            int g = bb.get() & 0xFF;
+            int b = bb.get() & 0xFF;
+            int a = bb.get() & 0xFF;
+            raw[i] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+
+        int[] flipped = new int[w * h];
+        for (int y2 = 0; y2 < h; y2++) {
+            for (int x2 = 0; x2 < w; x2++) {
+                flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
+            }
+        }
+
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        img.setRGB(0, 0, w, h, flipped, 0, w);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try { ImageIO.write(img, "png", baos); } catch (java.io.IOException e) { return null; }
+        return baos.toByteArray();
     }
 
     private static void doGlReadPixels(int x, int y, int w, int h, ByteBuffer bb) throws Exception {
@@ -469,26 +482,67 @@ public final class ReflectionHelper {
         }
     }
 
+    private static Method findMouseButtonMethod(Class<?> mouseHandlerClass) {
+        Method fallback = null;
+        for (Method m : mouseHandlerClass.getDeclaredMethods()) {
+            Class<?>[] pt = m.getParameterTypes();
+            if (pt.length != 4 || pt[0] != long.class || pt[1] != int.class || pt[2] != int.class || pt[3] != int.class) continue;
+            if (java.lang.reflect.Modifier.isStatic(m.getModifiers())) continue;
+            String name = m.getName();
+            if (name.equals("onPress")) return m;
+            if (name.startsWith("lambda$setup$")) {
+                if (fallback == null) fallback = m;
+                continue;
+            }
+            if (name.contains("mouseButton") || name.contains("onMouse") || name.contains("button")) {
+                if (fallback == null) fallback = m;
+            }
+        }
+        return fallback;
+    }
+
+    private static Object getMouseHandler(Object mc) {
+        try { return mc.getClass().getField("mouseHandler").get(mc); } catch (Exception e) {}
+        try { return mc.getClass().getDeclaredField("mouseHandler").get(mc); } catch (Exception e) {}
+        for (Field f : mc.getClass().getDeclaredFields()) {
+            if (f.getType().getSimpleName().contains("MouseHandler") || f.getType().getSimpleName().contains("Mouse")) {
+                try { f.setAccessible(true); return f.get(mc); } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
     public static void sendMouseButton(long handle, int button, int action) {
         if (LWJGL3 && handle != 0) {
             try {
                 Object mc = getMinecraftInstance();
-                Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
-                Method target = null;
-                for (Method m : mouseHandler.getClass().getDeclaredMethods()) {
-                    Class<?>[] pt = m.getParameterTypes();
-                    if (pt.length == 4 && pt[0] == long.class && pt[1] == int.class && pt[2] == int.class && pt[3] == int.class) {
-                        String name = m.getName();
-                        if (name.equals("onPress")) { target = m; break; }
-                        if (name.equals("lambda$setup$4") && target == null) { target = m; }
+                Object mouseHandler = getMouseHandler(mc);
+                if (mouseHandler != null) {
+                    Method target = findMouseButtonMethod(mouseHandler.getClass());
+                    if (target != null) {
+                        target.setAccessible(true);
+                        target.invoke(mouseHandler, handle, button, action, 0);
+                        return;
                     }
                 }
-                if (target == null) {
-                    dbg("sendMouseButton: NO matching method found!");
-                    return;
-                }
-                target.setAccessible(true);
-                target.invoke(mouseHandler, handle, button, action, 0);
+                try {
+                    Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                    Method glfwSetInputMode = glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class);
+                    int GLFW_STICKY_MOUSE_BUTTONS = glfwClass.getDeclaredField("GLFW_STICKY_MOUSE_BUTTONS").getInt(null);
+                    glfwSetInputMode.invoke(null, handle, GLFW_STICKY_MOUSE_BUTTONS, 1);
+                    Class<?>MouseButtonCallback = null;
+                    for (Method cbm : glfwClass.getDeclaredMethods()) {
+                        if (cbm.getName().equals("glfwSetMouseButtonCallback") && cbm.getParameterCount() == 2) {
+                            cbm.invoke(null, handle, (java.lang.reflect.Proxy.newProxyInstance(
+                                Thread.currentThread().getContextClassLoader(),
+                                new Class<?>[]{ Class.forName("org.lwjgl.glfw.GLFWMouseButtonCallbackI") },
+                                (proxy, method, args) -> null
+                            )));
+                            break;
+                        }
+                    }
+                } catch (Exception ignored) {}
+                dbg("sendMouseButton: NO matching method found!");
             } catch (Exception e) {
                 dbg("sendMouseButton GLFW: " + e.getMessage());
             }
@@ -637,13 +691,20 @@ public final class ReflectionHelper {
                     ww = ((java.nio.IntBuffer) wBuf).get(0);
                     wh = ((java.nio.IntBuffer) hBuf).get(0);
                 } catch (Exception e2) {
-                    Object window = mc.getClass().getMethod("getWindow").invoke(mc);
-                    Field wf = window.getClass().getDeclaredField("width");
-                    wf.setAccessible(true);
-                    ww = wf.getInt(window);
-                    Field hf = window.getClass().getDeclaredField("height");
-                    hf.setAccessible(true);
-                    wh = hf.getInt(window);
+                    Object window2 = null;
+                    try { window2 = mc.getClass().getMethod("getWindow").invoke(mc); }
+                    catch (NoSuchMethodException nsme) {
+                        try { window2 = mc.getClass().getMethod("getMainWindow").invoke(mc); }
+                        catch (Exception ignored) {}
+                    }
+                    if (window2 != null) {
+                        for (String fn : new String[]{"width", "cachedWidth"}) {
+                            try { Field wf = window2.getClass().getDeclaredField(fn); wf.setAccessible(true); ww = wf.getInt(window2); break; } catch (Exception ignored) {}
+                        }
+                        for (String fn : new String[]{"height", "cachedHeight"}) {
+                            try { Field hf = window2.getClass().getDeclaredField(fn); hf.setAccessible(true); wh = hf.getInt(window2); break; } catch (Exception ignored) {}
+                        }
+                    }
                 }
             } catch (Exception e) {
                 return null;

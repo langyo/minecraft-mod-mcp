@@ -1,7 +1,10 @@
 package com.mcbbs.mcp.common;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import javax.imageio.ImageIO;
 
 public class ReflectedInputHandler extends McpMessageHandler implements McpProtocol.MinecraftInput {
 
@@ -35,28 +38,58 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         return 0;
     }
 
+    private Object getWindow(Object mc) {
+        try {
+            try { return mc.getClass().getMethod("getWindow").invoke(mc); }
+            catch (NoSuchMethodException ignored) {}
+            try { return mc.getClass().getMethod("getMainWindow").invoke(mc); }
+            catch (NoSuchMethodException ignored) {}
+            for (Field f : mc.getClass().getDeclaredFields()) {
+                String tn = f.getType().getSimpleName();
+                if (tn.contains("Window") || tn.contains("MainWindow")) {
+                    try { f.setAccessible(true); return f.get(mc); } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
     private int getWidth() {
         Object mc = mc();
-        if (ReflectionHelper.hasWindow(mc)) {
+        Object window = getWindow(mc);
+        if (window != null) {
+            for (String fname : new String[]{"width", "cachedWidth", "framebufferWidth",
+                    "field_198122_i", "field_198131_r", "field_198120_g", "field_198127_n"}) {
+                try {
+                    Field f = window.getClass().getDeclaredField(fname);
+                    f.setAccessible(true);
+                    int v = f.getInt(window);
+                    if (v > 0) return v;
+                } catch (Exception ignored) {}
+            }
             try {
-                Object window = mc.getClass().getMethod("getWindow").invoke(mc);
-                Field w = window.getClass().getDeclaredField("width");
-                w.setAccessible(true);
-                return w.getInt(window);
-            } catch (Exception e) { return ReflectionHelper.getDisplayWidth(mc); }
+                return ((Number) window.getClass().getMethod("getWidth").invoke(window)).intValue();
+            } catch (Exception ignored) {}
         }
         return ReflectionHelper.getDisplayWidth(mc);
     }
 
     private int getHeight() {
         Object mc = mc();
-        if (ReflectionHelper.hasWindow(mc)) {
+        Object window = getWindow(mc);
+        if (window != null) {
+            for (String fname : new String[]{"height", "cachedHeight", "framebufferHeight",
+                    "field_198123_j", "field_198132_s", "field_198121_h", "field_198128_o"}) {
+                try {
+                    Field f = window.getClass().getDeclaredField(fname);
+                    f.setAccessible(true);
+                    int v = f.getInt(window);
+                    if (v > 0) return v;
+                } catch (Exception ignored) {}
+            }
             try {
-                Object window = mc.getClass().getMethod("getWindow").invoke(mc);
-                Field h = window.getClass().getDeclaredField("height");
-                h.setAccessible(true);
-                return h.getInt(window);
-            } catch (Exception e) { return ReflectionHelper.getDisplayHeight(mc); }
+                return ((Number) window.getClass().getMethod("getHeight").invoke(window)).intValue();
+            } catch (Exception ignored) {}
         }
         return ReflectionHelper.getDisplayHeight(mc);
     }
@@ -139,13 +172,39 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     @Override
     public byte[] screenshot() {
         try {
+            Object m = mc();
             int w = getWidth();
             int h = getHeight();
-            if (w <= 0 || h <= 0) throw new RuntimeException("bad dims w=" + w + " h=" + h);
-            byte[] result = ReflectionHelper.takeScreenshot(mc(), w, h);
-            if (result == null) throw new RuntimeException("takeScreenshot returned null");
+            if (w <= 0 || h <= 0) {
+                return createDummyScreenshot("dims=" + w + "x" + h);
+            }
+            byte[] result = ReflectionHelper.takeScreenshot(m, w, h);
+            if (result == null) return createDummyScreenshot("null");
             return result;
-        } catch (Exception e) { throw new RuntimeException("screenshot failed", e); }
+        } catch (Exception e) {
+            try { return createDummyScreenshot("err:" + e.getMessage()); } catch (Exception e2) { return null; }
+        }
+    }
+
+    private static byte[] createDummyScreenshot(String msg) throws Exception {
+        BufferedImage img = new BufferedImage(1600, 200, BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics g = img.getGraphics();
+        g.setColor(java.awt.Color.RED);
+        g.fillRect(0, 0, 1600, 200);
+        g.setColor(java.awt.Color.WHITE);
+        g.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 11));
+        int y = 15;
+        int maxLen = Math.min(msg.length(), 1600);
+        for (int i = 0; i < maxLen; i += 140) {
+            String line = msg.substring(i, Math.min(i + 140, msg.length()));
+            g.drawString(line, 5, y);
+            y += 14;
+            if (y > 195) break;
+        }
+        g.dispose();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(img, "png", baos);
+        return baos.toByteArray();
     }
 
     @Override

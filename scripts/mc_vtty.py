@@ -218,7 +218,7 @@ class McVtty:
 
     def screenshot(self, name="screenshot"):
         SS_DIR.mkdir(parents=True, exist_ok=True)
-        result = self._send_ws("screenshot", timeout=20)
+        result = self._send_ws("screenshot", timeout=60)
         if isinstance(result, dict) and result.get("type") == "image":
             data_uri = result["data"]
             if data_uri.startswith("data:image/png;base64,"):
@@ -356,10 +356,8 @@ class McVtty:
         if hasattr(self, '_fb_cache') and self._fb_cache:
             return self._fb_cache
         try:
-            import tempfile
-            tmp = tempfile.mktemp(suffix=".png")
             SS_DIR.mkdir(parents=True, exist_ok=True)
-            result = self._send_ws("screenshot", timeout=20)
+            result = self._send_ws("screenshot", timeout=60)
             if isinstance(result, dict) and result.get("type") == "image":
                 data_uri = result["data"]
                 if data_uri.startswith("data:image/png;base64,"):
