@@ -20,13 +20,37 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         try {
             Object mc = ReflectionHelper.getMinecraftInstance();
             try {
-                Method execute = mc.getClass().getMethod("execute", Runnable.class);
+                java.lang.reflect.Method execute = mc.getClass().getMethod("execute", Runnable.class);
                 execute.invoke(mc, task);
-            } catch (NoSuchMethodException e) {
-                mc.getClass().getMethod("addScheduledTask", Runnable.class).invoke(mc, task);
+                return;
+            } catch (NoSuchMethodException e) {}
+            try {
+                java.lang.reflect.Method m = mc.getClass().getMethod("addScheduledTask", Runnable.class);
+                m.invoke(mc, task);
+                return;
+            } catch (NoSuchMethodException e) {}
+            for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
+                if ((m.getName().contains("Schedule") || m.getName().contains("schedule"))
+                    && m.getParameterCount() == 1
+                    && Runnable.class.isAssignableFrom(m.getParameterTypes()[0])) {
+                    m.invoke(mc, task);
+                    return;
+                }
             }
+            for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
+                if (m.getName().contains("Task") && m.getParameterCount() == 1
+                    && Runnable.class.isAssignableFrom(m.getParameterTypes()[0])) {
+                    m.invoke(mc, task);
+                    return;
+                }
+            }
+            throw new RuntimeException("No scheduling method found on " + mc.getClass().getName()
+                + ". Methods with Runnable: " + java.util.Arrays.toString(
+                    java.util.Arrays.stream(mc.getClass().getMethods())
+                        .filter(x -> x.getParameterCount() == 1 && Runnable.class.isAssignableFrom(x.getParameterTypes()[0]))
+                        .map(java.lang.reflect.Method::getName).toArray()));
         } catch (Exception e) {
-            System.err.println("[ReflectedInputHandler] Failed to schedule: " + e.getMessage());
+            throw new RuntimeException("executeOnRenderThread failed: " + e.getMessage(), e);
         }
     }
 
@@ -71,7 +95,9 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 return ((Number) window.getClass().getMethod("getWidth").invoke(window)).intValue();
             } catch (Exception ignored) {}
         }
-        return ReflectionHelper.getDisplayWidth(mc);
+        int v = ReflectionHelper.getDisplayWidth(mc);
+        if (v > 0) return v;
+        return ReflectionHelper.getLwjgl2DisplaySize(true);
     }
 
     private int getHeight() {
@@ -91,7 +117,9 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 return ((Number) window.getClass().getMethod("getHeight").invoke(window)).intValue();
             } catch (Exception ignored) {}
         }
-        return ReflectionHelper.getDisplayHeight(mc);
+        int v = ReflectionHelper.getDisplayHeight(mc);
+        if (v > 0) return v;
+        return ReflectionHelper.getLwjgl2DisplaySize(false);
     }
 
     @Override
@@ -171,19 +199,71 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
 
     @Override
     public byte[] screenshot() {
-        try {
-            Object m = mc();
-            int w = getWidth();
-            int h = getHeight();
-            if (w <= 0 || h <= 0) {
-                return createDummyScreenshot("dims=" + w + "x" + h);
-            }
-            byte[] result = ReflectionHelper.takeScreenshot(m, w, h);
-            if (result == null) return createDummyScreenshot("null");
-            return result;
-        } catch (Exception e) {
-            try { return createDummyScreenshot("err:" + e.getMessage()); } catch (Exception e2) { return null; }
+        if (isOnRenderThread()) {
+            return doScreenshot();
         }
+        try {
+            final byte[][] holder = {null};
+            final Exception[] err = {null};
+            final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+            boolean scheduled = false;
+            try {
+                Object mc = mc();
+                try {
+                    java.lang.reflect.Method execute = mc.getClass().getMethod("execute", Runnable.class);
+                    execute.invoke(mc, (Runnable) () -> {
+                        try { holder[0] = doScreenshot(); }
+                        catch (Exception e) { err[0] = e; }
+                        latch.countDown();
+                    });
+                    scheduled = true;
+                } catch (NoSuchMethodException e) {
+                    try {
+                        mc.getClass().getMethod("addScheduledTask", Runnable.class).invoke(mc, (Runnable) () -> {
+                            try { holder[0] = doScreenshot(); }
+                            catch (Exception ex) { err[0] = ex; }
+                            latch.countDown();
+                        });
+                        scheduled = true;
+                    } catch (Exception ignored) {}
+                }
+            } catch (Exception ignored) {}
+            if (scheduled) {
+                try { latch.await(15, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException e) {}
+                if (holder[0] != null) return holder[0];
+                if (err[0] != null) throw new RuntimeException(err[0].getMessage(), err[0]);
+            }
+            return doScreenshot();
+        } catch (RuntimeException e) { throw e; }
+        catch (Exception e) { throw new RuntimeException(e.getMessage(), e); }
+    }
+
+    private boolean isOnRenderThread() {
+        try {
+            Object mc = mc();
+            try {
+                Method m = mc.getClass().getMethod("isSameThread");
+                return (Boolean) m.invoke(mc);
+            } catch (NoSuchMethodException e) {
+                return Thread.currentThread().getName().toLowerCase().contains("client")
+                    || Thread.currentThread().getName().toLowerCase().contains("render")
+                    || Thread.currentThread().getName().toLowerCase().contains("main");
+            }
+        } catch (Exception e) { return false; }
+    }
+
+    private byte[] doScreenshot() {
+        int w = getWidth();
+        int h = getHeight();
+        if (w <= 0 || h <= 0) {
+            throw new RuntimeException("dims=" + w + "x" + h);
+        }
+        try {
+            byte[] result = ReflectionHelper.takeScreenshot(mc(), w, h);
+            if (result == null) throw new RuntimeException("takeScreenshot null w=" + w + " h=" + h);
+            return result;
+        } catch (RuntimeException e) { throw e; }
+        catch (Exception e) { throw new RuntimeException(e.getMessage(), e); }
     }
 
     private static byte[] createDummyScreenshot(String msg) throws Exception {

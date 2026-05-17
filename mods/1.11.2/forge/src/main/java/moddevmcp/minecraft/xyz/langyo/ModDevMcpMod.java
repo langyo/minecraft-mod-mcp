@@ -3,6 +3,8 @@ package moddevmcp.minecraft.xyz.langyo;
 import com.mcbbs.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraftforge.common.MinecraftForge;
 
 @Mod(modid = "moddevmcp", name = "ModDev MCP", version = "1.0")
 public class ModDevMcpMod {
@@ -20,13 +22,11 @@ public class ModDevMcpMod {
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         wsClient = new McpWebSocketClient(serverUrl, handler);
         wsClient.connectAsync();
-        new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(50);
-                    if (wsClient != null) wsClient.handleMessages();
-                } catch (Exception e) { break; }
-            }
-        }).start();
+        MinecraftForge.EVENT_BUS.register(this);
+    }
+
+    @net.minecraftforge.fml.common.eventhandler.SubscribeEvent
+    public void onTick(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
     }
 }

@@ -132,24 +132,27 @@ public final class ReflectionHelper {
         try {
             long handle = getWindowHandle(mc);
             if (handle == 0) return 0;
+            Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+            Class<?> intBufClass = Class.forName("java.nio.IntBuffer");
+            Object wBuf = java.nio.IntBuffer.allocate(1);
+            Object hBuf = java.nio.IntBuffer.allocate(1);
             try {
-                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                Class<?> intBufClass = Class.forName("java.nio.IntBuffer");
-                Object wBuf = java.nio.IntBuffer.allocate(1);
-                Object hBuf = java.nio.IntBuffer.allocate(1);
-                try {
-                    glfwClass.getMethod("glfwGetFramebufferSize", long.class, intBufClass, intBufClass)
-                        .invoke(null, handle, wBuf, hBuf);
-                } catch (NoSuchMethodException e) {
-                    glfwClass.getMethod("glfwGetWindowSize", long.class, intBufClass, intBufClass)
-                        .invoke(null, handle, wBuf, hBuf);
-                }
-                return isWidth ? ((java.nio.IntBuffer)wBuf).get(0) : ((java.nio.IntBuffer)hBuf).get(0);
-            } catch (Exception e) {
-                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                String getter = isWidth ? "glfwGetWindowWidth" : "glfwGetWindowHeight";
-                return ((Number) glfwClass.getMethod(getter, long.class).invoke(null, handle)).intValue();
+                glfwClass.getMethod("glfwGetFramebufferSize", long.class, intBufClass, intBufClass)
+                    .invoke(null, handle, wBuf, hBuf);
+            } catch (NoSuchMethodException e) {
+                glfwClass.getMethod("glfwGetWindowSize", long.class, intBufClass, intBufClass)
+                    .invoke(null, handle, wBuf, hBuf);
             }
+            return isWidth ? ((java.nio.IntBuffer)wBuf).get(0) : ((java.nio.IntBuffer)hBuf).get(0);
+        } catch (Exception e) { return 0; }
+    }
+
+    public static int getLwjgl2DisplaySize(boolean isWidth) {
+        if (LWJGL3) return 0;
+        try {
+            Class<?> displayClass = Class.forName("org.lwjgl.opengl.Display");
+            String method = isWidth ? "getWidth" : "getHeight";
+            return (Integer) displayClass.getMethod(method).invoke(null);
         } catch (Exception e) { return 0; }
     }
 
@@ -252,26 +255,28 @@ public final class ReflectionHelper {
     }
 
     public static byte[] takeScreenshot(Object mc, int width, int height) {
+        String failChain = "";
         try {
             byte[] nativeResult = takeMcNativeScreenshot(mc);
             if (nativeResult != null) return nativeResult;
         } catch (Exception e) {
-            System.err.println("[MCP-SS] native failed: " + e.getMessage());
+            failChain += "native:" + e.getMessage() + " ";
         }
         try {
             byte[] winResult = takeWindowScreenshot();
             if (winResult != null) return winResult;
         } catch (Exception e) {
-            System.err.println("[MCP-SS] window failed: " + e.getMessage());
+            failChain += "window:" + e.getMessage() + " ";
         }
         try {
             byte[] glResult = takeGlScreenshot(mc, width, height);
             if (glResult != null) return glResult;
         } catch (Exception e) {
-            System.err.println("[MCP-SS] gl failed: " + e.getMessage());
+            Throwable cause = e;
+            while (cause.getCause() != null) cause = cause.getCause();
+            failChain += "gl:" + cause.getClass().getSimpleName() + ": " + cause.getMessage() + " ";
         }
-        System.err.println("[MCP-SS] ALL screenshot methods failed (w=" + width + " h=" + height + ")");
-        return null;
+        throw new RuntimeException("ALL failed (" + failChain + ") w=" + width + " h=" + height);
     }
 
     private static byte[] takeMcNativeScreenshot(Object mc) {
@@ -314,9 +319,11 @@ public final class ReflectionHelper {
                         try { fis.read(data); } finally { fis.close(); }
                         tmpFile.delete();
                         imageHolder[0] = data;
-                    } catch (Exception e) {
-                        errorHolder[0] = e;
-                    }
+        } catch (Exception e) {
+            Throwable cause = e;
+            while (cause.getCause() != null) cause = cause.getCause();
+            throw new RuntimeException("glReadPixels failed: " + cause.getClass().getSimpleName() + ": " + cause.getMessage(), e);
+        }
                 }
             };
 
@@ -334,25 +341,20 @@ public final class ReflectionHelper {
         }
     }
 
-    private static byte[] takeGlScreenshot(Object mc, int width, int height) {
-        try {
-            return takeGlScreenshot0(mc, width, height);
-        } catch (Exception e) {
-            System.err.println("[MCP-GL] failed: " + e.getMessage());
-            return null;
-        }
+    private static byte[] takeGlScreenshot(Object mc, int width, int height) throws Exception {
+        return takeGlScreenshot0(mc, width, height);
     }
 
     private static byte[] takeGlScreenshot0(Object mc, int width, int height) throws Exception {
         if (width <= 0 || height <= 0) {
-            System.err.println("[MCP-GL] bad dims: " + width + "x" + height);
-            return null;
+            throw new RuntimeException("bad dims " + width + "x" + height);
         }
 
         try {
             Method m = mc.getClass().getMethod("getMainRenderTarget");
             Object fb = m.invoke(mc);
             if (fb != null) {
+                int origW = width, origH = height;
                 try {
                     Field fw = fb.getClass().getDeclaredField("width");
                     fw.setAccessible(true);
@@ -362,10 +364,26 @@ public final class ReflectionHelper {
                     int fbh = fh.getInt(fb);
                     if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
                 } catch (Exception fbEx) {
+                    for (Field f : fb.getClass().getDeclaredFields()) {
+                        if (f.getType() == int.class) {
+                            try { f.setAccessible(true); } catch (Exception ignored) {}
+                        }
+                    }
                     try {
-                        int fbw = (Integer) fb.getClass().getMethod("getViewWidth").invoke(fb);
-                        int fbh = (Integer) fb.getClass().getMethod("getViewHeight").invoke(fb);
-                        if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
+                        for (Method mm : fb.getClass().getMethods()) {
+                            if (mm.getName().contains("width") && mm.getParameterCount() == 0) {
+                                int v = ((Number) mm.invoke(fb)).intValue();
+                                if (v > 0) { width = v; break; }
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                    try {
+                        for (Method mm : fb.getClass().getMethods()) {
+                            if (mm.getName().contains("height") && mm.getParameterCount() == 0) {
+                                int v = ((Number) mm.invoke(fb)).intValue();
+                                if (v > 0) { height = v; break; }
+                            }
+                        }
                     } catch (Exception ignored) {}
                 }
             }
@@ -377,8 +395,9 @@ public final class ReflectionHelper {
         try {
             doGlReadPixels(0, 0, w, h, bb);
         } catch (Exception e) {
-            System.err.println("[MCP-GL] glReadPixels failed: " + e.getMessage());
-            return null;
+            Throwable cause = e;
+            while (cause.getCause() != null) cause = cause.getCause();
+            throw new RuntimeException("glReadPixels failed: " + cause.getClass().getName() + ": " + cause.getMessage(), e);
         }
         bb.rewind();
 
@@ -401,11 +420,23 @@ public final class ReflectionHelper {
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         img.setRGB(0, 0, w, h, flipped, 0, w);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try { ImageIO.write(img, "png", baos); } catch (java.io.IOException e) { return null; }
-        return baos.toByteArray();
+        try { ImageIO.write(img, "png", baos); } catch (java.io.IOException e) {
+            throw new RuntimeException("ImageIO.write failed", e);
+        }
+        byte[] result = baos.toByteArray();
+        if (result.length == 0) throw new RuntimeException("empty PNG w=" + w + " h=" + h);
+        return result;
     }
 
     private static void doGlReadPixels(int x, int y, int w, int h, ByteBuffer bb) throws Exception {
+        if (!LWJGL3) {
+            try {
+                Class<?> displayClass = Class.forName("org.lwjgl.opengl.Display");
+                try {
+                    displayClass.getMethod("makeCurrent").invoke(null);
+                } catch (Exception ignored) {}
+            } catch (Exception ignored) {}
+        }
         Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
         int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
         int GL_UB = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
@@ -672,42 +703,54 @@ public final class ReflectionHelper {
         try {
             Robot r = awtRobot;
             if (r == null) return null;
-            Object mc = getMinecraftInstance();
-            if (!hasWindow(mc)) return null;
-            long handle = getWindowHandle(mc);
-            if (handle == 0) return null;
             int wx = 0, wy = 0, ww = 800, wh = 600;
-            try {
-                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                wx = ((Number) glfwClass.getMethod("glfwGetWindowPosX", long.class).invoke(null, handle)).intValue();
-                wy = ((Number) glfwClass.getMethod("glfwGetWindowPosY", long.class).invoke(null, handle)).intValue();
-                int[] wArr = {0}, hArr = {0};
+            if (!LWJGL3) {
                 try {
-                    Class<?> intBufClass = Class.forName("org.lwjgl.system.MemoryUtil");
-                    Object wBuf = intBufClass.getMethod("memAllocInt", int.class).invoke(null, 1);
-                    Object hBuf = intBufClass.getMethod("memAllocInt", int.class).invoke(null, 1);
-                    glfwClass.getMethod("glfwGetWindowSize", long.class, Class.forName("java.nio.IntBuffer"), Class.forName("java.nio.IntBuffer"))
-                            .invoke(null, handle, wBuf, hBuf);
-                    ww = ((java.nio.IntBuffer) wBuf).get(0);
-                    wh = ((java.nio.IntBuffer) hBuf).get(0);
-                } catch (Exception e2) {
-                    Object window2 = null;
-                    try { window2 = mc.getClass().getMethod("getWindow").invoke(mc); }
-                    catch (NoSuchMethodException nsme) {
-                        try { window2 = mc.getClass().getMethod("getMainWindow").invoke(mc); }
-                        catch (Exception ignored) {}
-                    }
-                    if (window2 != null) {
-                        for (String fn : new String[]{"width", "cachedWidth"}) {
-                            try { Field wf = window2.getClass().getDeclaredField(fn); wf.setAccessible(true); ww = wf.getInt(window2); break; } catch (Exception ignored) {}
-                        }
-                        for (String fn : new String[]{"height", "cachedHeight"}) {
-                            try { Field hf = window2.getClass().getDeclaredField(fn); hf.setAccessible(true); wh = hf.getInt(window2); break; } catch (Exception ignored) {}
-                        }
-                    }
+                    Class<?> displayClass = Class.forName("org.lwjgl.opengl.Display");
+                    wx = (Integer) displayClass.getMethod("getX").invoke(null);
+                    wy = (Integer) displayClass.getMethod("getY").invoke(null);
+                    ww = (Integer) displayClass.getMethod("getWidth").invoke(null);
+                    wh = (Integer) displayClass.getMethod("getHeight").invoke(null);
+                } catch (Exception e) {
+                    return null;
                 }
-            } catch (Exception e) {
-                return null;
+            } else {
+                Object mc = getMinecraftInstance();
+                if (!hasWindow(mc)) return null;
+                long handle = getWindowHandle(mc);
+                if (handle == 0) return null;
+                try {
+                    Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                    wx = ((Number) glfwClass.getMethod("glfwGetWindowPosX", long.class).invoke(null, handle)).intValue();
+                    wy = ((Number) glfwClass.getMethod("glfwGetWindowPosY", long.class).invoke(null, handle)).intValue();
+                    int[] wArr = {0}, hArr = {0};
+                    try {
+                        Class<?> intBufClass = Class.forName("java.nio.IntBuffer");
+                        Object wBuf = java.nio.IntBuffer.allocate(1);
+                        Object hBuf = java.nio.IntBuffer.allocate(1);
+                        glfwClass.getMethod("glfwGetWindowSize", long.class, intBufClass, intBufClass)
+                                .invoke(null, handle, wBuf, hBuf);
+                        ww = ((java.nio.IntBuffer) wBuf).get(0);
+                        wh = ((java.nio.IntBuffer) hBuf).get(0);
+                    } catch (Exception e2) {
+                        Object window2 = null;
+                        try { window2 = mc.getClass().getMethod("getWindow").invoke(mc); }
+                        catch (NoSuchMethodException nsme) {
+                            try { window2 = mc.getClass().getMethod("getMainWindow").invoke(mc); }
+                            catch (Exception ignored) {}
+                        }
+                        if (window2 != null) {
+                            for (String fn : new String[]{"width", "cachedWidth"}) {
+                                try { Field wf = window2.getClass().getDeclaredField(fn); wf.setAccessible(true); ww = wf.getInt(window2); break; } catch (Exception ignored) {}
+                            }
+                            for (String fn : new String[]{"height", "cachedHeight"}) {
+                                try { Field hf = window2.getClass().getDeclaredField(fn); hf.setAccessible(true); wh = hf.getInt(window2); break; } catch (Exception ignored) {}
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    return null;
+                }
             }
             if (ww <= 0 || wh <= 0) return null;
             Rectangle rect = new Rectangle(wx, wy, ww, wh);

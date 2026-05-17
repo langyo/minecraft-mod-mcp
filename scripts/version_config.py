@@ -106,45 +106,60 @@ FG_ERAS = {
 
 ALL_VERSIONS = {
     # --- FG 2.1 (MC 1.8.x) ---
-    "1.8.9": {"forge": "1.8.9-11.15.1.2318-1.8.9",  "fg_era": "fg21", "java": 8, "mappings": "snapshot_20160113"},
+    "1.8.9": {"forge": "1.8.9-11.15.1.2318-1.8.9",  "fg_era": "fg21", "java": 8, "mappings": "snapshot_20160113",
+              "version_id": "1.8.9-forge1.8.9-11.15.1.2318-1.8.9"},
 
     # --- FG 2.2 (MC 1.9.4-1.11.2) ---
-    "1.9.4":  {"forge": "1.9.4-12.17.0.2317-1.9.4",  "fg_era": "fg22", "java": 8, "mappings": "snapshot_20160518"},
-    "1.10.2": {"forge": "1.10.2-12.18.3.2511",       "fg_era": "fg22", "java": 8, "mappings": "snapshot_20160518"},
-    "1.11.2": {"forge": "1.11.2-13.20.1.2588",       "fg_era": "fg22", "java": 8, "mappings": "snapshot_20170111"},
+    "1.9.4":  {"forge": "1.9.4-12.17.0.2317-1.9.4",  "fg_era": "fg22", "java": 8, "mappings": "snapshot_20160518",
+               "version_id": "1.9.4-forge1.9.4-12.17.0.2317-1.9.4"},
+    "1.10.2": {"forge": "1.10.2-12.18.3.2511",       "fg_era": "fg22", "java": 8, "mappings": "snapshot_20160518",
+               "version_id": "1.10.2-forge1.10.2-12.18.3.2511"},
+    "1.11.2": {"forge": "1.11.2-13.20.1.2588",       "fg_era": "fg22", "java": 8, "mappings": "snapshot_20170111",
+               "version_id": "1.11.2-forge1.11.2-13.20.1.2588"},
 
     # --- FG 2.3 (MC 1.12.x) ---
-    "1.12.2": {"forge": "1.12.2-14.23.5.2847",       "fg_era": "fg23", "java": 8, "mappings": "snapshot_20171003"},
+    "1.12.2": {"forge": "1.12.2-14.23.5.2847",       "fg_era": "fg23", "java": 8, "mappings": "snapshot_20171003",
+               "version_id": "1.12.2-forge1.12.2-14.23.5.2847"},
 
     # --- FG 3.x (MC 1.13-1.14) ---
-    "1.13.2": {"forge": "1.13.2-25.0.223",           "fg_era": "fg3",  "java": 8, "mappings": "snapshot_20190314"},
+    "1.13.2": {"forge": "1.13.2-25.0.223",           "fg_era": "fg3",  "java": 8, "mappings": "snapshot_20190314",
+               "version_id": "1.13.2-forge-25.0.223"},
     "1.14.4": {"forge": "1.14.4-28.2.28",            "fg_era": "fg3",  "java": 8, "mappings": "snapshot_20200119",
+               "version_id": "1.14.4-forge-28.2.28",
                "fabric_yarn": "1.14.4+build.18"},
 
     # --- FG 4.1 (MC 1.15-1.16.5) ---
     "1.15.2": {"forge": "1.15.2-31.2.60",            "fg_era": "fg41", "java": 8, "mappings": "snapshot_20200224-1.15.1",
+               "version_id": "1.15.2-forge-31.2.60",
                "fabric_yarn": "1.15.2+build.17"},
     "1.16.5": {"forge": "1.16.5-36.2.42",            "fg_era": "fg41", "java": 16, "mappings": "snapshot_20210309",
+               "version_id": "1.16.5-forge-36.2.42",
                "fabric_yarn": "1.16.5+build.10"},
 
     # --- FG 5.1 (MC 1.17-1.18.2) ---
     "1.17.1": {"forge": "1.17.1-37.1.1",             "fg_era": "fg51", "java": 17, "mappings": "official_1.17.1",
+               "version_id": "1.17.1-forge-37.1.1",
                "fabric_yarn": "1.17.1+build.65"},
     "1.18.2": {"forge": "1.18.2-40.3.12",            "fg_era": "fg51", "java": 17, "mappings": "official_1.18.2",
+               "version_id": "1.18.2-forge-40.3.12",
                "fabric_yarn": "1.18.2+build.4"},
 
     # --- FG 6.x (MC 1.19.4-1.20.6) ---
     "1.19.4": {"forge": "1.19.4-45.4.3",             "fg_era": "fg6",  "java": 17, "mappings": "official_1.19.4",
+               "version_id": "1.19.4-forge-45.4.3",
                "fabric_yarn": "1.19.4+build.1"},
     "1.20.6": {"forge": "1.20.6-50.2.8",             "fg_era": "fg6",  "java": 21, "mappings": "official_1.20.6",
+               "version_id": "1.20.6-forge-50.2.8",
                "neoforge": "20.6.139", "mdg": "2.0.141",
                "fabric_yarn": "1.20.6+build.1"},
 
     # --- FG 7.x (MC 1.21.7+) ---
-    "1.21.7": {"forge": "1.21.7-57.0.2",             "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.7"},
+    "1.21.7": {"forge": "1.21.7-57.0.2",             "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.7",
+               "version_id": "1.21.7-forge-57.0.2"},
 
     # --- FG 7.x (MC 26.x) ---
     "26.1.2": {"forge": "26.1.2-64.0.8",             "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
+               "version_id": "26.1.2-forge-64.0.8",
                "neoforge": "26.1.2.36-beta", "mdg": "2.0.141"},
 }
 

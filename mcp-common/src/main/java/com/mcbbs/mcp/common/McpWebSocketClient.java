@@ -40,6 +40,10 @@ public class McpWebSocketClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         System.out.println("[MCP-WS] Disconnected: " + reason + " (code=" + code + ")");
+        new Thread(() -> {
+            try { Thread.sleep(3000); reconnect(); }
+            catch (Exception e) { System.err.println("[MCP-WS] Reconnect failed: " + e.getMessage()); }
+        }, "MCP-WS-Reconnect").start();
     }
 
     @Override
