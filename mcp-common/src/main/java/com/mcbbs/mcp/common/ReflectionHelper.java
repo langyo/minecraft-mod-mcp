@@ -474,14 +474,21 @@ public final class ReflectionHelper {
             try {
                 Object mc = getMinecraftInstance();
                 Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
+                Method target = null;
                 for (Method m : mouseHandler.getClass().getDeclaredMethods()) {
                     Class<?>[] pt = m.getParameterTypes();
                     if (pt.length == 4 && pt[0] == long.class && pt[1] == int.class && pt[2] == int.class && pt[3] == int.class) {
-                        m.setAccessible(true);
-                        m.invoke(mouseHandler, handle, button, action, 0);
-                        return;
+                        String name = m.getName();
+                        if (name.equals("onPress")) { target = m; break; }
+                        if (name.equals("lambda$setup$4") && target == null) { target = m; }
                     }
                 }
+                if (target == null) {
+                    dbg("sendMouseButton: NO matching method found!");
+                    return;
+                }
+                target.setAccessible(true);
+                target.invoke(mouseHandler, handle, button, action, 0);
             } catch (Exception e) {
                 dbg("sendMouseButton GLFW: " + e.getMessage());
             }
@@ -662,6 +669,12 @@ public final class ReflectionHelper {
 
     private static Object getPlayer(Object mc) throws Exception {
         try { return mc.getClass().getMethod("player").invoke(mc); } catch (NoSuchMethodException ignored) {}
+        try {
+            Field f = mc.getClass().getDeclaredField("player");
+            f.setAccessible(true);
+            Object p = f.get(mc);
+            if (p != null) return p;
+        } catch (Exception ignored) {}
         Object f = fieldOrNull(mc, "thePlayer");
         if (f != null) return f;
         return fieldOrNull(mc, "field_71439_g");
