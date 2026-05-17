@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
@@ -173,6 +174,327 @@ public final class ReflectionHelper {
         }
     }
 
+    public static String guiClick(Object mc, int x, int y, int button) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen == null) return "{\"error\":\"no screen\"}";
+            String screenName = screen.getClass().getSimpleName();
+            // Get GUI scale factor for coordinate conversion
+            double scale = getGuiScale(mc);
+            double gx = x / scale;
+            double gy = y / scale;
+            dbg("guiClick: raw(" + x + "," + y + ") -> gui(" + (int)gx + "," + (int)gy + ") scale=" + scale + " screen=" + screenName);
+            for (Method m : getAllMethods(screen.getClass())) {
+                String n = m.getName();
+                if ((n.equals("mouseClicked") || n.equals("mouseReleased") || n.equals("func_73864_a"))
+                        && m.getParameterCount() == 3) {
+                    Class<?>[] pt = m.getParameterTypes();
+                    boolean match = (pt[0] == double.class && pt[1] == double.class && pt[2] == int.class)
+                            || (pt[0] == int.class && pt[1] == int.class && pt[2] == int.class);
+                    if (match) {
+                        m.setAccessible(true);
+                        Object result = m.invoke(screen, castParam(pt[0], gx), castParam(pt[1], gy), castParam(pt[2], button));
+                        return "{\"clicked\":true,\"screen\":\"" + screenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"scale\":" + scale + ",\"result\":" + result + "}";
+                    }
+                }
+            }
+            for (Method m : getAllMethods(screen.getClass())) {
+                String n = m.getName();
+                if ((n.contains("mouseClicked") || n.equals("func_73864_a") || n.contains("click") || n.contains("Click"))
+                        && m.getParameterCount() >= 2) {
+                    try {
+                        m.setAccessible(true);
+                        Class<?>[] paramTypes = m.getParameterTypes();
+                        Object[] args = new Object[paramTypes.length];
+                        args[0] = castParam(paramTypes[0], x);
+                        args[1] = castParam(paramTypes[1], y);
+                        if (args.length > 2) args[2] = castParam(paramTypes[2], button);
+                        for (int i = 3; i < args.length; i++) {
+                            args[i] = defaultParam(paramTypes[i]);
+                        }
+                        Object result = m.invoke(screen, args);
+                        return "{\"clicked\":true,\"screen\":\"" + screen.getClass().getSimpleName() + "\",\"method\":\"" + n + "\"}";
+                    } catch (Exception ignored) { dbg("guiClick invoke fail " + n + ": " + ignored.getMessage()); }
+                }
+            }
+            return "{\"error\":\"no mouseClicked method on " + screen.getClass().getName() + "\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    public static String getScreenButtons(Object mc) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen == null) return "{\"error\":\"no screen\"}";
+            StringBuilder sb = new StringBuilder("{\"screen\":\"" + screen.getClass().getSimpleName() + "\",\"buttons\":[");
+            boolean first = true;
+            for (Field f : getAllFields(screen.getClass())) {
+                String fn = f.getName();
+                if (fn.equals("buttonList") || fn.equals("buttons") || fn.equals("field_146292_n") || fn.contains("button")) {
+                    try {
+                        f.setAccessible(true);
+                        Object list = f.get(screen);
+                        if (list instanceof java.util.List) {
+                            for (Object btn : (java.util.List<?>) list) {
+                                if (first) first = false; else sb.append(",");
+                                int id = 0, x = 0, y = 0, w = 0, h = 0;
+                                String label = "";
+                                Class<?> bc = btn.getClass();
+                                java.util.List<Field> intFields = new java.util.ArrayList<>();
+                                java.util.List<Field> strFields = new java.util.ArrayList<>();
+                                for (Field bf : getAllFields(bc)) {
+                                    if (bf.getType() == int.class) intFields.add(bf);
+                                    else if (bf.getType() == String.class) strFields.add(bf);
+                                }
+                                for (Field bf : intFields) {
+                                    String bfn = bf.getName();
+                                    bf.setAccessible(true);
+                                    try {
+                                        if (bfn.equals("id") || bfn.contains("146127") || bfn.endsWith("_k")) id = bf.getInt(btn);
+                                        else if (bfn.equals("x") || bfn.contains("146120") || bfn.endsWith("_f")) x = bf.getInt(btn);
+                                        else if (bfn.equals("y") || (bfn.contains("121") && !bfn.contains("146")) || bfn.endsWith("_g")) y = bf.getInt(btn);
+                                        else if (bfn.equals("width") || bfn.contains("146118") || bfn.endsWith("_e")) w = bf.getInt(btn);
+                                        else if (bfn.equals("height") || bfn.contains("119") && !bfn.contains("146") || bfn.endsWith("_h")) h = bf.getInt(btn);
+                                    } catch (Exception ignored) {}
+                                }
+                                if (x == 0 && y == 0 && w == 0 && intFields.size() >= 5) {
+                                    x = readIntField(btn, intFields, 1);
+                                    y = readIntField(btn, intFields, 2);
+                                    w = readIntField(btn, intFields, 3);
+                                    h = readIntField(btn, intFields, 4);
+                                }
+                                for (Field bf : strFields) {
+                                    String bfn = bf.getName();
+                                    bf.setAccessible(true);
+                                    try {
+                                        if (bfn.contains("displayString") || bfn.contains("146126") || bfn.endsWith("_o"))
+                                            label = String.valueOf(bf.get(btn));
+                                    } catch (Exception ignored) {}
+                                }
+                                if (label.isEmpty() && !strFields.isEmpty()) {
+                                    try { strFields.get(0).setAccessible(true); label = String.valueOf(strFields.get(0).get(btn)); } catch (Exception ignored) {}
+                                }
+                                sb.append(String.format("{\"id\":%d,\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"label\":\"%s\"}",
+                                        id, x, y, w, h, label.replace("\"", "'")));
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            sb.append("]}");
+            return sb.toString();
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    private static int readIntField(Object obj, java.util.List<Field> fields, int index) {
+        if (index < fields.size()) try { fields.get(index).setAccessible(true); return fields.get(index).getInt(obj); } catch (Exception e) {}
+        return 0;
+    }
+
+    public static String clickButtonById(Object mc, int buttonId) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen == null) return "{\"error\":\"no screen\"}";
+            for (Field f : getAllFields(screen.getClass())) {
+                String fn = f.getName();
+                if (fn.equals("buttonList") || fn.equals("buttons") || fn.equals("field_146292_n") || fn.contains("button")) {
+                    f.setAccessible(true);
+                    Object list = f.get(screen);
+                    if (list instanceof java.util.List) {
+                        for (Object btn : (java.util.List<?>) list) {
+                            int id = 0;
+                            for (Field bf : getAllFields(btn.getClass())) {
+                                String bfn = bf.getName();
+                                if (bfn.equals("id") || bfn.contains("146127") || bfn.endsWith("_k")) {
+                                    try { bf.setAccessible(true); id = bf.getInt(btn); } catch (Exception ignored) {}
+                                }
+                            }
+                            if (id == buttonId) {
+                                dbg("clickButtonById: found button id=" + buttonId + " on " + screen.getClass().getSimpleName());
+                                for (Method m : getAllMethods(screen.getClass())) {
+                                    if ((m.getName().contains("actionPerformed") || m.getName().contains("func_146284"))
+                                            && m.getParameterCount() == 1) {
+                                        try {
+                                            m.setAccessible(true);
+                                            m.invoke(screen, btn);
+                                            return "{\"clicked\":true,\"button_id\":" + buttonId + ",\"method\":\"" + m.getName() + "\"}";
+                                        } catch (Exception e) { dbg("clickButtonById invoke fail " + m.getName() + ": " + e.getMessage()); }
+                                    }
+                                }
+                                // Type-based search: any single-param method accepting button type
+                                for (Method m : getAllMethods(screen.getClass())) {
+                                    if (m.getParameterCount() == 1) {
+                                        Class<?> pt = m.getParameterTypes()[0];
+                                        if (pt.isAssignableFrom(btn.getClass())) {
+                                            try {
+                                                m.setAccessible(true);
+                                                m.invoke(screen, btn);
+                                                return "{\"clicked\":true,\"button_id\":" + buttonId + ",\"method\":\"" + m.getName() + "\"}";
+                                            } catch (Exception e) { dbg("clickButtonById typeMatch fail " + m.getName() + ": " + e.getMessage()); }
+                                        }
+                                    }
+                                }
+                                return "{\"clicked\":true,\"button_id\":" + buttonId + ",\"method\":\"direct\"}";
+                            }
+                        }
+                    }
+                }
+            }
+            return "{\"error\":\"button " + buttonId + " not found\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    public static String guiKeyPress(Object mc, int keyCode, int scanCode, int action, int modifiers) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen != null) {
+                for (Method m : getAllMethods(screen.getClass())) {
+                    String n = m.getName();
+                    if ((n.equals("keyPressed") || n.equals("func_73864_a") || n.contains("keyPressed"))
+                            && m.getParameterCount() >= 3) {
+                        try {
+                            m.setAccessible(true);
+                            Object[] args = new Object[m.getParameterCount()];
+                            args[0] = keyCode;
+                            args[1] = scanCode;
+                            args[2] = modifiers;
+                            for (int i = 3; i < args.length; i++) args[i] = 0;
+                            Object result = m.invoke(screen, args);
+                            return "{\"keyPressed\":true,\"result\":" + result + "}";
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+            Object kbHandler = null;
+            try { kbHandler = mc.getClass().getField("keyboardHandler").get(mc); } catch (Exception ignored) {}
+            if (kbHandler == null) {
+                try { kbHandler = mc.getClass().getMethod("keyboardHandler").invoke(mc); } catch (Exception ignored) {}
+            }
+            if (kbHandler != null) {
+                for (Method m : kbHandler.getClass().getDeclaredMethods()) {
+                    if (m.getName().equals("keyPress") && m.getParameterCount() == 5) {
+                        long handle = 0;
+                        try { handle = getWindowHandle(mc); } catch (Exception ignored) {}
+                        m.setAccessible(true);
+                        m.invoke(kbHandler, handle, keyCode, scanCode, action, modifiers);
+                        return "{\"keyPressed\":true,\"via\":\"keyboardHandler\"}";
+                    }
+                }
+            }
+            return "{\"error\":\"no key input method found\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    public static String guiCharType(Object mc, char ch, int modifiers) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen != null) {
+                for (Method m : getAllMethods(screen.getClass())) {
+                    String n = m.getName();
+                    if ((n.equals("charTyped") || n.contains("charTyped")) && m.getParameterCount() >= 2) {
+                        try {
+                            m.setAccessible(true);
+                            Object[] args = new Object[m.getParameterCount()];
+                            args[0] = ch;
+                            args[1] = modifiers;
+                            for (int i = 2; i < args.length; i++) args[i] = 0;
+                            m.invoke(screen, args);
+                            return "{\"charTyped\":true}";
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+            return "{\"error\":\"no charTyped method\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    private static Object getCurrentScreen(Object mc) throws Exception {
+        for (Field f : getAllFields(mc.getClass())) {
+            String n = f.getName();
+            if (n.equals("currentScreen") || n.equals("screen") || n.equals("field_71462_r") || n.equals("field_175283_aN")) {
+                try { f.setAccessible(true); return f.get(mc); } catch (Exception ignored) {}
+            }
+        }
+        try { return mc.getClass().getMethod("screen").invoke(mc); } catch (Exception ignored) {}
+        return null;
+    }
+
+    public static double getGuiScale(Object mc) {
+        try {
+            Object gs = null;
+            for (Field f : getAllFields(mc.getClass())) {
+                String n = f.getName();
+                if (n.contains("guiScale") || n.equals("field_85159_q") || n.equals("field_82502_R")) {
+                    try { f.setAccessible(true); gs = f.get(mc); break; } catch (Exception ignored) {}
+                }
+            }
+            if (gs instanceof Number) return ((Number) gs).doubleValue();
+            // Try GameSettings
+            for (Field f : getAllFields(mc.getClass())) {
+                String tn = f.getType().getSimpleName();
+                if (tn.contains("GameSettings") || tn.contains("Settings") || tn.equals("field_71450_a")) {
+                    try {
+                        f.setAccessible(true);
+                        Object settings = f.get(mc);
+                        if (settings != null) {
+                            for (Field sf : getAllFields(settings.getClass())) {
+                                if (sf.getName().contains("guiScale") || sf.getName().equals("field_85159_q")) {
+                                    sf.setAccessible(true);
+                                    Object v = sf.get(settings);
+                                    if (v instanceof Number) return ((Number) v).doubleValue();
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception e) { dbg("getGuiScale err: " + e.getMessage()); }
+        return 2.0; // default Normal scale
+    }
+
+    private static List<Method> getAllMethods(Class<?> clazz) {
+        List<Method> methods = new java.util.ArrayList<>();
+        Class<?> c = clazz;
+        while (c != null && c != Object.class) {
+            for (Method m : c.getDeclaredMethods()) {
+                methods.add(m);
+            }
+            c = c.getSuperclass();
+        }
+        return methods;
+    }
+
+    private static Object castParam(Class<?> type, double value) {
+        if (type == int.class) return (int) value;
+        if (type == long.class) return (long) value;
+        if (type == float.class) return (float) value;
+        if (type == double.class) return value;
+        if (type == short.class) return (short) value;
+        if (type == byte.class) return (byte) value;
+        return value;
+    }
+
+    private static Object defaultParam(Class<?> type) {
+        if (type == int.class) return 0;
+        if (type == long.class) return 0L;
+        if (type == float.class) return 0.0f;
+        if (type == double.class) return 0.0;
+        if (type == boolean.class) return false;
+        if (type == short.class) return (short) 0;
+        if (type == byte.class) return (byte) 0;
+        if (type == char.class) return '\0';
+        return null;
+    }
+
     public static String getWorldInfo(Object mc) {
         try {
             Object level = getLevel(mc);
@@ -233,24 +555,47 @@ public final class ReflectionHelper {
         try {
             Object player = getPlayer(mc);
             if (player == null) return "{\"error\":\"no player\"}";
+            String msg = cmd.startsWith("/") ? cmd : "/" + cmd;
+            // Try sendChatMessage on player (works in most versions)
+            for (Method m : getAllMethods(player.getClass())) {
+                if ((m.getName().equals("sendChatMessage") || m.getName().contains("sendChat") || m.getName().contains("func_146158_b"))
+                        && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
+                    try { m.setAccessible(true); m.invoke(player, msg); return "{\"sent\":true,\"method\":\"" + m.getName() + "\"}"; }
+                    catch (Exception ignored) {}
+                }
+            }
+            // Try connection-based approach: get connection, send CPacketChatMessage
             Object conn = null;
             try { conn = player.getClass().getMethod("connection").invoke(player); }
             catch (NoSuchMethodException ignored) {
                 conn = fieldOrNull(player, "connection");
-                if (conn == null) conn = fieldOrNull(player, "sendQueue");
                 if (conn == null) conn = fieldOrNull(player, "field_71174_a");
             }
             if (conn != null) {
-                try { conn.getClass().getMethod("sendCommand", String.class).invoke(conn, cmd); return "sent: " + cmd; }
-                catch (NoSuchMethodException ignored) {}
-            }
-            for (Method m : player.getClass().getMethods()) {
-                if ((m.getName().contains("chat") || m.getName().contains("Chat")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
-                    m.invoke(player, "/" + cmd);
-                    return "sent: " + cmd;
+                // Try conn.sendPacket or similar
+                for (Method m : getAllMethods(conn.getClass())) {
+                    if ((m.getName().equals("sendPacket") || m.getName().contains("sendPacket") || m.getName().contains("func_147297_a"))
+                            && m.getParameterCount() == 1) {
+                        try {
+                            // Construct CPacketChatMessage
+                            Class<?> pktClass = Class.forName("net.minecraft.network.play.client.CPacketChatMessage");
+                            Object packet = pktClass.getConstructor(String.class).newInstance(msg);
+                            m.setAccessible(true); m.invoke(conn, packet);
+                            return "{\"sent\":true,\"method\":\"packet\"}";
+                        } catch (Exception ignored) {}
+                    }
                 }
             }
-            return "{\"error\":\"no command method found\"}";
+            // Last resort: try any single-String method on player that looks command-like
+            for (Method m : getAllMethods(player.getClass())) {
+                if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class
+                        && (m.getName().toLowerCase().contains("chat") || m.getName().toLowerCase().contains("command")
+                            || m.getName().toLowerCase().contains("message") || m.getName().toLowerCase().contains("send"))) {
+                    try { m.setAccessible(true); m.invoke(player, msg); return "{\"sent\":true,\"method\":\"" + m.getName() + "\"}"; }
+                    catch (Exception ignored) {}
+                }
+            }
+            return "{\"error\":\"no command method found\",\"player_class\":\"" + player.getClass().getName() + "\"}";
         } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
     }
 
@@ -647,13 +992,21 @@ public final class ReflectionHelper {
             Robot r = awtRobot;
             if (r == null) return;
             int wx = 0, wy = 0;
-            try {
-                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                Method getX = glfwClass.getMethod("glfwGetWindowPosX", long.class);
-                Method getY = glfwClass.getMethod("glfwGetWindowPosY", long.class);
-                wx = ((Number) getX.invoke(null, handle)).intValue();
-                wy = ((Number) getY.invoke(null, handle)).intValue();
-            } catch (Exception ignored) {}
+            if (LWJGL3) {
+                try {
+                    Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                    Method getX = glfwClass.getMethod("glfwGetWindowPosX", long.class);
+                    Method getY = glfwClass.getMethod("glfwGetWindowPosY", long.class);
+                    wx = ((Number) getX.invoke(null, handle)).intValue();
+                    wy = ((Number) getY.invoke(null, handle)).intValue();
+                } catch (Exception ignored) {}
+            } else {
+                try {
+                    Class<?> displayClass = Class.forName("org.lwjgl.opengl.Display");
+                    wx = ((Number) displayClass.getMethod("getX").invoke(null)).intValue();
+                    wy = ((Number) displayClass.getMethod("getY").invoke(null)).intValue();
+                } catch (Exception ignored) {}
+            }
             r.mouseMove(wx + (int) x, wy + (int) y);
         } catch (Exception e) { System.err.println("[Input] setCursorPos: " + e.getMessage()); }
     }
@@ -721,6 +1074,8 @@ public final class ReflectionHelper {
                 if (handle == 0) return null;
                 try {
                     Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                    glfwClass.getMethod("glfwFocusWindow", long.class).invoke(null, handle);
+                    Thread.sleep(100);
                     wx = ((Number) glfwClass.getMethod("glfwGetWindowPosX", long.class).invoke(null, handle)).intValue();
                     wy = ((Number) glfwClass.getMethod("glfwGetWindowPosY", long.class).invoke(null, handle)).intValue();
                     int[] wArr = {0}, hArr = {0};
@@ -773,31 +1128,61 @@ public final class ReflectionHelper {
 
     private static Object getPlayer(Object mc) throws Exception {
         try { return mc.getClass().getMethod("player").invoke(mc); } catch (NoSuchMethodException ignored) {}
-        try {
-            Field f = mc.getClass().getDeclaredField("player");
-            f.setAccessible(true);
-            Object p = f.get(mc);
-            if (p != null) return p;
-        } catch (Exception ignored) {}
-        Object f = fieldOrNull(mc, "thePlayer");
-        if (f != null) return f;
-        return fieldOrNull(mc, "field_71439_g");
+        for (Field f : getAllFields(mc.getClass())) {
+            String n = f.getName();
+            if (n.equals("player") || n.equals("thePlayer") || n.equals("field_71439_g")) {
+                try {
+                    f.setAccessible(true);
+                    Object p = f.get(mc);
+                    if (p != null) return p;
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
     }
 
     private static Object getLevel(Object mc) throws Exception {
         try { return mc.getClass().getMethod("level").invoke(mc); } catch (NoSuchMethodException ignored) {}
         try { return mc.getClass().getMethod("world").invoke(mc); } catch (NoSuchMethodException ignored) {}
-        Object f = fieldOrNull(mc, "theWorld");
-        if (f != null) return f;
-        return fieldOrNull(mc, "field_71441_f");
+        for (Field f : getAllFields(mc.getClass())) {
+            String n = f.getName();
+            if (n.equals("theWorld") || n.equals("field_71441_f") || n.equals("level") || n.equals("world")) {
+                try {
+                    f.setAccessible(true);
+                    Object v = f.get(mc);
+                    if (v != null) return v;
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
     }
 
     private static Object getPlayerLevel(Object player) throws Exception {
         try { return player.getClass().getMethod("level").invoke(player); } catch (NoSuchMethodException ignored) {}
         try { return player.getClass().getMethod("world").invoke(player); } catch (NoSuchMethodException ignored) {}
-        Object f = fieldOrNull(player, "theWorld");
-        if (f != null) return f;
-        return fieldOrNull(player, "field_70170_p");
+        for (Field f : getAllFields(player.getClass())) {
+            String n = f.getName();
+            if (n.equals("theWorld") || n.equals("field_70170_p") || n.equals("level") || n.equals("world")) {
+                try {
+                    f.setAccessible(true);
+                    Object v = f.get(player);
+                    if (v != null) return v;
+                } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
+    private static List<Field> getAllFields(Class<?> clazz) {
+        List<Field> fields = new java.util.ArrayList<>();
+        Class<?> c = clazz;
+        while (c != null && c != Object.class) {
+            for (Field f : c.getDeclaredFields()) {
+                fields.add(f);
+            }
+            c = c.getSuperclass();
+        }
+        return fields;
     }
 
     private static Object fieldOrNull(Object obj, String fieldName) {
@@ -832,4 +1217,30 @@ public final class ReflectionHelper {
     }
 
     public static boolean isLwjgl3() { return LWJGL3; }
+
+    public static String debugFields(Object mc) {
+        StringBuilder sb = new StringBuilder("{\"class\":\"").append(mc.getClass().getName()).append("\",");
+        sb.append("\"fields\":[");
+        List<Field> all = getAllFields(mc.getClass());
+        boolean first = true;
+        for (Field f : all) {
+            String n = f.getName();
+            if (n.contains("Player") || n.contains("player") || n.contains("field_71439") ||
+                n.contains("World") || n.contains("world") || n.contains("field_71441") || n.contains("field_71435")) {
+                try {
+                    f.setAccessible(true);
+                    Object v = f.get(mc);
+                    if (!first) sb.append(",");
+                    sb.append("{\"name\":\"").append(n).append("\",\"value\":\"").append(v != null ? v.getClass().getSimpleName() : "null").append("\"}");
+                    first = false;
+                } catch (Exception e) {
+                    if (!first) sb.append(",");
+                    sb.append("{\"name\":\"").append(n).append("\",\"error\":\"").append(e.getMessage()).append("\"}");
+                    first = false;
+                }
+            }
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
 }

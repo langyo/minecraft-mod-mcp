@@ -44,6 +44,13 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                     return;
                 }
             }
+            for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
+                if (m.getParameterCount() == 1 && Runnable.class.isAssignableFrom(m.getParameterTypes()[0])
+                        && java.lang.reflect.Modifier.isPublic(m.getModifiers())) {
+                    m.invoke(mc, task);
+                    return;
+                }
+            }
             throw new RuntimeException("No scheduling method found on " + mc.getClass().getName()
                 + ". Methods with Runnable: " + java.util.Arrays.toString(
                     java.util.Arrays.stream(mc.getClass().getMethods())
@@ -126,14 +133,9 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     public void click(int x, int y, String button) {
         executor.executeOnRenderThread(() -> {
             try {
-                long h = getWindowHandle();
-                if (h == 0) return;
                 int b = "right".equals(button) ? 1 : "middle".equals(button) ? 2 : 0;
-                ReflectionHelper.setCursorPos(h, x, y);
-                Thread.sleep(50);
-                ReflectionHelper.sendMouseButton(h, b, 1);
-                Thread.sleep(50);
-                ReflectionHelper.sendMouseButton(h, b, 0);
+                String result = ReflectionHelper.guiClick(mc(), x, y, b);
+                ReflectionHelper.dbg("guiClick: " + result);
             } catch (Exception e) { ReflectionHelper.dbg("click err: " + e.getMessage()); }
         });
     }
@@ -142,13 +144,13 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     public void pressKey(String key, float holdSeconds) {
         executor.executeOnRenderThread(() -> {
             try {
-                long h = getWindowHandle();
-                if (h == 0) return;
                 int c = GlfwKeys.keyCode(key);
                 if (c < 0) return;
-                ReflectionHelper.sendKey(h, c, 1);
+                String result = ReflectionHelper.guiKeyPress(mc(), c, 0, 1, 0);
+                ReflectionHelper.dbg("guiKeyPress: " + result);
                 Thread.sleep(holdSeconds > 0 ? (long)(holdSeconds * 1000) : 30);
-                ReflectionHelper.sendKey(h, c, 0);
+                result = ReflectionHelper.guiKeyPress(mc(), c, 0, 0, 0);
+                ReflectionHelper.dbg("guiKeyPress release: " + result);
             } catch (Exception e) { System.err.println("[Input] Key: " + e.getMessage()); }
         });
     }
@@ -157,18 +159,10 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     public void typeText(String text) {
         executor.executeOnRenderThread(() -> {
             try {
-                long h = getWindowHandle();
-                if (h == 0) return;
                 for (char ch : text.toCharArray()) {
-                    int code = GlfwKeys.charCode(ch);
-                    if (code > 0) {
-                        boolean shift = Character.isUpperCase(ch) || isShiftChar(ch);
-                        if (shift) { ReflectionHelper.sendKey(h, GlfwKeys.keyCode("shift"), 1); Thread.sleep(5); }
-                        ReflectionHelper.sendKey(h, code, 1); Thread.sleep(25);
-                        ReflectionHelper.sendKey(h, code, 0);
-                        if (shift) { Thread.sleep(5); ReflectionHelper.sendKey(h, GlfwKeys.keyCode("shift"), 0); }
-                    }
-                    Thread.sleep(20);
+                    String r = ReflectionHelper.guiCharType(mc(), ch, 0);
+                    ReflectionHelper.dbg("guiCharType '" + ch + "': " + r);
+                    Thread.sleep(30);
                 }
             } catch (Exception e) { System.err.println("[Input] Type: " + e.getMessage()); }
         });
@@ -295,6 +289,8 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
 
     @Override
     public String getWorldInfo() { return ReflectionHelper.getWorldInfo(mc()); }
+
+    public String debugFields() { return ReflectionHelper.debugFields(mc()); }
 
     private static final String SHIFT_CHARS = "!@#$%^&*()_+{}|:<>?~";
 

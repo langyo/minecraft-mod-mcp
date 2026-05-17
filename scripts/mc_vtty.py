@@ -393,6 +393,21 @@ class McVtty:
     def execute_command(self, cmd):
         return self._send_ws("execute_command", {"command": cmd})
 
+    def player_info(self):
+        return self._send_ws("get_player_info")
+
+    def world_info(self):
+        return self._send_ws("get_world_info")
+
+    def debug_fields(self):
+        return self._send_ws("debug_fields")
+
+    def screen_buttons(self):
+        return self._send_ws("get_screen_buttons")
+
+    def click_button_id(self, button_id):
+        return self._send_ws("click_button_id", {"id": button_id})
+
     def kill(self):
         self._ws_connected = False
         self._mc_ws = None
@@ -474,6 +489,12 @@ class McVtty:
                 return self.hotkey(cmd_dict.get("keys", ""))
             elif cmd == "command":
                 return self.execute_command(cmd_dict.get("command", ""))
+            elif cmd == "player_info":
+                return self.player_info()
+            elif cmd == "world_info":
+                return self.world_info()
+            elif cmd == "debug_fields":
+                return self.debug_fields()
             elif cmd == "wait":
                 time.sleep(float(cmd_dict.get("seconds", 1)))
                 return {"waited": cmd_dict.get("seconds", 1)}
@@ -572,6 +593,8 @@ def send_command(cmd_str, port=VTTY_PORT):
         cmd_dict["keys"] = rest
     elif cmd == "command":
         cmd_dict["command"] = rest
+    elif cmd in ("player_info", "world_info", "debug_fields"):
+        pass
     elif cmd == "wait":
         cmd_dict["seconds"] = float(rest) if rest else 1
 
@@ -632,7 +655,7 @@ def main():
     threading.Thread(target=run_tcp_server, args=(vtty,), daemon=True).start()
 
     _log(f"[VTTY] Daemon ready. WS={WS_PORT} TCP={VTTY_PORT}")
-    _log(f"[VTTY] Commands: launch, status, screenshot, click, pyclick, focus, window_rect, press_key, type_text, scroll, hotkey, command, wait, kill")
+    _log(f"[VTTY] Commands: launch, status, screenshot, click, pyclick, focus, window_rect, press_key, type_text, scroll, hotkey, command, player_info, world_info, wait, kill")
 
     try:
         while True:

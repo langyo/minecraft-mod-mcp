@@ -61,6 +61,9 @@ public class McpMessageHandler {
         if (method.equals("execute_command")) return handleExecuteCommand(params);
         if (method.equals("get_player_info")) return handleGetPlayerInfo();
         if (method.equals("get_world_info")) return handleGetWorldInfo();
+        if (method.equals("debug_fields")) return handleDebugFields();
+        if (method.equals("get_screen_buttons")) return handleGetScreenButtons();
+        if (method.equals("click_button_id")) return handleClickButtonId(params);
         if (method.equals("ping")) return "pong";
         return "unknown: " + method;
     }
@@ -156,6 +159,25 @@ public class McpMessageHandler {
     protected Object handleGetWorldInfo() {
         if (minecraftInput != null) return minecraftInput.getWorldInfo();
         return "no world";
+    }
+
+    protected Object handleDebugFields() {
+        if (minecraftInput != null) return minecraftInput.debugFields();
+        return "no input handler";
+    }
+
+    protected Object handleGetScreenButtons() {
+        if (minecraftInput != null) return ReflectionHelper.getScreenButtons(ReflectionHelper.getMinecraftInstance());
+        return "no input handler";
+    }
+
+    protected Object handleClickButtonId(java.util.Map<String, String> params) {
+        if (minecraftInput != null) {
+            int id = 0;
+            try { id = Integer.parseInt(params.get("id")); } catch (Exception ignored) {}
+            return ReflectionHelper.clickButtonById(ReflectionHelper.getMinecraftInstance(), id);
+        }
+        return "no input handler";
     }
 
     private static McpWebSocketClient castClient(Object wsClient) {

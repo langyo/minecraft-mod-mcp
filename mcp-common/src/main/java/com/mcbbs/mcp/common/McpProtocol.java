@@ -18,6 +18,7 @@ public final class McpProtocol {
         String executeCommand(String command);
         String getPlayerInfo();
         String getWorldInfo();
+        String debugFields();
     }
 
     public interface ModLifecycle {
