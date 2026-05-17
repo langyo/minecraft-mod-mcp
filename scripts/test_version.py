@@ -86,7 +86,14 @@ def clear_mods():
     mods_dir = MC_DIR / "mods"
     if mods_dir.exists():
         for f in mods_dir.glob("*mcp*"):
-            f.unlink()
+            for attempt in range(10):
+                try:
+                    f.unlink()
+                    break
+                except PermissionError:
+                    import time
+                    kill_all_java()
+                    time.sleep(2)
 
 
 def kill_all_java():
