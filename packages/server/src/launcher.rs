@@ -57,7 +57,7 @@ pub fn merge_version_json(version_name: &str) -> anyhow::Result<Value> {
             } else {
                 Ok(vj)
             }
-        }
+        },
         None => Ok(vj),
     }
 }
@@ -69,7 +69,7 @@ fn merge_values(base: Value, overlay: Value) -> Value {
                 base_map.insert(k, v);
             }
             Value::Object(base_map)
-        }
+        },
         (_, overlay) => overlay,
     }
 }
@@ -85,10 +85,10 @@ pub fn build_classpath(vj: &Value) -> anyhow::Result<String> {
     let mut cp_parts: Vec<String> = Vec::new();
 
     for lib in &libs {
-        if let Some(rules) = lib.get("rules").and_then(|v| v.as_array()) {
-            if !should_include_lib(rules) {
-                continue;
-            }
+        if let Some(rules) = lib.get("rules").and_then(|v| v.as_array())
+            && !should_include_lib(rules)
+        {
+            continue;
         }
 
         if let Some(path) = lib
@@ -132,7 +132,7 @@ fn should_include_lib(rules: &[Value]) -> bool {
             match action {
                 "allow" => allowed = true,
                 "disallow" => disallowed = true,
-                _ => {}
+                _ => {},
             }
         }
     }
@@ -214,10 +214,7 @@ fn resolve_arg(s: &str) -> String {
         mc.join("assets").to_string_lossy().as_ref(),
     )
     .replace("${auth_player_name}", "MCPPlayer")
-    .replace(
-        "${auth_uuid}",
-        "00000000-0000-0000-0000-000000000000",
-    )
+    .replace("${auth_uuid}", "00000000-0000-0000-0000-000000000000")
     .replace("${auth_access_token}", "0")
     .replace("${user_type}", "legacy")
     .replace("${version_type}", "release")
@@ -225,20 +222,23 @@ fn resolve_arg(s: &str) -> String {
 
 pub fn find_java() -> Option<String> {
     if let Ok(java_home) = std::env::var("JAVA_HOME") {
-        let java = PathBuf::from(java_home)
-            .join("bin")
-            .join(if cfg!(windows) { "java.exe" } else { "java" });
+        let java = PathBuf::from(java_home).join("bin").join(if cfg!(windows) {
+            "java.exe"
+        } else {
+            "java"
+        });
         if java.exists() {
             return Some(java.to_string_lossy().to_string());
         }
     }
-    which::which("java").ok().map(|p| p.to_string_lossy().to_string())
+    which::which("java")
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
 }
 
 pub fn install_mod(project_root: &Path, version: &str, loader: &str) -> anyhow::Result<PathBuf> {
-    let jar = find_mod_jar(project_root, version, loader).ok_or_else(|| {
-        anyhow::anyhow!("mod jar not found for {} {}", version, loader)
-    })?;
+    let jar = find_mod_jar(project_root, version, loader)
+        .ok_or_else(|| anyhow::anyhow!("mod jar not found for {} {}", version, loader))?;
 
     let mods_dir = mc_dir().join("mods");
     if mods_dir.exists() {
@@ -266,8 +266,8 @@ pub async fn launch_mc(
 ) -> anyhow::Result<tokio::process::Child> {
     let vj = merge_version_json(version_name)?;
     let classpath = build_classpath(&vj)?;
-    let main_class = get_main_class(&vj)
-        .ok_or_else(|| anyhow::anyhow!("no mainClass in version JSON"))?;
+    let main_class =
+        get_main_class(&vj).ok_or_else(|| anyhow::anyhow!("no mainClass in version JSON"))?;
 
     let java = find_java().ok_or_else(|| anyhow::anyhow!("Java not found"))?;
 

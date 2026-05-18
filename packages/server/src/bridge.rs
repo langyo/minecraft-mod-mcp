@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{Mutex, mpsc, oneshot};
 use tracing::{info, warn};
 
 type PendingMap = Arc<Mutex<HashMap<String, oneshot::Sender<JsonRpcResponse>>>>;
@@ -43,17 +43,23 @@ impl Bridge {
 
     pub async fn start_ws_server(&self, port: u16) -> anyhow::Result<()> {
         let app = axum::Router::new()
-            .route("/ws", axum::routing::get({
-                let bridge = self.clone_handle();
-                move |ws| handle_ws_upgrade(ws, bridge)
-            }))
-            .route("/status", axum::routing::get({
-                let connected = self.connected.clone();
-                move || async move {
-                    let c = *connected.lock().await;
-                    axum::Json(serde_json::json!({"ws_connected": c}))
-                }
-            }));
+            .route(
+                "/ws",
+                axum::routing::get({
+                    let bridge = self.clone_handle();
+                    move |ws| handle_ws_upgrade(ws, bridge)
+                }),
+            )
+            .route(
+                "/status",
+                axum::routing::get({
+                    let connected = self.connected.clone();
+                    move || async move {
+                        let c = *connected.lock().await;
+                        axum::Json(serde_json::json!({"ws_connected": c}))
+                    }
+                }),
+            );
 
         let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
         info!("WebSocket server on port {}", port);
@@ -69,11 +75,7 @@ impl Bridge {
         }
     }
 
-    pub async fn send_rpc(
-        &self,
-        method: &str,
-        params: Value,
-    ) -> anyhow::Result<JsonRpcResponse> {
+    pub async fn send_rpc(&self, method: &str, params: Value) -> anyhow::Result<JsonRpcResponse> {
         let connected = self.connected.lock().await;
         if !*connected {
             return Err(anyhow::anyhow!("MC mod not connected"));
@@ -94,7 +96,7 @@ impl Bridge {
                 let mut m = serde_json::Map::new();
                 m.insert("requestId".into(), params);
                 m
-            }
+            },
         };
         params_obj.insert("requestId".into(), Value::String(rid.clone()));
 
@@ -119,12 +121,12 @@ impl Bridge {
                 let mut pending = self.pending.lock().await;
                 pending.remove(&rid);
                 Err(anyhow::anyhow!("response channel dropped"))
-            }
+            },
             Err(_) => {
                 let mut pending = self.pending.lock().await;
                 pending.remove(&rid);
                 Err(anyhow::anyhow!("timeout after 30s"))
-            }
+            },
         }
     }
 
@@ -272,10 +274,7 @@ async fn handle_ws_connection(socket: axum::extract::ws::WebSocket, bridge: Brid
                         Err(_) => continue,
                     };
 
-                    let rid = msg
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
+                    let rid = msg.get("id").and_then(|v| v.as_str()).unwrap_or("");
                     if rid == "init" {
                         info!("Init response received");
                         continue;
@@ -301,13 +300,13 @@ async fn handle_ws_connection(socket: axum::extract::ws::WebSocket, bridge: Brid
                             info!("Unsolicited msg: {:.200}", result_str);
                         }
                     }
-                }
+                },
                 Ok(axum::extract::ws::Message::Close(_)) => break,
                 Err(e) => {
                     warn!("WS recv error: {}", e);
                     break;
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 

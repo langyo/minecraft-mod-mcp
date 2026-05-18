@@ -42,11 +42,11 @@ impl ControlServer {
                     line.clear();
                     match reader.read_line(&mut line).await {
                         Ok(0) => break,
-                        Ok(_) => {}
+                        Ok(_) => {},
                         Err(e) => {
                             warn!("TCP read error: {}", e);
                             break;
-                        }
+                        },
                     };
 
                     let cmd_str = line.trim();
@@ -60,18 +60,17 @@ impl ControlServer {
                             let resp = serde_json::json!({"error": format!("parse error: {}", e)});
                             let _ = writer
                                 .write_all(
-                                    format!("{}\n", serde_json::to_string(&resp).unwrap()).as_bytes(),
+                                    format!("{}\n", serde_json::to_string(&resp).unwrap())
+                                        .as_bytes(),
                                 )
                                 .await;
                             continue;
-                        }
+                        },
                     };
 
-                    let result =
-                        handle_command(&cmd, &bridge, &mc_proc, &version).await;
-                    let resp = serde_json::to_string(&result).unwrap_or_else(|e| {
-                        format!(r#"{{"error":"serialize error: {}"}}"#, e)
-                    });
+                    let result = handle_command(&cmd, &bridge, &mc_proc, &version).await;
+                    let resp = serde_json::to_string(&result)
+                        .unwrap_or_else(|e| format!(r#"{{"error":"serialize error: {}"}}"#, e));
 
                     if let Err(e) = writer.write_all(format!("{}\n", resp).as_bytes()).await {
                         warn!("TCP write error: {}", e);
@@ -108,7 +107,7 @@ async fn handle_command(
                 "version": ver,
                 "pid": proc.as_ref().and_then(|p| p.id()),
             })
-        }
+        },
 
         "screenshot" => {
             let name = cmd
@@ -120,7 +119,7 @@ async fn handle_command(
                 Ok(path) => serde_json::json!({"path": path.to_string_lossy().to_string()}),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
-        }
+        },
 
         "click" => {
             let x = cmd.params.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
@@ -134,7 +133,7 @@ async fn handle_command(
                 Ok(r) => serde_json::to_value(r).unwrap_or_default(),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
-        }
+        },
 
         "press_key" => {
             let key = cmd
@@ -151,7 +150,7 @@ async fn handle_command(
                 Ok(r) => serde_json::to_value(r).unwrap_or_default(),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
-        }
+        },
 
         "type_text" => {
             let text = cmd
@@ -168,7 +167,7 @@ async fn handle_command(
                 Ok(r) => serde_json::to_value(r).unwrap_or_default(),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
-        }
+        },
 
         "scroll" => {
             let clicks = cmd
@@ -180,7 +179,7 @@ async fn handle_command(
                 Ok(r) => serde_json::to_value(r).unwrap_or_default(),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
-        }
+        },
 
         "hotkey" => {
             let keys = cmd
@@ -192,7 +191,7 @@ async fn handle_command(
                 Ok(r) => serde_json::to_value(r).unwrap_or_default(),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
-        }
+        },
 
         "command" => {
             let command = cmd
@@ -204,7 +203,7 @@ async fn handle_command(
                 Ok(r) => serde_json::to_value(r).unwrap_or_default(),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
-        }
+        },
 
         "player_info" => match bridge.player_info().await {
             Ok(r) => serde_json::to_value(r).unwrap_or_default(),
@@ -222,16 +221,12 @@ async fn handle_command(
         },
 
         "click_button_id" => {
-            let id = cmd
-                .params
-                .get("id")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) as i32;
+            let id = cmd.params.get("id").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
             match bridge.click_button_id(id).await {
                 Ok(r) => serde_json::to_value(r).unwrap_or_default(),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
-        }
+        },
 
         "kill" => {
             bridge.disconnect().await;
@@ -241,7 +236,7 @@ async fn handle_command(
             }
             *proc = None;
             serde_json::json!({"status": "killed"})
-        }
+        },
 
         "wait" => {
             let seconds = cmd
@@ -251,7 +246,7 @@ async fn handle_command(
                 .unwrap_or(1.0);
             tokio::time::sleep(std::time::Duration::from_secs_f64(seconds)).await;
             serde_json::json!({"waited": seconds})
-        }
+        },
 
         "ws" => {
             let method = cmd
@@ -264,7 +259,7 @@ async fn handle_command(
                 Ok(r) => serde_json::to_value(r).unwrap_or_default(),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
-        }
+        },
 
         _ => serde_json::json!({"error": format!("unknown cmd: {}", cmd.cmd)}),
     }

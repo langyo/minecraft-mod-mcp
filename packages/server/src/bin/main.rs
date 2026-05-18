@@ -62,51 +62,43 @@ async fn main() -> anyhow::Result<()> {
             "launch" => {
                 let version = rest;
                 serde_json::json!({"cmd": "launch", "version": version}).to_string()
-            }
+            },
             "kill" => r#"{"cmd":"kill"}"#.to_string(),
             "status" => r#"{"cmd":"status"}"#.to_string(),
             "screenshot" => {
                 let name = if rest.is_empty() { "auto" } else { rest };
                 serde_json::json!({"cmd": "screenshot", "name": name}).to_string()
-            }
+            },
             "click" => {
                 let coords: Vec<&str> = rest.split_whitespace().collect();
                 let x: i64 = coords.first().and_then(|s| s.parse().ok()).unwrap_or(0);
                 let y: i64 = coords.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
                 let button = coords.get(2).copied().unwrap_or("left");
                 serde_json::json!({"cmd": "click", "x": x, "y": y, "button": button}).to_string()
-            }
-            "press_key" => {
-                serde_json::json!({"cmd": "press_key", "key": rest}).to_string()
-            }
-            "type_text" => {
-                serde_json::json!({"cmd": "type_text", "text": rest}).to_string()
-            }
+            },
+            "press_key" => serde_json::json!({"cmd": "press_key", "key": rest}).to_string(),
+            "type_text" => serde_json::json!({"cmd": "type_text", "text": rest}).to_string(),
             "scroll" => {
                 let clicks: i64 = rest.parse().unwrap_or(1);
                 serde_json::json!({"cmd": "scroll", "clicks": clicks}).to_string()
-            }
-            "hotkey" => {
-                serde_json::json!({"cmd": "hotkey", "keys": rest}).to_string()
-            }
-            "command" => {
-                serde_json::json!({"cmd": "command", "command": rest}).to_string()
-            }
+            },
+            "hotkey" => serde_json::json!({"cmd": "hotkey", "keys": rest}).to_string(),
+            "command" => serde_json::json!({"cmd": "command", "command": rest}).to_string(),
             "screen_buttons" => r#"{"cmd":"screen_buttons"}"#.to_string(),
             "player_info" => r#"{"cmd":"player_info"}"#.to_string(),
             "world_info" => r#"{"cmd":"world_info"}"#.to_string(),
             "click_button_id" => {
                 let id: i64 = rest.parse().unwrap_or(0);
                 serde_json::json!({"cmd": "click_button_id", "id": id}).to_string()
-            }
+            },
             "wait" => {
                 let seconds: f64 = rest.parse().unwrap_or(1.0);
                 serde_json::json!({"cmd": "wait", "seconds": seconds}).to_string()
-            }
+            },
             _ => {
                 eprintln!("Unknown command: {}", cmd_name);
                 std::process::exit(1);
-            }
+            },
         };
 
         match send_raw_command(cli.tcp_port, &json).await {
