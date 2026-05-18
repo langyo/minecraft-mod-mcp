@@ -116,7 +116,10 @@ async fn handle_command(
                 .and_then(|v| v.as_str())
                 .unwrap_or("auto");
             match bridge.take_screenshot(name).await {
-                Ok(path) => serde_json::json!({"path": path.to_string_lossy().to_string()}),
+                Ok(result) => serde_json::json!({
+                    "original": result.original.to_string_lossy().to_string(),
+                    "grid": result.grid.to_string_lossy().to_string(),
+                }),
                 Err(e) => serde_json::json!({"error": e.to_string()}),
             }
         },

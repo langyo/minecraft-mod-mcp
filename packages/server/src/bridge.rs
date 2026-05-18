@@ -11,6 +11,11 @@ use tracing::{info, warn};
 
 type PendingMap = Arc<Mutex<HashMap<String, oneshot::Sender<JsonRpcResponse>>>>;
 
+pub struct ScreenshotResult {
+    pub original: PathBuf,
+    pub grid: PathBuf,
+}
+
 pub struct Bridge {
     ws_tx: Arc<Mutex<Option<mpsc::UnboundedSender<String>>>>,
     pending: PendingMap,
@@ -44,10 +49,10 @@ impl Bridge {
     pub async fn start_ws_server(&self, port: u16) -> anyhow::Result<()> {
         let app = axum::Router::new()
             .route(
-                "/ws",
-                axum::routing::get({
+                "/",
+                axum::routing::any({
                     let bridge = self.clone_handle();
-                    move |ws| handle_ws_upgrade(ws, bridge)
+                    move |req| async move { handle_root(req, bridge).await }
                 }),
             )
             .route(
@@ -130,7 +135,7 @@ impl Bridge {
         }
     }
 
-    pub async fn take_screenshot(&self, name: &str) -> anyhow::Result<PathBuf> {
+    pub async fn take_screenshot(&self, name: &str) -> anyhow::Result<ScreenshotResult> {
         let resp = self.send_rpc("screenshot", Value::Null).await?;
 
         let result_val = resp.result.ok_or_else(|| anyhow::anyhow!("no result"))?;
@@ -149,16 +154,57 @@ impl Bridge {
         let png_bytes = base64::engine::general_purpose::STANDARD.decode(b64)?;
 
         let ts = chrono::Utc::now().timestamp_millis();
-        let filename = format!("{}_{}.png", name, ts);
-        let path = self.screenshot_dir.join(&filename);
-        tokio::fs::write(&path, &png_bytes).await?;
 
-        info!(
-            "Screenshot saved: {} ({} bytes)",
-            path.display(),
-            png_bytes.len()
-        );
-        Ok(path)
+        let orig_filename = format!("{}_{}.png", name, ts);
+        let orig_path = self.screenshot_dir.join(&orig_filename);
+        tokio::fs::write(&orig_path, &png_bytes).await?;
+        info!("Screenshot saved: {} ({} bytes)", orig_path.display(), png_bytes.len());
+
+        let grid_path = self.generate_grid_overlay(&orig_path, &png_bytes, ts)?;
+
+        Ok(ScreenshotResult {
+            original: orig_path,
+            grid: grid_path,
+        })
+    }
+
+    fn generate_grid_overlay(
+        &self,
+        _orig_path: &std::path::Path,
+        png_bytes: &[u8],
+        ts: i64,
+    ) -> anyhow::Result<PathBuf> {
+        use image::{GenericImageView, ImageBuffer, Rgba};
+
+        let img = image::load_from_memory(png_bytes)?;
+        let (w, h) = img.dimensions();
+        let mut buf: ImageBuffer<Rgba<u8>, Vec<u8>> = img.to_rgba8();
+
+        let grid_step: u32 = 100;
+
+        for y in (0..h).step_by(grid_step as usize) {
+            for x in 0..w {
+                let px = buf.get_pixel_mut(x, y);
+                px.0[0] = !px.0[0];
+                px.0[1] = !px.0[1];
+                px.0[2] = !px.0[2];
+            }
+        }
+        for x in (0..w).step_by(grid_step as usize) {
+            for y in 0..h {
+                let px = buf.get_pixel_mut(x, y);
+                px.0[0] = !px.0[0];
+                px.0[1] = !px.0[1];
+                px.0[2] = !px.0[2];
+            }
+        }
+
+        let grid_filename = format!("{}_{}_grid.png", _orig_path.file_stem().unwrap_or_default().to_string_lossy().trim_end_matches(&format!("_{}", ts)), ts);
+        let grid_path = self.screenshot_dir.join(&grid_filename);
+        buf.save(&grid_path)?;
+        info!("Grid overlay saved: {}", grid_path.display());
+
+        Ok(grid_path)
     }
 
     pub async fn click(&self, x: i32, y: i32, button: &str) -> anyhow::Result<JsonRpcResponse> {
@@ -230,7 +276,7 @@ struct BridgeHandle {
     connected: Arc<Mutex<bool>>,
 }
 
-async fn handle_ws_upgrade(
+async fn handle_root(
     ws: axum::extract::ws::WebSocketUpgrade,
     bridge: BridgeHandle,
 ) -> axum::response::Response {
