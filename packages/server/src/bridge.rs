@@ -1,8 +1,62 @@
 use crate::protocol::*;
 use base64::Engine;
 use futures::{SinkExt, StreamExt};
+use image::Rgba;
 use serde_json::Value;
 use std::collections::HashMap;
+
+fn blend_grid(underlying: Rgba<u8>, overlay: &Rgba<u8>) -> Rgba<u8> {
+    let alpha = overlay.0[3] as f32 / 255.0;
+    Rgba([
+        (underlying.0[0] as f32 * (1.0 - alpha) + overlay.0[0] as f32 * alpha) as u8,
+        (underlying.0[1] as f32 * (1.0 - alpha) + overlay.0[1] as f32 * alpha) as u8,
+        (underlying.0[2] as f32 * (1.0 - alpha) + overlay.0[2] as f32 * alpha) as u8,
+        255,
+    ])
+}
+
+fn load_system_font() -> ab_glyph::FontArc {
+    use ab_glyph::FontArc;
+    let candidates: Vec<std::path::PathBuf> = if cfg!(target_os = "windows") {
+        vec![
+            std::path::PathBuf::from(r"C:\Windows\Fonts\arial.ttf"),
+            std::path::PathBuf::from(r"C:\Windows\Fonts\segoeui.ttf"),
+            std::path::PathBuf::from(r"C:\Windows\Fonts\tahoma.ttf"),
+        ]
+    } else if cfg!(target_os = "macos") {
+        vec![
+            std::path::PathBuf::from("/System/Library/Fonts/Helvetica.ttc"),
+            std::path::PathBuf::from("/System/Library/Fonts/SFNSMono.ttf"),
+            std::path::PathBuf::from("/Library/Fonts/Arial.ttf"),
+        ]
+    } else {
+        vec![
+            std::path::PathBuf::from("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+            std::path::PathBuf::from("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            std::path::PathBuf::from("/usr/share/fonts/TTF/DejaVuSans.ttf"),
+            std::path::PathBuf::from("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+            std::path::PathBuf::from("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"),
+        ]
+    };
+    for path in &candidates {
+        if path.exists() {
+            if let Ok(data) = std::fs::read(path) {
+                if let Ok(font) = FontArc::try_from_vec(data) {
+                    info!("Loaded system font: {}", path.display());
+                    return font;
+                }
+            }
+        }
+    }
+    let fallback_data: Vec<u8> = vec![
+        0x00, 0x01, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x80, 0x00, 0x01, 0x00, 0x00, 0x47, 0x44,
+        0x00, 0x20, 0x00, 0x00, 0x00, 0x00,
+    ];
+    warn!("No system font found, using minimal fallback (labels will be invisible)");
+    FontArc::try_from_vec(fallback_data).unwrap_or_else(|_| {
+        FontArc::try_from_vec(vec![0u8; 20]).expect("impossible")
+    })
+}
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -172,36 +226,69 @@ impl Bridge {
         &self,
         _orig_path: &std::path::Path,
         png_bytes: &[u8],
-        ts: i64,
+        _ts: i64,
     ) -> anyhow::Result<PathBuf> {
-        use image::{GenericImageView, ImageBuffer, Rgba};
+        use ab_glyph::{Font as _, PxScale, ScaleFont as _};
+        use image::{DynamicImage, GenericImage, GenericImageView, Rgba};
+        use imageproc::drawing::draw_text_mut;
 
         let img = image::load_from_memory(png_bytes)?;
         let (w, h) = img.dimensions();
-        let mut buf: ImageBuffer<Rgba<u8>, Vec<u8>> = img.to_rgba8();
+        let mut canvas: DynamicImage = img;
 
-        let grid_step: u32 = 100;
+        let step: u32 = 100;
+        let thickness: u32 = 3;
+        let grid_color = Rgba([255, 0, 0, 180]);
+        let label_color = Rgba([255, 255, 0, 255]);
 
-        for y in (0..h).step_by(grid_step as usize) {
-            for x in 0..w {
-                let px = buf.get_pixel_mut(x, y);
-                px.0[0] = !px.0[0];
-                px.0[1] = !px.0[1];
-                px.0[2] = !px.0[2];
+        for gy in (0..h).step_by(step as usize) {
+            for dy in 0..thickness {
+                let y = gy + dy;
+                if y >= h {
+                    break;
+                }
+                for x in 0..w {
+                    canvas.put_pixel(x, y, blend_grid(canvas.get_pixel(x, y), &grid_color));
+                }
             }
         }
-        for x in (0..w).step_by(grid_step as usize) {
-            for y in 0..h {
-                let px = buf.get_pixel_mut(x, y);
-                px.0[0] = !px.0[0];
-                px.0[1] = !px.0[1];
-                px.0[2] = !px.0[2];
+        for gx in (0..w).step_by(step as usize) {
+            for dx in 0..thickness {
+                let x = gx + dx;
+                if x >= w {
+                    break;
+                }
+                for y in 0..h {
+                    canvas.put_pixel(x, y, blend_grid(canvas.get_pixel(x, y), &grid_color));
+                }
             }
         }
 
-        let grid_filename = format!("{}_{}_grid.png", _orig_path.file_stem().unwrap_or_default().to_string_lossy().trim_end_matches(&format!("_{}", ts)), ts);
+        let font = load_system_font();
+        let scale = PxScale::from(18.0);
+
+        for gx in (step..w).step_by(step as usize) {
+            let label = format!("{}", gx);
+            let scaled_font = font.as_scaled(scale);
+            let text_w = label.chars().map(|c| scaled_font.h_advance(font.glyph_id(c))).sum::<f32>() as i32;
+            let tx = (gx as i32 + 6).min((w - text_w as u32 - 4) as i32).max(0) as i32;
+            let ty = 6i32;
+            draw_text_mut(&mut canvas, label_color, tx, ty, scale, &font, &label);
+        }
+        for gy in (step..h).step_by(step as usize) {
+            let label = format!("{}", gy);
+            let tx = 6i32;
+            let ty = (gy as i32 + 6).min((h - 24) as i32).max(0) as i32;
+            draw_text_mut(&mut canvas, label_color, tx, ty, scale, &font, &label);
+        }
+
+        let stem = _orig_path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy();
+        let grid_filename = format!("{}_grid.png", stem);
         let grid_path = self.screenshot_dir.join(&grid_filename);
-        buf.save(&grid_path)?;
+        canvas.save(&grid_path)?;
         info!("Grid overlay saved: {}", grid_path.display());
 
         Ok(grid_path)

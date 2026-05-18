@@ -20,6 +20,8 @@ chrono.workspace = true
 clap.workspace = true
 futures.workspace = true
 image = { version = "0.25.10", features = ["png"] }
+imageproc.workspace = true
+ab_glyph.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
