@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 MC_DIR = Path(os.environ.get("APPDATA", os.path.expanduser("~"))) / ".minecraft"
 SS_DIR = ROOT / "screenshots" / "debug"
 SS_DIR.mkdir(parents=True, exist_ok=True)
+mc_pid = None  # set by main()
 
 from test_version import kill_all_java, _start_mcp_server, _send_server_cmd, _start_mc, clear_mods, install_mod
 from container import McpContainer
@@ -76,6 +77,18 @@ def do(srv, cmd_str, container=None):
             _pump(container)
             time.sleep(0.05)
 
+    elif cmd == "win32_borderless":
+        _send_server_cmd(srv, "win32_borderless", {})
+        print(f"  WIN32_BORDERLESS -> mod"); time.sleep(2)
+
+    elif cmd == "win32_container":
+        _send_server_cmd(srv, "win32_container", {})
+        print(f"  WIN32_CONTAINER -> mod"); time.sleep(3)
+
+    elif cmd == "win32_status":
+        _send_server_cmd(srv, "win32_status", {})
+        print(f"  WIN32_STATUS -> mod"); time.sleep(1)
+
     else:
         print(f"  UNKNOWN: {cmd}")
     _pump(container)
@@ -88,7 +101,7 @@ def _pump(container):
 
 
 def main():
-    ACTIONS = {"ss", "click", "key", "paste", "scroll", "wait", "execute_command", "cmd"}
+    ACTIONS = {"ss", "click", "key", "paste", "scroll", "wait", "execute_command", "cmd", "win32_borderless", "win32_container", "win32_status"}
     args = sys.argv[1:]
 
     use_container = True
@@ -112,6 +125,8 @@ def main():
     clear_mods(); install_mod(version, "forge")
     srv = _start_mcp_server(); time.sleep(3)
     mc = _start_mc(version)
+    global mc_pid
+    mc_pid = mc.pid
     print(f"MC pid={mc.pid}")
 
     container = None

@@ -178,7 +178,9 @@ fun main() {
                     toolObj("paste_text", "Paste text into MC via clipboard (avoids IME issues)", """{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}"""),
                     toolObj("set_view_angle", "Set player view angle (game-internal, no mouse movement)", """{"type":"object","properties":{"yaw":{"type":"number"},"pitch":{"type":"number"}},"required":["yaw","pitch"]}"""),
                     toolObj("look_delta", "Rotate view by delta (game-internal)", """{"type":"object","properties":{"dyaw":{"type":"number"},"dpitch":{"type":"number"}}}"""),
-                    toolObj("right_click", "Right click / use item (via mod input system)", """{"type":"object","properties":{}}""")
+                    toolObj("right_click", "Right click / use item (via mod input system)", """{"type":"object","properties":{}}"""),
+                    toolObj("win32_borderless", "Test: make MC window borderless from within mod process", """{"type":"object","properties":{}}"""),
+                    toolObj("win32_container", "Create container window and embed MC via SetParent (mod-internal)", """{"type":"object","properties":{}}""")
                 )))
                 "tools/call" -> { val r = handleToolCall(req.getAsJsonObject("params"), ws); jobj("result" to r) }
                 else -> jobj("error" to jobj("code" to -32601, "message" to "unknown method: $method"))
@@ -222,6 +224,9 @@ fun handleToolCall(params: JsonObject?, ws: McWsServer): JsonObject {
         "set_view_angle" -> { val e = requireWs(ws); if (e != null) e else doSetViewAngle(args, ws) }
         "look_delta" -> { val e = requireWs(ws); if (e != null) e else doLookDelta(args, ws) }
         "right_click" -> { val e = requireWs(ws); if (e != null) e else doRightClick(args, ws) }
+        "win32_borderless" -> { val e = requireWs(ws); if (e != null) e else doWin32Borderless(ws) }
+        "win32_container" -> { val e = requireWs(ws); if (e != null) e else doWin32Container(ws) }
+        "win32_status" -> { val e = requireWs(ws); if (e != null) e else doWin32Status(ws) }
         else -> txtObj("Error: unknown tool $name")
     }} catch (e: Exception) { txtObj("Error: ${e.message}") }
 }
@@ -732,6 +737,30 @@ fun doRightClick(a: JsonObject, w: McWsServer): JsonObject {
     var out: JsonObject? = null
     w.send(McCommand("right_click", emptyMap())) { o ->
         out = if (o.success) txtObj("right clicked") else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doWin32Borderless(w: McWsServer): JsonObject {
+    var out: JsonObject? = null
+    w.send(McCommand("win32_borderless", emptyMap())) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doWin32Container(w: McWsServer): JsonObject {
+    var out: JsonObject? = null
+    w.send(McCommand("win32_container", emptyMap())) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doWin32Status(w: McWsServer): JsonObject {
+    var out: JsonObject? = null
+    w.send(McCommand("win32_status", emptyMap())) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
     }
     return out ?: txtObj("timeout")
 }

@@ -69,6 +69,9 @@ public class McpMessageHandler {
         if (method.equals("look_delta")) return handleLookDelta(params);
         if (method.equals("right_click")) return handleRightClick();
         if (method.equals("ping")) return "pong";
+        if (method.equals("win32_borderless")) return handleWin32Borderless();
+        if (method.equals("win32_container")) return handleWin32Container();
+        if (method.equals("win32_status")) return handleWin32Status();
         return "unknown: " + method;
     }
 
@@ -215,6 +218,80 @@ public class McpMessageHandler {
     protected Object handleRightClick() {
         if (minecraftInput != null) minecraftInput.rightClick();
         return "right_clicked";
+    }
+
+    protected Object handleWin32Status() {
+        long ch = xyz.langyo.minecraft.mcp.mod.McpWin32.getContainerHwnd();
+        boolean cm = xyz.langyo.minecraft.mcp.mod.McpWin32.isControlMode();
+        return "containerHwnd=" + Long.toHexString(ch) + " controlMode=" + cm;
+    }
+
+    protected Object handleWin32Container() {
+        try {
+            Object mc = ReflectionHelper.getMinecraftInstance();
+            Object window = mc.getClass().getMethod("getWindow").invoke(mc);
+            final long glfwWin = (long) window.getClass().getMethod("getWindow").invoke(window);
+            final Object[] hwndResult = {null};
+            java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
+            java.util.concurrent.CountDownLatch hwndLatch = new java.util.concurrent.CountDownLatch(1);
+            // Get HWND on render thread
+            exec.invoke(mc, (Runnable) () -> {
+                hwndResult[0] = (Long) xyz.langyo.minecraft.mcp.mod.McpWin32.getMcWindowHandle(glfwWin);
+                hwndLatch.countDown();
+            });
+            hwndLatch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+            if (hwndResult[0] == null) return "error: HWND not found";
+            final long hwnd = (Long) hwndResult[0];
+            if (hwnd == 0) return "error: HWND is 0";
+            // Create container on a NEW thread
+            new Thread(() -> {
+                try {
+                    xyz.langyo.minecraft.mcp.mod.McpWin32.createContainer(hwnd);
+                } catch (Exception e) {
+                    System.err.println("[McpWin32] Container thread crashed: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }, "McpContainerCreator").start();
+            return "container: creating on thread, mcHwnd=" + Long.toHexString(hwnd);
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
+    }
+
+    protected Object handleWin32Borderless() {
+        try {
+            Object mc = ReflectionHelper.getMinecraftInstance();
+            Object window = mc.getClass().getMethod("getWindow").invoke(mc);
+            final long glfwWin = (long) window.getClass().getMethod("getWindow").invoke(window);
+            final Object[] result = {null};
+            final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+            java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
+            exec.invoke(mc, (Runnable) () -> {
+                try {
+                    long hwnd = 0;
+                    try {
+                        hwnd = (long) Class.forName("org.lwjgl.glfw.GLFWNativeWin32")
+                                .getMethod("glfwGetWin32Window", long.class).invoke(null, glfwWin);
+                    } catch (Exception e1) {
+                        hwnd = (long) Class.forName("org.lwjgl.glfw.GLFW")
+                                .getMethod("glfwGetWin32Window", long.class).invoke(null, glfwWin);
+                    }
+                    if (hwnd == 0) {
+                        result[0] = "error: HWND is 0 (glfw=" + glfwWin + ")";
+                    } else {
+                        long oldStyle = xyz.langyo.minecraft.mcp.mod.McpWin32.makeBorderless(hwnd);
+                        result[0] = "borderless: hwnd=" + Long.toHexString(hwnd) + " oldStyle=" + Long.toHexString(oldStyle);
+                    }
+                } catch (Exception e) {
+                    result[0] = "error: " + e.getMessage();
+                }
+                latch.countDown();
+            });
+            latch.await(8, java.util.concurrent.TimeUnit.SECONDS);
+            return result[0] != null ? result[0] : "timeout on render thread";
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
     }
 
     private static McpWebSocketClient castClient(Object wsClient) {
