@@ -180,7 +180,7 @@ def main():
         step(server_proc, 2, TOTAL_STEPS, "Installing mod and launching MC...")
         clear_mods()
         install_mod(version, loader)
-        mc_proc = _start_mc(version, loader)
+        mc_proc = _start_mc(version)
         if not mc_proc:
             print("  ERROR: Failed to launch MC")
             return 1
@@ -196,7 +196,7 @@ def main():
             if stdout_log.exists():
                 try:
                     content = stdout_log.read_text(encoding="utf-8", errors="replace")
-                    if "MOD CONNECTED" in content or "MC connected" in content:
+                    if "MOD CONNECTED" in content or "MC connected" in content or "MCP-WS" in content:
                         connected = True
                         print("  MOD CONNECTED")
                         break

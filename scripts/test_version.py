@@ -134,7 +134,10 @@ def _start_mcp_server() -> subprocess.Popen:
         for line in p.stdout:
             stripped = line.strip()
             _server_output_lines.append(stripped)
-            print(f"  [SRV] {stripped}")
+            if len(stripped) > 200:
+                print(f"  [SRV] {stripped[:200]}... [TRUNCATED {len(stripped)} chars]")
+            else:
+                print(f"  [SRV] {stripped}")
 
     __import__("threading").Thread(target=reader, args=(proc,), daemon=True).start()
     return proc

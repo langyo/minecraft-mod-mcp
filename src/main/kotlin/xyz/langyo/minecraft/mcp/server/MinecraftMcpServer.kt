@@ -174,7 +174,11 @@ fun main() {
                     toolObj("get_player_info", "Query player state from mod", """{"type":"object","properties":{}}"""),
                     toolObj("get_world_info", "Query world state from mod", """{"type":"object","properties":{}}"""),
                     toolObj("ping", "Ping mod for connectivity test", """{"type":"object","properties":{}}"""),
-                    toolObj("list_screenshots", "List recent screenshots saved to disk", """{"type":"object","properties":{"limit":{"type":"number"}}}""")
+                    toolObj("list_screenshots", "List recent screenshots saved to disk", """{"type":"object","properties":{"limit":{"type":"number"}}}"""),
+                    toolObj("paste_text", "Paste text into MC via clipboard (avoids IME issues)", """{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}"""),
+                    toolObj("set_view_angle", "Set player view angle (game-internal, no mouse movement)", """{"type":"object","properties":{"yaw":{"type":"number"},"pitch":{"type":"number"}},"required":["yaw","pitch"]}"""),
+                    toolObj("look_delta", "Rotate view by delta (game-internal)", """{"type":"object","properties":{"dyaw":{"type":"number"},"dpitch":{"type":"number"}}}"""),
+                    toolObj("right_click", "Right click / use item (via mod input system)", """{"type":"object","properties":{}}""")
                 )))
                 "tools/call" -> { val r = handleToolCall(req.getAsJsonObject("params"), ws); jobj("result" to r) }
                 else -> jobj("error" to jobj("code" to -32601, "message" to "unknown method: $method"))
@@ -214,6 +218,10 @@ fun handleToolCall(params: JsonObject?, ws: McWsServer): JsonObject {
         "get_world_info" -> { val e = requireWs(ws); if (e != null) e else doWorldInfo(ws) }
         "ping" -> { val e = requireWs(ws); if (e != null) e else doPing(ws) }
         "list_screenshots" -> doListScreenshots(args, screenshotStore)
+        "paste_text" -> { val e = requireWs(ws); if (e != null) e else doPasteText(args, ws) }
+        "set_view_angle" -> { val e = requireWs(ws); if (e != null) e else doSetViewAngle(args, ws) }
+        "look_delta" -> { val e = requireWs(ws); if (e != null) e else doLookDelta(args, ws) }
+        "right_click" -> { val e = requireWs(ws); if (e != null) e else doRightClick(args, ws) }
         else -> txtObj("Error: unknown tool $name")
     }} catch (e: Exception) { txtObj("Error: ${e.message}") }
 }
@@ -567,7 +575,8 @@ private fun replaceGameVars(s: String, mcDir: java.io.File, json: JsonObject, ta
 }
 
 fun doScreenshot(a: JsonObject, w: McWsServer, store: ScreenshotStore): JsonObject {
-    val result = w.sendAndWait(McCommand("screenshot", hashMapOf("save_path" to a.get("save_path")?.asString)), 5000)
+    val savePath = a.get("save_path")?.asString
+    val result = w.sendAndWait(McCommand("screenshot", hashMapOf("save_path" to savePath)), 5000)
         ?: return txtObj("timeout")
     if (result.has("content")) {
         val content = result.getAsJsonArray("content")
@@ -576,12 +585,15 @@ fun doScreenshot(a: JsonObject, w: McWsServer, store: ScreenshotStore): JsonObje
                 val obj = elem.asJsonObject
                 if (obj.get("type")?.asString == "image") {
                     val b64 = obj.get("data")?.asString ?: continue
-                    try { store.save(b64) } catch (_: Exception) {}
+                    try {
+                        val entry = store.save(b64)
+                        return txtObj("screenshot saved: ${entry.path} (${entry.sizeBytes/1024}KB)")
+                    } catch (_: Exception) {}
                 }
             }
         }
     }
-    return result
+    return txtObj("screenshot done (no image data in response)")
 }
 
 fun doListScreenshots(a: JsonObject, store: ScreenshotStore): JsonObject {
@@ -683,6 +695,43 @@ fun doPing(w: McWsServer): JsonObject {
     var out: JsonObject? = null
     w.send(McCommand("ping", emptyMap())) { o ->
         out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj("pong")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doPasteText(a: JsonObject, w: McWsServer): JsonObject {
+    val t = a.get("text")?.asString ?: return txtObj("missing text")
+    var out: JsonObject? = null
+    w.send(McCommand("paste_text", hashMapOf("text" to t))) { o ->
+        out = if (o.success) txtObj(t) else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doSetViewAngle(a: JsonObject, w: McWsServer): JsonObject {
+    val yaw = a.get("yaw")?.asFloat ?: a.get("yaw")?.asDouble?.toFloat() ?: return txtObj("missing yaw")
+    val pitch = a.get("pitch")?.asFloat ?: a.get("pitch")?.asDouble?.toFloat() ?: return txtObj("missing pitch")
+    var out: JsonObject? = null
+    w.send(McCommand("set_view_angle", hashMapOf("yaw" to yaw, "pitch" to pitch))) { o ->
+        out = if (o.success) txtObj("yaw=$yaw pitch=$pitch") else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doLookDelta(a: JsonObject, w: McWsServer): JsonObject {
+    val dy = a.get("dyaw")?.asFloat ?: a.get("dyaw")?.asDouble?.toFloat() ?: 0f
+    val dp = a.get("dpitch")?.asFloat ?: a.get("dpitch")?.asDouble?.toFloat() ?: 0f
+    var out: JsonObject? = null
+    w.send(McCommand("look_delta", hashMapOf("dyaw" to dy, "dpitch" to dp))) { o ->
+        out = if (o.success) txtObj("dyaw=$dy dpitch=$dp") else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doRightClick(a: JsonObject, w: McWsServer): JsonObject {
+    var out: JsonObject? = null
+    w.send(McCommand("right_click", emptyMap())) { o ->
+        out = if (o.success) txtObj("right clicked") else txtObj(o.error ?: "fail")
     }
     return out ?: txtObj("timeout")
 }
