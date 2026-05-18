@@ -327,7 +327,7 @@ def _resolve_mc_key(version: str) -> str:
 
 def _resolve_mod_dir(version: str, loader: str) -> Path:
     mc_key = _resolve_mc_key(version)
-    return ROOT / "mods" / mc_key / loader
+    return ROOT / "packages" / "mods" / mc_key / loader
 
 
 def test_single(version: str, loader: str, timeout: int = 300) -> TestResult:

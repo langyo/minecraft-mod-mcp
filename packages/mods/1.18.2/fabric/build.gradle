@@ -11,11 +11,11 @@ targetCompatibility = "17"
 repositories {
     mavenCentral()
     maven {
-        url = "../../../.maven-local"
+        url = "../../../../.maven-local"
     }
 }
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {
     minecraft "com.mojang:minecraft:1.18.2"

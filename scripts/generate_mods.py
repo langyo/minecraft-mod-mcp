@@ -192,7 +192,7 @@ repositories {{
     }}
 }}
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {{
     compile "org.java-websocket:Java-WebSocket:1.5.4"
@@ -255,7 +255,7 @@ repositories {{
     }}
 }}
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
@@ -315,7 +315,7 @@ repositories {{
     }}
 }}
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
@@ -372,7 +372,7 @@ repositories {{
     }}
 }}
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
@@ -436,7 +436,7 @@ repositories {{
     }}
 }}
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {{
     minecraft "net.minecraftforge:forge:{forge_ver}"
@@ -503,7 +503,7 @@ repositories {{
     }}
 }}
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {{
     implementation minecraft.dependency('net.minecraftforge:forge:{forge_ver}')
@@ -611,7 +611,7 @@ repositories {{
     }}
 }}
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {{
     minecraft "{nf_group}:{nf_ver}"
@@ -661,7 +661,7 @@ repositories {{
     mavenCentral()
 }}
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {{
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
@@ -758,7 +758,7 @@ repositories {{
     }}
 }}
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {{
     minecraft "com.mojang:minecraft:{mc}"

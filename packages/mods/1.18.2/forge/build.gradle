@@ -29,11 +29,11 @@ minecraft {
 repositories {
     mavenCentral()
     maven {
-        url = "../../../.maven-local"
+        url = "../../../../.maven-local"
     }
 }
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {
     minecraft "net.minecraftforge:forge:1.18.2-40.3.12"

@@ -2,7 +2,7 @@
 import os, shutil
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODS_DIR = os.path.join(BASE, "mods")
+MODS_DIR = os.path.join(BASE, "packages", "mods")
 
 # Source templates directory
 TEMPLATES_DIR = os.path.join(BASE, "mod-templates")

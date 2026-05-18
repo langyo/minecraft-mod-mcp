@@ -30,10 +30,10 @@ BUILD_CACHE = [
     ("project logs/",               PROJECT / "logs"),
     ("project out/",                PROJECT / "out"),
     ("project build/",              PROJECT / "build"),
-    ("mcp-common .gradle/",         PROJECT / "mcp-common" / ".gradle"),
-    ("mcp-common build/",           PROJECT / "mcp-common" / "build"),
-    ("mcp-common .kotlin/",         PROJECT / "mcp-common" / ".kotlin"),
-    ("mcp-common bin/",             PROJECT / "mcp-common" / "bin"),
+    ("common .gradle/",             PROJECT / "packages" / "common" / ".gradle"),
+    ("common build/",               PROJECT / "packages" / "common" / "build"),
+    ("common .kotlin/",             PROJECT / "packages" / "common" / ".kotlin"),
+    ("common bin/",                 PROJECT / "packages" / "common" / "bin"),
 ]
 
 TEMP_FILES = [
@@ -124,7 +124,7 @@ def confirm(prompt, default=False):
 
 def find_mod_build_dirs():
     items = []
-    mods_dir = PROJECT / "mods"
+    mods_dir = PROJECT / "packages" / "mods"
     if not mods_dir.is_dir():
         return items
     for mc_ver in sorted(mods_dir.iterdir()):

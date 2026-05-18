@@ -72,7 +72,7 @@ def cmd_status(args):
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     for mc in sorted(ALL_VERSIONS):
         for loader in get_loaders(mc):
-            jars = glob.glob(os.path.join(base, "mods", mc, loader, "build", "libs", "*.jar"))
+            jars = glob.glob(os.path.join(base, "packages", "mods", mc, loader, "build", "libs", "*.jar"))
             jars = [j for j in jars if "sources" not in j and "javadoc" not in j]
             if jars:
                 sz = os.path.getsize(jars[0]) // 1024

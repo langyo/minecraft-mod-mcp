@@ -11,13 +11,13 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 repositories {
     maven {
-        url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
+        url = rootProject.projectDir.toPath().resolve('../../../../.maven-local').toUri()
         allowInsecureProtocol = false
     }
     mavenCentral()
 }
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'

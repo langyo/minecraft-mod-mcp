@@ -25,11 +25,11 @@ minecraft {
 repositories {
     mavenCentral()
     maven {
-        url = "../../../.maven-local"
+        url = "../../../../.maven-local"
     }
 }
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {
     compile "org.java-websocket:Java-WebSocket:1.5.4"

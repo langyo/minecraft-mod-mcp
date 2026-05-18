@@ -17,7 +17,7 @@ FG Era Definitions:
 import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODS_DIR = os.path.join(BASE_DIR, "mods")
+MODS_DIR = os.path.join(BASE_DIR, "packages", "mods")
 
 # ============================================================
 # FG ERA DEFINITIONS (structural, not per-version)

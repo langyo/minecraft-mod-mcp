@@ -27,12 +27,12 @@ repositories {
     maven fg.minecraftLibsMaven
     mavenCentral()
     maven {
-        url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
+        url = rootProject.projectDir.toPath().resolve('../../../../.maven-local').toUri()
         allowInsecureProtocol = false
     }
 }
 
-sourceSets.main.java.srcDir '../../../mcp-common/src/main/java'
+sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {
     implementation minecraft.dependency('net.minecraftforge:forge:26.1.2-64.0.8')
