@@ -108,11 +108,7 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let project_root = std::env::current_dir()?
-        .parent()
-        .and_then(|p| p.parent())
-        .ok_or_else(|| anyhow::anyhow!("cannot determine project root"))?
-        .to_path_buf();
+    let project_root = std::env::current_dir()?;
 
     let ss_dir = if cli.screenshot_dir.is_absolute() {
         cli.screenshot_dir
