@@ -6,7 +6,7 @@ plugins {
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
-group = "com.mcbbs"
+group = "xyz.langyo.minecraft"
 version = "0.1.0"
 
 repositories {
@@ -20,7 +20,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("com.mcbbs.mcp.MinecraftMcpServerKt")
+    mainClass.set("xyz.langyo.minecraft.mcp.server.MinecraftMcpServerKt")
 }
 
 kotlin {
@@ -30,5 +30,5 @@ kotlin {
 tasks.withType<ShadowJar> {
     archiveBaseName.set("mcp-server")
     archiveClassifier.set("")
-    manifest { attributes["Main-Class"] = "com.mcbbs.mcp.MinecraftMcpServerKt" }
+    manifest { attributes["Main-Class"] = "xyz.langyo.minecraft.mcp.server.MinecraftMcpServerKt" }
 }

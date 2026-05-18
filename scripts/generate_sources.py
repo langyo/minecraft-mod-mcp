@@ -15,10 +15,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import ALL_VERSIONS, MODS_DIR, get_api_group, get_loaders
 
-PKG = "moddevmcp/minecraft/xyz/langyo"
-MOD_ID = "moddevmcp"
+PKG = "xyz/langyo/minecraft/mcp/mod"
+MOD_ID = "mcpmod"
 CLASS = "ModDevMcpMod"
-PKG_DOTTED = "moddevmcp.minecraft.xyz.langyo"
+PKG_DOTTED = "xyz.langyo.minecraft.mcp.mod"
 
 
 # ============================================================
@@ -26,19 +26,19 @@ PKG_DOTTED = "moddevmcp.minecraft.xyz.langyo"
 # ============================================================
 
 def forge_mod_legacy(mc):
-    return """package moddevmcp.minecraft.xyz.langyo;
+    return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 
-@Mod(modid = "moddevmcp", name = "ModDev MCP", version = "1.0")
+@Mod(modid = "mcpmod", name = "ModDev MCP", version = "1.0")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
     private ReflectedInputHandler handler;
 
-    @Mod.Instance("moddevmcp")
+    @Mod.Instance("mcpmod")
     public static ModDevMcpMod instance;
 
     @Mod.EventHandler
@@ -62,12 +62,12 @@ public class ModDevMcpMod {
 
 def forge_mod_fg3(mc):
     if mc == "1.13.2":
-        return """package moddevmcp.minecraft.xyz.langyo;
+        return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 
-@Mod("moddevmcp")
+@Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
@@ -90,14 +90,14 @@ public class ModDevMcpMod {
     }
 }
 """
-    return """package moddevmcp.minecraft.xyz.langyo;
+    return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.event.TickEvent;
 
-@Mod("moddevmcp")
+@Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
@@ -123,15 +123,15 @@ public class ModDevMcpMod {
 """
 
 def forge_mod_fg4(mc):
-    return """package moddevmcp.minecraft.xyz.langyo;
+    return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.common.MinecraftForge;
 
-@Mod("moddevmcp")
+@Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
@@ -164,16 +164,16 @@ def forge_mod_fg6(mc):
     return forge_mod_fg4(mc)
 
 def forge_mod_fg7(mc):
-    return """package moddevmcp.minecraft.xyz.langyo;
+    return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.common.MinecraftForge;
 
-@Mod("moddevmcp")
+@Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
@@ -200,12 +200,12 @@ public class ModDevMcpMod {
 """
 
 def forge_mod_mc26(mc):
-    return """package moddevmcp.minecraft.xyz.langyo;
+    return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 
-@Mod("moddevmcp")
+@Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
@@ -234,16 +234,16 @@ public class ModDevMcpMod {
 # ============================================================
 
 def neoforge_mod_1201(mc):
-    return """package moddevmcp.minecraft.xyz.langyo;
+    return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 
-@Mod("moddevmcp")
+@Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
@@ -270,16 +270,16 @@ public class ModDevMcpMod {
 
 
 def neoforge_mod_1204(mc):
-    return """package moddevmcp.minecraft.xyz.langyo;
+    return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 
-@Mod("moddevmcp")
+@Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
@@ -309,16 +309,16 @@ public class ModDevMcpMod {
 # ============================================================
 
 def neoforge_mod(mc):
-    return """package moddevmcp.minecraft.xyz.langyo;
+    return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 
-@Mod("moddevmcp")
+@Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpWebSocketClient wsClient;
@@ -349,9 +349,9 @@ public class ModDevMcpMod {
 # ============================================================
 
 def fabric_mod(mc):
-    return """package moddevmcp.minecraft.xyz.langyo;
+    return """package xyz.langyo.minecraft.mcp.mod;
 
-import com.mcbbs.mcp.common.*;
+import xyz.langyo.minecraft.mcp.common.*;
 import net.fabricmc.api.ClientModInitializer;
 
 public class ModDevMcpMod implements ClientModInitializer {
@@ -393,7 +393,7 @@ loaderVersion="[4,)"
 license="MIT"
 
 [[mods]]
-modId="moddevmcp"
+modId="mcpmod"
 version="1.0.0"
 displayName="ModDev MCP"
 description="WebSocket bridge for AI agent interaction"
@@ -402,7 +402,7 @@ authors="langyo"
 
 MCMOD_INFO = """[
   {
-    "modid": "moddevmcp",
+    "modid": "mcpmod",
     "name": "ModDev MCP",
     "description": "WebSocket bridge for AI agent interaction",
     "version": "1.0.0",
@@ -417,7 +417,7 @@ loaderVersion = "[4,)"
 license = "MIT"
 
 [[mods]]
-modId = "moddevmcp"
+modId = "mcpmod"
 version = "1.0.0"
 displayName = "ModDev MCP"
 description = "WebSocket bridge for AI agent interaction"

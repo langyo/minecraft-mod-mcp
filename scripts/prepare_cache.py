@@ -537,7 +537,7 @@ def main():
     # ================================================================
     print("\n[Phase 11] Shared dependencies")
     shared = [
-        ("com.mcbbs.mcp", "mcp-common", "1.0.0-SNAPSHOT",
+        ("xyz.langyo.minecraft.mcp", "mcp-common", "1.0.0-SNAPSHOT",
          "mcp-common-1.0.0-SNAPSHOT.jar", "maven-local"),
     ]
     import urllib.request

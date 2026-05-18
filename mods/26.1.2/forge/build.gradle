@@ -15,7 +15,7 @@ minecraft {
         configureEach {
             workingDir = layout.projectDirectory.dir('run')
             systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
-            systemProperty 'forge.enabledGameTestNamespaces', 'moddevmcp'
+            systemProperty 'forge.enabledGameTestNamespaces', 'mcpmod'
         }
         register('client')
     }
@@ -46,7 +46,7 @@ tasks.withType(JavaCompile).configureEach {
 jar {
     manifest {
         attributes 'ModSide' : 'BOTH'
-        attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
+        attributes 'Automatic-Module' : 'xyz.langyo.minecraft.mcp.mod'
         attributes 'Implementation-Version' : project.version
     }
 }

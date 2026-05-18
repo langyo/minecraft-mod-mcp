@@ -317,7 +317,7 @@ git commit -m "fix: LWJGL2 mouse button events for MC 1.7–1.12"
 **Step 1: Add ConcurrentLinkedQueue and drain in handleMessages()**
 
 ```kotlin
-package com.mcbbs.mcp.common
+package xyz.langyo.minecraft.mcp.common
 
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
@@ -393,7 +393,7 @@ git commit -m "fix: add message queue to McpWebSocketClient for thread-safe tick
 **Step 1: Create McpConfig.java**
 
 ```java
-package com.mcbbs.mcp.common;
+package xyz.langyo.minecraft.mcp.common;
 
 public final class McpConfig {
     private McpConfig() {}
@@ -457,7 +457,7 @@ Option (b) is simpler and avoids classloader issues. Rewrite `McpProtocol.kt` an
 Delete `McpProtocol.kt`, create `McpProtocol.java`:
 
 ```java
-package com.mcbbs.mcp.common;
+package xyz.langyo.minecraft.mcp.common;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;

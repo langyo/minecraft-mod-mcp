@@ -3,7 +3,7 @@ loaderVersion="[4,)"
 license="MIT"
 
 [[mods]]
-modId="moddevmcp"
+modId="mcpmod"
 version="1.0.0"
 displayName="ModDev MCP"
 description="WebSocket bridge for AI agent interaction"

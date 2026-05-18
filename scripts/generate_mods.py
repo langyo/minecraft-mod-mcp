@@ -449,7 +449,7 @@ tasks.withType(JavaCompile).configureEach {{
 
 jar {{
     manifest {{
-        attributes 'Automatic-Module': 'moddevmcp.minecraft.xyz.langyo'
+        attributes 'Automatic-Module': 'xyz.langyo.minecraft.mcp.mod'
     }}
 }}
 """
@@ -486,7 +486,7 @@ minecraft {{
         configureEach {{
             workingDir = layout.projectDirectory.dir('run')
             systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
-            systemProperty 'forge.enabledGameTestNamespaces', 'moddevmcp'
+            systemProperty 'forge.enabledGameTestNamespaces', 'mcpmod'
         }}
         register('client')
     }}
@@ -517,7 +517,7 @@ tasks.withType(JavaCompile).configureEach {{
 jar {{
     manifest {{
         attributes 'ModSide' : 'BOTH'
-        attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
+        attributes 'Automatic-Module' : 'xyz.langyo.minecraft.mcp.mod'
         attributes 'Implementation-Version' : project.version
     }}
 }}
@@ -624,7 +624,7 @@ tasks.withType(JavaCompile).configureEach {{
 
 jar {{
     manifest {{
-        attributes 'Automatic-Module': 'moddevmcp.minecraft.xyz.langyo'
+        attributes 'Automatic-Module': 'xyz.langyo.minecraft.mcp.mod'
     }}
 }}
 """
@@ -678,7 +678,7 @@ neoForge {{
         }}
     }}
     mods {{
-        moddevmcp {{
+        mcpmod {{
             sourceSet sourceSets.main
         }}
     }}
@@ -691,7 +691,7 @@ tasks.withType(JavaCompile).configureEach {{
 jar {{
     manifest {{
         attributes 'ModSide' : 'CLIENT'
-        attributes 'Automatic-Module' : 'moddevmcp.minecraft.xyz.langyo'
+        attributes 'Automatic-Module' : 'xyz.langyo.minecraft.mcp.mod'
         attributes 'Implementation-Version' : project.version
     }}
 }}
@@ -795,14 +795,14 @@ rootProject.name = 'minecraft-moddev-mcp-fabric-{mc}'
 def write_fabric_mod_json(mc, info, path):
     content = """{
   "schemaVersion": 1,
-  "id": "moddevmcp",
+  "id": "mcpmod",
   "version": "1.0.0",
   "name": "ModDev MCP",
   "description": "WebSocket bridge for AI agent interaction",
   "authors": ["langyo"],
   "environment": "client",
   "entrypoints": {
-    "client": ["moddevmcp.minecraft.xyz.langyo.ModDevMcpMod"]
+    "client": ["xyz.langyo.minecraft.mcp.mod.ModDevMcpMod"]
   }
 }
 """

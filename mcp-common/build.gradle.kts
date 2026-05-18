@@ -3,7 +3,7 @@ plugins {
     `maven-publish`
 }
 
-group = "com.mcbbs.mcp"
+group = "xyz.langyo.minecraft.mcp"
 version = "1.0.0-SNAPSHOT"
 
 java {
