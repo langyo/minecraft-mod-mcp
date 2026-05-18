@@ -9,13 +9,11 @@ Usage:
   python scripts/mc_vtty.py --send 'status'              # check state
   python scripts/mc_vtty.py --send 'launch 1.21.7-forge-57.0.2'
   python scripts/mc_vtty.py --send 'screenshot menu'     # take screenshot
-  python scripts/mc_vtty.py --send 'click 960 480'       # click
+  python scripts/mc_vtty.py --send 'click_button_id 1'   # click by ID
   python scripts/mc_vtty.py --send 'type_text hello'     # type text
   python scripts/mc_vtty.py --send 'press_key E'         # press key
-  python scripts/mc_vtty.py --send 'hotkey Ctrl,S'       # key combo
-  python scripts/mc_vtty.py --send 'scroll -3'           # scroll
   python scripts/mc_vtty.py --send 'command /gamemode creative'
-  python scripts/mc_vtty.py --send 'wait 5'              # wait seconds
+  python scripts/mc_vtty.py --send 'screen_buttons'      # list GUI buttons
   python scripts/mc_vtty.py --send 'kill'                # kill MC
 """
 
@@ -190,7 +188,7 @@ class McVtty:
         install_mod(version, loader)
         time.sleep(1)
 
-        _log(f"[VTTY] Launching MC {version}...")
+        _log(f"[VTTY] Launching Mc {version}...")
         self.mc_proc = _start_mc(version)
         if not self.mc_proc:
             return {"error": "MC launch failed"}
@@ -235,141 +233,6 @@ class McVtty:
 
     def click(self, x, y, button="left"):
         return self._send_ws("click", {"x": str(x), "y": str(y), "button": button})
-
-    def focus(self):
-        try:
-            import pyautogui
-            wins = pyautogui.getWindowsWithTitle("Minecraft")
-            if wins:
-                w = wins[0]
-                w.activate()
-                time.sleep(0.5)
-                return {"focused": True, "title": w.title}
-            return {"focused": False, "error": "window not found"}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def pyclick(self, x, y, button="left"):
-        try:
-            import pyautogui
-            self.focus()
-            time.sleep(0.3)
-
-            rect = self.get_window_rect()
-            if "error" in rect:
-                return rect
-            win_w = rect["width"]
-            win_h = rect["height"]
-            win_l = rect["left"]
-            win_t = rect["top"]
-
-            fb_w, fb_h = self._get_framebuffer_size()
-
-            if fb_w > 0 and fb_h > 0:
-                sx = win_l + int(x * win_w / fb_w)
-                sy = win_t + int(y * win_h / fb_h)
-            else:
-                sx = win_l + x
-                sy = win_t + y
-
-            btn = "left" if button == "left" else "right" if button == "right" else "middle"
-            pyautogui.click(x=sx, y=sy, button=btn)
-            return {"clicked": True, "screen_x": sx, "screen_y": sy, "fb_coord": [x, y], "window": [win_l, win_t, win_w, win_h], "fb": [fb_w, fb_h]}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def win32click(self, x, y, button="left"):
-        try:
-            import ctypes
-            import pyautogui
-            user32 = ctypes.windll.user32
-
-            self.focus()
-            time.sleep(0.5)
-
-            rect = self.get_window_rect()
-            if "error" in rect:
-                return rect
-            win_w = rect["width"]
-            win_h = rect["height"]
-            win_l = rect["left"]
-            win_t = rect["top"]
-
-            fb_w, fb_h = self._get_framebuffer_size()
-
-            if fb_w > 0 and fb_h > 0:
-                sx = win_l + int(x * win_w / fb_w)
-                sy = win_t + int(y * win_h / fb_h)
-            else:
-                sx = win_l + x
-                sy = win_t + y
-
-            screen_w = user32.GetSystemMetrics(0)
-            screen_h = user32.GetSystemMetrics(1)
-
-            MOUSEEVENTF_LEFTDOWN = 0x0002
-            MOUSEEVENTF_LEFTUP = 0x0004
-            MOUSEEVENTF_RIGHTDOWN = 0x0008
-            MOUSEEVENTF_RIGHTUP = 0x0010
-            MOUSEEVENTF_MIDDLEDOWN = 0x0020
-            MOUSEEVENTF_MIDDLEUP = 0x0040
-            MOUSEEVENTF_MOVE = 0x0001
-            MOUSEEVENTF_ABSOLUTE = 0x8000
-
-            norm_x = int(sx * 65535 / (screen_w - 1))
-            norm_y = int(sy * 65535 / (screen_h - 1))
-
-            user32.SetCursorPos(sx, sy)
-            time.sleep(0.05)
-            user32.mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE, norm_x, norm_y, 0, 0)
-            time.sleep(0.02)
-
-            if button == "left":
-                user32.mouse_event(MOUSEEVENTF_LEFTDOWN, norm_x, norm_y, 0, 0)
-                time.sleep(0.05)
-                user32.mouse_event(MOUSEEVENTF_LEFTUP, norm_x, norm_y, 0, 0)
-            elif button == "right":
-                user32.mouse_event(MOUSEEVENTF_RIGHTDOWN, norm_x, norm_y, 0, 0)
-                time.sleep(0.05)
-                user32.mouse_event(MOUSEEVENTF_RIGHTUP, norm_x, norm_y, 0, 0)
-            else:
-                user32.mouse_event(MOUSEEVENTF_MIDDLEDOWN, norm_x, norm_y, 0, 0)
-                time.sleep(0.05)
-                user32.mouse_event(MOUSEEVENTF_MIDDLEUP, norm_x, norm_y, 0, 0)
-
-            return {"clicked": True, "screen_x": sx, "screen_y": sy, "fb": [fb_w, fb_h]}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def get_window_rect(self):
-        try:
-            import pyautogui
-            wins = pyautogui.getWindowsWithTitle("Minecraft")
-            if wins:
-                w = wins[0]
-                return {"left": w.left, "top": w.top, "width": w.width, "height": w.height, "title": w.title}
-            return {"error": "window not found"}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_framebuffer_size(self):
-        if hasattr(self, '_fb_cache') and self._fb_cache:
-            return self._fb_cache
-        try:
-            SS_DIR.mkdir(parents=True, exist_ok=True)
-            result = self._send_ws("screenshot", timeout=60)
-            if isinstance(result, dict) and result.get("type") == "image":
-                data_uri = result["data"]
-                if data_uri.startswith("data:image/png;base64,"):
-                    b64 = data_uri[len("data:image/png;base64,"):]
-                    png_bytes = base64.b64decode(b64)
-                    w = int.from_bytes(png_bytes[16:20], 'big')
-                    h = int.from_bytes(png_bytes[20:24], 'big')
-                    self._fb_cache = (w, h)
-                    return (w, h)
-        except Exception:
-            pass
-        return (0, 0)
 
     def press_key(self, key, hold=0):
         p = {"key": key}
@@ -469,22 +332,6 @@ class McVtty:
                 )
             elif cmd == "scroll":
                 return self.scroll(int(cmd_dict.get("clicks", 1)))
-            elif cmd == "focus":
-                return self.focus()
-            elif cmd == "pyclick":
-                return self.pyclick(
-                    int(cmd_dict.get("x", 0)),
-                    int(cmd_dict.get("y", 0)),
-                    cmd_dict.get("button", "left"),
-                )
-            elif cmd == "win32click":
-                return self.win32click(
-                    int(cmd_dict.get("x", 0)),
-                    int(cmd_dict.get("y", 0)),
-                    cmd_dict.get("button", "left"),
-                )
-            elif cmd == "window_rect":
-                return self.get_window_rect()
             elif cmd == "hotkey":
                 return self.hotkey(cmd_dict.get("keys", ""))
             elif cmd == "command":
@@ -495,6 +342,10 @@ class McVtty:
                 return self.world_info()
             elif cmd == "debug_fields":
                 return self.debug_fields()
+            elif cmd == "screen_buttons":
+                return self.screen_buttons()
+            elif cmd == "click_button_id":
+                return self.click_button_id(cmd_dict.get("id", 0))
             elif cmd == "wait":
                 time.sleep(float(cmd_dict.get("seconds", 1)))
                 return {"waited": cmd_dict.get("seconds", 1)}
@@ -571,30 +422,14 @@ def send_command(cmd_str, port=VTTY_PORT):
         cmd_dict["name"] = rest if rest else "auto"
     elif cmd == "scroll":
         cmd_dict["clicks"] = int(rest) if rest else 1
-    elif cmd == "focus":
-        pass
-    elif cmd == "pyclick":
-        coords = rest.split()
-        if len(coords) >= 2:
-            cmd_dict["x"] = int(coords[0])
-            cmd_dict["y"] = int(coords[1])
-        if len(coords) >= 3:
-            cmd_dict["button"] = coords[2]
-    elif cmd == "win32click":
-        coords = rest.split()
-        if len(coords) >= 2:
-            cmd_dict["x"] = int(coords[0])
-            cmd_dict["y"] = int(coords[1])
-        if len(coords) >= 3:
-            cmd_dict["button"] = coords[2]
-    elif cmd == "window_rect":
-        pass
     elif cmd == "hotkey":
         cmd_dict["keys"] = rest
     elif cmd == "command":
         cmd_dict["command"] = rest
-    elif cmd in ("player_info", "world_info", "debug_fields"):
+    elif cmd in ("player_info", "world_info", "debug_fields", "screen_buttons"):
         pass
+    elif cmd == "click_button_id":
+        cmd_dict["id"] = int(rest) if rest else 0
     elif cmd == "wait":
         cmd_dict["seconds"] = float(rest) if rest else 1
 
@@ -655,7 +490,7 @@ def main():
     threading.Thread(target=run_tcp_server, args=(vtty,), daemon=True).start()
 
     _log(f"[VTTY] Daemon ready. WS={WS_PORT} TCP={VTTY_PORT}")
-    _log(f"[VTTY] Commands: launch, status, screenshot, click, pyclick, focus, window_rect, press_key, type_text, scroll, hotkey, command, player_info, world_info, wait, kill")
+    _log(f"[VTTY] Commands: launch, status, screenshot, click, press_key, type_text, scroll, hotkey, command, player_info, world_info, screen_buttons, click_button_id, debug_fields, wait, kill")
 
     try:
         while True:

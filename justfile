@@ -2,68 +2,157 @@ set windows-shell := ["pwsh", "-NoLogo", "-Command"]
 set windows-powershell := true
 
 base := absolute_path("")
-mc-common-dir := base / "mcp-common"
-mods-dir := base / "mods"
-screenshots-dir := base / "screenshots"
-mcp-jar := base / "build" / "libs" / "mcp-server-0.1.0.jar"
-ws-port := env("MC_MCP_WS_PORT", "9876")
-java-home := env("JAVA_HOME", "C:\\Program Files\\Amazon Corretto\\jdk21.0.8_9")
-java := java-home + "\\bin\\java.exe"
+
+# ============================================================
+# Info
+# ============================================================
 
 # List all available MC versions
 list:
-    @python scripts/version_config.py 2> /dev/null || python -c "
-import sys; sys.path.insert(0, 'scripts')
-from version_config import ALL_VERSIONS, get_loaders
-for mc in sorted(ALL_VERSIONS):
-    loaders = get_loaders(mc)
-    print(f'  {mc:10s} {\" \".join(loaders)}')
-"
+    python scripts/jf.py list
 
-# Build MCP server (shadow jar)
-build-server:
-    gradlew.bat shadowJar --no-daemon
+# Show project status (mod JAR build state)
+status:
+    python scripts/jf.py status
 
-# Build mcp-common and publish to local maven
-publish-common:
-    cd mcp-common; ..\gradlew.bat publish --no-daemon
+# Environment check
+check-env:
+    python scripts/init.py --check-only
 
-# Build all 76+ mod projects
-build-all *ARGS:
+# ============================================================
+# Build
+# ============================================================
+
+# Build all mod projects (with cache prep)
+build *ARGS:
     python scripts/build_all.py {{ ARGS }}
 
-# Build a single mod version
+# Build a single MC version
 build-mod mc loader="forge":
-    python scripts/build_all.py --mc {{ mc }} --loader {{ loader }} --no-cache
+    python scripts/build_all.py --mc {{ mc }} --loader {{ loader }} --no-cache -j 1
+
+# Build mcp-common only
+build-common:
+    python scripts/build_common.py
 
 # Prepare all caches
 prepare-cache:
     python scripts/prepare_cache.py
+
+# Full pipeline: generate + cache + build
+full *ARGS:
+    python scripts/generate_mods.py {{ ARGS }}
+    python scripts/generate_sources.py {{ ARGS }}
+    python scripts/prepare_cache.py
+    python scripts/build_all.py {{ ARGS }}
 
 # Generate mod projects for all versions
 generate *ARGS:
     python scripts/generate_mods.py {{ ARGS }}
     python scripts/generate_sources.py {{ ARGS }}
 
-# Start MCP server in foreground
-server:
-    {{ java }} -DMC_MCP_WS_PORT={{ ws-port }} -jar {{ mcp-jar }}
+# ============================================================
+# Forge installation
+# ============================================================
 
-# Start MCP server in background (detached)
-server-bg:
-    start /B {{ java }} -DMC_MCP_WS_PORT={{ ws-port }} -jar {{ mcp-jar }}
+# Install Forge for all versions
+install-forge *ARGS:
+    python scripts/install_forge.py {{ ARGS }}
 
-# Stop MCP server
-server-stop:
-    -taskkill /FI "WINDOWTITLE eq mcp-server*" /F 2> $null; taskkill /FI "IMAGENAME eq java.exe" /FI "MEMUSAGE gt 100000" /F 2> $null
+# Install Forge for a specific MC version
+install-forge-version mc:
+    python scripts/install_forge.py --mc {{ mc }}
 
-# Smoke test a specific MC version
+# Build + install mod for a version
+install-mod mc loader="forge":
+    python scripts/jf.py install-mod {{ mc }} {{ loader }}
+
+# ============================================================
+# MC Launch (via mc_vtty daemon)
+# ============================================================
+
+# Start the VTTY daemon (WS + TCP servers)
+daemon *ARGS:
+    python scripts/mc_vtty.py {{ ARGS }}
+
+# Send raw command to running daemon
+send cmd:
+    python scripts/mc_vtty.py --send '{{ cmd }}'
+
+# Launch MC version via daemon (resolves short name to version_id)
+# Usage: just launch 1.12.2         -> uses version_id from config
+#        just launch 1.21.7 neoforge
+launch mc loader="forge":
+    python scripts/jf.py launch {{ mc }} {{ loader }}
+
+# Take a screenshot via running daemon
+snap name="manual":
+    python scripts/jf.py snap {{ name }}
+
+# List GUI buttons on current screen
+buttons:
+    python scripts/jf.py buttons
+
+# Click a button by ID
+click-id id:
+    python scripts/jf.py click-id {{ id }}
+
+# Send a chat command to MC
+mc-command cmd:
+    python scripts/jf.py mc-cmd {{ cmd }}
+
+# Type text in MC
+type-text text:
+    python scripts/jf.py type-text {{ text }}
+
+# Check daemon status
+check:
+    python scripts/jf.py check
+
+# Kill MC process via daemon
+kill:
+    python scripts/jf.py kill
+
+# ============================================================
+# Testing
+# ============================================================
+
+# Smoke test a specific MC version (full E2E)
+# Usage: just smoke 1.12.2
+#        just smoke 1.21.7-forge-57.0.2
 smoke mc *ARGS:
-    python scripts/smoke_test.py {{ mc }} {{ ARGS }}
+    python scripts/jf.py smoke {{ mc }} {{ ARGS }}
 
-# Smoke test without launching game (game already running)
-smoke-no-launch mc:
-    python scripts/smoke_test.py {{ mc }} --no-launch
+# Test a single version (build + launch + connect + screenshot)
+test mc loader="forge":
+    python scripts/test_version.py {{ mc }} --loader {{ loader }}
+
+# Test all installed versions
+test-all:
+    python scripts/test_version.py --all
+
+# Quick local smoke: install + launch + screenshot + kill (no daemon needed)
+# Usage: just local-smoke 1.12.2
+local-smoke mc loader="forge":
+    python scripts/jf.py local-smoke {{ mc }} {{ loader }}
+
+# ============================================================
+# Direct MC launch (no daemon — blocks until MC exits)
+# ============================================================
+
+# Launch MC directly from version JSON (blocking)
+# Usage: just run 1.12.2-forge1.12.2-14.23.5.2847
+#        just run 1.21.7-forge-57.0.2 --mc-dir "C:\custom\.minecraft"
+run version *ARGS:
+    python scripts/launch_mc.py {{ version }} {{ ARGS }}
+
+# Dry-run: print the launch command without executing
+dry-run version:
+    python scripts/launch_mc.py {{ version }} --dry-run
+
+# ============================================================
+# Utilities
+# ============================================================
 
 # WS client for manual testing
 ws *ARGS:
@@ -72,23 +161,3 @@ ws *ARGS:
 # Interactive WS session
 ws-shell:
     python scripts/ws_client.py
-
-# Take a screenshot via WS
-screenshot path="":
-    #!/usr/bin/env python
-    import sys, os
-    sys.path.insert(0, os.path.join(os.path.dirname("{{ base }}"), "scripts"))
-    path = "{{ path }}" or f"screenshots/manual_{__import__('time').strftime('%H%M%S')}.png"
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    __import__('asyncio').run(__import__('importlib').import_module('ws_client').ws_send_action("screenshot", {"save_path": path}, path))
-
-# Ping the game mod via WS
-ping:
-    python scripts/ws_client.py --action ping
-
-# Full pipeline: generate + cache + build
-full *ARGS:
-    python scripts/generate_mods.py {{ ARGS }}
-    python scripts/generate_sources.py {{ ARGS }}
-    python scripts/prepare_cache.py
-    python scripts/build_all.py {{ ARGS }}
