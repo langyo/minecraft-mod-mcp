@@ -64,6 +64,10 @@ public class McpMessageHandler {
         if (method.equals("debug_fields")) return handleDebugFields();
         if (method.equals("get_screen_buttons")) return handleGetScreenButtons();
         if (method.equals("click_button_id")) return handleClickButtonId(params);
+        if (method.equals("paste_text")) return handlePasteText(params);
+        if (method.equals("set_view_angle")) return handleSetViewAngle(params);
+        if (method.equals("look_delta")) return handleLookDelta(params);
+        if (method.equals("right_click")) return handleRightClick();
         if (method.equals("ping")) return "pong";
         return "unknown: " + method;
     }
@@ -178,6 +182,39 @@ public class McpMessageHandler {
             return ReflectionHelper.clickButtonById(ReflectionHelper.getMinecraftInstance(), id);
         }
         return "no input handler";
+    }
+
+    protected Object handlePasteText(java.util.Map<String, String> p) {
+        String text = p.get("text");
+        if (text == null) return "missing text";
+        if (minecraftInput != null) {
+            minecraftInput.pasteText(text);
+            if ("true".equals(p.get("press_enter"))) {
+                minecraftInput.pressKey("Enter", 0f);
+            }
+        }
+        return text;
+    }
+
+    protected Object handleSetViewAngle(java.util.Map<String, String> p) {
+        float yaw = 0f, pitch = 0f;
+        try { yaw = Float.parseFloat(p.get("yaw")); } catch (Exception ignored) {}
+        try { pitch = Float.parseFloat(p.get("pitch")); } catch (Exception ignored) {}
+        if (minecraftInput != null) minecraftInput.setViewAngle(yaw, pitch);
+        return "yaw=" + yaw + ",pitch=" + pitch;
+    }
+
+    protected Object handleLookDelta(java.util.Map<String, String> p) {
+        float deltaYaw = 0f, deltaPitch = 0f;
+        try { deltaYaw = Float.parseFloat(p.get("delta_yaw")); } catch (Exception ignored) {}
+        try { deltaPitch = Float.parseFloat(p.get("delta_pitch")); } catch (Exception ignored) {}
+        if (minecraftInput != null) minecraftInput.lookDelta(deltaYaw, deltaPitch);
+        return "deltaYaw=" + deltaYaw + ",deltaPitch=" + deltaPitch;
+    }
+
+    protected Object handleRightClick() {
+        if (minecraftInput != null) minecraftInput.rightClick();
+        return "right_clicked";
     }
 
     private static McpWebSocketClient castClient(Object wsClient) {

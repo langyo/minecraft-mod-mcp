@@ -1243,4 +1243,180 @@ public final class ReflectionHelper {
         sb.append("]}");
         return sb.toString();
     }
+
+    public static String pasteText(Object mc, String text) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen != null) {
+                try {
+                    Object clipboardManager = getClipboardManager(mc);
+                    if (clipboardManager != null) {
+                        for (Method m : getAllMethods(clipboardManager.getClass())) {
+                            if ((m.getName().equals("setClipboard") || m.getName().contains("setClipboard"))
+                                    && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
+                                m.setAccessible(true);
+                                m.invoke(clipboardManager, text);
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+                for (Method m : getAllMethods(screen.getClass())) {
+                    if ((m.equals("paste") || m.getName().contains("paste"))
+                            && m.getParameterCount() == 1 && m.getParameterTypes()[0] == CharSequence.class) {
+                        try {
+                            m.setAccessible(true);
+                            m.invoke(screen, text);
+                            return "{\"pasted\":true,\"method\":\"paste(CharSequence)\"}";
+                        } catch (Exception ignored) {}
+                    }
+                    if ((m.getName().equals("paste") || m.getName().contains("paste"))
+                            && m.getParameterCount() == 0) {
+                        try {
+                            m.setAccessible(true);
+                            m.invoke(screen);
+                            return "{\"pasted\":true,\"method\":\"paste()\"}";
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+            java.awt.datatransfer.Clipboard clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+            clipboard.setContents(new java.awt.datatransfer.StringSelection(text), null);
+            Thread.sleep(50);
+            if (screen != null) {
+                for (Method m : getAllMethods(screen.getClass())) {
+                    if ((m.getName().equals("paste") || m.getName().contains("paste")) && m.getParameterCount() == 0) {
+                        try {
+                            m.setAccessible(true);
+                            m.invoke(screen);
+                            return "{\"pasted\":true,\"method\":\"awt_paste\"}";
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+            hotkey(mc, new String[]{"ctrl", "v"});
+            return "{\"pasted\":true,\"method\":\"hotkey_ctrl_v\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    private static Object getClipboardManager(Object mc) {
+        try { return mc.getClass().getField("clipboardHandler").get(mc); } catch (Exception e1) {}
+        try { return mc.getClass().getMethod("getClipboardHandler").invoke(mc); } catch (Exception e2) {}
+        try { return mc.getClass().getField("clipboardManager").get(mc); } catch (Exception e3) {}
+        for (Field f : getAllFields(mc.getClass())) {
+            String fn = f.getType().getSimpleName();
+            if ((fn.contains("Clipboard") || fn.contains("clipboard")) && !fn.contains("Handler")) {
+                try { f.setAccessible(true); return f.get(mc); } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
+    private static void hotkey(Object mc, String[] keys) {
+        try {
+            long h = getWindowHandle(mc);
+            if (h == 0) return;
+            int[] codes = new int[keys.length];
+            for (int i = 0; i < keys.length; i++) codes[i] = GlfwKeys.keyCode(keys[i]);
+            for (int c : codes) { sendKey(h, c, 1); Thread.sleep(5); }
+            Thread.sleep(80);
+            for (int i = codes.length - 1; i >= 0; i--) sendKey(h, codes[i], 0);
+        } catch (Exception e) { System.err.println("[ReflectionHelper] hotkey: " + e.getMessage()); }
+    }
+
+    public static String setPlayerRotation(Object mc, float yaw, float pitch) {
+        try {
+            Object player = getPlayer(mc);
+            if (player == null) return "{\"error\":\"no player\"}";
+            setRotField(player, "yRot", yaw);
+            setRotField(player, "xRot", pitch);
+            setRotField(player, "yawRot", yaw);
+            setRotField(player, "xRotO", pitch);
+            setRotField(player, "yRotO", yaw);
+            setRotField(player, "oYRot", yaw);
+            setRotField(player, "oXRot", pitch);
+            return "{\"rot_set\":true,\"yaw\":" + yaw + ",\"pitch\":" + pitch + "}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    public static String deltaPlayerRotation(Object mc, float deltaYaw, float deltaPitch) {
+        try {
+            Object player = getPlayer(mc);
+            if (player == null) return "{\"error\":\"no player\"}";
+            float currentYaw = getRotField(player, "yRot");
+            float currentPitch = getRotField(player, "xRot");
+            float newYaw = currentYaw + deltaYaw;
+            float newPitch = Math.max(-90f, Math.min(90f, currentPitch + deltaPitch));
+            setPlayerRotation(mc, newYaw, newPitch);
+            return "{\"rot_delta\":true,\"from\":[" + currentYaw + "," + currentPitch + "],\"to\":[" + newYaw + "," + newPitch + "]}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    private static void setRotField(Object player, String fieldName, float value) throws Exception {
+        for (Field f : getAllFields(player.getClass())) {
+            if (f.getName().equals(fieldName) || f.getName().contains(srgSafe(fieldName))) {
+                if (f.getType() == float.class || f.getType() == double.class) {
+                    f.setAccessible(true);
+                    if (f.getType() == double.class) f.setDouble(player, (double)value);
+                    else f.setFloat(player, value);
+                    return;
+                }
+            }
+        }
+    }
+
+    private static float getRotField(Object player, String fieldName) throws Exception {
+        for (Field f : getAllFields(player.getClass())) {
+            if (f.getName().equals(fieldName) || f.getName().contains(srgSafe(fieldName))) {
+                if (f.getType() == float.class || f.getType() == double.class) {
+                    f.setAccessible(true);
+                    if (f.getType() == double.class) return (float)f.getDouble(player);
+                    return f.getFloat(player);
+                }
+            }
+        }
+        return 0f;
+    }
+
+    private static String srgSafe(String name) {
+        switch (name) {
+            case "yRot": return "146127";
+            case "xRot": return "146118";
+            case "yRotO": return "146128";
+            case "xRotO": return "146119";
+            case "yawRot": return "36076";
+            case "oYRot": return "36080";
+            case "oXRot": return "36081";
+            default: return name;
+        }
+    }
+
+    public static String doRightClick(Object mc) {
+        try {
+            long handle = getWindowHandle(mc);
+            Object mouseHandler = getMouseHandler(mc);
+            if (mouseHandler != null && handle != 0) {
+                Method target = findMouseButtonMethod(mouseHandler.getClass());
+                if (target != null) {
+                    target.setAccessible(true);
+                    target.invoke(mouseHandler, handle, 1, 1, 0);
+                    Thread.sleep(50);
+                    target.invoke(mouseHandler, handle, 1, 0, 0);
+                    return "{\"right_click\":true,\"via\":\"mouseHandler\"}";
+                }
+            }
+            sendMouseButton(handle, 1, 1);
+            Thread.sleep(100);
+            sendMouseButton(handle, 1, 0);
+            return "{\"right_click\":true,\"via\":\"sendMouseButton\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
 }

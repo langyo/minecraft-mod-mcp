@@ -12,8 +12,12 @@ public final class McpProtocol {
         void click(int x, int y, String button);
         void pressKey(String key, float holdSeconds);
         void typeText(String text);
+        void pasteText(String text);
         void scroll(int clicks);
         void hotkey(String[] keys);
+        void setViewAngle(float yaw, float pitch);
+        void lookDelta(float deltaYaw, float deltaPitch);
+        void rightClick();
         byte[] screenshot();
         String executeCommand(String command);
         String getPlayerInfo();

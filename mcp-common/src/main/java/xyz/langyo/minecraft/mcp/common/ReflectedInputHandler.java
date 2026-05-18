@@ -169,6 +169,16 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     }
 
     @Override
+    public void pasteText(String text) {
+        executor.executeOnRenderThread(() -> {
+            try {
+                String result = ReflectionHelper.pasteText(mc(), text);
+                ReflectionHelper.dbg("pasteText: " + result);
+            } catch (Exception e) { System.err.println("[Input] Paste: " + e.getMessage()); }
+        });
+    }
+
+    @Override
     public void scroll(int clicks) {
         executor.executeOnRenderThread(() -> {
             try { ReflectionHelper.sendScroll(getWindowHandle(), clicks * 1.0); }
@@ -188,6 +198,36 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 Thread.sleep(80);
                 for (int i = codes.length - 1; i >= 0; i--) ReflectionHelper.sendKey(h, codes[i], 0);
             } catch (Exception e) { System.err.println("[Input] Hotkey: " + e.getMessage()); }
+        });
+    }
+
+    @Override
+    public void setViewAngle(float yaw, float pitch) {
+        executor.executeOnRenderThread(() -> {
+            try {
+                String result = ReflectionHelper.setPlayerRotation(mc(), yaw, pitch);
+                ReflectionHelper.dbg("setViewAngle: " + result);
+            } catch (Exception e) { System.err.println("[Input] setViewAngle: " + e.getMessage()); }
+        });
+    }
+
+    @Override
+    public void lookDelta(float deltaYaw, float deltaPitch) {
+        executor.executeOnRenderThread(() -> {
+            try {
+                String result = ReflectionHelper.deltaPlayerRotation(mc(), deltaYaw, deltaPitch);
+                ReflectionHelper.dbg("lookDelta: " + result);
+            } catch (Exception e) { System.err.println("[Input] lookDelta: " + e.getMessage()); }
+        });
+    }
+
+    @Override
+    public void rightClick() {
+        executor.executeOnRenderThread(() -> {
+            try {
+                String result = ReflectionHelper.doRightClick(mc());
+                ReflectionHelper.dbg("rightClick: " + result);
+            } catch (Exception e) { System.err.println("[Input] rightClick: " + e.getMessage()); }
         });
     }
 

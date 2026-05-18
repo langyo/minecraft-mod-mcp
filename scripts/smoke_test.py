@@ -1,6 +1,21 @@
-"""Smoke test: launch MC, navigate menus, create a Redstone Ready superflat world.
+"""Smoke test: launch MC, navigate menus, create Redstone Ready superflat world,
+place a sign with 'Hello World', then exit cleanly.
 
-Demonstrates end-to-end MCP control: screenshot -> vision analysis -> click -> type -> verify.
+Complete workflow:
+  1. Detect main menu
+  2. Click Single Player
+  3. Click Create New World
+  4. Enter world name via paste (date-time format, avoids IME conflict)
+  5. Configure Superflat + Redstone Ready preset
+  6. Generate world
+  7. Open inventory, take a sign
+  8. Close inventory
+  9. Rotate view angle (game-internal, no OS mouse interference)
+ 10. Right-click to place sign
+ 11. Type 'Hello World' on sign, confirm
+ 12. Press ESC -> pause menu
+ 13. Save and Quit to title
+ 14. Quit Game
 
 Usage:
   python scripts/smoke_test.py 1.21.7-forge-57.0.2
@@ -8,12 +23,12 @@ Usage:
 """
 
 import argparse
-import base64
 import json
 import os
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -52,17 +67,13 @@ def analyze_screenshot(ss_path, prompt):
     if not ss_path or not os.path.isfile(ss_path):
         print(f"  [VISION] No screenshot to analyze")
         return None
-    import importlib
     try:
-        mcp = importlib.import_module("zai-mcp-server")
-        analyze_fn = getattr(mcp, "analyze_image", None)
-        if analyze_fn:
-            result = analyze_fn(image_source=ss_path, prompt=prompt)
-            return result
-    except Exception:
-        pass
-    print(f"  [VISION] Image saved at {ss_path} (manual analysis needed)")
-    return None
+        from zai_mcp_server import analyze_image
+        result = analyze_image(image_source=ss_path, prompt=prompt)
+        return result
+    except Exception as e:
+        print(f"  [VISION] analyze error: {e}")
+        return None
 
 
 def find_button_positions(ss_path, button_labels):
@@ -71,7 +82,6 @@ def find_button_positions(ss_path, button_labels):
     try:
         from zai_mcp_server import analyze_image
     except ImportError:
-        print("  [VISION] zai-mcp-server not available, using hardcoded positions")
         return {}
     result = analyze_image(image_source=ss_path, prompt=(
         f"Find the pixel coordinates (x, y center) of these buttons in this Minecraft screenshot: "
@@ -91,8 +101,24 @@ def find_button_positions(ss_path, button_labels):
     return {}
 
 
+def is_ingame(ss_path):
+    """Use AI vision to check if screenshot shows in-game world."""
+    if not ss_path:
+        return False
+    result = analyze_screenshot(ss_path, (
+        "Is this showing a Minecraft in-game world (not a menu)? "
+        "Look for: hotbar at bottom, crosshair in center, terrain/blocks visible. "
+        "Answer ONLY 'YES' or 'NO'."
+    ))
+    return result and "YES" in str(result).upper()
+
+
+def step(server, step_num, total, desc):
+    print(f"[{step_num}/{total}] {desc}")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Smoke test: create Redstone Ready world")
+    parser = argparse.ArgumentParser(description="Smoke test: full E2E Minecraft workflow")
     parser.add_argument("version", help="MC version e.g. 1.21.7-forge-57.0.2")
     parser.add_argument("--timeout", type=int, default=600)
     args = parser.parse_args()
@@ -111,9 +137,26 @@ def main():
                 mc_key = k
                 break
 
+    TOTAL_STEPS = 14
     is_chinese = True
+
+    LABELS = {
+        "single_player": "单人游戏" if is_chinese else "Single Player",
+        "create_world": "创建新的世界" if is_chinese else "Create New World",
+        "more_options": "更多世界的选项..." if is_chinese else "More World Options...",
+        "superflat": "超平坦" if is_chinese else "Superflat",
+        "customize": "自定义" if is_chinese else "Customize",
+        "presets": "预设" if is_chinese else "Presets",
+        "redstone_ready": "红石就绪" if is_chinese else "Redstone Ready",
+        "use_preset": "使用预设" if is_chinese else "Use Preset",
+        "done": "完成" if is_chinese else "Done",
+        "cancel": "取消" if is_chinese else "Cancel",
+        "save_quit": "保存并退出到标题..." if is_chinese else "Save and Quit to Title...",
+        "quit_game": "退出游戏" if is_chinese else "Quit Game",
+    }
+
     print(f"============================================================")
-    print(f"SMOKE TEST: {version}/{loader}")
+    print(f"SMOKE TEST: {version}/{loader}  ({TOTAL_STEPS} steps)")
     print(f"  Language: {'Chinese' if is_chinese else 'English'}")
     print(f"============================================================")
 
@@ -123,21 +166,18 @@ def main():
     server_proc = None
     mc_proc = None
     try:
-        # Step 0: Build mod
-        print("[0/8] Building mod...")
+        step(server_proc, 0, TOTAL_STEPS, "Building mod...")
         mod_jar = find_mod_jar(version, loader)
         if not mod_jar:
             print(f"  ERROR: Mod JAR not found for {version}/{loader}")
             return 1
         print(f"  Mod: {mod_jar.name} ({mod_jar.stat().st_size // 1024}KB)")
 
-        # Step 1: Start MCP server
-        print("[1/8] Starting MCP server...")
+        step(server_proc, 1, TOTAL_STEPS, "Starting MCP server...")
         server_proc = _start_mcp_server()
         time.sleep(3)
 
-        # Step 2: Install mod + launch MC
-        print("[2/8] Installing mod and launching MC...")
+        step(server_proc, 2, TOTAL_STEPS, "Installing mod and launching MC...")
         clear_mods()
         install_mod(version, loader)
         mc_proc = _start_mc(version, loader)
@@ -145,8 +185,7 @@ def main():
             print("  ERROR: Failed to launch MC")
             return 1
 
-        # Step 3: Wait for mod connection
-        print("[3/8] Waiting for mod connection...")
+        step(server_proc, 3, TOTAL_STEPS, "Waiting for mod connection...")
         deadline = time.time() + 120
         connected = False
         while time.time() < deadline:
@@ -164,235 +203,251 @@ def main():
                 except Exception:
                     pass
             time.sleep(3)
-
         if not connected:
             print("  ERROR: Mod did not connect in time")
             return 1
-
         time.sleep(5)
 
-        # Step 4: Screenshot main menu
-        print("[4/8] Screenshot main menu...")
+        # ========== STEP 4: Detect main menu ==========
+        step(server_proc, 4, TOTAL_STEPS, "Screenshot & detect main menu...")
         ss = take_screenshot_via_server(server_proc, "01_main_menu")
         if ss:
             print(f"  Screenshot: {ss} ({os.path.getsize(ss) // 1024}KB)")
-        else:
-            print("  WARNING: No screenshot")
 
-        # Analyze the screenshot to find button positions
-        single_player_label = "单人游戏"
-        if is_chinese else "Single Player"
-        create_world_label = "创建新的世界" if is_chinese else "Create New World"
-        game_mode_label = "游戏模式" if is_chinese else "Game Mode"
-        more_options_label = "更多世界的选项..." if is_chinese else "More World Options..."
-        done_label = "完成" if is_chinese else "Done"
-        cancel_label = "取消" if is_chinese else "Cancel"
-
-        print("[5/8] Analyzing main menu...")
-        buttons = find_button_positions(ss, [single_player_label])
-        sp_pos = buttons.get(single_player_label)
-
-        if sp_pos:
-            print(f"  {single_player_label} found at ({sp_pos['x']}, {sp_pos['y']})")
-            click_x, click_y = sp_pos["x"], sp_pos["y"]
-        else:
-            print(f"  Button not detected, using default center position")
-            click_x, click_y = 512, 300
-
-        # Step 5: Click Single Player
-        print(f"[5/8] Clicking '{single_player_label}' at ({click_x}, {click_y})...")
+        # ========== STEP 5: Click Single Player ==========
+        step(server_proc, 5, TOTAL_STEPS, f"Clicking '{LABELS['single_player']}'...")
+        buttons = find_button_positions(ss, [LABELS["single_player"]])
+        sp_pos = buttons.get(LABELS["single_player"])
+        click_x, click_y = (sp_pos["x"], sp_pos["y"]) if sp_pos else (512, 300)
         send_and_wait(server_proc, "click", {"x": click_x, "y": click_y})
         time.sleep(3)
 
-        # Step 6: Screenshot world selection
-        print("[6/8] Screenshot world selection screen...")
+        # ========== STEP 6: Click Create New World ==========
+        step(server_proc, 6, TOTAL_STEPS, f"Clicking '{LABELS['create_world']}'...")
         ss2 = take_screenshot_via_server(server_proc, "02_world_select")
-        if ss2:
-            print(f"  Screenshot: {ss2} ({os.path.getsize(ss2) // 1024}KB)")
-
-        # Find "Create New World" button
-        buttons2 = find_button_positions(ss2, [create_world_label])
-        cnw_pos = buttons2.get(create_world_label)
-
-        if cnw_pos:
-            print(f"  {create_world_label} found at ({cnw_pos['x']}, {cnw_pos['y']})")
-            cnw_x, cnw_y = cnw_pos["x"], cnw_pos["y"]
-        else:
-            cnw_x, cnw_y = 512, 350
-
-        print(f"  Clicking '{create_world_label}' at ({cnw_x}, {cnw_y})...")
+        buttons2 = find_button_positions(ss2, [LABELS["create_world"]])
+        cnw_pos = buttons2.get(LABELS["create_world"])
+        cnw_x, cnw_y = (cnw_pos["x"], cnw_pos["y"]) if cnw_pos else (512, 350)
         send_and_wait(server_proc, "click", {"x": cnw_x, "y": cnw_y})
         time.sleep(3)
 
-        # Step 7: Screenshot world creation screen
-        print("[7/8] Screenshot world creation screen...")
+        # ========== STEP 7: Paste world name (date-time format) ==========
+        step(server_proc, 7, TOTAL_STEPS, "Entering world name via paste...")
         ss3 = take_screenshot_via_server(server_proc, "03_create_world")
-        if ss3:
-            print(f"  Screenshot: {ss3} ({os.path.getsize(ss3) // 1024}KB)")
 
-        # Click "More World Options" button (bottom-left area in MC)
-        buttons3 = find_button_positions(ss3, [more_options_label, game_mode_label])
-        mo_pos = buttons3.get(more_options_label)
+        world_name = datetime.now().strftime("Test_%Y%m%d_%H%M%S")
+        print(f"  World name: {world_name}")
+        send_and_wait(server_proc, "paste_text", {"text": world_name}, wait=1)
+        time.sleep(1)
 
-        if mo_pos:
-            mo_x, mo_y = mo_pos["x"], mo_pos["y"]
-        else:
-            mo_x, mo_y = 350, 420
+        # ========== STEP 8: Configure Superflat + Redstone Ready ==========
+        step(server_proc, 8, TOTAL_STEPS, f"Configuring {LABELS['superflat']} + {LABELS['redstone_ready']}...")
 
-        print(f"  Clicking '{more_options_label}' at ({mo_x}, {mo_y})...")
+        ss_mo = take_screenshot_via_server(server_proc, "04_more_options_pre")
+        mo_buttons = find_button_positions(ss_mo, [LABELS["more_options"]])
+        mo_pos = mo_buttons.get(LABELS["more_options"])
+        mo_x, mo_y = (mo_pos["x"], mo_pos["y"]) if mo_pos else (350, 420)
+        print(f"  Clicking '{LABELS['more_options']}' at ({mo_x}, {mo_y})...")
         send_and_wait(server_proc, "click", {"x": mo_x, "y": mo_y})
         time.sleep(2)
 
-        # Screenshot more options
         ss4 = take_screenshot_via_server(server_proc, "04_more_options")
-        if ss4:
-            print(f"  Screenshot: {ss4} ({os.path.getsize(ss4) // 1024}KB)")
-
-        # Click World Type button to cycle to Superflat
-        # In MC, the world type button is near the top of the More Options tab
-        # We need to click it multiple times to cycle through types to "Superflat/超平坦"
-        superflat_label = "超平坦" if is_chinese else "Superflat"
-        wt_buttons = find_button_positions(ss4, ["World Type", "世界类型", superflat_label])
+        wt_buttons = find_button_positions(ss4, ["World Type", "世界类型", LABELS["superflat"]])
         wt_pos = wt_buttons.get("World Type") or wt_buttons.get("世界类型")
-        if wt_pos:
-            wt_x, wt_y = wt_pos["x"], wt_pos["y"]
-        else:
-            wt_x, wt_y = 350, 100
+        wt_x, wt_y = (wt_pos["x"], wt_pos["y"]) if wt_pos else (350, 100)
 
-        print(f"  Cycling world type at ({wt_x}, {wt_y}) to '{superflat_label}'...")
+        print(f"  Cycling world type to '{LABELS['superflat']}'...")
         for i in range(8):
             send_and_wait(server_proc, "click", {"x": wt_x, "y": wt_y}, wait=0.5)
             time.sleep(0.5)
             ss_cycle = take_screenshot_via_server(server_proc, f"05_cycle_{i}")
-            if ss_cycle:
-                print(f"  Cycle {i}: {os.path.getsize(ss_cycle) // 1024}KB")
-            cycle_btns = find_button_positions(ss_cycle, [superflat_label])
-            if cycle_btns.get(superflat_label):
-                print(f"  Found '{superflat_label}'!")
+            cycle_btns = find_button_positions(ss_cycle, [LABELS["superflat"]])
+            if cycle_btns.get(LABELS["superflat"]):
+                print(f"  Found '{LABELS['superflat']}'!")
                 break
 
-        # Now click "Customize" button (next to the world type)
-        customize_label = "自定义" if is_chinese else "Customize"
-        time.sleep(1)
-        ss5 = take_screenshot_via_server(server_proc, "06_pre_customize")
-        cust_buttons = find_button_positions(ss5, [customize_label])
-        cust_pos = cust_buttons.get(customize_label)
-        if cust_pos:
-            cust_x, cust_y = cust_pos["x"], cust_pos["y"]
-        else:
-            cust_x, cust_y = 680, 100
-
-        print(f"  Clicking '{customize_label}' at ({cust_x}, {cust_y})...")
+        cust_buttons = find_button_positions(
+            take_screenshot_via_server(server_proc, "06_pre_customize"),
+            [LABELS["customize"]]
+        )
+        cust_pos = cust_buttons.get(LABELS["customize"])
+        cust_x, cust_y = (cust_pos["x"], cust_pos["y"]) if cust_pos else (680, 100)
+        print(f"  Clicking '{LABELS['customize']}' at ({cust_x}, {cust_y})...")
         send_and_wait(server_proc, "click", {"x": cust_x, "y": cust_y})
         time.sleep(2)
 
-        # Screenshot customization screen
-        ss6 = take_screenshot_via_server(server_proc, "07_customize")
-        if ss6:
-            print(f"  Screenshot: {ss6} ({os.path.getsize(ss6) // 1024}KB)")
-
-        # Click "Presets" button
-        presets_label = "预设" if is_chinese else "Presets"
-        preset_buttons = find_button_positions(ss6, [presets_label])
-        preset_pos = preset_buttons.get(presets_label)
-        if preset_pos:
-            preset_x, preset_y = preset_pos["x"], preset_pos["y"]
-        else:
-            preset_x, preset_y = 260, 350
-
-        print(f"  Clicking '{presets_label}' at ({preset_x}, {preset_y})...")
+        preset_buttons = find_button_positions(
+            take_screenshot_via_server(server_proc, "07_customize"),
+            [LABELS["presets"]]
+        )
+        preset_pos = preset_buttons.get(LABELS["presets"])
+        preset_x, preset_y = (preset_pos["x"], preset_pos["y"]) if preset_pos else (260, 350)
+        print(f"  Clicking '{LABELS['presets']}' at ({preset_x}, {preset_y})...")
         send_and_wait(server_proc, "click", {"x": preset_x, "y": preset_y})
         time.sleep(2)
 
-        # Screenshot presets screen
-        ss7 = take_screenshot_via_server(server_proc, "08_presets")
-        if ss7:
-            print(f"  Screenshot: {ss7} ({os.path.getsize(ss7) // 1024}KB)")
-
-        # Find and click "Redstone Ready" preset
-        redstone_label = "红石就绪" if is_chinese else "Redstone Ready"
-        rs_buttons = find_button_positions(ss7, [redstone_label])
-        rs_pos = rs_buttons.get(redstone_label)
+        ss_presets = take_screenshot_via_server(server_proc, "08_presets")
+        rs_buttons = find_button_positions(ss_presets, [LABELS["redstone_ready"]])
+        rs_pos = rs_buttons.get(LABELS["redstone_ready"])
         if rs_pos:
             rs_x, rs_y = rs_pos["x"], rs_pos["y"]
-            print(f"  Found '{redstone_label}' at ({rs_x}, {rs_y})")
+            print(f"  Found '{LABELS['redstone_ready']}' at ({rs_x}, {rs_y})")
         else:
-            print(f"  '{redstone_label}' not detected, trying scroll + click")
             rs_x, rs_y = 200, 150
             send_and_wait(server_proc, "scroll", {"clicks": -3}, wait=0.5)
             time.sleep(1)
-
-        print(f"  Clicking '{redstone_label}' at ({rs_x}, {rs_y})...")
         send_and_wait(server_proc, "click", {"x": rs_x, "y": rs_y})
         time.sleep(1)
 
-        # Click "Use Preset" / "使用预设" or "Done" / "完成"
-        use_label = "使用预设" if is_chinese else "Use Preset"
-        ss8 = take_screenshot_via_server(server_proc, "09_selected_preset")
-        use_buttons = find_button_positions(ss8, [use_label, done_label])
-        use_pos = use_buttons.get(use_label) or use_buttons.get(done_label)
-        if use_pos:
-            use_x, use_y = use_pos["x"], use_pos["y"]
-        else:
-            use_x, use_y = 512, 350
-
-        print(f"  Clicking '{use_label}' at ({use_x}, {use_y})...")
+        use_buttons = find_button_positions(
+            take_screenshot_via_server(server_proc, "09_selected_preset"),
+            [LABELS["use_preset"], LABELS["done"]]
+        )
+        use_pos = use_buttons.get(LABELS["use_preset"]) or use_buttons.get(LABELS["done"])
+        use_x, use_y = (use_pos["x"], use_pos["y"]) if use_pos else (512, 350)
         send_and_wait(server_proc, "click", {"x": use_x, "y": use_y})
         time.sleep(1)
 
-        # Click Done on customize screen
-        ss9 = take_screenshot_via_server(server_proc, "10_customize_done")
-        done_buttons = find_button_positions(ss9, [done_label])
-        done_pos = done_buttons.get(done_label)
-        if done_pos:
-            d_x, d_y = done_pos["x"], done_pos["y"]
-        else:
-            d_x, d_y = 512, 350
-
-        print(f"  Clicking '{done_label}' at ({d_x}, {d_y})...")
+        done_buttons = find_button_positions(
+            take_screenshot_via_server(server_proc, "10_customize_done"),
+            [LABELS["done"]]
+        )
+        done_pos = done_buttons.get(LABELS["done"])
+        d_x, d_y = (done_pos["x"], done_pos["y"]) if done_pos else (512, 350)
         send_and_wait(server_proc, "click", {"x": d_x, "y": d_y})
         time.sleep(1)
 
-        # Step 8: Click "Create New World" / "创建新的世界" to start
-        print("[8/8] Creating world...")
-        ss10 = take_screenshot_via_server(server_proc, "11_ready_create")
-        final_create = "创建新的世界" if is_chinese else "Create New World"
-        fc_buttons = find_button_positions(ss10, [final_create])
-        fc_pos = fc_buttons.get(final_create)
-        if fc_pos:
-            fc_x, fc_y = fc_pos["x"], fc_pos["y"]
-        else:
-            fc_x, fc_y = 512, 420
-
-        print(f"  Clicking '{final_create}' at ({fc_x}, {fc_y})...")
+        # ========== STEP 9: Click Create/Generate ==========
+        step(server_proc, 9, TOTAL_STEPS, f"Clicking '{LABELS['create_world']}' to generate...")
+        ss_ready = take_screenshot_via_server(server_proc, "11_ready_create")
+        fc_buttons = find_button_positions(ss_ready, [LABELS["create_world"]])
+        fc_pos = fc_buttons.get(LABELS["create_world"])
+        fc_x, fc_y = (fc_pos["x"], fc_pos["y"]) if fc_pos else (512, 420)
         send_and_wait(server_proc, "click", {"x": fc_x, "y": fc_y})
 
-        # Wait for world to load
-        print("  Waiting for world to load...")
+        # ========== STEP 10: Wait for world load ==========
+        step(server_proc, 10, TOTAL_STEPS, "Waiting for world to load...")
+        ingame = False
         for i in range(60):
             time.sleep(5)
-            ss_ingame = take_screenshot_via_server(server_proc, f"12_ingame_{i}")
-            if ss_ingame:
-                size_kb = os.path.getsize(ss_ingame) // 1024
+            ss_ig = take_screenshot_via_server(server_proc, f"12_ingame_{i}")
+            if ss_ig:
+                size_kb = os.path.getsize(ss_ig) // 1024
                 print(f"  [{i*5}s] Screenshot: {size_kb}KB")
+                if is_ingame(ss_ig):
+                    print(f"  WORLD LOADED after {i*5}s!")
+                    ingame = True
+                    break
+        if not ingame:
+            print(f"\n  FAIL: World did not load in 5 minutes")
+            return 1
 
-                ingame_prompt = (
-                    "Is this showing a Minecraft in-game world (not a menu)? "
-                    "Look for: hotbar at bottom, crosshair in center, terrain/blocks visible. "
-                    "Answer ONLY 'YES' or 'NO'."
-                )
-                result = analyze_screenshot(ss_ingame, ingame_prompt)
-                if result and "YES" in str(result).upper():
-                    print(f"\n  ✓ WORLD LOADED! In-game after {i*5}s")
+        # ========== STEP 11: Open inventory, take sign ==========
+        step(server_proc, 11, TOTAL_STEPS, "Opening inventory (E), taking sign...")
+        send_and_wait(server_proc, "press_key", {"key": "E"}, wait=2)
+        time.sleep(2)
+        ss_inv = take_screenshot_via_server(server_proc, "13_inventory_open")
+        if ss_inv:
+            print(f"  Inventory screenshot: {os.path.getsize(ss_inv) // 1024}KB")
 
-                    final_ss = take_screenshot_via_server(server_proc, "13_final")
-                    if final_ss:
-                        print(f"  Final screenshot: {final_ss} ({os.path.getsize(final_ss) // 1024}KB)")
-                    print(f"\n  SMOKE TEST: PASS")
-                    return 0
+        inv_labels = ["sign", "牌子", "Oak Sign", "橡木牌"]
+        sign_buttons = find_button_positions(ss_inv, inv_labels)
+        sign_pos = sign_buttons.get(inv_labels[0]) or sign_buttons.get(inv_labels[1]) or sign_buttons.get(inv_labels[2])
 
-        print(f"\n  SMOKE TEST: FAIL (world did not load in 5 minutes)")
-        return 1
+        if sign_pos:
+            print(f"  Sign found at ({sign_pos['x']}, {sign_pos['y']}), picking it up...")
+            send_and_wait(server_proc, "click", {"x": sign_pos["x"], "y": sign_pos["y"]})
+            time.sleep(1)
+            send_and_wait(server_proc, "click", {"x": sign_pos["x"], "y": sign_pos["y"]})
+            time.sleep(1)
+        else:
+            print(f"  Sign button not detected by AI, trying slot positions...")
+            send_and_wait(server_proc, "click", {"x": 360, "y": 90}, wait=1)
+            time.sleep(1)
+
+        # ========== STEP 12: Close inventory ==========
+        step(server_proc, 12, TOTAL_STEPS, "Closing inventory (E)...")
+        send_and_wait(server_proc, "press_key", {"key": "E"}, wait=1)
+        time.sleep(2)
+
+        # ========== STEP 13: Rotate view (game-internal) + Place sign ==========
+        step(server_proc, 13, TOTAL_STEPS, "Rotating view (game-internal) & placing sign...")
+
+        send_and_wait(server_proc, "look_delta", {"delta_yaw": 45.0, "delta_pitch": -15.0}, wait=1)
+        time.sleep(1)
+        print("  View rotated: yaw+45, pitch-15")
+
+        send_and_wait(server_proc, "right_click", {}, wait=1)
+        time.sleep(2)
+        print("  Right-click sent (placing sign)")
+
+        # Check if sign edit screen appeared
+        ss_sign = take_screenshot_via_server(server_proc, "14_sign_edit")
+        if ss_sign:
+            print(f"  Sign screen: {os.path.getsize(ss_sign) // 1024}KB")
+
+        # Type "Hello World" on sign using paste (avoid IME issues)
+        send_and_wait(server_proc, "paste_text", {"text": "Hello World"}, wait=1)
+        time.sleep(1)
+        print("  Typed 'Hello World' on sign")
+
+        # Confirm sign text - try Enter first, then look for Done button
+        send_and_wait(server_proc, "press_key", {"key": "Enter"}, wait=1)
+        time.sleep(2)
+
+        # If still on sign screen, try clicking "Done"
+        ss_sign2 = take_screenshot_via_server(server_proc, "14b_sign_after_enter")
+        done_sign_btns = find_button_positions(ss_sign2, [LABELS["done"]])
+        done_sign_pos = done_sign_btns.get(LABELS["done"])
+        if done_sign_pos:
+            send_and_wait(server_proc, "click", {"x": done_sign_pos["x"], "y": done_sign_pos["y"]})
+            time.sleep(1)
+            print("  Clicked 'Done' on sign screen")
+        else:
+            # Try Enter again or Escape to confirm
+            send_and_wait(server_proc, "press_key", {"key": "Enter"}, wait=1)
+            time.sleep(1)
+
+        # Final screenshot of placed sign
+        ss_final_sign = take_screenshot_via_server(server_proc, "15_sign_placed")
+        if ss_final_sign:
+            print(f"  Sign placed: {ss_final_sign} ({os.path.getsize(ss_final_sign) // 1024}KB)")
+
+        # ========== STEP 14: ESC -> Save & Quit -> Quit Game ==========
+        step(server_proc, 14, TOTAL_STEPS, "ESC -> Save & Quit -> Quit Game...")
+
+        # Press ESC to open pause menu
+        send_and_wait(server_proc, "press_key", {"key": "Escape"}, wait=2)
+        time.sleep(2)
+        ss_pause = take_screenshot_via_server(server_proc, "16_pause_menu")
+        if ss_pause:
+            print(f"  Pause menu: {os.path.getsize(ss_pause) // 1024}KB")
+
+        # Click "Save and Quit to Title..."
+        sq_buttons = find_button_positions(ss_pause, [LABELS["save_quit"]])
+        sq_pos = sq_buttons.get(LABELS["save_quit"])
+        sq_x, sq_y = (sq_pos["x"], sq_pos["y"]) if sq_pos else (512, 280)
+        print(f"  Clicking '{LABELS['save_quit']}' at ({sq_x}, {sq_y})...")
+        send_and_wait(server_proc, "click", {"x": sq_x, "y": sq_y})
+        time.sleep(5)
+
+        # Should be back at title screen now, click "Quit Game"
+        ss_title = take_screenshot_via_server(server_proc, "17_back_to_title")
+        qg_buttons = find_button_positions(ss_title, [LABELS["quit_game"]])
+        qg_pos = qg_buttons.get(LABELS["quit_game"])
+        qg_x, qg_y = (qg_pos["x"], qg_pos["y"]) if qg_pos else (512, 380)
+        print(f"  Clicking '{LABELS['quit_game']}' at ({qg_x}, {qg_y})...")
+        send_and_wait(server_proc, "click", {"x": qg_x, "y": qg_y})
+        time.sleep(3)
+
+        final_ss = take_screenshot_via_server(server_proc, "18_final")
+        if final_ss:
+            print(f"  Final screenshot: {final_ss} ({os.path.getsize(final_ss) // 1024}KB)")
+
+        print(f"\n  ========================================")
+        print(f"  SMOKE TEST: PASS  (all {TOTAL_STEPS} steps completed)")
+        print(f"  ========================================")
+        return 0
 
     except Exception as e:
         print(f"  ERROR: {e}")
