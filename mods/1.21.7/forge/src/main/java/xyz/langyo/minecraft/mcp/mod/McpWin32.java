@@ -223,9 +223,13 @@ public class McpWin32 {
         // Register window class
         WNDCLASSEXW wc = new WNDCLASSEXW();
         wc.style = 0;
-        wndProcRef = (hwnd, msg, wParam, lParam) -> {
-            return U32.DefWindowProcW(hwnd, msg, wParam, lParam);
-        };
+        // Use a named inner class instead of lambda (prevents GC issues)
+        class DefWndProc implements WindowProc {
+            public long callback(long hwnd, int msg, long wParam, long lParam) {
+                return U32.DefWindowProcW(hwnd, msg, wParam, lParam);
+            }
+        }
+        wndProcRef = new DefWndProc();
         wc.lpfnWndProc = wndProcRef;
         wc.hInstance = inst;
         wc.lpszClassName = "McpContainerClass";
