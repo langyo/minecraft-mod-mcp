@@ -209,6 +209,12 @@ fun handleToolCall(params: JsonObject?, ws: McWsServer): JsonObject {
         "launch_game" -> doLaunchGame(args)
         "screenshot" -> { val e = requireWs(ws); if (e != null) e else doScreenshot(args, ws, screenshotStore) }
         "click" -> { val e = requireWs(ws); if (e != null) e else doClick(args, ws) }
+        "click_button_id" -> { val e = requireWs(ws); if (e != null) e else doClickButtonId(args, ws) }
+        "click_button_index" -> { val e = requireWs(ws); if (e != null) e else doClickButtonIndex(args, ws) }
+        "enumerate_widgets" -> { val e = requireWs(ws); if (e != null) e else doEnumerateWidgets(ws) }
+        "call_screen_method" -> { val e = requireWs(ws); if (e != null) e else doCallScreenMethod(args, ws) }
+        "enter_control_mode" -> { val e = requireWs(ws); if (e != null) e else doControlMode(ws, true) }
+        "exit_control_mode" -> { val e = requireWs(ws); if (e != null) e else doControlMode(ws, false) }
         "press_key" -> { val e = requireWs(ws); if (e != null) e else doPressKey(args, ws) }
         "type_text" -> { val e = requireWs(ws); if (e != null) e else doTypeText(args, ws) }
         "scroll" -> { val e = requireWs(ws); if (e != null) e else doScroll(args, ws) }
@@ -227,6 +233,7 @@ fun handleToolCall(params: JsonObject?, ws: McWsServer): JsonObject {
         "win32_borderless" -> { val e = requireWs(ws); if (e != null) e else doWin32Borderless(ws) }
         "win32_container" -> { val e = requireWs(ws); if (e != null) e else doWin32Container(ws) }
         "win32_status" -> { val e = requireWs(ws); if (e != null) e else doWin32Status(ws) }
+        "get_screen_buttons" -> { val e = requireWs(ws); if (e != null) e else doScreenButtons(ws) }
         else -> txtObj("Error: unknown tool $name")
     }} catch (e: Exception) { txtObj("Error: ${e.message}") }
 }
@@ -613,7 +620,51 @@ fun doClick(a: JsonObject, w: McWsServer): JsonObject {
     val x = a.get("x")?.asInt ?: return txtObj("missing x"); val y = a.get("y")?.asInt ?: return txtObj("missing y")
     var out: JsonObject? = null
     w.send(McCommand("click", hashMapOf("x" to x, "y" to y))) { o ->
-        out = if (o.success) txtObj("clicked ($x,$y)") else txtObj(o.error ?: "fail")
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doClickButtonId(a: JsonObject, w: McWsServer): JsonObject {
+    val bid = a.get("button_id")?.asInt ?: return txtObj("missing button_id")
+    var out: JsonObject? = null
+    w.send(McCommand("click_button_id", hashMapOf("button_id" to bid))) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doClickButtonIndex(a: JsonObject, w: McWsServer): JsonObject {
+    val idx = a.get("index")?.asInt ?: return txtObj("missing index")
+    var out: JsonObject? = null
+    w.send(McCommand("click_button_index", hashMapOf("index" to idx))) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doEnumerateWidgets(w: McWsServer): JsonObject {
+    var out: JsonObject? = null
+    w.send(McCommand("enumerate_widgets", emptyMap())) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doCallScreenMethod(a: JsonObject, w: McWsServer): JsonObject {
+    val method = a.get("method")?.asString ?: return txtObj("missing method")
+    var out: JsonObject? = null
+    w.send(McCommand("call_screen_method", hashMapOf("method" to method))) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doControlMode(w: McWsServer, enter: Boolean): JsonObject {
+    val method = if (enter) "enter_control_mode" else "exit_control_mode"
+    var out: JsonObject? = null
+    w.send(McCommand(method, emptyMap())) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
     }
     return out ?: txtObj("timeout")
 }
@@ -760,6 +811,14 @@ fun doWin32Container(w: McWsServer): JsonObject {
 fun doWin32Status(w: McWsServer): JsonObject {
     var out: JsonObject? = null
     w.send(McCommand("win32_status", emptyMap())) { o ->
+        out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
+    }
+    return out ?: txtObj("timeout")
+}
+
+fun doScreenButtons(w: McWsServer): JsonObject {
+    var out: JsonObject? = null
+    w.send(McCommand("get_screen_buttons", emptyMap())) { o ->
         out = if (o.success && o.data != null) txtObj(o.data.toString()) else txtObj(o.error ?: "fail")
     }
     return out ?: txtObj("timeout")

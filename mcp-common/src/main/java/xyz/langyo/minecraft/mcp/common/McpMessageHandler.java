@@ -3,6 +3,8 @@ package xyz.langyo.minecraft.mcp.common;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class McpMessageHandler {
 
@@ -64,6 +66,10 @@ public class McpMessageHandler {
         if (method.equals("debug_fields")) return handleDebugFields();
         if (method.equals("get_screen_buttons")) return handleGetScreenButtons();
         if (method.equals("click_button_id")) return handleClickButtonId(params);
+        if (method.equals("click_button_index")) return handleClickButtonIndex(params);
+        if (method.equals("enumerate_widgets")) return handleEnumerateWidgets(params);
+        if (method.equals("call_screen_method")) return handleCallScreenMethod(params);
+        if (method.equals("enter_control_mode") || method.equals("exit_control_mode")) return handleControlMode(params, method);
         if (method.equals("paste_text")) return handlePasteText(params);
         if (method.equals("set_view_angle")) return handleSetViewAngle(params);
         if (method.equals("look_delta")) return handleLookDelta(params);
@@ -104,8 +110,11 @@ public class McpMessageHandler {
         int x = Integer.parseInt(xStr);
         int y = Integer.parseInt(yStr);
         String button = p.getOrDefault("button", "left");
-        if (minecraftInput != null) minecraftInput.click(x, y, button);
-        return "clicked(" + x + "," + y + ")";
+        if (minecraftInput != null) {
+            minecraftInput.click(x, y, button);
+            return ReflectedInputHandler.getLastClickResult();
+        }
+        return "{\"error\":\"no handler\"}";
     }
 
     protected Object handlePressKey(java.util.Map<String, String> p) {
@@ -181,10 +190,80 @@ public class McpMessageHandler {
     protected Object handleClickButtonId(java.util.Map<String, String> params) {
         if (minecraftInput != null) {
             int id = 0;
-            try { id = Integer.parseInt(params.get("id")); } catch (Exception ignored) {}
-            return ReflectionHelper.clickButtonById(ReflectionHelper.getMinecraftInstance(), id);
+            try { id = Integer.parseInt(params.getOrDefault("id", params.get("button_id"))); } catch (Exception ignored) {}
+            final int fid = id;
+            final CountDownLatch latch = new CountDownLatch(1);
+            final String[] result = {""};
+            ReflectedInputHandler.executeOnRenderThread(() -> {
+                try { result[0] = ReflectionHelper.clickButtonById(ReflectionHelper.getMinecraftInstance(), fid); }
+                catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+                latch.countDown();
+            });
+            try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+            return result[0];
         }
         return "no input handler";
+    }
+
+    protected Object handleClickButtonIndex(java.util.Map<String, String> params) {
+        if (minecraftInput != null) {
+            int idx = 0;
+            try { idx = Integer.parseInt(params.getOrDefault("index", params.get("button_index"))); } catch (Exception ignored) {}
+            final int fidx = idx;
+            final CountDownLatch latch = new CountDownLatch(1);
+            final String[] result = {""};
+            ReflectedInputHandler.executeOnRenderThread(() -> {
+                try { result[0] = ReflectionHelper.clickButtonByIndex(ReflectionHelper.getMinecraftInstance(), fidx); }
+                catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+                latch.countDown();
+            });
+            try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+            return result[0];
+        }
+        return "no input handler";
+    }
+
+    protected Object handleEnumerateWidgets(java.util.Map<String, String> params) {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {""};
+        ReflectedInputHandler.executeOnRenderThread(() -> {
+            try { result[0] = ReflectionHelper.enumerateWidgets(ReflectionHelper.getMinecraftInstance()); }
+            catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+            latch.countDown();
+        });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
+    }
+
+    protected Object handleCallScreenMethod(java.util.Map<String, String> params) {
+        String methodName = params.get("method");
+        if (methodName == null) return "missing method";
+        final String fm = methodName;
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {""};
+        ReflectedInputHandler.executeOnRenderThread(() -> {
+            try { result[0] = ReflectionHelper.callScreenMethod(ReflectionHelper.getMinecraftInstance(), fm); }
+            catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+            latch.countDown();
+        });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
+    }
+
+    protected Object handleControlMode(java.util.Map<String, String> params, String method) {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {""};
+        ReflectedInputHandler.executeOnRenderThread(() -> {
+            try {
+                if ("enter_control_mode".equals(method))
+                    result[0] = ReflectionHelper.enterMcpControlMode(ReflectionHelper.getMinecraftInstance());
+                else
+                    result[0] = ReflectionHelper.exitMcpControlMode(ReflectionHelper.getMinecraftInstance());
+            } catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+            latch.countDown();
+        });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
     }
 
     protected Object handlePasteText(java.util.Map<String, String> p) {

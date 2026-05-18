@@ -4,6 +4,8 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
 
 public class ReflectedInputHandler extends McpMessageHandler implements McpProtocol.MinecraftInput {
@@ -129,16 +131,23 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         return ReflectionHelper.getLwjgl2DisplaySize(false);
     }
 
+    private static String lastClickResult = "";
+
     @Override
     public void click(int x, int y, String button) {
+        final CountDownLatch latch = new CountDownLatch(1);
         executor.executeOnRenderThread(() -> {
             try {
                 int b = "right".equals(button) ? 1 : "middle".equals(button) ? 2 : 0;
-                String result = ReflectionHelper.guiClick(mc(), x, y, b);
-                ReflectionHelper.dbg("guiClick: " + result);
-            } catch (Exception e) { ReflectionHelper.dbg("click err: " + e.getMessage()); }
+                lastClickResult = ReflectionHelper.guiClick(mc(), x, y, b);
+                ReflectionHelper.dbg("guiClick: " + lastClickResult);
+            } catch (Exception e) { lastClickResult = "{\"error\":\"" + e.getMessage() + "\"}"; }
+            latch.countDown();
         });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
     }
+
+    public static String getLastClickResult() { return lastClickResult; }
 
     @Override
     public void pressKey(String key, float holdSeconds) {

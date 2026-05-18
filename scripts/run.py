@@ -52,6 +52,32 @@ def do(srv, cmd_str, container=None):
         _send_server_cmd(srv, "click", {"x": x, "y": y})
         print(f"  CLICK ({x},{y})"); time.sleep(2); _pump(container)
 
+    elif cmd == "click_btn":
+        bid = int(rest.strip())
+        _send_server_cmd(srv, "click_button_id", {"button_id": bid})
+        print(f"  CLICK_BTN id={bid}"); time.sleep(3); _pump(container)
+
+    elif cmd == "click_btn_idx":
+        idx = int(rest.strip())
+        _send_server_cmd(srv, "click_button_index", {"index": idx})
+        print(f"  CLICK_BTN_IDX idx={idx}"); time.sleep(3); _pump(container)
+
+    elif cmd == "enum":
+        _send_server_cmd(srv, "enumerate_widgets", {})
+        print(f"  ENUMERATE -> mod"); time.sleep(2); _pump(container)
+
+    elif cmd == "call":
+        _send_server_cmd(srv, "call_screen_method", {"method": rest.strip()})
+        print(f"  CALL {rest.strip()} -> mod"); time.sleep(3); _pump(container)
+
+    elif cmd == "ctrl_on":
+        _send_server_cmd(srv, "enter_control_mode", {})
+        print(f"  CTRL_MODE ON"); time.sleep(1); _pump(container)
+
+    elif cmd == "ctrl_off":
+        _send_server_cmd(srv, "exit_control_mode", {})
+        print(f"  CTRL_MODE OFF"); time.sleep(1); _pump(container)
+
     elif cmd == "key":
         _send_server_cmd(srv, "press_key", {"key": rest})
         print(f"  KEY {rest}"); time.sleep(1.5); _pump(container)
@@ -85,9 +111,27 @@ def do(srv, cmd_str, container=None):
         _send_server_cmd(srv, "win32_container", {})
         print(f"  WIN32_CONTAINER -> mod"); time.sleep(3)
 
-    elif cmd == "win32_status":
-        _send_server_cmd(srv, "win32_status", {})
-        print(f"  WIN32_STATUS -> mod"); time.sleep(1)
+    elif cmd == "buttons":
+        _send_server_cmd(srv, "get_screen_buttons", {})
+        print(f"  GET_SCREEN_BUTTONS -> mod"); time.sleep(2)
+
+    elif cmd == "look" or cmd == "look_delta":
+        parts = rest.split()
+        dy = float(parts[0]) if len(parts) > 0 else 90.0
+        dp = float(parts[1]) if len(parts) > 1 else 0.0
+        _send_server_cmd(srv, "look_delta", {"dyaw": dy, "dpitch": dp})
+        print(f"  LOOK_DELTA dy={dy} dp={dp}"); time.sleep(1); _pump(container)
+
+    elif cmd == "set_view" or cmd == "set_view_angle":
+        parts = rest.split()
+        yaw = float(parts[0]) if len(parts) > 0 else 0.0
+        pitch = float(parts[1]) if len(parts) > 1 else 0.0
+        _send_server_cmd(srv, "set_view_angle", {"yaw": yaw, "pitch": pitch})
+        print(f"  SET_VIEW yaw={yaw} pitch={pitch}"); time.sleep(1); _pump(container)
+
+    elif cmd == "right_click":
+        _send_server_cmd(srv, "right_click", {})
+        print(f"  RIGHT_CLICK"); time.sleep(1); _pump(container)
 
     else:
         print(f"  UNKNOWN: {cmd}")
@@ -101,7 +145,7 @@ def _pump(container):
 
 
 def main():
-    ACTIONS = {"ss", "click", "key", "paste", "scroll", "wait", "execute_command", "cmd", "win32_borderless", "win32_container", "win32_status"}
+    ACTIONS = {"ss", "click", "click_btn", "click_btn_idx", "enum", "call", "ctrl_on", "ctrl_off", "key", "paste", "scroll", "wait", "execute_command", "cmd", "win32_borderless", "win32_container", "win32_status", "buttons", "look", "look_delta", "set_view", "set_view_angle", "right_click"}
     args = sys.argv[1:]
 
     use_container = True
@@ -159,9 +203,17 @@ def main():
     time.sleep(5)
     _pump(container)
 
+    # Auto-detect if user wants control mode; don't force it during loading
+    has_ctrl = any(a.strip().startswith("ctrl_on") for a in actions)
+    if not has_ctrl:
+        print("  [TIP: add 'ctrl_on' to actions to enable mouse decoupling]")
+
     for i, act in enumerate(actions):
         print(f"\n[{i+1}/{len(actions)}] {act}")
         do(srv, act, container)
+
+    # Exit MCP control mode if it was entered
+    _send_server_cmd(srv, "exit_control_mode", {})
 
     if container:
         container.destroy()

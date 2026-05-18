@@ -1,0 +1,116 @@
+name: "冒烟测试: 主菜单 → 选世界 → 进入游戏 → 视角旋转"
+description: |
+  验证完整链路:
+  1. 主菜单截图基线
+  2. preview_click 预选坐标 → 截图带红点标注 → 视觉确认
+  3. 点击「单人游戏」→ 进入 SelectWorldScreen
+  4. 选中并进入世界
+  5. 游戏内 lookDelta 视角旋转测试
+  每次点击都走 preview → screenshot → confirm 流程
+
+setup:
+  version: "1.21.7-forge-57.0.2"
+  container: false
+  wait_after_connect: 15
+
+steps:
+  # ── Phase 0: 等待 MC 完全加载 ──────────────────────
+  - action: wait
+    seconds: 15
+    comment: "等待 Mojang 启动画面消失，主菜单出现"
+
+  - action: ctrl_on
+    comment: "进入 MCP 控制模式（鼠标解耦）"
+
+  - action: wait
+    seconds: 2
+
+  # ── Phase 1: 主菜单基线截图 ────────────────────────
+  - action: screenshot
+    name: "01_main_menu"
+    comment: "捕获主菜单作为基线"
+
+  # ── Phase 2: 预选「单人游戏」按钮坐标 ─────────────
+  - action: preview_click
+    x: 426
+    y: 236
+    label: "单人游戏"
+    radius: 10
+    comment: "预选: 在 (426,236) 画红点，等视觉确认"
+
+  - action: screenshot
+    name: "02_preview_singleplayer"
+    comment: "截图带红点标注，AI 检查红点是否在「单人游戏」按钮上"
+
+  # ── Phase 3: 确认后执行点击 ───────────────────────
+  - action: click
+    x: 426
+    y: 236
+    comment: "确认坐标正确，执行点击「单人游戏」"
+
+  - action: wait
+    seconds: 5
+
+  # ── Phase 4: SelectWorldScreen ────────────────────
+  - action: screenshot
+    name: "03_select_world"
+    comment: "应该显示 SelectWorldScreen（世界列表）"
+
+  - action: enumerate_widgets
+    comment: "列出当前界面的所有控件，获取按钮坐标"
+
+  # ── Phase 5: 预选「进入选中的世界」坐标 ───────────
+  # TODO: 根据 enum 输出调整坐标
+  - action: preview_click
+    x: 426
+    y: 200
+    label: "选中世界/进入"
+    radius: 10
+    comment: "预选: 世界列表区域或「进入」按钮"
+
+  - action: screenshot
+    name: "04_preview_enter_world"
+    comment: "截图带红点标注，确认点击位置"
+
+  # ── Phase 6: 执行点击进入世界 ─────────────────────
+  - action: click
+    x: 426
+    y: 200
+    comment: "点击进入选中的世界"
+
+  - action: wait
+    seconds: 10
+
+  # ── Phase 7: 游戏内验证 ──────────────────────────
+  - action: screenshot
+    name: "05_ingame_baseline"
+    comment: "应该显示游戏世界（地形、天空、十字准心）"
+
+  # ── Phase 8: lookDelta 测试 ──────────────────────
+  - action: look_delta
+    dyaw: 90.0
+    dpitch: 0.0
+    comment: "旋转视角: yaw +90°（向右转）"
+
+  - action: wait
+    seconds: 2
+
+  - action: screenshot
+    name: "06_ingame_look90"
+    comment: "视角应该已向右旋转约 90°"
+
+  - action: look_delta
+    dyaw: 45.0
+    dpitch: -30.0
+    comment: "旋转视角: yaw +45° pitch -30°（向右下看）"
+
+  - action: wait
+    seconds: 2
+
+  - action: screenshot
+    name: "07_ingame_look45_30"
+    comment: "视角应该再次变化"
+
+  # ── Phase 9: 清理 ───────────────────────────────
+  - action: ctrl_off
+    comment: "退出控制模式，归还鼠标"
