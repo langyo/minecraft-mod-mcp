@@ -18,3 +18,4 @@ build-error.log
 gradle.properties
 rpc_*
 .cache/
+target/
