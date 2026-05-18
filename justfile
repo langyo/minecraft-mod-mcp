@@ -161,3 +161,23 @@ ws *ARGS:
 # Interactive WS session
 ws-shell:
     python scripts/ws_client.py
+
+# ============================================================
+# Cleanup
+# ============================================================
+
+# Show what would be deleted (dry-run)
+clean-dry:
+    python scripts/clean.py --dry-run
+
+# Clean build caches and temp files (safe, no worlds)
+clean:
+    python scripts/clean.py
+
+# Clean everything including test worlds (with confirmation)
+clean-all:
+    python scripts/clean.py --all
+
+# Clean everything including worlds, no confirmation
+clean-full:
+    python scripts/clean.py --all --force
