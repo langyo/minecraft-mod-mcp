@@ -1424,33 +1424,73 @@ public final class ReflectionHelper {
         }
     }
 
+    private static volatile long mcpOpDeadline = 0;
+    private static Thread mouseReleaseThread = null;
+    private static volatile boolean suppressingGrab = false;
+
     public static void forceReleaseMouse(Object mc) {
         try {
-            Object mouseHandler = getMouseHandler(mc);
-            if (mouseHandler == null) return;
-            for (Field f : getAllFields(mouseHandler.getClass())) {
-                String n = f.getName();
-                if ((f.getType() == boolean.class)
-                        && (n.equals("mouseGrabbed") || n.equals("f_91520_"))) {
-                    try {
-                        f.setAccessible(true);
-                        f.setBoolean(mouseHandler, false);
-                        dbg("forceReleaseMouse: set " + n + " = false");
-                    } catch (Exception ignored) {}
-                    break;
+            mcpOpDeadline = System.currentTimeMillis() + 1500;
+            if (!suppressingGrab && mouseReleaseThread == null) {
+                startMouseSuppress(mc);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private static void startMouseSuppress(Object mc) {
+        suppressingGrab = true;
+        mouseReleaseThread = new Thread(() -> {
+            try {
+                while (System.currentTimeMillis() < mcpOpDeadline) {
+                    scheduleOnRenderThread(mc, () -> {
+                        try {
+                            Object mh = getMouseHandler(mc);
+                            if (mh == null) return;
+                            for (Field f : getAllFields(mh.getClass())) {
+                                String n = f.getName();
+                                if (f.getType() == boolean.class
+                                        && (n.equals("mouseGrabbed") || n.equals("f_91520_"))) {
+                                    try { f.setAccessible(true); f.setBoolean(mh, true); } catch (Exception ignored) {}
+                                    break;
+                                }
+                            }
+                            long handle = getWindowHandle(mc);
+                            if (handle != 0 && LWJGL3) {
+                                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                                glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class)
+                                        .invoke(null, handle, 0x00033001, 0x00034001);
+                            }
+                        } catch (Exception ignored) {}
+                    });
+                    Thread.sleep(100);
                 }
+                suppressingGrab = false;
+                mouseReleaseThread = null;
+            } catch (InterruptedException ignored) {
+                suppressingGrab = false;
+                mouseReleaseThread = null;
             }
-            long handle = getWindowHandle(mc);
-            if (handle != 0 && LWJGL3) {
-                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                int GLFW_CURSOR = 0x00033001;
-                int GLFW_CURSOR_NORMAL = 0x00034001;
-                glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class)
-                        .invoke(null, handle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                dbg("forceReleaseMouse: GLFW_CURSOR_NORMAL set");
+        }, "MCP-MouseSuppress");
+        mouseReleaseThread.setDaemon(true);
+        mouseReleaseThread.start();
+    }
+
+    private static void scheduleOnRenderThread(Object mc, Runnable task) {
+        try {
+            java.lang.reflect.Method m = mc.getClass().getMethod("execute", Runnable.class);
+            m.invoke(mc, task);
+            return;
+        } catch (Exception ignored) {}
+        try {
+            java.lang.reflect.Method m = mc.getClass().getMethod("addScheduledTask", Runnable.class);
+            m.invoke(mc, task);
+            return;
+        } catch (Exception ignored) {}
+        for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
+            if (m.getParameterCount() == 1 && Runnable.class.isAssignableFrom(m.getParameterTypes()[0])
+                    && java.lang.reflect.Modifier.isPublic(m.getModifiers())) {
+                try { m.invoke(mc, task); return; } catch (Exception ignored) {}
             }
-        } catch (Exception e) {
-            dbg("forceReleaseMouse err: " + e.getMessage());
         }
     }
 }
