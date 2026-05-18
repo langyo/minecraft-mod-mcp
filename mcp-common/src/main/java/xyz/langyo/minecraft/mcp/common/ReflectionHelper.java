@@ -194,6 +194,7 @@ public final class ReflectionHelper {
                     if (match) {
                         m.setAccessible(true);
                         Object result = m.invoke(screen, castParam(pt[0], gx), castParam(pt[1], gy), castParam(pt[2], button));
+                        forceReleaseMouse(mc);
                         return "{\"clicked\":true,\"screen\":\"" + screenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"scale\":" + scale + ",\"result\":" + result + "}";
                     }
                 }
@@ -213,6 +214,7 @@ public final class ReflectionHelper {
                             args[i] = defaultParam(paramTypes[i]);
                         }
                         Object result = m.invoke(screen, args);
+                        forceReleaseMouse(mc);
                         return "{\"clicked\":true,\"screen\":\"" + screen.getClass().getSimpleName() + "\",\"method\":\"" + n + "\"}";
                     } catch (Exception ignored) { dbg("guiClick invoke fail " + n + ": " + ignored.getMessage()); }
                 }
@@ -898,6 +900,7 @@ public final class ReflectionHelper {
                     if (target != null) {
                         target.setAccessible(true);
                         target.invoke(mouseHandler, handle, button, action, 0);
+                        forceReleaseMouse(mc);
                         return;
                     }
                 }
@@ -1074,7 +1077,6 @@ public final class ReflectionHelper {
                 if (handle == 0) return null;
                 try {
                     Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                    glfwClass.getMethod("glfwFocusWindow", long.class).invoke(null, handle);
                     Thread.sleep(100);
                     wx = ((Number) glfwClass.getMethod("glfwGetWindowPosX", long.class).invoke(null, handle)).intValue();
                     wy = ((Number) glfwClass.getMethod("glfwGetWindowPosY", long.class).invoke(null, handle)).intValue();
@@ -1408,15 +1410,47 @@ public final class ReflectionHelper {
                     target.invoke(mouseHandler, handle, 1, 1, 0);
                     Thread.sleep(50);
                     target.invoke(mouseHandler, handle, 1, 0, 0);
+                    forceReleaseMouse(mc);
                     return "{\"right_click\":true,\"via\":\"mouseHandler\"}";
                 }
             }
             sendMouseButton(handle, 1, 1);
             Thread.sleep(100);
             sendMouseButton(handle, 1, 0);
+            forceReleaseMouse(mc);
             return "{\"right_click\":true,\"via\":\"sendMouseButton\"}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    public static void forceReleaseMouse(Object mc) {
+        try {
+            Object mouseHandler = getMouseHandler(mc);
+            if (mouseHandler == null) return;
+            for (Field f : getAllFields(mouseHandler.getClass())) {
+                String n = f.getName();
+                if ((f.getType() == boolean.class)
+                        && (n.equals("mouseGrabbed") || n.equals("f_91520_"))) {
+                    try {
+                        f.setAccessible(true);
+                        f.setBoolean(mouseHandler, false);
+                        dbg("forceReleaseMouse: set " + n + " = false");
+                    } catch (Exception ignored) {}
+                    break;
+                }
+            }
+            long handle = getWindowHandle(mc);
+            if (handle != 0 && LWJGL3) {
+                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                int GLFW_CURSOR = 0x00033001;
+                int GLFW_CURSOR_NORMAL = 0x00034001;
+                glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class)
+                        .invoke(null, handle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                dbg("forceReleaseMouse: GLFW_CURSOR_NORMAL set");
+            }
+        } catch (Exception e) {
+            dbg("forceReleaseMouse err: " + e.getMessage());
         }
     }
 }
