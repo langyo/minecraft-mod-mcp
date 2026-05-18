@@ -295,7 +295,6 @@ public final class ReflectionHelper {
                     }
                 }
             }
-            forceReleaseMouse(mc);
             if (results.length() > 0 || !widgetResult.isEmpty())
                 return "{\"clicked\":true,\"screen\":\"" + screenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"scale\":" + scale + ",\"results\":{" + results.toString() + "}" + widgetResult + "}";
             return "{\"error\":\"no click method on " + screen.getClass().getName() + "\"}";
@@ -885,24 +884,37 @@ public final class ReflectionHelper {
     public static byte[] takeScreenshot(Object mc, int width, int height) {
         String failChain = "";
         try {
-            byte[] winResult = takeWindowScreenshot();
-            if (winResult != null) return winResult;
-        } catch (Exception e) {
-            failChain += "window:" + e.getMessage() + " ";
-        }
-        try {
-            byte[] glResult = takeGlScreenshot(mc, width, height);
-            if (glResult != null) return glResult;
-        } catch (Exception e) {
-            Throwable cause = e;
-            while (cause.getCause() != null) cause = cause.getCause();
-            failChain += "gl:" + cause.getClass().getSimpleName() + ": " + cause.getMessage() + " ";
-        }
-        try {
+            dbg("takeScreenshot: trying MC native Screenshot.takeScreenshot()...");
             byte[] nativeResult = takeMcNativeScreenshot(mc);
-            if (nativeResult != null) return nativeResult;
+            if (nativeResult != null) { dbg("takeScreenshot: OK via MC native " + nativeResult.length + " bytes"); return nativeResult; }
         } catch (Exception e) {
             failChain += "native:" + e.getMessage() + " ";
+            dbg("takeScreenshot: MC native FAILED - " + e.getMessage());
+        }
+        try {
+            dbg("takeScreenshot: trying glReadPixels + glFinish...");
+            byte[] glResult = takeGlScreenshot(mc, width, height);
+            if (glResult != null) { dbg("takeScreenshot: OK via glReadPixels " + glResult.length + " bytes"); return glResult; }
+        } catch (Exception e) {
+            Throwable c = e; while (c.getCause() != null) c = c.getCause();
+            failChain += "gl:" + c.getClass().getSimpleName() + ":" + c.getMessage() + " ";
+            dbg("takeScreenshot: glReadPixels FAILED - " + failChain);
+        }
+        try {
+            dbg("takeScreenshot: trying Robot window capture...");
+            byte[] winResult = takeWindowScreenshot();
+            if (winResult != null) { dbg("takeScreenshot: OK via Robot window " + winResult.length + " bytes"); return winResult; }
+        } catch (Exception e) {
+            failChain += "window:" + e.getMessage() + " ";
+            dbg("takeScreenshot: Robot window FAILED - " + e.getMessage());
+        }
+        try {
+            dbg("takeScreenshot: trying Win32 BitBlt...");
+            byte[] bitBltResult = takeWin32BitBltScreenshot();
+            if (bitBltResult != null) { dbg("takeScreenshot: OK via Win32 BitBlt " + bitBltResult.length + " bytes"); return bitBltResult; }
+        } catch (Exception e) {
+            failChain += "bitblt:" + e.getMessage() + " ";
+            dbg("takeScreenshot: Win32 BitBlt FAILED - " + e.getMessage());
         }
         throw new RuntimeException("ALL failed (" + failChain + ") w=" + width + " h=" + height);
     }
@@ -959,12 +971,19 @@ public final class ReflectionHelper {
             takeScreenshot.invoke(null, renderTarget, consumer);
 
             if (errorHolder[0] != null) {
-                System.err.println("[MCP-Native] consumer error: " + errorHolder[0].getMessage());
+                Throwable err = errorHolder[0];
+                System.err.println("[MCP-Native] consumer error: " + err.getMessage());
+                while (err.getCause() != null) { err = err.getCause(); }
+                System.err.println("[MCP-Native] root cause: " + err.getClass().getName() + ": " + err.getMessage());
+                dbg("takeScreenshot: MC native CONSUMER ERROR - " + errorHolder[0].getMessage());
                 return null;
             }
             return (byte[]) imageHolder[0];
         } catch (Exception e) {
-            System.err.println("[MCP-Native] failed: " + e.getMessage());
+            Throwable cause = e;
+            while (cause.getCause() != null) cause = cause.getCause();
+            System.err.println("[MCP-Native] failed: " + e.getMessage() + " root=" + cause.getClass().getName() + ":" + cause.getMessage());
+            dbg("takeScreenshot: MC native EXCEPTION - " + e.getMessage());
             return null;
         }
     }
@@ -1068,6 +1087,25 @@ public final class ReflectionHelper {
         Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
         int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
         int GL_UB = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
+
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glFinish") && m.getParameterCount() == 0) {
+                try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}
+                break;
+            }
+        }
+
+        try {
+            int GL_FRONT = 0x0404;
+            for (Method m : gl11.getMethods()) {
+                if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) {
+                    try { m.setAccessible(true); m.invoke(null, GL_FRONT); dbg("doGlRead: set read buffer to FRONT"); }
+                    catch (Exception ignored) {}
+                    break;
+                }
+            }
+        } catch (Exception ignored) {}
+
         for (Method m : gl11.getMethods()) {
             if (m.getName().equals("glReadPixels") && m.getParameterCount() == 7) {
                 Class<?>[] pts = m.getParameterTypes();
@@ -1181,7 +1219,6 @@ public final class ReflectionHelper {
                     if (target != null) {
                         target.setAccessible(true);
                         target.invoke(mouseHandler, handle, button, action, 0);
-                        forceReleaseMouse(mc);
                         return;
                     }
                 }
@@ -1397,6 +1434,22 @@ public final class ReflectionHelper {
             ImageIO.write(img, "png", baos);
             return baos.toByteArray();
         } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static byte[] takeWin32BitBltScreenshot() {
+        try {
+            Class<?> win32Class = Class.forName("xyz.langyo.minecraft.mcp.mod.McpWin32");
+            java.lang.reflect.Method m = win32Class.getMethod("takeWin32Screenshot");
+            byte[] result = (byte[]) m.invoke(null);
+            if (result != null) dbg("takeWin32BitBltScreenshot: " + result.length + " bytes");
+            return result;
+        } catch (ClassNotFoundException e) {
+            dbg("takeWin32BitBltScreenshot: McpWin32 not available");
+            return null;
+        } catch (Exception e) {
+            dbg("takeWin32BitBltScreenshot error: " + e.getMessage());
             return null;
         }
     }
@@ -1691,198 +1744,102 @@ public final class ReflectionHelper {
                     target.invoke(mouseHandler, handle, 1, 1, 0);
                     Thread.sleep(50);
                     target.invoke(mouseHandler, handle, 1, 0, 0);
-                    forceReleaseMouse(mc);
                     return "{\"right_click\":true,\"via\":\"mouseHandler\"}";
                 }
             }
             sendMouseButton(handle, 1, 1);
             Thread.sleep(100);
             sendMouseButton(handle, 1, 0);
-            forceReleaseMouse(mc);
             return "{\"right_click\":true,\"via\":\"sendMouseButton\"}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
         }
     }
 
-    private static volatile long mcpOpDeadline = 0;
-    private static volatile boolean suppressingGrab = false;
-    private static volatile boolean suppressScheduled = false;
-    private static double savedX = 0, savedY = 0;
-    private static volatile boolean posSaverRunning = false;
     private static volatile boolean mcpControlMode = false;
 
-    // Cached reflective objects (resolved once, reused forever)
-    private static Object cachedMouseHandler = null;
-    private static Field cachedMouseGrabbedField = null;
-    private static Long cachedWindowHandle = null;
-    private static Method glfwSetCursorPosMethod = null;
-    private static Method glfwSetInputModeMethod = null;
-    private static Class<?> glfwClass = null;
-    private static volatile boolean cacheResolved = false;
-
-    /** Resolve all reflective references once. Called on first use. */
-    private static void resolveCache(Object mc) {
-        if (cacheResolved) return;
+    public static String enterMcpControlMode(Object mc) {
         try {
-            // Cache MouseHandler
-            cachedMouseHandler = getMouseHandler(mc);
-            if (cachedMouseHandler != null) {
-                for (Field f : getAllFields(cachedMouseHandler.getClass())) {
-                    if (f.getType() == boolean.class
-                            && (f.getName().equals("mouseGrabbed") || f.getName().equals("f_91520_"))) {
-                        f.setAccessible(true);
-                        cachedMouseGrabbedField = f;
-                        break;
+            mcpControlMode = true;
+            McpPlatformControl ctrl = McpControlFactory.get();
+
+            long nativeHwnd = 0;
+            long glfwHandle = getWindowHandle(mc);
+            if (glfwHandle != 0 && LWJGL3) {
+                try {
+                    Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+                    nativeHwnd = (long) glfw.getMethod("glfwGetWin32Window", long.class).invoke(null, glfwHandle);
+                } catch (Exception e1) {
+                    try {
+                        nativeHwnd = (long) Class.forName("org.lwjgl.glfw.GLFWNativeWin32")
+                                .getMethod("glfwGetWin32Window", long.class).invoke(null, glfwHandle);
+                    } catch (Exception e2) {
+                        dbg("enterMcpControlMode: native hwnd resolution failed (non-Windows?): " + e2.getMessage());
                     }
                 }
             }
-            // Cache window handle
-            long h = getWindowHandle(mc);
-            if (h != 0) cachedWindowHandle = h;
-            // Cache GLFW methods
-            if (LWJGL3) {
-                glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                glfwSetCursorPosMethod = glfwClass.getMethod("glfwSetCursorPos", long.class, double.class, double.class);
-                glfwSetInputModeMethod = glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class);
-            }
-            cacheResolved = true;
-            dbg("resolveCache: ok mh=" + (cachedMouseHandler != null) + " grabField=" + (cachedMouseGrabbedField != null)
-                    + " hwnd=" + cachedWindowHandle + " glfw=" + (glfwClass != null));
-        } catch (Exception e) { dbg("resolveCache err: " + e.getMessage()); }
-    }
+            if (nativeHwnd == 0) nativeHwnd = glfwHandle;
 
-    public static void forceReleaseMouse(Object mc) {
-        try {
-            resolveCache(mc);
-            mcpOpDeadline = System.currentTimeMillis() + 1500;
-            if (!posSaverRunning) { startPosSaver(mc); }
-            if (!suppressingGrab && !suppressScheduled) {
-                suppressingGrab = true;
-                suppressScheduled = true;
-                scheduleSuppressLoop(mc);
-            }
-        } catch (Exception ignored) {}
-    }
-
-    /** Enter MCP control mode: mouse is permanently decoupled from game. */
-    public static String enterMcpControlMode(Object mc) {
-        try {
-            resolveCache(mc);
-            mcpControlMode = true;
-            dbg("enterMcpControlMode: ON");
-            if (!posSaverRunning) { startPosSaver(mc); }
-
-            // Save current cursor position
-            if (cachedWindowHandle != 0L && LWJGL3 && glfwGetCursorPosMethod != null) {
-                double[] px = {0}, py = {0};
-                glfwGetCursorPosMethod.invoke(null, cachedWindowHandle, px, py);
-                savedX = px[0]; savedY = py[0];
-            }
-
-            // One-time GLFW setup
-            applyMouseSuppress();
-
-            if (!suppressingGrab && !suppressScheduled) {
-                suppressingGrab = true;
-                suppressScheduled = true;
-                scheduleSuppressLoop(mc);
-            }
-            return "{\"control_mode\":true}";
+            boolean hookOk = ctrl.installMouseHook(nativeHwnd);
+            dbg("enterMcpControlMode: platform=" + ctrl.getPlatformName() + " hook=" + hookOk + " hwnd=" + Long.toHexString(nativeHwnd));
+            ctrl.setControlMode(true);
+            ctrl.showOverlay("", 9876);
+            return "{\"control_mode\":true,\"platform\":\"" + ctrl.getPlatformName() + "\",\"hook\":" + hookOk + "}";
         } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
     }
 
-    /** Exit MCP control mode: let MC have its mouse back. */
     public static String exitMcpControlMode(Object mc) {
         try {
             mcpControlMode = false;
-            dbg("exitMcpControlMode: OFF");
+            McpPlatformControl ctrl = McpControlFactory.get();
+            ctrl.setControlMode(false);
+            ctrl.hideOverlay();
+            ctrl.uninstallMouseHook();
+            dbg("exitMcpControlMode: OFF platform=" + ctrl.getPlatformName());
             return "{\"control_mode\":false}";
         } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
     }
 
     public static boolean isMcpControlMode() { return mcpControlMode; }
 
-    /** Lightweight: set mouseGrabbed=true and fix cursor mode. No field scanning. */
-    private static void applyMouseSuppress() {
-        try {
-            // Set mouseGrabbed=true to trick MC
-            if (cachedMouseHandler != null && cachedMouseGrabbedField != null) {
-                cachedMouseGrabbedField.setBoolean(cachedMouseHandler, true);
-            }
-            // Fix cursor - only if we have a saved position
-            if (cachedWindowHandle != 0L && LWJGL3 && glfwClass != null) {
-                if (savedX != 0.0 || savedY != 0.0) {
-                    glfwSetCursorPosMethod.invoke(null, cachedWindowHandle, savedX, savedY);
-                }
-                glfwSetInputModeMethod.invoke(null, cachedWindowHandle, 0x00033001, 0x00034001);
-            }
-        } catch (Exception ignored) {}
+    public static String showMcpOverlay(String text, int port) {
+        McpPlatformControl ctrl = McpControlFactory.get();
+        boolean ok = ctrl.showOverlay(text, port);
+        return "{\"overlay_shown\":" + ok + ",\"text\":\"" + text + "\",\"port\":" + port + ",\"platform\":\"" + ctrl.getPlatformName() + "\"}";
     }
 
-    private static Method glfwGetCursorPosMethod;
-
-    private static void startPosSaver(Object mc) {
-        posSaverRunning = true;
-        try {
-            java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
-            exec.invoke(mc, (Runnable) () -> {
-                try {
-                    if (!posSaverRunning) return;
-                    // Only save position when NOT suppressing (user is in control)
-                    if (!suppressingGrab) {
-                        long h = (cachedWindowHandle != null) ? cachedWindowHandle : getWindowHandle(mc);
-                        if (h != 0 && LWJGL3) {
-                            if (glfwGetCursorPosMethod == null && glfwClass != null) {
-                                glfwGetCursorPosMethod = glfwClass.getMethod("glfwGetCursorPos", long.class, double[].class, double[].class);
-                            }
-                            if (glfwGetCursorPosMethod != null) {
-                                double[] px = {0}, py = {0};
-                                glfwGetCursorPosMethod.invoke(null, h, px, py);
-                                savedX = px[0]; savedY = py[0];
-                            }
-                        }
-                    }
-                    java.lang.reflect.Method ex = mc.getClass().getMethod("execute", Runnable.class);
-                    ex.invoke(mc, (Runnable) () -> startPosSaver(mc));
-                } catch (Exception e) { posSaverRunning = false; }
-            });
-        } catch (Exception ignored) { posSaverRunning = false; }
+    public static String hideMcpOverlay() {
+        McpControlFactory.get().hideOverlay();
+        return "{\"overlay_hidden\":true}";
     }
 
-    /** Light tick loop: only runs every N frames via re-scheduling. Uses zero field scanning. */
-    private static int suppressTickCounter = 0;
-    private static final int SUPPRESS_INTERVAL_TICKS = 10;
-
-    private static void scheduleSuppressLoop(Object mc) {
-        try {
-            java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
-            exec.invoke(mc, (Runnable) () -> {
-                try {
-                    if (!mcpControlMode && System.currentTimeMillis() > mcpOpDeadline) {
-                        suppressingGrab = false;
-                        suppressScheduled = false;
-                        suppressTickCounter = 0;
-                        return;
-                    }
-                    suppressTickCounter++;
-                    if (suppressTickCounter >= SUPPRESS_INTERVAL_TICKS) {
-                        suppressTickCounter = 0;
-                        applyMouseSuppress();
-                    }
-                    scheduleSuppressLoop(mc);
-                } catch (Exception e) {
-                    suppressingGrab = false;
-                    suppressScheduled = false;
-                    suppressTickCounter = 0;
-                }
-            });
-        } catch (Exception e) {
-            suppressingGrab = false;
-            suppressScheduled = false;
-        }
+    public static String updateMcpOverlayText(String text) {
+        McpControlFactory.get().updateOverlayText(text);
+        return "{\"overlay_text_updated\":true}";
     }
 
-    public static boolean isSuppressingGrab() { return suppressingGrab; }
+    public static String platformInjectClick(int x, int y) {
+        McpPlatformControl ctrl = McpControlFactory.get();
+        boolean ok = ctrl.injectClick(x, y);
+        return "{\"inject_click\":" + ok + ",\"x\":" + x + ",\"y\":" + y + "}";
+    }
+
+    public static String platformInjectKey(int vk) {
+        McpPlatformControl ctrl = McpControlFactory.get();
+        boolean ok = ctrl.injectKey(vk);
+        return "{\"inject_key\":" + ok + ",\"vk\":" + vk + "}";
+    }
+
+    public static byte[] takePlatformScreenshot() {
+        return McpControlFactory.get().takePlatformScreenshot();
+    }
+
+    public static String getHookStatus() {
+        McpPlatformControl ctrl = McpControlFactory.get();
+        return "{\"platform\":\"" + ctrl.getPlatformName() +
+                "\",\"hook_installed\":" + ctrl.isHookInstalled() +
+                ",\"control_mode\":" + ctrl.isControlMode() + "}";
+    }
+
     public static boolean isLWJGL3() { return LWJGL3; }
 }

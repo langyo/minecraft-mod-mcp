@@ -78,6 +78,13 @@ public class McpMessageHandler {
         if (method.equals("win32_borderless")) return handleWin32Borderless();
         if (method.equals("win32_container")) return handleWin32Container();
         if (method.equals("win32_status")) return handleWin32Status();
+        if (method.equals("overlay_show")) return handleOverlayShow(params);
+        if (method.equals("overlay_hide")) return handleOverlayHide();
+        if (method.equals("overlay_text")) return handleOverlayText(params);
+        if (method.equals("mouse_hook_status")) return handleMouseHookStatus();
+        if (method.equals("inject_click")) return handleInjectClick(params);
+        if (method.equals("inject_key")) return handleInjectKey(params);
+        if (method.equals("platform_status")) return handlePlatformStatus();
         return "unknown: " + method;
     }
 
@@ -300,38 +307,35 @@ public class McpMessageHandler {
     }
 
     protected Object handleWin32Status() {
-        long ch = xyz.langyo.minecraft.mcp.mod.McpWin32.getContainerHwnd();
-        boolean cm = xyz.langyo.minecraft.mcp.mod.McpWin32.isControlMode();
-        return "containerHwnd=" + Long.toHexString(ch) + " controlMode=" + cm;
+        return ReflectionHelper.getHookStatus();
     }
 
     protected Object handleWin32Container() {
         try {
+            Class<?> win32Class = Class.forName("xyz.langyo.minecraft.mcp.mod.McpWin32");
             Object mc = ReflectionHelper.getMinecraftInstance();
             Object window = mc.getClass().getMethod("getWindow").invoke(mc);
             final long glfwWin = (long) window.getClass().getMethod("getWindow").invoke(window);
+            final java.util.concurrent.CountDownLatch hwndLatch = new java.util.concurrent.CountDownLatch(1);
             final Object[] hwndResult = {null};
             java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
-            java.util.concurrent.CountDownLatch hwndLatch = new java.util.concurrent.CountDownLatch(1);
-            // Get HWND on render thread
             exec.invoke(mc, (Runnable) () -> {
-                hwndResult[0] = (Long) xyz.langyo.minecraft.mcp.mod.McpWin32.getMcWindowHandle(glfwWin);
+                try {
+                    hwndResult[0] = win32Class.getMethod("getMcWindowHandle", long.class).invoke(null, glfwWin);
+                } catch (Exception e) { hwndResult[0] = null; }
                 hwndLatch.countDown();
             });
             hwndLatch.await(5, java.util.concurrent.TimeUnit.SECONDS);
             if (hwndResult[0] == null) return "error: HWND not found";
             final long hwnd = (Long) hwndResult[0];
             if (hwnd == 0) return "error: HWND is 0";
-            // Create container on a NEW thread
             new Thread(() -> {
-                try {
-                    xyz.langyo.minecraft.mcp.mod.McpWin32.createContainer(hwnd);
-                } catch (Exception e) {
-                    System.err.println("[McpWin32] Container thread crashed: " + e.getMessage());
-                    e.printStackTrace();
-                }
+                try { win32Class.getMethod("createContainer", long.class).invoke(null, hwnd); }
+                catch (Exception e) { System.err.println("[McpWin32] Container thread crashed: " + e.getMessage()); }
             }, "McpContainerCreator").start();
             return "container: creating on thread, mcHwnd=" + Long.toHexString(hwnd);
+        } catch (ClassNotFoundException e) {
+            return "error: McpWin32 not available on this platform";
         } catch (Exception e) {
             return "error: " + e.getMessage();
         }
@@ -339,6 +343,7 @@ public class McpMessageHandler {
 
     protected Object handleWin32Borderless() {
         try {
+            Class<?> win32Class = Class.forName("xyz.langyo.minecraft.mcp.mod.McpWin32");
             Object mc = ReflectionHelper.getMinecraftInstance();
             Object window = mc.getClass().getMethod("getWindow").invoke(mc);
             final long glfwWin = (long) window.getClass().getMethod("getWindow").invoke(window);
@@ -347,30 +352,60 @@ public class McpMessageHandler {
             java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
             exec.invoke(mc, (Runnable) () -> {
                 try {
-                    long hwnd = 0;
-                    try {
-                        hwnd = (long) Class.forName("org.lwjgl.glfw.GLFWNativeWin32")
-                                .getMethod("glfwGetWin32Window", long.class).invoke(null, glfwWin);
-                    } catch (Exception e1) {
-                        hwnd = (long) Class.forName("org.lwjgl.glfw.GLFW")
-                                .getMethod("glfwGetWin32Window", long.class).invoke(null, glfwWin);
-                    }
+                    long hwnd = (long) win32Class.getMethod("getMcWindowHandle", long.class).invoke(null, glfwWin);
                     if (hwnd == 0) {
                         result[0] = "error: HWND is 0 (glfw=" + glfwWin + ")";
                     } else {
-                        long oldStyle = xyz.langyo.minecraft.mcp.mod.McpWin32.makeBorderless(hwnd);
+                        long oldStyle = (long) win32Class.getMethod("makeBorderless", long.class).invoke(null, hwnd);
                         result[0] = "borderless: hwnd=" + Long.toHexString(hwnd) + " oldStyle=" + Long.toHexString(oldStyle);
                     }
-                } catch (Exception e) {
-                    result[0] = "error: " + e.getMessage();
-                }
+                } catch (Exception e) { result[0] = "error: " + e.getMessage(); }
                 latch.countDown();
             });
             latch.await(8, java.util.concurrent.TimeUnit.SECONDS);
             return result[0] != null ? result[0] : "timeout on render thread";
+        } catch (ClassNotFoundException e) {
+            return "error: McpWin32 not available on this platform";
         } catch (Exception e) {
             return "error: " + e.getMessage();
         }
+    }
+
+    protected Object handleOverlayShow(java.util.Map<String, String> p) {
+        String text = p.getOrDefault("text", "");
+        int port = 9876;
+        try { port = Integer.parseInt(p.getOrDefault("port", "9876")); } catch (Exception ignored) {}
+        return ReflectionHelper.showMcpOverlay(text, port);
+    }
+
+    protected Object handleOverlayHide() {
+        return ReflectionHelper.hideMcpOverlay();
+    }
+
+    protected Object handleOverlayText(java.util.Map<String, String> p) {
+        String text = p.getOrDefault("text", "");
+        return ReflectionHelper.updateMcpOverlayText(text);
+    }
+
+    protected Object handleMouseHookStatus() {
+        return ReflectionHelper.getHookStatus();
+    }
+
+    protected Object handleInjectClick(java.util.Map<String, String> p) {
+        int x = 0, y = 0;
+        try { x = Integer.parseInt(p.getOrDefault("x", "0")); } catch (Exception ignored) {}
+        try { y = Integer.parseInt(p.getOrDefault("y", "0")); } catch (Exception ignored) {}
+        return ReflectionHelper.platformInjectClick(x, y);
+    }
+
+    protected Object handleInjectKey(java.util.Map<String, String> p) {
+        int vk = 0;
+        try { vk = Integer.parseInt(p.getOrDefault("vk", p.getOrDefault("key", "0"))); } catch (Exception ignored) {}
+        return ReflectionHelper.platformInjectKey(vk);
+    }
+
+    protected Object handlePlatformStatus() {
+        return ReflectionHelper.getHookStatus();
     }
 
     private static McpWebSocketClient castClient(Object wsClient) {

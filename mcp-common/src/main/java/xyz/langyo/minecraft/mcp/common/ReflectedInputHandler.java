@@ -160,7 +160,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 Thread.sleep(holdSeconds > 0 ? (long)(holdSeconds * 1000) : 30);
                 result = ReflectionHelper.guiKeyPress(mc(), c, 0, 0, 0);
                 ReflectionHelper.dbg("guiKeyPress release: " + result);
-                ReflectionHelper.forceReleaseMouse(mc());
             } catch (Exception e) { System.err.println("[Input] Key: " + e.getMessage()); }
         });
     }
@@ -174,7 +173,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                     ReflectionHelper.dbg("guiCharType '" + ch + "': " + r);
                     Thread.sleep(30);
                 }
-                ReflectionHelper.forceReleaseMouse(mc());
             } catch (Exception e) { System.err.println("[Input] Type: " + e.getMessage()); }
         });
     }
@@ -185,7 +183,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
             try {
                 String result = ReflectionHelper.pasteText(mc(), text);
                 ReflectionHelper.dbg("pasteText: " + result);
-                ReflectionHelper.forceReleaseMouse(mc());
             } catch (Exception e) { System.err.println("[Input] Paste: " + e.getMessage()); }
         });
     }
@@ -195,7 +192,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         executor.executeOnRenderThread(() -> {
             try { ReflectionHelper.sendScroll(getWindowHandle(), clicks * 1.0); }
             catch (Exception ignored) {}
-            ReflectionHelper.forceReleaseMouse(mc());
         });
     }
 
@@ -210,7 +206,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 for (int c : codes) { ReflectionHelper.sendKey(h, c, 1); Thread.sleep(5); }
                 Thread.sleep(80);
                 for (int i = codes.length - 1; i >= 0; i--) ReflectionHelper.sendKey(h, codes[i], 0);
-                ReflectionHelper.forceReleaseMouse(mc());
             } catch (Exception e) { System.err.println("[Input] Hotkey: " + e.getMessage()); }
         });
     }
@@ -221,7 +216,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
             try {
                 String result = ReflectionHelper.setPlayerRotation(mc(), yaw, pitch);
                 ReflectionHelper.dbg("setViewAngle: " + result);
-                ReflectionHelper.forceReleaseMouse(mc());
             } catch (Exception e) { System.err.println("[Input] setViewAngle: " + e.getMessage()); }
         });
     }
@@ -232,7 +226,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
             try {
                 String result = ReflectionHelper.deltaPlayerRotation(mc(), deltaYaw, deltaPitch);
                 ReflectionHelper.dbg("lookDelta: " + result);
-                ReflectionHelper.forceReleaseMouse(mc());
             } catch (Exception e) { System.err.println("[Input] lookDelta: " + e.getMessage()); }
         });
     }
@@ -309,7 +302,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
             throw new RuntimeException("dims=" + w + "x" + h);
         }
         try {
-            ReflectionHelper.forceReleaseMouse(mc());
             byte[] result = ReflectionHelper.takeScreenshot(mc(), w, h);
             if (result == null) throw new RuntimeException("takeScreenshot null w=" + w + " h=" + h);
             return result;
@@ -340,7 +332,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
 
     @Override
     public String executeCommand(String command) {
-        ReflectionHelper.forceReleaseMouse(mc());
         return ReflectionHelper.sendCommand(mc(), command);
     }
 

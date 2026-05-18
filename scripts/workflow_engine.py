@@ -190,26 +190,33 @@ class WorkflowEngine:
         try:
             img = Image.open(src_path)
             draw = ImageDraw.Draw(img)
+            w, h = img.size
 
             for m in markers:
                 x, y, r = m.x, m.y, m.radius
                 color = m.color
 
                 if m.crosshair:
-                    draw.line([(x - r * 2, y), (x + r * 2, y)], fill=color, width=3)
-                    draw.line([(x, y - r * 2), (x, y + r * 2)], fill=color, width=3)
+                    draw.line([(0, y), (w, y)], fill=color, width=1)
+                    draw.line([(x, 0), (x, h)], fill=color, width=1)
                 draw.ellipse([(x - r, y - r), (x + r, y + r)], outline=color, width=3)
-                draw.ellipse([(x - 2, y - 2), (x + 2, y + 2)], fill=color)
+                draw.ellipse([(x - 3, y - 3), (x + 3, y + 3)], fill=color)
 
                 if m.label:
                     try:
-                        font = ImageFont.truetype("arial.ttf", 18)
+                        font = ImageFont.truetype("arial.ttf", 16)
                     except Exception:
                         font = ImageFont.load_default()
                     text = f"({x},{y}) {m.label}"
-                    bbox = draw.textbbox((x + r + 6, y - 10), text, font=font)
-                    draw.rectangle([bbox[0] - 4, bbox[1] - 2, bbox[2] + 4, bbox[3] + 2], fill="#000000CC")
-                    draw.text((x + r + 6, y - 10), text, fill=color, font=font)
+                    tx = x + r + 8
+                    ty = y - 12
+                    if tx + 200 > w:
+                        tx = x - r - 8 - 200
+                        ty = y + 10
+                    bbox = draw.textbbox((tx, ty), text, font=font)
+                    pad = 4
+                    draw.rectangle([bbox[0] - pad, bbox[1] - pad, bbox[2] + pad, bbox[3] + pad], fill="#000000CC")
+                    draw.text((tx, ty), text, fill=color, font=font)
 
             img.save(out_path)
             return out_path
