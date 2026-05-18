@@ -879,7 +879,7 @@ public final class ReflectionHelper {
         return fallback;
     }
 
-    private static Object getMouseHandler(Object mc) {
+    public static Object getMouseHandler(Object mc) {
         try { return mc.getClass().getField("mouseHandler").get(mc); } catch (Exception e) {}
         try { return mc.getClass().getDeclaredField("mouseHandler").get(mc); } catch (Exception e) {}
         for (Field f : mc.getClass().getDeclaredFields()) {
@@ -1425,72 +1425,95 @@ public final class ReflectionHelper {
     }
 
     private static volatile long mcpOpDeadline = 0;
-    private static Thread mouseReleaseThread = null;
     private static volatile boolean suppressingGrab = false;
+    private static volatile boolean suppressScheduled = false;
+    private static double savedX = 0, savedY = 0;
+    private static volatile boolean posSaverRunning = false;
 
     public static void forceReleaseMouse(Object mc) {
         try {
             mcpOpDeadline = System.currentTimeMillis() + 1500;
-            if (!suppressingGrab && mouseReleaseThread == null) {
-                startMouseSuppress(mc);
+            if (!posSaverRunning) { startPosSaver(mc); }
+            long handle = getWindowHandle(mc);
+            if (handle != 0 && LWJGL3 && (savedX != 0 || savedY != 0)) {
+                Class<?> gc = Class.forName("org.lwjgl.glfw.GLFW");
+                gc.getMethod("glfwSetCursorPos", long.class, double.class, double.class)
+                        .invoke(null, handle, savedX, savedY);
+            }
+            if (!suppressingGrab && !suppressScheduled) {
+                suppressingGrab = true;
+                suppressScheduled = true;
+                scheduleSuppressLoop(mc);
             }
         } catch (Exception ignored) {}
     }
 
-    private static void startMouseSuppress(Object mc) {
-        suppressingGrab = true;
-        mouseReleaseThread = new Thread(() -> {
-            try {
-                while (System.currentTimeMillis() < mcpOpDeadline) {
-                    scheduleOnRenderThread(mc, () -> {
-                        try {
-                            Object mh = getMouseHandler(mc);
-                            if (mh == null) return;
-                            for (Field f : getAllFields(mh.getClass())) {
-                                String n = f.getName();
-                                if (f.getType() == boolean.class
-                                        && (n.equals("mouseGrabbed") || n.equals("f_91520_"))) {
-                                    try { f.setAccessible(true); f.setBoolean(mh, true); } catch (Exception ignored) {}
-                                    break;
-                                }
+    private static void startPosSaver(Object mc) {
+        posSaverRunning = true;
+        try {
+            java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
+            exec.invoke(mc, (Runnable) () -> {
+                try {
+                    if (!posSaverRunning) return;
+                    long h = getWindowHandle(mc);
+                    if (h != 0 && LWJGL3 && !suppressingGrab) {
+                        Class<?> gc = Class.forName("org.lwjgl.glfw.GLFW");
+                        double[] px = {0}, py = {0};
+                        gc.getMethod("glfwGetCursorPos", long.class, double[].class, double[].class)
+                                .invoke(null, h, px, py);
+                        savedX = px[0]; savedY = py[0];
+                    }
+                    java.lang.reflect.Method ex = mc.getClass().getMethod("execute", Runnable.class);
+                    ex.invoke(mc, (Runnable) () -> startPosSaver(mc));
+                } catch (Exception e) { posSaverRunning = false; }
+            });
+        } catch (Exception ignored) { posSaverRunning = false; }
+    }
+
+    private static void scheduleSuppressLoop(Object mc) {
+        try {
+            java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
+            exec.invoke(mc, (Runnable) () -> {
+                try {
+                    if (!suppressingGrab || System.currentTimeMillis() > mcpOpDeadline) {
+                        suppressingGrab = false;
+                        suppressScheduled = false;
+                        return;
+                    }
+                    Object mh = getMouseHandler(mc);
+                    if (mh != null) {
+                        for (Field f : getAllFields(mh.getClass())) {
+                            String n = f.getName();
+                            if (f.getType() == boolean.class
+                                    && (n.equals("mouseGrabbed") || n.equals("f_91520_"))) {
+                                try { f.setAccessible(true); f.setBoolean(mh, true); } catch (Exception ignored) {}
+                                break;
                             }
-                            long handle = getWindowHandle(mc);
-                            if (handle != 0 && LWJGL3) {
-                                Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                                glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class)
-                                        .invoke(null, handle, 0x00033001, 0x00034001);
-                            }
-                        } catch (Exception ignored) {}
-                    });
-                    Thread.sleep(100);
+                        }
+                    }
+                    long handle = getWindowHandle(mc);
+                    if (handle != 0 && LWJGL3) {
+                        Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+                        if (savedX != 0 || savedY != 0) {
+                            glfwClass.getMethod("glfwSetCursorPos", long.class, double.class, double.class)
+                                    .invoke(null, handle, savedX, savedY);
+                        }
+                        glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class)
+                                .invoke(null, handle, 0x00033001, 0x00034001);
+                    }
+                    scheduleSuppressLoop(mc);
+                } catch (Exception e) {
+                    suppressingGrab = false;
+                    suppressScheduled = false;
                 }
-                suppressingGrab = false;
-                mouseReleaseThread = null;
-            } catch (InterruptedException ignored) {
-                suppressingGrab = false;
-                mouseReleaseThread = null;
-            }
-        }, "MCP-MouseSuppress");
-        mouseReleaseThread.setDaemon(true);
-        mouseReleaseThread.start();
-    }
-
-    private static void scheduleOnRenderThread(Object mc, Runnable task) {
-        try {
-            java.lang.reflect.Method m = mc.getClass().getMethod("execute", Runnable.class);
-            m.invoke(mc, task);
-            return;
-        } catch (Exception ignored) {}
-        try {
-            java.lang.reflect.Method m = mc.getClass().getMethod("addScheduledTask", Runnable.class);
-            m.invoke(mc, task);
-            return;
-        } catch (Exception ignored) {}
-        for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
-            if (m.getParameterCount() == 1 && Runnable.class.isAssignableFrom(m.getParameterTypes()[0])
-                    && java.lang.reflect.Modifier.isPublic(m.getModifiers())) {
-                try { m.invoke(mc, task); return; } catch (Exception ignored) {}
-            }
+            });
+        } catch (Exception e) {
+            suppressingGrab = false;
+            suppressScheduled = false;
         }
     }
+
+    public static boolean isSuppressingGrab() { return suppressingGrab; }
+
+    public static boolean isLWJGL3() { return LWJGL3; }
 }
