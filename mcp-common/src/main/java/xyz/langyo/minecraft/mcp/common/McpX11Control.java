@@ -38,31 +38,19 @@ public class McpX11Control implements McpPlatformControl {
         int XSetForeground(long display, long gc, long foreground);
         int XSetBackground(long display, long gc, long background);
         int XSetFont(long display, long gc, long font);
-        long XInternAtom(long display, String atomName, boolean onlyIfExists);
-        int XSetWindowBackground(long display, long window, long backgroundPixel);
-        int XStoreName(long display, long window, String name);
         int XSelectInput(long display, long window, long eventMask);
-        int XSendEvent(long display, long window, boolean propagate, long eventMask, Pointer eventSend);
-        int XWarpPointer(long display, long srcW, long destW, int srcX, int srcY,
-                         int srcWidth, int srcHeight, int destX, int destY);
+        int XStoreName(long display, long window, String name);
         int XGetGeometry(long display, long drawable, PointerByReference root,
                          IntByReference x, IntByReference y,
                          IntByReference width, IntByReference height,
                          IntByReference borderWidth, IntByReference depth);
-        int XQueryPointer(long display, long window, PointerByReference rootReturn,
-                          PointerByReference childReturn, IntByReference rootXReturn,
-                          IntByReference rootYReturn, IntByReference winXReturn,
-                          IntByReference winYReturn, IntByReference maskReturn);
-    }
-
-    private interface XFixes extends Library {
-        XFixes INSTANCE = Native.load("Xfixes", XFixes.class);
-        int XFixesHideCursor(long display, long window);
-        int XFixesShowCursor(long display, long window);
+        long XGetImage(long display, long drawable, int x, int y,
+                       int width, int height, long planeMask, int format);
+        int XDestroyImage(long image);
+        long XAllPlanes();
     }
 
     private static final X11 X = X11.INSTANCE;
-    private static final XFixes XF = XFixes.INSTANCE;
 
     private static final int GrabModeAsync = 1;
     private static final int ButtonPressMask = 1 << 2;
@@ -70,6 +58,7 @@ public class McpX11Control implements McpPlatformControl {
     private static final int PointerMotionMask = 1 << 6;
     private static final int ExposureMask = 1 << 15;
     private static final int StructureNotifyMask = 1 << 17;
+    private static final int ZPixmap = 2;
 
     private volatile long display;
     private volatile long mcWindow;
@@ -82,6 +71,11 @@ public class McpX11Control implements McpPlatformControl {
 
     @Override
     public String getPlatformName() { return "x11"; }
+
+    @Override
+    public long resolveNativeWindowHandle(long glfwOrLwjglHandle) {
+        return glfwOrLwjglHandle;
+    }
 
     @Override
     public synchronized boolean installMouseHook(long mcNativeWindowHandle) {
@@ -106,6 +100,7 @@ public class McpX11Control implements McpPlatformControl {
     public synchronized boolean uninstallMouseHook() {
         if (!hookInstalled) return true;
         if (controlMode) setControlMode(false);
+        hideOverlay();
         if (display != 0) {
             X.XCloseDisplay(display);
             display = 0;
@@ -153,18 +148,19 @@ public class McpX11Control implements McpPlatformControl {
 
         overlayText = text.isEmpty() ? "MCP is operating at localhost:" + port : text;
         long root = X.XDefaultRootWindow(display);
+        long parent = mcWindow != 0 ? mcWindow : root;
 
         IntByReference x = new IntByReference(), y = new IntByReference();
         IntByReference w = new IntByReference(), h = new IntByReference();
         IntByReference bw = new IntByReference(), depth = new IntByReference();
         PointerByReference rootRet = new PointerByReference();
-        X.XGetGeometry(display, mcWindow != 0 ? mcWindow : root, rootRet, x, y, w, h, bw, depth);
+        X.XGetGeometry(display, parent, rootRet, x, y, w, h, bw, depth);
 
-        int screenW = w.getValue();
-        int screenH = h.getValue();
+        int winW = w.getValue() > 0 ? w.getValue() : 800;
+        int winH = h.getValue() > 0 ? h.getValue() : 600;
 
-        overlayWindow = X.XCreateSimpleWindow(display, mcWindow != 0 ? mcWindow : root,
-                0, 0, screenW, screenH, 0, 0, 0x404040L);
+        overlayWindow = X.XCreateSimpleWindow(display, parent,
+                0, 0, winW, winH, 0, 0, 0x404040L);
         if (overlayWindow == 0) return false;
 
         X.XSelectInput(display, overlayWindow, ExposureMask | StructureNotifyMask);
@@ -172,12 +168,21 @@ public class McpX11Control implements McpPlatformControl {
         X.XFlush(display);
 
         overlayGC = X.XCreateGC(display, overlayWindow, 0, null);
-        overlayFont = X.XLoadQueryFont(display, "-*-helvetica-bold-r-*-*-24-*-*-*-*-*-*-*");
-        if (overlayFont == 0) overlayFont = X.XLoadQueryFont(display, "fixed");
+        String[] fontNames = {
+            "-*-helvetica-bold-r-*-*-24-*-*-*-*-*-*-*",
+            "-*-dejavu-sans-bold-r-*-*-24-*-*-*-*-*-*-*",
+            "fixed",
+            "*"
+        };
+        overlayFont = 0;
+        for (String fn : fontNames) {
+            overlayFont = X.XLoadQueryFont(display, fn);
+            if (overlayFont != 0) break;
+        }
         if (overlayFont != 0) X.XSetFont(display, overlayGC, overlayFont);
         X.XSetForeground(display, overlayGC, 0xFFFFFF);
 
-        ReflectionHelper.dbg("McpX11: overlay shown " + screenW + "x" + screenH);
+        ReflectionHelper.dbg("McpX11: overlay shown " + winW + "x" + winH + " font=" + overlayFont);
         return true;
     }
 
@@ -187,7 +192,6 @@ public class McpX11Control implements McpPlatformControl {
         X.XUnmapWindow(display, overlayWindow);
         X.XDestroyWindow(display, overlayWindow);
         if (overlayGC != 0) X.XFreeGC(display, overlayGC);
-        if (overlayFont != 0) X.XFree(overlayFont);
         overlayWindow = 0;
         overlayGC = 0;
         overlayFont = 0;
@@ -200,33 +204,103 @@ public class McpX11Control implements McpPlatformControl {
     }
 
     @Override
+    public void updateOverlayPosition() {
+        if (display == 0 || overlayWindow == 0 || mcWindow == 0) return;
+        IntByReference x = new IntByReference(), y = new IntByReference();
+        IntByReference w = new IntByReference(), h = new IntByReference();
+        IntByReference bw = new IntByReference(), depth = new IntByReference();
+        PointerByReference rootRet = new PointerByReference();
+        if (X.XGetGeometry(display, mcWindow, rootRet, x, y, w, h, bw, depth) != 0
+                && w.getValue() > 0 && h.getValue() > 0) {
+            X.XMoveResizeWindow(display, overlayWindow, 0, 0, w.getValue(), h.getValue());
+        }
+    }
+
+    @Override
     public boolean injectClick(int screenX, int screenY) {
-        ReflectionHelper.dbg("McpX11: injectClick not implemented (use reflection guiClick)");
+        ReflectionHelper.dbg("McpX11: injectClick not yet implemented");
         return false;
     }
 
     @Override
-    public boolean injectRightClick(int screenX, int screenY) {
-        return false;
+    public boolean injectRightClick(int screenX, int screenY) { return false; }
+
+    @Override
+    public boolean injectKey(int vkOrKeyCode) { return false; }
+
+    @Override
+    public boolean injectChar(char ch) { return false; }
+
+    @Override
+    public boolean injectScroll(int screenX, int screenY, int clicks) { return false; }
+
+    @Override
+    public byte[] takePlatformScreenshot() {
+        if (display == 0 || mcWindow == 0) return null;
+        try {
+            IntByReference x = new IntByReference(), y = new IntByReference();
+            IntByReference w = new IntByReference(), h = new IntByReference();
+            IntByReference bw = new IntByReference(), depth = new IntByReference();
+            PointerByReference rootRet = new PointerByReference();
+            if (X.XGetGeometry(display, mcWindow, rootRet, x, y, w, h, bw, depth) == 0) return null;
+            int width = w.getValue();
+            int height = h.getValue();
+            if (width <= 0 || height <= 0) return null;
+
+            long image = X.XGetImage(display, mcWindow, 0, 0, width, height, X.XAllPlanes(), ZPixmap);
+            if (image == 0) return null;
+
+            int dataOffset = 32; // XImage struct: bytes_per_line at offset 16, data at offset 24 on 64-bit
+            Pointer imgPtr = new Pointer(image);
+            long dataPtr = imgPtr.getLong(24);
+            int bytesPerLine = imgPtr.getInt(16);
+
+            if (dataPtr == 0 || bytesPerLine <= 0) {
+                X.XDestroyImage(image);
+                return null;
+            }
+
+            Pointer data = new Pointer(dataPtr);
+            byte[] raw = data.getByteArray(0, bytesPerLine * height);
+
+            int[] pixels = new int[width * height];
+            for (int row = 0; row < height; row++) {
+                for (int col = 0; col < width; col++) {
+                    int idx = row * bytesPerLine + col * 4;
+                    if (idx + 3 >= raw.length) continue;
+                    int b = raw[idx] & 0xFF;
+                    int g = raw[idx + 1] & 0xFF;
+                    int r = raw[idx + 2] & 0xFF;
+                    int a = raw[idx + 3] & 0xFF;
+                    pixels[row * width + col] = (a << 24) | (r << 16) | (g << 8) | b;
+                }
+            }
+
+            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            img.setRGB(0, 0, width, height, pixels, 0, width);
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(img, "png", baos);
+            byte[] result = baos.toByteArray();
+            X.XDestroyImage(image);
+            ReflectionHelper.dbg("McpX11: screenshot " + result.length + " bytes " + width + "x" + height);
+            return result;
+        } catch (Exception e) {
+            ReflectionHelper.dbg("McpX11: screenshot failed: " + e.getMessage());
+            return null;
+        }
     }
 
     @Override
-    public boolean injectKey(int vkOrKeyCode) {
-        return false;
-    }
+    public long makeBorderless(long nativeHandle) { return 0; }
 
     @Override
-    public boolean injectChar(char ch) {
-        return false;
-    }
+    public void restoreWindowStyle(long nativeHandle, long originalStyle) {}
 
     @Override
-    public boolean injectScroll(int screenX, int screenY, int clicks) {
-        return false;
-    }
+    public String createContainer(long nativeHandle) { return "error: container not supported on X11"; }
 
     @Override
-    public byte[] takePlatformScreenshot() { return null; }
+    public void destroyContainer() {}
 
     @Override
     public String getStatus() {

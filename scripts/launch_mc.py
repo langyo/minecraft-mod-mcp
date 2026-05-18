@@ -703,6 +703,39 @@ def main():
         cp.append(ws_jar)
         print(f"[LAUNCH] Added Java-WebSocket to classpath")
 
+    _GRADLE_CACHE = os.path.join(os.path.expanduser("~"), ".gradle", "caches",
+                                  "modules-2", "files-2.1")
+
+    def _find_in_gradle_cache(group, artifact, version):
+        cache_dir = os.path.join(_GRADLE_CACHE, group, artifact, version)
+        if not os.path.isdir(cache_dir):
+            return None
+        for root, dirs, files in os.walk(cache_dir):
+            for f in files:
+                if f.endswith(".jar") and "sources" not in f and "javadoc" not in f:
+                    return os.path.join(root, f)
+        return None
+
+    for group, artifact, version in [
+        ("net.java.dev.jna", "jna", "5.15.0"),
+        ("net.java.dev.jna", "jna-platform", "5.15.0"),
+    ]:
+        lib_dir_jar = os.path.join(mc_dir, "libraries",
+                                    group.replace(".", os.sep), artifact, version,
+                                    f"{artifact}-{version}.jar")
+        if os.path.isfile(lib_dir_jar):
+            cp.append(lib_dir_jar)
+            print(f"[LAUNCH] Added {artifact} to classpath (lib dir)")
+        else:
+            gradle_jar = _find_in_gradle_cache(group, artifact, version)
+            if gradle_jar:
+                os.makedirs(os.path.dirname(lib_dir_jar), exist_ok=True)
+                shutil.copy2(gradle_jar, lib_dir_jar)
+                cp.append(lib_dir_jar)
+                print(f"[LAUNCH] Added {artifact} to classpath (gradle cache -> lib dir)")
+            else:
+                print(f"[LAUNCH] WARNING: {artifact}-{version} not found")
+
     sep = ";" if platform.system() == "Windows" else ":"
     cp_str = sep.join(cp)
 

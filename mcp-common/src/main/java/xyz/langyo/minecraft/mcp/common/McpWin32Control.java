@@ -57,6 +57,17 @@ public class McpWin32Control implements McpPlatformControl {
         boolean SetWindowPos(long hWnd, long hWndInsertAfter, int X, int Y, int cx, int cy, int uFlags);
         boolean GetClientRect(long hWnd, RECT rect);
         boolean PrintWindow(long hWnd, long hdcBlt, int nFlags);
+        long SetParent(long hWndChild, long hWndNewParent);
+        long GetWindowLongW(long hWnd, int nIndex);
+        long SetWindowLongW(long hWnd, int nIndex, long dwNewLong);
+        boolean EnableWindow(long hWnd, boolean bEnable);
+        long SetFocus(long hWnd);
+        boolean SetForegroundWindow(long hWnd);
+        int GetSystemMetrics(int nIndex);
+        boolean RegisterHotKey(long hWnd, int id, int fsModifiers, int vk);
+        boolean UnregisterHotKey(long hWnd, int id);
+        boolean PeekMessageW(MSG lpMsg, long hWnd, int wMsgFilterMin, int wMsgFilterMax, int wRemoveMsg);
+        boolean PostQuitMessage(int nExitCode);
     }
 
     private interface MyKernel32 extends StdCallLibrary {
@@ -184,6 +195,24 @@ public class McpWin32Control implements McpPlatformControl {
     private static final long WS_EX_TOPMOST = 0x08L;
     private static final int SW_SHOW = 5;
 
+    private static final long WS_OVERLAPPEDWINDOW = 0x00CF0000L;
+    private static final long WS_CHILD = 0x40000000L;
+    private static final int GWL_STYLE = -16;
+    private static final int SWP_NOMOVE = 0x0002;
+    private static final int SWP_NOSIZE = 0x0001;
+    private static final int SWP_NOZORDER = 0x0004;
+    private static final int SWP_FRAMECHANGED = 0x0020;
+    private static final int SWP_SHOWWINDOW = 0x0040;
+    private static final int SWP_FLAGS = SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED;
+    private static final int SM_CXSCREEN = 0;
+    private static final int SM_CYSCREEN = 1;
+    private static final int WM_HOTKEY = 0x0312;
+    private static final int MOD_CONTROL = 0x0002;
+    private static final int MOD_NOREPEAT = 0x4000;
+    private static final int VK_ESCAPE = 0x1B;
+    private static final int PM_REMOVE = 1;
+    private static final int CONTAINER_MARGIN = 40;
+
     private static final MyUser32 U = MyUser32.INSTANCE;
     private static final MyKernel32 K = MyKernel32.INSTANCE;
 
@@ -199,6 +228,12 @@ public class McpWin32Control implements McpPlatformControl {
     private volatile boolean overlayRunning;
 
     private volatile long mcHwnd;
+
+    private volatile long containerHwnd;
+    private volatile long mcOriginalStyle;
+    private volatile boolean containerRunning;
+    private volatile Thread containerThread;
+    private volatile WindowProc containerWndProc;
 
     @Override
     public String getPlatformName() { return "win32"; }
@@ -472,6 +507,158 @@ public class McpWin32Control implements McpPlatformControl {
         } catch (Exception e) {
             ReflectionHelper.dbg("McpWin32Control.takePlatformScreenshot: " + e.getMessage());
             return null;
+        }
+    }
+
+    @Override
+    public long resolveNativeWindowHandle(long glfwOrLwjglHandle) {
+        try {
+            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+            java.lang.reflect.Method m = glfw.getMethod("glfwGetWin32Window", long.class);
+            return (long) m.invoke(null, glfwOrLwjglHandle);
+        } catch (Exception e) {
+            try {
+                return (long) Class.forName("org.lwjgl.glfw.GLFWNativeWin32")
+                        .getMethod("glfwGetWin32Window", long.class).invoke(null, glfwOrLwjglHandle);
+            } catch (Exception e2) {
+                ReflectionHelper.dbg("McpWin32Control: resolveNativeWindowHandle failed: " + e2.getMessage());
+                return glfwOrLwjglHandle;
+            }
+        }
+    }
+
+    @Override
+    public void updateOverlayPosition() {
+        if (overlayHwnd == 0 || mcHwnd == 0) return;
+        RECT mcRect = new RECT();
+        U.GetWindowRect(mcHwnd, mcRect);
+        int mw = mcRect.right - mcRect.left;
+        int mh = mcRect.bottom - mcRect.top;
+        if (mw > 0 && mh > 0) {
+            U.SetWindowPos(overlayHwnd, 0, mcRect.left, mcRect.top, mw, mh,
+                    SWP_NOZORDER | SWP_SHOWWINDOW);
+        }
+    }
+
+    @Override
+    public long makeBorderless(long nativeHandle) {
+        long oldStyle = U.GetWindowLongW(nativeHandle, GWL_STYLE);
+        U.SetWindowLongW(nativeHandle, GWL_STYLE, WS_POPUP);
+        U.SetWindowPos(nativeHandle, 0, 0, 0, 0, 0, SWP_FLAGS | SWP_SHOWWINDOW);
+        return oldStyle;
+    }
+
+    @Override
+    public void restoreWindowStyle(long nativeHandle, long originalStyle) {
+        U.SetWindowLongW(nativeHandle, GWL_STYLE, originalStyle);
+        U.SetWindowPos(nativeHandle, 0, 0, 0, 0, 0, SWP_FLAGS | SWP_SHOWWINDOW);
+    }
+
+    @Override
+    public String createContainer(long nativeHandle) {
+        if (containerRunning) return "container: already running hwnd=" + Long.toHexString(containerHwnd);
+        mcHwnd = nativeHandle;
+
+        RECT mcRect = new RECT();
+        U.GetWindowRect(mcHwnd, mcRect);
+        int mcW = mcRect.right - mcRect.left;
+        int mcH = mcRect.bottom - mcRect.top;
+        int contW = mcW + CONTAINER_MARGIN * 2;
+        int contH = mcH + CONTAINER_MARGIN * 2;
+        int screenW = U.GetSystemMetrics(SM_CXSCREEN);
+        int screenH = U.GetSystemMetrics(SM_CYSCREEN);
+        int cx = Math.max(0, (screenW - contW) / 2);
+        int cy = Math.max(0, (screenH - contH) / 2);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        String[] result = {"error: unknown"};
+
+        containerThread = new Thread(() -> {
+            try {
+                long inst = K.GetModuleHandleW(null);
+
+                containerWndProc = (hwnd, msg, wParam, lParam) -> U.DefWindowProcW(hwnd, msg, wParam, lParam);
+
+                WNDCLASSEXW wc = new WNDCLASSEXW();
+                wc.lpfnWndProc = containerWndProc;
+                wc.hInstance = inst;
+                wc.lpszClassName = "McpContainer";
+                wc.hbrBackground = 16;
+                U.RegisterClassExW(wc);
+
+                containerHwnd = U.CreateWindowExW(0, "McpContainer", "MCP Container",
+                        WS_OVERLAPPEDWINDOW, cx, cy, contW, contH, 0, 0, inst, null);
+                if (containerHwnd == 0) {
+                    result[0] = "error: CreateWindowEx failed";
+                    latch.countDown();
+                    return;
+                }
+
+                mcOriginalStyle = U.GetWindowLongW(mcHwnd, GWL_STYLE);
+                U.SetWindowLongW(mcHwnd, GWL_STYLE, WS_POPUP);
+                U.SetWindowPos(mcHwnd, 0, 0, 0, 0, 0, SWP_FLAGS);
+                U.SetParent(mcHwnd, containerHwnd);
+                U.SetWindowPos(mcHwnd, 0, CONTAINER_MARGIN, CONTAINER_MARGIN, mcW, mcH, SWP_NOZORDER);
+                U.ShowWindow(containerHwnd, SW_SHOW);
+
+                WindowProc hotProc = (hwnd, msg2, wParam2, lParam2) -> {
+                    if (msg2 == WM_HOTKEY) {
+                        setControlMode(!isControlMode());
+                        return 0L;
+                    }
+                    return U.DefWindowProcW(hwnd, msg2, wParam2, lParam2);
+                };
+                WNDCLASSEXW hotWc = new WNDCLASSEXW();
+                hotWc.lpfnWndProc = hotProc;
+                hotWc.hInstance = inst;
+                hotWc.lpszClassName = "McpHotkey";
+                U.RegisterClassExW(hotWc);
+                long hotHwnd = U.CreateWindowExW(0, "McpHotkey", "", 0,
+                        0, 0, 0, 0, 0, 0, inst, null);
+                U.RegisterHotKey(hotHwnd, 1, MOD_CONTROL | MOD_NOREPEAT, VK_ESCAPE);
+
+                containerRunning = true;
+                result[0] = "container: hwnd=" + Long.toHexString(containerHwnd) + " mcHwnd=" + Long.toHexString(mcHwnd);
+                latch.countDown();
+
+                MSG m = new MSG();
+                while (containerRunning) {
+                    int r = U.GetMessageW(m, 0, 0, 0);
+                    if (r == 0 || r == -1) break;
+                    U.TranslateMessage(m);
+                    U.DispatchMessageW(m);
+                }
+                U.UnregisterHotKey(hotHwnd, 1);
+                U.DestroyWindow(hotHwnd);
+            } catch (Exception e) {
+                result[0] = "error: " + e.getMessage();
+                latch.countDown();
+            }
+        }, "McpContainer");
+        containerThread.setDaemon(true);
+        containerThread.start();
+
+        try { latch.await(8, TimeUnit.SECONDS); } catch (InterruptedException e) { return "timeout"; }
+        return result[0];
+    }
+
+    @Override
+    public void destroyContainer() {
+        containerRunning = false;
+        if (mcHwnd != 0) {
+            try {
+                U.SetParent(mcHwnd, 0);
+                if (mcOriginalStyle != 0) {
+                    U.SetWindowLongW(mcHwnd, GWL_STYLE, mcOriginalStyle);
+                    U.SetWindowPos(mcHwnd, 0, 0, 0, 0, 0, SWP_FLAGS | SWP_SHOWWINDOW);
+                }
+                U.EnableWindow(mcHwnd, true);
+                U.ShowWindow(mcHwnd, SW_SHOW);
+            } catch (Exception ignored) {}
+        }
+        if (containerHwnd != 0) {
+            U.DestroyWindow(containerHwnd);
+            containerHwnd = 0;
         }
     }
 

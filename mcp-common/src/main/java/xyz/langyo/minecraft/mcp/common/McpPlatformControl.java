@@ -4,6 +4,8 @@ public interface McpPlatformControl {
 
     String getPlatformName();
 
+    long resolveNativeWindowHandle(long glfwOrLwjglHandle);
+
     boolean installMouseHook(long mcNativeWindowHandle);
 
     boolean uninstallMouseHook();
@@ -20,6 +22,8 @@ public interface McpPlatformControl {
 
     void updateOverlayText(String text);
 
+    void updateOverlayPosition();
+
     boolean injectClick(int screenX, int screenY);
 
     boolean injectRightClick(int screenX, int screenY);
@@ -31,6 +35,14 @@ public interface McpPlatformControl {
     boolean injectScroll(int screenX, int screenY, int clicks);
 
     byte[] takePlatformScreenshot();
+
+    long makeBorderless(long nativeHandle);
+
+    void restoreWindowStyle(long nativeHandle, long originalStyle);
+
+    String createContainer(long nativeHandle);
+
+    void destroyContainer();
 
     String getStatus();
 }

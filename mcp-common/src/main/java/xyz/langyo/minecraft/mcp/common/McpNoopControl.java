@@ -30,6 +30,9 @@ public class McpNoopControl implements McpPlatformControl {
     public void updateOverlayText(String text) {}
 
     @Override
+    public void updateOverlayPosition() {}
+
+    @Override
     public boolean injectClick(int screenX, int screenY) { return false; }
 
     @Override
@@ -49,4 +52,19 @@ public class McpNoopControl implements McpPlatformControl {
 
     @Override
     public String getStatus() { return "platform=noop (no native control available)"; }
+
+    @Override
+    public long resolveNativeWindowHandle(long glfwOrLwjglHandle) { return glfwOrLwjglHandle; }
+
+    @Override
+    public long makeBorderless(long nativeHandle) { return 0; }
+
+    @Override
+    public void restoreWindowStyle(long nativeHandle, long originalStyle) {}
+
+    @Override
+    public String createContainer(long nativeHandle) { return "error: not supported on this platform"; }
+
+    @Override
+    public void destroyContainer() {}
 }

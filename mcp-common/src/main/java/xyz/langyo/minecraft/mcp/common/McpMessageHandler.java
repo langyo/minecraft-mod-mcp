@@ -312,7 +312,7 @@ public class McpMessageHandler {
 
     protected Object handleWin32Container() {
         try {
-            Class<?> win32Class = Class.forName("xyz.langyo.minecraft.mcp.mod.McpWin32");
+            McpPlatformControl ctrl = McpControlFactory.get();
             Object mc = ReflectionHelper.getMinecraftInstance();
             Object window = mc.getClass().getMethod("getWindow").invoke(mc);
             final long glfwWin = (long) window.getClass().getMethod("getWindow").invoke(window);
@@ -321,21 +321,15 @@ public class McpMessageHandler {
             java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
             exec.invoke(mc, (Runnable) () -> {
                 try {
-                    hwndResult[0] = win32Class.getMethod("getMcWindowHandle", long.class).invoke(null, glfwWin);
+                    hwndResult[0] = ctrl.resolveNativeWindowHandle(glfwWin);
                 } catch (Exception e) { hwndResult[0] = null; }
                 hwndLatch.countDown();
             });
             hwndLatch.await(5, java.util.concurrent.TimeUnit.SECONDS);
-            if (hwndResult[0] == null) return "error: HWND not found";
-            final long hwnd = (Long) hwndResult[0];
-            if (hwnd == 0) return "error: HWND is 0";
-            new Thread(() -> {
-                try { win32Class.getMethod("createContainer", long.class).invoke(null, hwnd); }
-                catch (Exception e) { System.err.println("[McpWin32] Container thread crashed: " + e.getMessage()); }
-            }, "McpContainerCreator").start();
-            return "container: creating on thread, mcHwnd=" + Long.toHexString(hwnd);
-        } catch (ClassNotFoundException e) {
-            return "error: McpWin32 not available on this platform";
+            if (hwndResult[0] == null) return "error: native handle not found";
+            final long nativeHandle = (Long) hwndResult[0];
+            if (nativeHandle == 0) return "error: native handle is 0";
+            return ctrl.createContainer(nativeHandle);
         } catch (Exception e) {
             return "error: " + e.getMessage();
         }
@@ -343,29 +337,27 @@ public class McpMessageHandler {
 
     protected Object handleWin32Borderless() {
         try {
-            Class<?> win32Class = Class.forName("xyz.langyo.minecraft.mcp.mod.McpWin32");
+            McpPlatformControl ctrl = McpControlFactory.get();
             Object mc = ReflectionHelper.getMinecraftInstance();
             Object window = mc.getClass().getMethod("getWindow").invoke(mc);
             final long glfwWin = (long) window.getClass().getMethod("getWindow").invoke(window);
-            final Object[] result = {null};
             final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+            final Object[] result = {null};
             java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
             exec.invoke(mc, (Runnable) () -> {
                 try {
-                    long hwnd = (long) win32Class.getMethod("getMcWindowHandle", long.class).invoke(null, glfwWin);
-                    if (hwnd == 0) {
-                        result[0] = "error: HWND is 0 (glfw=" + glfwWin + ")";
+                    long nativeHandle = ctrl.resolveNativeWindowHandle(glfwWin);
+                    if (nativeHandle == 0) {
+                        result[0] = "error: native handle is 0 (glfw=" + glfwWin + ")";
                     } else {
-                        long oldStyle = (long) win32Class.getMethod("makeBorderless", long.class).invoke(null, hwnd);
-                        result[0] = "borderless: hwnd=" + Long.toHexString(hwnd) + " oldStyle=" + Long.toHexString(oldStyle);
+                        long oldStyle = ctrl.makeBorderless(nativeHandle);
+                        result[0] = "borderless: hwnd=" + Long.toHexString(nativeHandle) + " oldStyle=" + Long.toHexString(oldStyle);
                     }
                 } catch (Exception e) { result[0] = "error: " + e.getMessage(); }
                 latch.countDown();
             });
             latch.await(8, java.util.concurrent.TimeUnit.SECONDS);
             return result[0] != null ? result[0] : "timeout on render thread";
-        } catch (ClassNotFoundException e) {
-            return "error: McpWin32 not available on this platform";
         } catch (Exception e) {
             return "error: " + e.getMessage();
         }

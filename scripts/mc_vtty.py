@@ -349,6 +349,12 @@ class McVtty:
             elif cmd == "wait":
                 time.sleep(float(cmd_dict.get("seconds", 1)))
                 return {"waited": cmd_dict.get("seconds", 1)}
+            elif cmd == "ws":
+                return self._send_ws(
+                    cmd_dict.get("method", "ping"),
+                    cmd_dict.get("params", {}),
+                    timeout=int(cmd_dict.get("timeout", 15)),
+                )
             else:
                 return {"error": f"unknown cmd: {cmd}"}
         except Exception as e:

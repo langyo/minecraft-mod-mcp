@@ -41,14 +41,14 @@ dependencies {
     implementation 'net.java.dev.jna:jna-platform:5.15.0'
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
 jar {
     manifest {
         attributes 'ModSide' : 'BOTH'
         attributes 'Automatic-Module' : 'xyz.langyo.minecraft.mcp.mod'
         attributes 'Implementation-Version' : project.version
     }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
 }
