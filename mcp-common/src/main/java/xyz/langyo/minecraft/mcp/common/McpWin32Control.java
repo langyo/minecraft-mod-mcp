@@ -55,6 +55,8 @@ public class McpWin32Control implements McpPlatformControl {
                       Pointer lpvBits, BITMAPINFO lpbi, int uUsage);
         int ReleaseDC(long hWnd, long hDC);
         boolean SetWindowPos(long hWnd, long hWndInsertAfter, int X, int Y, int cx, int cy, int uFlags);
+        boolean GetClientRect(long hWnd, RECT rect);
+        boolean PrintWindow(long hWnd, long hdcBlt, int nFlags);
     }
 
     private interface MyKernel32 extends StdCallLibrary {
@@ -287,7 +289,7 @@ public class McpWin32Control implements McpPlatformControl {
                 if (hdc != 0) {
                     try {
                         RECT cr = new RECT();
-                        U.GetWindowRect(mcHwnd, cr);
+                        U.GetClientRect(hwnd, cr);
                         int w = cr.right - cr.left;
                         int h = cr.bottom - cr.top;
                         long brush = U.CreateSolidBrush(0x00404040);
@@ -433,7 +435,10 @@ public class McpWin32Control implements McpPlatformControl {
             long hdcMem = U.CreateCompatibleDC(hdcScreen);
             long hBmp = U.CreateCompatibleBitmap(hdcScreen, w, h);
             U.SelectObject(hdcMem, hBmp);
-            boolean ok = U.BitBlt(hdcMem, 0, 0, w, h, hdcScreen, 0, 0, SRCCOPY);
+            boolean ok = U.PrintWindow(mcHwnd, hdcMem, PW_RENDERFULLCONTENT);
+            if (!ok) {
+                ok = U.BitBlt(hdcMem, 0, 0, w, h, hdcScreen, 0, 0, SRCCOPY);
+            }
             if (!ok) { U.DeleteObject(hBmp); U.DeleteDC(hdcMem); U.ReleaseDC(mcHwnd, hdcScreen); return null; }
 
             BITMAPINFO bmi = new BITMAPINFO();

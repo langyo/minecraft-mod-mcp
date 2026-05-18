@@ -41,6 +41,8 @@ public final class McpControlFactory {
             ReflectionHelper.dbg("McpControlFactory: " + className + " not found, falling back to Noop");
         } catch (Exception e) {
             ReflectionHelper.dbg("McpControlFactory: " + className + " failed: " + e.getMessage());
+        } catch (Error e) {
+            ReflectionHelper.dbg("McpControlFactory: " + className + " class load error: " + e.getMessage());
         }
         return new McpNoopControl();
     }

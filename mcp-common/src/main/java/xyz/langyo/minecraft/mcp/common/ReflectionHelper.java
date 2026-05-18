@@ -909,12 +909,12 @@ public final class ReflectionHelper {
             dbg("takeScreenshot: Robot window FAILED - " + e.getMessage());
         }
         try {
-            dbg("takeScreenshot: trying Win32 BitBlt...");
-            byte[] bitBltResult = takeWin32BitBltScreenshot();
-            if (bitBltResult != null) { dbg("takeScreenshot: OK via Win32 BitBlt " + bitBltResult.length + " bytes"); return bitBltResult; }
+            dbg("takeScreenshot: trying platform native capture...");
+            byte[] platResult = takePlatformScreenshot();
+            if (platResult != null) { dbg("takeScreenshot: OK via platform native " + platResult.length + " bytes"); return platResult; }
         } catch (Exception e) {
-            failChain += "bitblt:" + e.getMessage() + " ";
-            dbg("takeScreenshot: Win32 BitBlt FAILED - " + e.getMessage());
+            failChain += "platform:" + e.getMessage() + " ";
+            dbg("takeScreenshot: platform native FAILED - " + e.getMessage());
         }
         throw new RuntimeException("ALL failed (" + failChain + ") w=" + width + " h=" + height);
     }
@@ -1438,20 +1438,8 @@ public final class ReflectionHelper {
         }
     }
 
-    private static byte[] takeWin32BitBltScreenshot() {
-        try {
-            Class<?> win32Class = Class.forName("xyz.langyo.minecraft.mcp.mod.McpWin32");
-            java.lang.reflect.Method m = win32Class.getMethod("takeWin32Screenshot");
-            byte[] result = (byte[]) m.invoke(null);
-            if (result != null) dbg("takeWin32BitBltScreenshot: " + result.length + " bytes");
-            return result;
-        } catch (ClassNotFoundException e) {
-            dbg("takeWin32BitBltScreenshot: McpWin32 not available");
-            return null;
-        } catch (Exception e) {
-            dbg("takeWin32BitBltScreenshot error: " + e.getMessage());
-            return null;
-        }
+    public static byte[] takePlatformScreenshot() {
+        return McpControlFactory.get().takePlatformScreenshot();
     }
 
     public static void lwjgl2PressKey(int keyCode) {}
@@ -1828,10 +1816,6 @@ public final class ReflectionHelper {
         McpPlatformControl ctrl = McpControlFactory.get();
         boolean ok = ctrl.injectKey(vk);
         return "{\"inject_key\":" + ok + ",\"vk\":" + vk + "}";
-    }
-
-    public static byte[] takePlatformScreenshot() {
-        return McpControlFactory.get().takePlatformScreenshot();
     }
 
     public static String getHookStatus() {
