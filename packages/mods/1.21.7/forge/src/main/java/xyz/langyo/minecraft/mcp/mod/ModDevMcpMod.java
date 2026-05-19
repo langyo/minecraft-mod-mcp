@@ -4,15 +4,16 @@ import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Style;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     McpHttpServer httpServer;
     volatile String debugUrl = null;
+    volatile boolean chatSent = false;
     private final boolean dependenciesAvailable;
 
     public ModDevMcpMod() {
@@ -38,7 +39,6 @@ public class ModDevMcpMod {
                     httpServer.start();
                     debugUrl = "http://127.0.0.1:" + port + "/debug";
                     System.out.println("[MCP-MOD] Debug page: " + debugUrl);
-                    sendChatUrl();
                 } catch (Exception e) {
                     System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
                 } catch (Error e) {
@@ -49,7 +49,7 @@ public class ModDevMcpMod {
 
         CustomizeGuiOverlayEvent.DebugText.BUS.addListener(event -> {
             if (debugUrl != null && event.getSide() == CustomizeGuiOverlayEvent.DebugText.Side.Left) {
-                event.getText().add("§a[MCP] " + debugUrl + " §7(click chat msg to open)");
+                event.getText().add("\u00a7a[MCP] " + debugUrl);
             }
         });
 
@@ -59,31 +59,27 @@ public class ModDevMcpMod {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 net.minecraft.client.gui.GuiGraphics g = event.getGuiGraphics();
                 String text = "[MCP] " + debugUrl;
-                int y = event.getScreen().height - 24;
-                g.drawString(mc.font, text, 4, y, 0xFF55FF55, true);
+                g.drawString(mc.font, text, 4, 4, 0xFF55FF55, true);
             } catch (Exception ignored) {}
         });
-    }
 
-    private void sendChatUrl() {
-        try {
-            Thread.sleep(3000);
-            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-            mc.execute(() -> {
-                if (debugUrl == null) return;
-                try {
-                    Component msg = Component.empty()
-                        .append(Component.literal("[MCP] Debug page: ").withStyle(style -> style.withColor(0x55FF55)))
-                        .append(Component.literal(debugUrl).withStyle(style -> style
-                            .withColor(0x5555FF)
-                            .withUnderlined(true)
-                            .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(debugUrl)))
-                        ));
-                    mc.gui.getChat().addMessage(msg);
-                } catch (Exception e) {
-                    System.err.println("[MCP-MOD] chat msg failed: " + e.getMessage());
-                }
-            });
-        } catch (Exception ignored) {}
+        TickEvent.ClientTickEvent.BUS.addListener(event -> {
+            if (event.phase != TickEvent.Phase.END) return;
+            if (chatSent || debugUrl == null) return;
+            try {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                if (mc.gui == null || mc.gui.getChat() == null) return;
+                chatSent = true;
+                String url = debugUrl;
+                Component msg = Component.empty()
+                    .append(Component.literal("[MCP] Debug page: ").withStyle(s -> s.withColor(0x55FF55)))
+                    .append(Component.literal(url).withStyle(s -> s
+                        .withColor(0x5555FF)
+                        .withUnderlined(true)
+                        .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(url)))
+                    ));
+                mc.gui.getChat().addMessage(msg);
+            } catch (Exception ignored) {}
+        });
     }
 }
