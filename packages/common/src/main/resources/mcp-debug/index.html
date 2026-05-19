@@ -52,12 +52,15 @@ body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',system-ui,sans-seri
   <h1>MCP Debug</h1>
   <span class="dot" id="dot"></span>
   <span class="info" id="st">Connecting...</span>
+  <a id="mcpUrl" class="info" style="color:#58a6ff;text-decoration:none;margin-left:4px" href=""></a>
 </div>
 <div class="main">
 <div class="left">
   <div class="imgbox"><img id="img" src="" alt="screenshot"/></div>
   <div class="vctrl">
     <button id="btnPoll" onclick="togglePoll()">Start Capture</button>
+    <button id="btnGrid" onclick="toggleGrid()">Grid</button>
+    <button id="btnSnap" onclick="fetchSS()">Snapshot</button>
     <span class="info" id="fps">--</span>
     <span class="info" id="res"></span>
   </div>
@@ -90,10 +93,18 @@ body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',system-ui,sans-seri
 </div>
 <script>
 var polling=false,iv=null,fc=0,tot=0;
-var lastImg='';
+var lastImg='',lastGrid='';
+var showGrid=false;
 var BASE=location.origin;
 
 function $(id){return document.getElementById(id)}
+
+function toggleGrid(){
+  showGrid=!showGrid;
+  var b=$('btnGrid');
+  if(showGrid){b.className='active';if(lastGrid)$('img').src=lastGrid;}
+  else{b.className='';if(lastImg)$('img').src=lastImg;}
+}
 
 function togglePoll(){
   polling=!polling;
@@ -113,7 +124,9 @@ function fetchSS(){
     var d=x.response;
     if(!d||!d.original)return;
     lastImg=d.original;
-    $('img').src=lastImg;
+    lastGrid=d.grid||'';
+    if(showGrid&&lastGrid)$('img').src=lastGrid;
+    else $('img').src=lastImg;
     fc++;
     $('res').textContent=d.width+'x'+d.height+' '+(performance.now()-t0).toFixed(0)+'ms';
   };
@@ -171,6 +184,11 @@ function sendC(){
 }
 
 function connectSSE(){
+  var url=BASE.replace(/^http:/,'');
+  var link=$('mcpUrl');
+  link.textContent=url;
+  link.href=BASE;
+  link.target='_blank';
   var es=new EventSource(BASE+'/api/events');
   es.onopen=function(){$('dot').className='dot';$('st').textContent='Connected';};
   es.onmessage=function(ev){try{addC(JSON.parse(ev.data))}catch(e){}};
@@ -182,6 +200,7 @@ function connectSSE(){
 }
 
 onSel();
+fetchSS();
 connectSSE();
 </script>
 </body>
