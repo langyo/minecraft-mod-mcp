@@ -95,6 +95,26 @@ async fn main() -> anyhow::Result<()> {
                 let seconds: f64 = rest.parse().unwrap_or(1.0);
                 serde_json::json!({"cmd": "wait", "seconds": seconds}).to_string()
             },
+            "click_btn_idx" => {
+                let idx: i64 = rest.parse().unwrap_or(0);
+                serde_json::json!({
+                    "cmd": "ws",
+                    "method": "click_button_index",
+                    "params": {"index": idx}
+                }).to_string()
+            },
+            "ws" => {
+                let parts: Vec<&str> = rest.splitn(2, ' ').collect();
+                let method = parts.first().copied().unwrap_or("ping");
+                let params_str = parts.get(1).copied().unwrap_or("{}");
+                let params: serde_json::Value = serde_json::from_str(params_str)
+                    .unwrap_or(serde_json::json!({}));
+                serde_json::json!({
+                    "cmd": "ws",
+                    "method": method,
+                    "params": params
+                }).to_string()
+            },
             _ => {
                 eprintln!("Unknown command: {}", cmd_name);
                 std::process::exit(1);
