@@ -85,6 +85,8 @@ public class McpMessageHandler {
         if (method.equals("inject_click")) return handleInjectClick(params);
         if (method.equals("inject_key")) return handleInjectKey(params);
         if (method.equals("platform_status")) return handlePlatformStatus();
+        if (method.equals("video_start")) return handleVideoStart();
+        if (method.equals("video_stop")) return handleVideoStop();
         return "unknown: " + method;
     }
 
@@ -398,6 +400,16 @@ public class McpMessageHandler {
 
     protected Object handlePlatformStatus() {
         return ReflectionHelper.getHookStatus();
+    }
+
+    protected Object handleVideoStart() {
+        ReflectionHelper.setVideoCaptureActive(true);
+        return "{\"video_capture\":true}";
+    }
+
+    protected Object handleVideoStop() {
+        ReflectionHelper.setVideoCaptureActive(false);
+        return "{\"video_capture\":false}";
     }
 
     private static McpWebSocketClient castClient(Object wsClient) {

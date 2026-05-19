@@ -65,4 +65,21 @@ public class McpWebSocketClient extends WebSocketClient {
             catch (Exception e) { e.printStackTrace(); }
         }
     }
+
+    private static volatile McpWebSocketClient instance;
+
+    public static void setInstance(McpWebSocketClient c) { instance = c; }
+
+    public static void sendVideoFrame(byte[] jpegData) {
+        McpWebSocketClient ws = instance;
+        if (ws != null && ws.isOpen()) {
+            try {
+                String b64 = java.util.Base64.getEncoder().encodeToString(jpegData);
+                String msg = "{\"jsonrpc\":\"2.0\",\"method\":\"video_frame\",\"params\":{\"data\":\"" + b64 + "\",\"size\":" + jpegData.length + "}}";
+                ws.send(msg);
+            } catch (Exception e) {
+                ReflectionHelper.dbg("video: send failed: " + e.getMessage());
+            }
+        }
+    }
 }

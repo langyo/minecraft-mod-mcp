@@ -273,6 +273,16 @@ async fn handle_command(
             }
         },
 
+        "video_start" => match bridge.send_rpc("video_start", Value::Null).await {
+            Ok(r) => serde_json::to_value(r).unwrap_or_default(),
+            Err(e) => serde_json::json!({"error": e.to_string()}),
+        },
+
+        "video_stop" => match bridge.send_rpc("video_stop", Value::Null).await {
+            Ok(r) => serde_json::to_value(r).unwrap_or_default(),
+            Err(e) => serde_json::json!({"error": e.to_string()}),
+        },
+
         _ => serde_json::json!({"error": format!("unknown cmd: {}", cmd.cmd)}),
     }
 }

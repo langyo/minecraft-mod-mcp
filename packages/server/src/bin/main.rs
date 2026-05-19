@@ -125,6 +125,8 @@ async fn main() -> anyhow::Result<()> {
                     "params": params
                 }).to_string()
             },
+            "video_start" => r#"{"cmd":"video_start"}"#.to_string(),
+            "video_stop" => r#"{"cmd":"video_stop"}"#.to_string(),
             _ => {
                 eprintln!("Unknown command: {}", cmd_name);
                 std::process::exit(1);

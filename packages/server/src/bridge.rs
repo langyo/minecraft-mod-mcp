@@ -76,6 +76,7 @@ pub struct Bridge {
     connected: Arc<Mutex<bool>>,
     req_counter: Arc<Mutex<u64>>,
     screenshot_dir: PathBuf,
+    stream_tx: Arc<Mutex<Option<mpsc::UnboundedSender<Vec<u8>>>>>,
 }
 
 impl Bridge {
@@ -87,6 +88,7 @@ impl Bridge {
             connected: Arc::new(Mutex::new(false)),
             req_counter: Arc::new(Mutex::new(0)),
             screenshot_dir,
+            stream_tx: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -107,6 +109,13 @@ impl Bridge {
                 axum::routing::any({
                     let bridge = self.clone_handle();
                     move |req| async move { handle_root(req, bridge).await }
+                }),
+            )
+            .route(
+                "/stream",
+                axum::routing::any({
+                    let bridge = self.clone_handle();
+                    move |req| async move { handle_stream(req, bridge).await }
                 }),
             )
             .route(
@@ -131,6 +140,7 @@ impl Bridge {
             ws_tx: self.ws_tx.clone(),
             pending: self.pending.clone(),
             connected: self.connected.clone(),
+            stream_tx: self.stream_tx.clone(),
         }
     }
 
@@ -361,6 +371,7 @@ struct BridgeHandle {
     ws_tx: Arc<Mutex<Option<mpsc::UnboundedSender<String>>>>,
     pending: PendingMap,
     connected: Arc<Mutex<bool>>,
+    stream_tx: Arc<Mutex<Option<mpsc::UnboundedSender<Vec<u8>>>>>,
 }
 
 async fn handle_root(
@@ -397,6 +408,7 @@ async fn handle_ws_connection(socket: axum::extract::ws::WebSocket, bridge: Brid
     let pending = bridge.pending.clone();
     let connected = bridge.connected.clone();
     let ws_tx_ref = bridge.ws_tx.clone();
+    let stream_tx_clone = bridge.stream_tx.clone();
 
     let recv_task = tokio::spawn(async move {
         while let Some(msg_result) = ws_stream.next().await {
@@ -420,6 +432,19 @@ async fn handle_ws_connection(socket: axum::extract::ws::WebSocket, bridge: Brid
                             error: None,
                             id: None,
                         });
+
+                    let method = msg.get("method").and_then(|v| v.as_str()).unwrap_or("");
+                    if method == "video_frame" {
+                        if let Some(data_b64) = msg.get("params").and_then(|p| p.get("data")).and_then(|v| v.as_str()) {
+                            if let Ok(jpeg_bytes) = base64::engine::general_purpose::STANDARD.decode(data_b64) {
+                                let stream_tx = stream_tx_clone.lock().await;
+                                if let Some(tx) = stream_tx.as_ref() {
+                                    let _ = tx.send(jpeg_bytes);
+                                }
+                            }
+                        }
+                        continue;
+                    }
 
                     let mut pending_map = pending.lock().await;
                     if let Some(sender) = pending_map.remove(rid) {
@@ -458,6 +483,46 @@ async fn handle_ws_connection(socket: axum::extract::ws::WebSocket, bridge: Brid
                 break;
             }
         }
+    });
+
+    tokio::select! {
+        _ = recv_task => {},
+        _ = send_task => {},
+    }
+}
+
+async fn handle_stream(
+    ws: axum::extract::ws::WebSocketUpgrade,
+    bridge: BridgeHandle,
+) -> axum::response::Response {
+    ws.on_upgrade(move |socket| handle_stream_connection(socket, bridge))
+}
+
+async fn handle_stream_connection(socket: axum::extract::ws::WebSocket, bridge: BridgeHandle) {
+    info!("Stream viewer connected");
+    let (mut ws_sink, mut ws_stream) = socket.split();
+    let (tx, mut rx) = mpsc::unbounded_channel::<Vec<u8>>();
+
+    *bridge.stream_tx.lock().await = Some(tx);
+
+    let stream_tx_ref = bridge.stream_tx.clone();
+
+    let recv_task = tokio::spawn(async move {
+        while ws_stream.next().await.is_some() {}
+        info!("Stream viewer disconnected");
+    });
+
+    let send_task = tokio::spawn(async move {
+        while let Some(jpeg_bytes) = rx.recv().await {
+            if ws_sink
+                .send(axum::extract::ws::Message::Binary(jpeg_bytes.into()))
+                .await
+                .is_err()
+            {
+                break;
+            }
+        }
+        *stream_tx_ref.lock().await = None;
     });
 
     tokio::select! {

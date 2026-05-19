@@ -2032,4 +2032,50 @@ public final class ReflectionHelper {
     }
 
     public static boolean isLWJGL3() { return LWJGL3; }
+
+    private static volatile boolean videoCaptureActive = false;
+    private static int videoFrameCounter = 0;
+    private static final int VIDEO_FRAME_SKIP = 6;
+
+    public static void setVideoCaptureActive(boolean v) { videoCaptureActive = v; }
+    public static boolean isVideoCaptureActive() { return videoCaptureActive; }
+
+    public static byte[] captureFrameJpeg(Object mc) {
+        try {
+            int w = getGlfwWindowSize(mc, true);
+            int h = getGlfwWindowSize(mc, false);
+            if (w <= 0 || h <= 0) return null;
+            ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
+            doGlReadPixels(0, 0, w, h, bb);
+            bb.rewind();
+            BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    int r = bb.get() & 0xFF;
+                    int g = bb.get() & 0xFF;
+                    int b = bb.get() & 0xFF;
+                    bb.get();
+                    img.setRGB(x, h - 1 - y, (r << 16) | (g << 8) | b);
+                }
+            }
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(img, "jpg", baos);
+            return baos.toByteArray();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static void tickVideoCapture(Object mc) {
+        if (!videoCaptureActive) return;
+        if (++videoFrameCounter % VIDEO_FRAME_SKIP != 0) return;
+        try {
+            byte[] jpeg = captureFrameJpeg(mc);
+            if (jpeg != null && jpeg.length > 0) {
+                McpWebSocketClient.sendVideoFrame(jpeg);
+            }
+        } catch (Exception e) {
+            dbg("video: " + e.getMessage());
+        }
+    }
 }
