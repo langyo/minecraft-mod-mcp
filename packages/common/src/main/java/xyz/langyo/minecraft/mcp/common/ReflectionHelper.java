@@ -1984,17 +1984,27 @@ public final class ReflectionHelper {
             if (lastForceState) {
                 showWindow(mc);
                 lastForceState = false;
+                cursorApplied = false;
             }
             return;
         }
         try {
             long handle = getWindowHandle(mc);
             if (handle == 0 || !LWJGL3) return;
+
+            if (!isMcReady(mc)) return;
+
             initCursorCache();
 
-            hideWindow(mc);
+            if (!windowHidden) {
+                hideWindow(mc);
+            }
 
-            glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+            if (!cursorApplied) {
+                glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+                cursorApplied = true;
+                dbg("cursor: GLFW_CURSOR_NORMAL applied once");
+            }
 
             Object mouseHandler = getMouseHandler(mc);
             if (mouseHandler != null) {
@@ -2010,6 +2020,20 @@ public final class ReflectionHelper {
         } catch (Exception e) {
             dbg("cursor: " + e.getMessage());
         }
+    }
+
+    private static volatile boolean cursorApplied = false;
+    private static volatile long forceCursorNormalStartTime = 0;
+    private static final long READY_DELAY_MS = 10000;
+
+    private static boolean isMcReady(Object mc) {
+        if (forceCursorNormalStartTime == 0) {
+            forceCursorNormalStartTime = System.currentTimeMillis();
+        }
+        if (System.currentTimeMillis() - forceCursorNormalStartTime < READY_DELAY_MS) {
+            return false;
+        }
+        return getWindowHandle(mc) != 0;
     }
 
     public static String showMcpOverlay(String text, int port) {
