@@ -33,11 +33,13 @@ public class ModDevMcpMod {
                     ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
                     wsClient = new McpWebSocketClient(serverUrl, handler);
                     McpWebSocketClient.setInstance(wsClient);
-                    wsClient.connectAsync();
+                    wsClient.connectBlocking(30, java.util.concurrent.TimeUnit.SECONDS);
+                    long start = System.currentTimeMillis();
                     while (true) {
                         try {
                             Thread.sleep(10);
                             if (wsClient != null) wsClient.handleMessages();
+                            if (System.currentTimeMillis() - start < 15000) continue;
                             Object mc = ReflectionHelper.getMinecraftInstance();
                             ReflectionHelper.tickForceCursorNormal(mc);
                             ReflectionHelper.tickVideoCapture(mc);

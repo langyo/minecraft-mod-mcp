@@ -1923,13 +1923,15 @@ public final class ReflectionHelper {
         if (windowHidden) return;
         try {
             long handle = getWindowHandle(mc);
+            dbg("cursor: hideWindow v2 called, handle=" + handle + " LWJGL3=" + LWJGL3);
             if (handle == 0 || !LWJGL3) return;
-            initCursorCache();
             McpPlatformControl ctrl = McpControlFactory.get();
+            dbg("cursor: ctrl type=" + ctrl.getClass().getSimpleName());
             if (ctrl instanceof McpWin32Control) {
                 McpWin32Control w32 = (McpWin32Control) ctrl;
                 w32.ensureHwndFromGlfw(handle);
                 long hwnd = w32.getMcHwnd();
+                dbg("cursor: hwnd=" + hwnd);
                 if (hwnd != 0) {
                     int[] rect = w32.getWindowRect(hwnd);
                     if (rect != null) {
@@ -1942,11 +1944,8 @@ public final class ReflectionHelper {
                     return;
                 }
             }
-            if (glfwHideWindowMethod != null) {
-                glfwHideWindowMethod.invoke(null, handle);
-                windowHidden = true;
-                dbg("cursor: window hidden via glfwHideWindow (fallback)");
-            }
+            windowHidden = true;
+            dbg("cursor: hideWindow no-op (not Win32 or no hwnd)");
         } catch (Exception e) {
             dbg("cursor: hideWindow failed: " + e.getMessage());
         }
@@ -1954,29 +1953,8 @@ public final class ReflectionHelper {
 
     public static void showWindow(Object mc) {
         if (!windowHidden) return;
-        try {
-            long handle = getWindowHandle(mc);
-            if (handle == 0 || !LWJGL3) return;
-            initCursorCache();
-            McpPlatformControl ctrl = McpControlFactory.get();
-            if (ctrl instanceof McpWin32Control) {
-                McpWin32Control w32 = (McpWin32Control) ctrl;
-                long hwnd = w32.getMcHwnd();
-                if (hwnd != 0) {
-                    w32.moveWindowBack(hwnd, savedWindowX, savedWindowY);
-                    windowHidden = false;
-                    dbg("cursor: window moved back onscreen");
-                    return;
-                }
-            }
-            if (glfwShowWindowMethod != null) {
-                glfwShowWindowMethod.invoke(null, handle);
-                windowHidden = false;
-                dbg("cursor: window shown via glfwShowWindow (fallback)");
-            }
-        } catch (Exception e) {
-            dbg("cursor: showWindow failed: " + e.getMessage());
-        }
+        windowHidden = false;
+        dbg("cursor: showWindow skipped (no-op for testing)");
     }
 
     public static void tickForceCursorNormal(Object mc) {
