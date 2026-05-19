@@ -68,11 +68,20 @@ public class McpWin32Control implements McpPlatformControl {
         boolean UnregisterHotKey(long hWnd, int id);
         boolean PeekMessageW(MSG lpMsg, long hWnd, int wMsgFilterMin, int wMsgFilterMax, int wRemoveMsg);
         boolean PostQuitMessage(int nExitCode);
+        interface WNDENUMPROC extends StdCallCallback { boolean callback(long hWnd, long lParam); }
+        boolean EnumWindows(WNDENUMPROC lpEnumFunc, long lParam);
+        int GetWindowThreadProcessId(long hWnd, int[] lpdwProcessId);
+        boolean IsWindowVisible(long hWnd);
+        long FindWindowW(String lpClassName, String lpWindowName);
+        boolean ClientToScreen(long hWnd, POINT lpPoint);
+        boolean SetCursorPos(int X, int Y);
+        void mouse_event(int dwFlags, int dx, int dy, int dwData, long dwExtraInfo);
     }
 
     private interface MyKernel32 extends StdCallLibrary {
         MyKernel32 INSTANCE = Native.load("kernel32", MyKernel32.class);
         long GetModuleHandleW(String lpModuleName);
+        long GetCurrentProcessId();
     }
 
     public interface LowLevelMouseProc extends Callback {
@@ -243,21 +252,7 @@ public class McpWin32Control implements McpPlatformControl {
         if (mouseHookHandle != 0) return true;
         mcHwnd = mcNativeWindowHandle;
 
-        mouseHookCallback = (nCode, wParam, lParam) -> {
-            if (nCode >= 0 && controlMode && mcHwnd != 0) {
-                try {
-                    Pointer base = lParam;
-                    int ptX = base.getInt(0);
-                    int ptY = base.getInt(4);
-                    RECT r = new RECT();
-                    U.GetWindowRect(mcHwnd, r);
-                    if (ptX >= r.left && ptX <= r.right && ptY >= r.top && ptY <= r.bottom) {
-                        return 1L;
-                    }
-                } catch (Exception ignored) {}
-            }
-            return U.CallNextHookEx(mouseHookHandle, nCode, wParam, lParam);
-        };
+        mouseHookCallback = (nCode, wParam, lParam) -> U.CallNextHookEx(mouseHookHandle, nCode, wParam, lParam);
 
         CountDownLatch latch = new CountDownLatch(1);
         boolean[] ok = {false};
@@ -419,6 +414,71 @@ public class McpWin32Control implements McpPlatformControl {
         U.PostMessageW(mcHwnd, WM_LBUTTONDOWN, MK_LBUTTON, lp);
         try { Thread.sleep(50); } catch (InterruptedException ignored) {}
         return U.PostMessageW(mcHwnd, WM_LBUTTONUP, 0, lp);
+    }
+
+    private long findMcHwnd() {
+        if (mcHwnd != 0) return mcHwnd;
+        long hwnd = U.FindWindowW(null, "Minecraft* Forge 1.21.7");
+        if (hwnd == 0) hwnd = U.FindWindowW(null, "Minecraft");
+        if (hwnd != 0) {
+            mcHwnd = hwnd;
+            return mcHwnd;
+        }
+        int pid = (int) K.GetCurrentProcessId();
+        final long[] found = {0};
+        try {
+            MyUser32.WNDENUMPROC proc = new MyUser32.WNDENUMPROC() {
+                @Override
+                public boolean callback(long hWnd, long lParam) {
+                    int[] wpid = new int[1];
+                    U.GetWindowThreadProcessId(hWnd, wpid);
+                    if (wpid[0] == pid && U.IsWindowVisible(hWnd)) {
+                        found[0] = hWnd;
+                        return false;
+                    }
+                    return true;
+                }
+            };
+            U.EnumWindows(proc, 0);
+        } catch (Exception ignored) {}
+        if (found[0] != 0) mcHwnd = found[0];
+        return mcHwnd;
+    }
+
+    public boolean ensureHwndFromGlfw(long glfwHandle) {
+        if (mcHwnd != 0) return true;
+        try {
+            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFWNativeWin32");
+            java.lang.reflect.Method m = glfw.getMethod("glfwGetWin32Window", long.class);
+            mcHwnd = (long) m.invoke(null, glfwHandle);
+            return mcHwnd != 0;
+        } catch (Exception e) {
+            ReflectionHelper.dbg("ensureHwndFromGlfw: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static final int MOUSEEVENTF_LEFTDOWN = 0x0002;
+    private static final int MOUSEEVENTF_LEFTUP = 0x0004;
+
+    public boolean injectClickClient(int clientX, int clientY) {
+        if (findMcHwnd() == 0) return false;
+        try {
+            POINT pt = new POINT(clientX, clientY);
+            U.ClientToScreen(mcHwnd, pt);
+            int screenX = pt.x;
+            int screenY = pt.y;
+            ReflectionHelper.dbg("injectClickClient: client(" + clientX + "," + clientY + ") -> screen(" + screenX + "," + screenY + ")");
+            U.SetCursorPos(screenX, screenY);
+            Thread.sleep(30);
+            U.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
+            Thread.sleep(50);
+            U.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+            return true;
+        } catch (Exception e) {
+            ReflectionHelper.dbg("injectClickClient mouse_event failed: " + e.getMessage());
+            return false;
+        }
     }
 
     @Override

@@ -138,6 +138,15 @@ async fn handle_command(
             }
         },
 
+        "inject_click" => {
+            let x = cmd.params.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+            let y = cmd.params.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+            match bridge.send_rpc("inject_click", serde_json::json!({"x": x.to_string(), "y": y.to_string()})).await {
+                Ok(r) => serde_json::to_value(r).unwrap_or_default(),
+                Err(e) => serde_json::json!({"error": e.to_string()}),
+            }
+        },
+
         "press_key" => {
             let key = cmd
                 .params

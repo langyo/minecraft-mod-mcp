@@ -23,6 +23,7 @@ public class McpWebSocketClient extends WebSocketClient {
             setMax.invoke(this, 10 * 1024 * 1024);
         } catch (Exception ignored) {}
         System.out.println("[MCP-WS] Connected to MCP server");
+        ReflectionHelper.setForceCursorNormal(true);
         handler.sendInit(this);
     }
 
@@ -40,6 +41,7 @@ public class McpWebSocketClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         System.out.println("[MCP-WS] Disconnected: " + reason + " (code=" + code + ")");
+        ReflectionHelper.setForceCursorNormal(false);
         new Thread(() -> {
             try { Thread.sleep(3000); reconnect(); }
             catch (Exception e) { System.err.println("[MCP-WS] Reconnect failed: " + e.getMessage()); }

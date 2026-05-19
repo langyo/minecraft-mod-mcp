@@ -95,6 +95,16 @@ async fn main() -> anyhow::Result<()> {
                 let seconds: f64 = rest.parse().unwrap_or(1.0);
                 serde_json::json!({"cmd": "wait", "seconds": seconds}).to_string()
             },
+            "inject_click" => {
+                let coords: Vec<&str> = rest.split_whitespace().collect();
+                let x: i64 = coords.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+                let y: i64 = coords.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                serde_json::json!({
+                    "cmd": "ws",
+                    "method": "inject_click",
+                    "params": {"x": x, "y": y}
+                }).to_string()
+            },
             "click_btn_idx" => {
                 let idx: i64 = rest.parse().unwrap_or(0);
                 serde_json::json!({

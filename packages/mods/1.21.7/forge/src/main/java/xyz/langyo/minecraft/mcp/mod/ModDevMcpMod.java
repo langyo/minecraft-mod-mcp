@@ -35,8 +35,9 @@ public class ModDevMcpMod {
                     wsClient.connectAsync();
                     while (true) {
                         try {
-                            Thread.sleep(50);
+                            Thread.sleep(10);
                             if (wsClient != null) wsClient.handleMessages();
+                            ReflectionHelper.tickForceCursorNormal(ReflectionHelper.getMinecraftInstance());
                         } catch (Exception e) { break; }
                     }
                 } catch (Exception e) {

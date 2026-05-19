@@ -89,7 +89,10 @@ public final class ReflectionHelper {
         }
     }
 
+    private static long cachedWindowHandle = 0;
+
     public static long getWindowHandle(Object mc) {
+        if (cachedWindowHandle != 0) return cachedWindowHandle;
         try {
             Object window = null;
             try { window = mc.getClass().getMethod("getWindow").invoke(mc); }
@@ -111,7 +114,7 @@ public final class ReflectionHelper {
                     Object result = window.getClass().getMethod(methodName).invoke(window);
                     if (result instanceof Number) {
                         long val = ((Number) result).longValue();
-                        if (val != 0) return val;
+                        if (val != 0) { cachedWindowHandle = val; return val; }
                     }
                 } catch (NoSuchMethodException ignored) {}
             }
@@ -119,7 +122,7 @@ public final class ReflectionHelper {
                 if (f.getType() == long.class) {
                     f.setAccessible(true);
                     long val = f.getLong(window);
-                    if (val != 0) return val;
+                    if (val != 0) { cachedWindowHandle = val; return val; }
                 }
             }
             return 0;
@@ -216,24 +219,33 @@ public final class ReflectionHelper {
             double gx = x / scale;
             double gy = y / scale;
             dbg("guiClick: raw(" + x + "," + y + ") -> gui(" + (int)gx + "," + (int)gy + ") scale=" + scale + " screen=" + screenName);
+            dbg("guiClick: listing all boolean methods on " + screen.getClass().getName());
+            for (Method dm : getAllMethods(screen.getClass())) {
+                if (dm.getParameterCount() <= 4 && (dm.getReturnType() == boolean.class)) {
+                    dbg("guiClick: bool method: " + dm.getName() + java.util.Arrays.toString(dm.getParameterTypes()) + " from " + dm.getDeclaringClass().getSimpleName());
+                }
+            }
             StringBuilder results = new StringBuilder();
-            for (String methodName : new String[]{"mouseClicked", "mouseReleased"}) {
-                for (Method m : getAllMethods(screen.getClass())) {
-                    String n = m.getName();
-                    if (n.equals(methodName) && m.getParameterCount() == 3) {
-                        Class<?>[] pt = m.getParameterTypes();
-                        boolean match = (pt[0] == double.class && pt[1] == double.class && pt[2] == int.class)
-                                || (pt[0] == int.class && pt[1] == int.class && pt[2] == int.class);
-                        if (match) {
+            for (Method m : getAllMethods(screen.getClass())) {
+                String n = m.getName();
+                Class<?>[] pt = m.getParameterTypes();
+                if (m.getParameterCount() == 3 && (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class)) {
+                    boolean isMouseLike = (pt[0] == double.class && pt[1] == double.class && pt[2] == int.class);
+                    boolean isIntMouse = (pt[0] == int.class && pt[1] == int.class && pt[2] == int.class);
+                    if (isMouseLike || isIntMouse) {
+                        dbg("guiClick: trying handler " + n + " params=" + java.util.Arrays.toString(pt) + " from " + m.getDeclaringClass().getSimpleName());
+                        try {
                             m.setAccessible(true);
-                            Object result = m.invoke(screen, castParam(pt[0], gx), castParam(pt[1], gy), castParam(pt[2], button));
+                            Object result = isMouseLike ? m.invoke(screen, gx, gy, button) : m.invoke(screen, (int)gx, (int)gy, button);
                             if (results.length() > 0) results.append(",");
-                            results.append("\"").append(methodName).append("\":").append(result);
+                            results.append("\"").append(n).append("\":").append(result);
+                            if (Boolean.TRUE.equals(result)) break;
+                        } catch (Exception e) {
+                            dbg("guiClick: " + n + " failed: " + e.getMessage());
                         }
                     }
                 }
             }
-            // Also find child widget at coordinates and trigger its press
             String widgetResult = "";
             for (Field f : getAllFields(screen.getClass())) {
                 String fn = f.getName();
@@ -256,23 +268,47 @@ public final class ReflectionHelper {
                                 // Check bounds with some tolerance
                                 if (wx <= gx && gx < wx + ww && wy <= gy && gy < wy + wh) {
                                     dbg("guiClick: hit widget " + w.getClass().getSimpleName() + " at (" + wx + "," + wy + ")+" + ww + "x" + wh);
-                                    // Try onPress method
+                                    double relX = gx - wx;
+                                    double relY = gy - wy;
+                                    boolean widgetClicked = false;
                                     for (Method bm : getAllMethods(w.getClass())) {
-                                        if ((bm.getName().equals("onPress") || bm.getName().equals("onClick"))
-                                                && bm.getParameterCount() <= 2) {
+                                        Class<?>[] bpt = bm.getParameterTypes();
+                                        if (bm.getParameterCount() == 3
+                                                && bpt[0] == double.class && bpt[1] == double.class && bpt[2] == int.class
+                                                && bm.getReturnType() == boolean.class) {
+                                            try {
+                                                bm.setAccessible(true);
+                                                Object r = bm.invoke(w, relX, relY, button);
+                                                dbg("guiClick: widget." + bm.getName() + "(" + (int)relX + "," + (int)relY + ")=" + r);
+                                                if (Boolean.TRUE.equals(r)) widgetClicked = true;
+                                            } catch (Exception e) {
+                                                dbg("guiClick: widget." + bm.getName() + " failed: " + e.getMessage());
+                                            }
+                                        }
+                                    }
+                                    if (!widgetClicked) {
+                                        for (Method bm : getAllMethods(w.getClass())) {
+                                            if ((bm.getName().equals("onPress") || bm.getName().equals("onClick"))
+                                                    && bm.getParameterCount() <= 2) {
                                             bm.setAccessible(true);
                                             Class<?>[] bpt = bm.getParameterTypes();
                                             Object[] bargs = new Object[bpt.length];
                                             for (int bi = 0; bi < bpt.length; bi++) {
                                                 if (bpt[bi] == double.class) bargs[bi] = 0.0;
-                                                else bargs[bi] = 0;
+                                                else if (bpt[bi] == float.class) bargs[bi] = 0.0f;
+                                                else if (bpt[bi] == int.class) bargs[bi] = 0;
+                                                else if (bpt[bi] == long.class) bargs[bi] = 0L;
+                                                else if (bpt[bi] == boolean.class) bargs[bi] = false;
+                                                else if (bpt[bi].isInstance(w)) bargs[bi] = w;
+                                                else bargs[bi] = null;
                                             }
                                             bm.invoke(w, bargs);
                                             widgetResult = ",\"widget\":\"" + w.getClass().getSimpleName() + "\",\"widget_method\":\"" + bm.getName() + "\"";
+                                            }
                                         }
                                     }
-                                    // Try onPress field
-                                    for (Field bf : getAllFields(w.getClass())) {
+                                    if (!widgetClicked) {
+                                        for (Field bf : getAllFields(w.getClass())) {
                                         if (bf.getName().equals("onPress")) {
                                             bf.setAccessible(true);
                                             Object ph = bf.get(w);
@@ -286,6 +322,7 @@ public final class ReflectionHelper {
                                                         widgetResult = ",\"widget\":\"" + w.getClass().getSimpleName() + "\",\"via\":\"" + hm.getName() + "()\"";
                                                     }
                                                 }
+                                            }
                                             }
                                         }
                                     }
@@ -536,11 +573,17 @@ public final class ReflectionHelper {
                         for (Object widget : (java.util.List<?>) list) {
                             if (idx == index) {
                                 dbg("clickButtonByIndex: index=" + index + " class=" + widget.getClass().getSimpleName());
+                                for (Field df : getAllFields(widget.getClass())) {
+                                    if (df.getName().equals("onPress") || df.getName().contains("press")) {
+                                        try { df.setAccessible(true); Object pv = df.get(widget); dbg("clickBtn: field " + df.getName() + "=" + (pv != null ? pv.getClass().getSimpleName() : "null") + " on " + df.getDeclaringClass().getSimpleName()); } catch (Exception ignored) {}
+                                    }
+                                }
                                 // Try onPress method
                                 for (Method bm : getAllMethods(widget.getClass())) {
                                     String bn = bm.getName();
                                     if ((bn.equals("onPress") || bn.equals("onClick") || bn.equals("pressAction"))
                                             && bm.getParameterCount() <= 2) {
+                                        dbg("clickBtn: found " + bn + " params=" + java.util.Arrays.toString(bm.getParameterTypes()) + " on " + widget.getClass().getSimpleName() + " declared=" + bm.getDeclaringClass().getSimpleName());
                                         try {
                                             bm.setAccessible(true);
                                             Class<?>[] bpt = bm.getParameterTypes();
@@ -548,9 +591,14 @@ public final class ReflectionHelper {
                                             for (int bi = 0; bi < bpt.length; bi++) {
                                                 if (bpt[bi] == double.class) bargs[bi] = 0.0;
                                                 else if (bpt[bi] == float.class) bargs[bi] = 0.0f;
-                                                else bargs[bi] = 0;
+                                                else if (bpt[bi] == int.class) bargs[bi] = 0;
+                                                else if (bpt[bi] == long.class) bargs[bi] = 0L;
+                                                else if (bpt[bi] == boolean.class) bargs[bi] = false;
+                                                else if (bpt[bi].isInstance(widget)) bargs[bi] = widget;
+                                                else bargs[bi] = null;
                                             }
                                             bm.invoke(widget, bargs);
+                                            dbg("clickBtn: invoke OK");
                                             return "{\"clicked\":true,\"index\":" + index + ",\"method\":\"" + bn + "\",\"class\":\"" + widget.getClass().getSimpleName() + "\"}";
                                         } catch (Exception e) { dbg("btn invoke fail " + bn + ": " + e.getMessage()); }
                                     }
@@ -1757,6 +1805,15 @@ public final class ReflectionHelper {
                 try {
                     Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
                     nativeHwnd = (long) glfw.getMethod("glfwGetWin32Window", long.class).invoke(null, glfwHandle);
+                    try {
+                        int GLFW_CURSOR_NORMAL = glfw.getField("GLFW_CURSOR_NORMAL").getInt(null);
+                        int GLFW_CURSOR = glfw.getField("GLFW_CURSOR").getInt(null);
+                        glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class)
+                            .invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                        dbg("enterMcpControlMode: GLFW cursor set to NORMAL");
+                    } catch (Exception ce) {
+                        dbg("enterMcpControlMode: glfwSetInputMode failed: " + ce.getMessage());
+                    }
                 } catch (Exception e1) {
                     try {
                         nativeHwnd = (long) Class.forName("org.lwjgl.glfw.GLFWNativeWin32")
@@ -1771,7 +1828,8 @@ public final class ReflectionHelper {
             boolean hookOk = ctrl.installMouseHook(nativeHwnd);
             dbg("enterMcpControlMode: platform=" + ctrl.getPlatformName() + " hook=" + hookOk + " hwnd=" + Long.toHexString(nativeHwnd));
             ctrl.setControlMode(true);
-            ctrl.showOverlay("", 9876);
+            forceCursorNormal = true;
+            dbg("enterMcpControlMode: platform=" + ctrl.getPlatformName() + " hook=" + hookOk + " hwnd=" + Long.toHexString(nativeHwnd));
             return "{\"control_mode\":true,\"platform\":\"" + ctrl.getPlatformName() + "\",\"hook\":" + hookOk + "}";
         } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
     }
@@ -1779,16 +1837,250 @@ public final class ReflectionHelper {
     public static String exitMcpControlMode(Object mc) {
         try {
             mcpControlMode = false;
+            forceCursorNormal = false;
             McpPlatformControl ctrl = McpControlFactory.get();
             ctrl.setControlMode(false);
-            ctrl.hideOverlay();
             ctrl.uninstallMouseHook();
+
+            long glfwHandle = getWindowHandle(mc);
+            if (glfwHandle != 0 && LWJGL3) {
+                try {
+                    Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+                    int GLFW_CURSOR_DISABLED = glfw.getField("GLFW_CURSOR_DISABLED").getInt(null);
+                    int GLFW_CURSOR = glfw.getField("GLFW_CURSOR").getInt(null);
+                    glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class)
+                        .invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                    dbg("exitMcpControlMode: GLFW cursor set back to DISABLED");
+                } catch (Exception ce) {
+                    dbg("exitMcpControlMode: glfwSetInputMode failed: " + ce.getMessage());
+                }
+            }
+
             dbg("exitMcpControlMode: OFF platform=" + ctrl.getPlatformName());
             return "{\"control_mode\":false}";
         } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
     }
 
     public static boolean isMcpControlMode() { return mcpControlMode; }
+
+    private static volatile boolean forceCursorNormal = false;
+    private static Method glfwSetInputMode;
+    private static int GLFW_CURSOR_VAL = -1;
+    private static int GLFW_CURSOR_NORMAL_VAL = -1;
+    private static boolean cursorCacheInit = false;
+    private static Field mouseGrabbedField = null;
+    private static Field accumulatedDXField = null;
+    private static Field accumulatedDYField = null;
+    private static Field mcScreenField = null;
+    private static boolean mouseFieldsInit = false;
+    private static boolean screenFieldInit = false;
+    private static volatile boolean dummyInjected = false;
+    private static volatile boolean lastForceState = false;
+
+    private static void initCursorCache() throws Exception {
+        if (cursorCacheInit) return;
+        Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+        GLFW_CURSOR_VAL = glfw.getField("GLFW_CURSOR").getInt(null);
+        GLFW_CURSOR_NORMAL_VAL = glfw.getField("GLFW_CURSOR_NORMAL").getInt(null);
+        glfwSetInputMode = glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class);
+        cursorCacheInit = true;
+    }
+
+    private static void initMouseFields(Object mouseHandler) throws Exception {
+        if (mouseFieldsInit) return;
+        mouseFieldsInit = true;
+        for (Field f : getAllFields(mouseHandler.getClass())) {
+            String fn = f.getName().toLowerCase();
+            if ((fn.contains("grabbed")) && f.getType() == boolean.class) {
+                f.setAccessible(true);
+                mouseGrabbedField = f;
+                dbg("cursor: found mouseGrabbed=" + f.getName());
+            }
+            if (fn.contains("accumulateddx") && f.getType() == double.class) {
+                f.setAccessible(true);
+                accumulatedDXField = f;
+                dbg("cursor: found accDX=" + f.getName());
+            }
+            if (fn.contains("accumulateddy") && f.getType() == double.class) {
+                f.setAccessible(true);
+                accumulatedDYField = f;
+                dbg("cursor: found accDY=" + f.getName());
+            }
+        }
+    }
+
+    private static void initScreenField(Object mc) throws Exception {
+        if (screenFieldInit) return;
+        screenFieldInit = true;
+        Class<?> screenClass = Class.forName("net.minecraft.client.gui.screens.Screen");
+        for (Field f : getAllFields(mc.getClass())) {
+            if (screenClass.isAssignableFrom(f.getType()) && f.getName().toLowerCase().contains("screen")) {
+                f.setAccessible(true);
+                mcScreenField = f;
+                dbg("cursor: found screen field: " + f.getName() + " type=" + f.getType().getName());
+                break;
+            }
+        }
+        if (mcScreenField == null) {
+            for (Field f : mc.getClass().getDeclaredFields()) {
+                if (screenClass.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    mcScreenField = f;
+                    dbg("cursor: found screen field (alt): " + f.getName());
+                    break;
+                }
+            }
+        }
+    }
+
+    private static Object createDummyScreen() {
+        String[] concreteClasses = {
+            "net.minecraft.client.gui.screens.ReceivingLevelScreen",
+            "net.minecraft.client.gui.screens.ProgressScreen",
+            "net.minecraft.client.gui.screens.GenericMessageScreen",
+            "net.minecraft.client.gui.screens.TitleScreen",
+        };
+        Object unsafe = null;
+        Method allocate = null;
+        try {
+            Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
+            Field uf = unsafeClass.getDeclaredField("theUnsafe");
+            uf.setAccessible(true);
+            unsafe = uf.get(null);
+            allocate = unsafeClass.getMethod("allocateInstance", Class.class);
+        } catch (Exception e) {
+            dbg("cursor: Unsafe unavailable: " + e);
+            return null;
+        }
+
+        for (String className : concreteClasses) {
+            try {
+                Class<?> cls = Class.forName(className);
+                try {
+                    java.lang.reflect.Constructor<?> ctor = cls.getDeclaredConstructor();
+                    ctor.setAccessible(true);
+                    Object screen = ctor.newInstance();
+                    dbg("cursor: created " + className + " via constructor");
+                    return screen;
+                } catch (Exception nsme) {
+                    // no no-arg constructor or instantiation failed, try Unsafe
+                }
+                try {
+                    Object screen = allocate.invoke(unsafe, cls);
+                    if (screen != null) {
+                        dbg("cursor: created " + className + " via Unsafe");
+                        return screen;
+                    }
+                } catch (Exception e) {
+                    dbg("cursor: Unsafe failed for " + className + ": " + e);
+                }
+            } catch (ClassNotFoundException cnfe) {
+                // try next
+            }
+        }
+
+        // Try Screen itself via Unsafe (it's abstract but Unsafe might still work)
+        try {
+            Class<?> screenClass = Class.forName("net.minecraft.client.gui.screens.Screen");
+            Object screen = allocate.invoke(unsafe, screenClass);
+            if (screen != null) {
+                dbg("cursor: created Screen via Unsafe (abstract)");
+                return screen;
+            }
+        } catch (Exception e) {
+            dbg("cursor: Screen Unsafe failed: " + e);
+        }
+
+        // Last resort: try Component.literal + constructor with Component
+        try {
+            Class<?> compClass = Class.forName("net.minecraft.network.chat.Component");
+            Method literal = compClass.getMethod("literal", String.class);
+            Object emptyComp = literal.invoke(null, "");
+            Class<?> screenClass = Class.forName("net.minecraft.client.gui.screens.Screen");
+            for (java.lang.reflect.Constructor<?> ctor : screenClass.getDeclaredConstructors()) {
+                if (ctor.getParameterCount() == 1 && ctor.getParameterTypes()[0].isInstance(emptyComp)) {
+                    ctor.setAccessible(true);
+                    Object screen = ctor.newInstance(emptyComp);
+                    dbg("cursor: created Screen(Component) via constructor");
+                    return screen;
+                }
+            }
+        } catch (Exception e) {
+            dbg("cursor: Screen(Component) failed: " + e);
+        }
+
+        dbg("cursor: ALL screen creation methods failed");
+        return null;
+    }
+
+    public static void setForceCursorNormal(boolean v) { forceCursorNormal = v; }
+
+    public static boolean isForceCursorNormal() { return forceCursorNormal; }
+
+    public static void tickForceCursorNormal(Object mc) {
+        if (!forceCursorNormal) {
+            if (lastForceState) {
+                dummyInjected = false;
+                lastForceState = false;
+            }
+            return;
+        }
+        try {
+            long handle = getWindowHandle(mc);
+            if (handle == 0 || !LWJGL3) return;
+            initCursorCache();
+
+            Object currentScreen = getCurrentScreen(mc);
+            if (currentScreen != null) {
+                dummyInjected = false;
+                return;
+            }
+
+            initScreenField(mc);
+            if (mcScreenField != null && !dummyInjected) {
+                Object dummy = createDummyScreen();
+                if (dummy != null) {
+                    try {
+                        mcScreenField.set(mc, dummy);
+                        dummyInjected = true;
+                        dbg("cursor: injected dummy screen, releasing mouse");
+                        Object mouseHandler = getMouseHandler(mc);
+                        if (mouseHandler != null) {
+                            initMouseFields(mouseHandler);
+                            if (mouseGrabbedField != null) {
+                                mouseGrabbedField.setBoolean(mouseHandler, false);
+                            }
+                        }
+                        // Call releaseMouse via method
+                        for (Method m : getAllMethods(mouseHandler.getClass())) {
+                            if (m.getName().equals("releaseMouse") && m.getParameterCount() == 0) {
+                                m.setAccessible(true);
+                                m.invoke(mouseHandler);
+                                dbg("cursor: called releaseMouse");
+                                break;
+                            }
+                        }
+                    } catch (Exception e) {
+                        dbg("cursor: inject failed: " + e);
+                        dummyInjected = false;
+                    }
+                }
+            }
+
+            glfwSetInputMode.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+
+            Object mouseHandler = getMouseHandler(mc);
+            if (mouseHandler != null) {
+                initMouseFields(mouseHandler);
+                if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
+                if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
+            }
+
+            lastForceState = true;
+        } catch (Exception e) {
+            dbg("cursor: " + e.getMessage());
+        }
+    }
 
     public static String showMcpOverlay(String text, int port) {
         McpPlatformControl ctrl = McpControlFactory.get();
@@ -1808,6 +2100,22 @@ public final class ReflectionHelper {
 
     public static String platformInjectClick(int x, int y) {
         McpPlatformControl ctrl = McpControlFactory.get();
+        if (ctrl instanceof McpWin32Control) {
+            McpWin32Control w32 = (McpWin32Control) ctrl;
+            try {
+                Object mc = getMinecraftInstance();
+                long glfwHandle = getWindowHandle(mc);
+                dbg("platformInjectClick: glfwHandle=" + glfwHandle);
+                if (glfwHandle != 0) {
+                    boolean ensured = w32.ensureHwndFromGlfw(glfwHandle);
+                    dbg("platformInjectClick: ensureHwnd=" + ensured);
+                }
+            } catch (Exception e) {
+                dbg("platformInjectClick: mc resolve failed: " + e.getMessage());
+            }
+            boolean ok = w32.injectClickClient(x, y);
+            return "{\"inject_click\":" + ok + ",\"x\":" + x + ",\"y\":" + y + "}";
+        }
         boolean ok = ctrl.injectClick(x, y);
         return "{\"inject_click\":" + ok + ",\"x\":" + x + ",\"y\":" + y + "}";
     }
