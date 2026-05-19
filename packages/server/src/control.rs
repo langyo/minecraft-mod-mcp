@@ -286,3 +286,16 @@ async fn handle_command(
         _ => serde_json::json!({"error": format!("unknown cmd: {}", cmd.cmd)}),
     }
 }
+
+pub async fn handle_http_cmd(
+    raw: serde_json::Value,
+    bridge: &crate::bridge::Bridge,
+) -> serde_json::Value {
+    let cmd: ControlCommand = match serde_json::from_value(raw) {
+        Ok(c) => c,
+        Err(e) => return serde_json::json!({"error": format!("parse error: {}", e)}),
+    };
+    let dummy_proc: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
+    let dummy_ver: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    handle_command(&cmd, bridge, &dummy_proc, &dummy_ver).await
+}

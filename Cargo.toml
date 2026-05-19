@@ -29,6 +29,8 @@ uuid = { version = "1", features = ["v4"] }
 which = "7"
 imageproc = "0.26"
 ab_glyph = "0.2"
+async-stream = "0.3"
+tokio-stream = "0.1"
 
 [profile.dev]
 debug = 1
