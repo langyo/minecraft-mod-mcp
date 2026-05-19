@@ -1866,6 +1866,7 @@ public final class ReflectionHelper {
     private static volatile boolean forceCursorNormal = false;
     private static Method glfwSetInputModeMethod;
     private static Method glfwHideWindowMethod;
+    private static Method glfwShowWindowMethod;
     private static int GLFW_CURSOR_VAL = -1;
     private static int GLFW_CURSOR_NORMAL_VAL = -1;
     private static boolean cursorCacheInit = false;
@@ -1875,6 +1876,8 @@ public final class ReflectionHelper {
     private static boolean mouseFieldsInit = false;
     private static volatile boolean lastForceState = false;
     private static volatile boolean windowHidden = false;
+    private static int savedWindowX = 0;
+    private static int savedWindowY = 0;
 
     private static void initCursorCache() throws Exception {
         if (cursorCacheInit) return;
@@ -1883,6 +1886,7 @@ public final class ReflectionHelper {
         GLFW_CURSOR_NORMAL_VAL = glfw.getField("GLFW_CURSOR_NORMAL").getInt(null);
         glfwSetInputModeMethod = glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class);
         try { glfwHideWindowMethod = glfw.getMethod("glfwHideWindow", long.class); } catch (Exception ignored) {}
+        try { glfwShowWindowMethod = glfw.getMethod("glfwShowWindow", long.class); } catch (Exception ignored) {}
         cursorCacheInit = true;
     }
 
@@ -1921,10 +1925,27 @@ public final class ReflectionHelper {
             long handle = getWindowHandle(mc);
             if (handle == 0 || !LWJGL3) return;
             initCursorCache();
+            McpPlatformControl ctrl = McpControlFactory.get();
+            if (ctrl instanceof McpWin32Control) {
+                McpWin32Control w32 = (McpWin32Control) ctrl;
+                w32.ensureHwndFromGlfw(handle);
+                long hwnd = w32.getMcHwnd();
+                if (hwnd != 0) {
+                    int[] rect = w32.getWindowRect(hwnd);
+                    if (rect != null) {
+                        savedWindowX = rect[0];
+                        savedWindowY = rect[1];
+                    }
+                    w32.moveWindowOffscreen(hwnd);
+                    windowHidden = true;
+                    dbg("cursor: window moved offscreen (saved " + savedWindowX + "," + savedWindowY + ")");
+                    return;
+                }
+            }
             if (glfwHideWindowMethod != null) {
                 glfwHideWindowMethod.invoke(null, handle);
                 windowHidden = true;
-                dbg("cursor: window hidden via glfwHideWindow");
+                dbg("cursor: window hidden via glfwHideWindow (fallback)");
             }
         } catch (Exception e) {
             dbg("cursor: hideWindow failed: " + e.getMessage());
@@ -1937,11 +1958,22 @@ public final class ReflectionHelper {
             long handle = getWindowHandle(mc);
             if (handle == 0 || !LWJGL3) return;
             initCursorCache();
-            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-            Method showMethod = glfw.getMethod("glfwShowWindow", long.class);
-            showMethod.invoke(null, handle);
-            windowHidden = false;
-            dbg("cursor: window shown via glfwShowWindow");
+            McpPlatformControl ctrl = McpControlFactory.get();
+            if (ctrl instanceof McpWin32Control) {
+                McpWin32Control w32 = (McpWin32Control) ctrl;
+                long hwnd = w32.getMcHwnd();
+                if (hwnd != 0) {
+                    w32.moveWindowBack(hwnd, savedWindowX, savedWindowY);
+                    windowHidden = false;
+                    dbg("cursor: window moved back onscreen");
+                    return;
+                }
+            }
+            if (glfwShowWindowMethod != null) {
+                glfwShowWindowMethod.invoke(null, handle);
+                windowHidden = false;
+                dbg("cursor: window shown via glfwShowWindow (fallback)");
+            }
         } catch (Exception e) {
             dbg("cursor: showWindow failed: " + e.getMessage());
         }
