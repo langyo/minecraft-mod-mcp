@@ -9,8 +9,7 @@ import net.minecraftforge.common.MinecraftForge;
 @Mod(modid = "mcpmod", name = "ModDev MCP", version = "1.0")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     @Mod.Instance("mcpmod")
     public static ModDevMcpMod instance;
@@ -18,15 +17,21 @@ public class ModDevMcpMod {
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         INSTANCE = this;
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
-        MinecraftForge.EVENT_BUS.register(this);
-    }
-
-    @net.minecraftforge.fml.common.eventhandler.SubscribeEvent
-    public void onTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+        boolean depsOk = false;
+        try { Class.forName("com.sun.jna.Library"); depsOk = true; } catch (Exception ignored) {}
+        if (!depsOk) {
+            System.err.println("[MCP-MOD] JNA not on classpath. External control unavailable.");
+            return;
+        }
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+                int port = McpConfig.getServerPort();
+                httpServer = new McpHttpServer(handler, port);
+                httpServer.start();
+                System.out.println("[MCP-MOD] Debug page: http://127.0.0.1:" + port + "/debug");
+            } catch (Exception e) { System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage()); }
+        }, "MCP-HTTP").start();
     }
 }

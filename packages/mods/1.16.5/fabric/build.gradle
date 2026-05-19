@@ -16,10 +16,13 @@ repositories {
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
+sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
     minecraft "com.mojang:minecraft:1.16.5"
     mappings "net.fabricmc:yarn:1.16.5+build.10:v2"
     modImplementation "net.fabricmc:fabric-loader:0.12.12"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    implementation "net.java.dev.jna:jna:5.15.0"
+    implementation "net.java.dev.jna:jna-platform:5.15.0"
 }

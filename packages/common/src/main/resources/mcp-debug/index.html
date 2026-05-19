@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MCP Debug</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.hdr{background:#161b22;border-bottom:1px solid #30363d;padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.hdr h1{font-size:16px;color:#58a6ff}
+.dot{width:10px;height:10px;border-radius:50%;background:#3fb950;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.dot.off{background:#f85149;animation:none}
+.main{display:flex;flex:1;overflow:hidden}
+.left{flex:1;display:flex;flex-direction:column;border-right:1px solid #30363d;min-width:0}
+.imgbox{flex:1;overflow:auto;background:#010409;display:flex;align-items:flex-start;justify-content:center;padding:8px}
+.imgbox img{max-width:100%;height:auto;image-rendering:pixelated}
+.vctrl{background:#161b22;padding:6px 12px;display:flex;gap:8px;align-items:center;border-top:1px solid #30363d;flex-shrink:0}
+.vctrl button{background:#21262d;color:#c9d1d9;border:1px solid #30363d;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+.vctrl button:hover{background:#30363d}
+.vctrl button.active{background:#238636;border-color:#2ea043;color:#fff}
+.info{color:#8b949e;font-size:11px;font-family:monospace}
+.right{width:480px;display:flex;flex-direction:column;flex-shrink:0}
+.rhdr{background:#161b22;padding:8px 12px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.rhdr h2{font-size:14px;color:#58a6ff}
+.rhdr span{font-size:11px;color:#8b949e}
+.rhdr button{background:#21262d;color:#c9d1d9;border:1px solid #30363d;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:10px}
+.clist{flex:1;overflow-y:auto;padding:4px}
+.cent{background:#161b22;border:1px solid #30363d;border-radius:4px;margin-bottom:4px;font-size:11px;overflow:hidden}
+.cent .ch{padding:6px 8px;display:flex;align-items:center;gap:6px;cursor:pointer}
+.cent .ch:hover{background:#1c2128}
+.dir{font-size:9px;padding:1px 4px;border-radius:3px;font-weight:600;text-transform:uppercase}
+.dir.res{background:#3fb95033;color:#3fb950}
+.dir.err{background:#f8514933;color:#f85149}
+.mtd{color:#d2a8ff;font-family:monospace;font-weight:600}
+.dur{color:#8b949e;font-size:10px;margin-left:auto}
+.ts{color:#484f58;font-size:10px;margin-left:6px}
+.cb{display:none;padding:4px 8px 8px;border-top:1px solid #21262d}
+.cb.open{display:block}
+.cb pre{color:#8b949e;font-size:10px;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;background:#0d1117;padding:6px;border-radius:3px;margin-top:4px}
+.cpanel{background:#161b22;border-top:1px solid #30363d;padding:8px 12px;flex-shrink:0}
+.crow{display:flex;gap:4px}
+.crow input,.crow select{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px 6px;border-radius:3px;font-size:11px;font-family:monospace}
+.crow input{flex:1}
+.crow button{background:#21262d;color:#c9d1d9;border:1px solid #30363d;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px}
+.crow button:hover{background:#30362d}
+.crow button.send{background:#1f6feb;border-color:#388bfd;color:#fff}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <h1>MCP Debug</h1>
+  <span class="dot" id="dot"></span>
+  <span class="info" id="st">Connecting...</span>
+</div>
+<div class="main">
+<div class="left">
+  <div class="imgbox"><img id="img" src="" alt="screenshot"/></div>
+  <div class="vctrl">
+    <button id="btnPoll" onclick="togglePoll()">Start Capture</button>
+    <span class="info" id="fps">--</span>
+    <span class="info" id="res"></span>
+  </div>
+</div>
+<div class="right">
+  <div class="rhdr">
+    <h2>Calls</h2>
+    <span id="cc">0</span>
+    <button onclick="clearC()">Clear</button>
+  </div>
+  <div class="clist" id="cl"></div>
+  <div class="cpanel"><div class="crow">
+    <select id="sel" onchange="onSel()">
+      <option value="screenshot">screenshot</option>
+      <option value="click">click</option>
+      <option value="inject_click">inject_click</option>
+      <option value="press_key">press_key</option>
+      <option value="type_text">type_text</option>
+      <option value="scroll">scroll</option>
+      <option value="hotkey">hotkey</option>
+      <option value="execute_command">command</option>
+      <option value="get_player_info">player_info</option>
+      <option value="get_world_info">world_info</option>
+      <option value="get_screen_buttons">screen_buttons</option>
+    </select>
+    <input id="ex" placeholder='{"x":100,"y":200}'/>
+    <button class="send" onclick="sendC()">Send</button>
+  </div></div>
+</div>
+</div>
+<script>
+var polling=false,iv=null,fc=0,tot=0;
+var lastImg='';
+var BASE=location.origin;
+
+function $(id){return document.getElementById(id)}
+
+function togglePoll(){
+  polling=!polling;
+  var b=$('btnPoll');
+  if(polling){b.textContent='Stop';b.className='active';iv=setInterval(fetchSS,200)}
+  else{b.textContent='Start Capture';b.className='';clearInterval(iv);iv=null}
+}
+setInterval(function(){$('fps').textContent=Math.round(fc*5)+' fps';fc=0},1000);
+
+function fetchSS(){
+  var t0=performance.now();
+  var x=new XMLHttpRequest();
+  x.open('GET',BASE+'/api/screenshot',true);
+  x.responseType='json';
+  x.onload=function(){
+    if(x.status!==200)return;
+    var d=x.response;
+    if(!d||!d.original)return;
+    lastImg=d.original;
+    $('img').src=lastImg;
+    fc++;
+    $('res').textContent=d.width+'x'+d.height+' '+(performance.now()-t0).toFixed(0)+'ms';
+  };
+  x.send();
+}
+
+function addC(e){
+  if(!e.timestamp)e.timestamp=Date.now();
+  tot++;$('cc').textContent=tot;
+  var d=document.createElement('div');d.className='cent';
+  var cls=e.error?'err':'res';
+  var dur=e.duration_ms>0?e.duration_ms+'ms':'';
+  var ts=e.timestamp?new Date(e.timestamp).toISOString().split('T')[1].split('.')[0]:'';
+  var err=e.error?' <span style="color:#f85149">'+esc(e.error.substring(0,120))+'</span>':'';
+  var res='';
+  if(e.result!=null){
+    var s=typeof e.result==='string'?e.result:JSON.stringify(e.result);
+    if(s.length>500)s=s.substring(0,500);
+    res='<pre>'+esc(s)+'</pre>';
+  }
+  d.innerHTML='<div class="ch" onclick="this.nextElementSibling.classList.toggle(\'open\')">'
+    +'<span class="dir '+cls+'">'+esc(e.direction||'?')+'</span>'
+    +'<span class="mtd">'+esc(e.method||'?')+'</span>'
+    +err+'<span class="dur">'+dur+'</span><span class="ts">'+ts+'</span>'
+    +'</div><div class="cb">'+res+'</div>';
+  $('cl').prepend(d);
+  while($('cl').children.length>300)$('cl').removeChild($('cl').lastChild);
+}
+function clearC(){$('cl').innerHTML='';tot=0;$('cc').textContent='0'}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+function onSel(){
+  var v=$('sel').value;
+  var h={click:'{"x":100,"y":200}',inject_click:'{"x":100,"y":200}',press_key:'{"key":"enter"}',type_text:'{"text":"hello"}',scroll:'{"clicks":3}',hotkey:'{"keys":"ctrl+a"}',execute_command:'{"command":"/time set day"}'};
+  $('ex').placeholder=h[v]||'';
+}
+
+function sendC(){
+  var cmd=$('sel').value;
+  var ex={};try{ex=JSON.parse($('ex').value||'{}')}catch(e){}
+  var body={cmd:cmd};
+  for(var k in ex)body[k]=ex[k];
+  var t0=performance.now();
+  var x=new XMLHttpRequest();
+  x.open('POST',BASE+'/api/cmd',true);
+  x.setRequestHeader('Content-Type','application/json');
+  x.onload=function(){
+    var ms=Math.round(performance.now()-t0);
+    addC({timestamp:Date.now(),direction:'response',method:cmd,result:x.responseText,error:x.status>=400?x.responseText:null,duration_ms:ms});
+  };
+  x.onerror=function(){
+    addC({timestamp:Date.now(),direction:'response',method:cmd,error:'network error',duration_ms:Math.round(performance.now()-t0)});
+  };
+  x.send(JSON.stringify(body));
+}
+
+function connectSSE(){
+  var es=new EventSource(BASE+'/api/events');
+  es.onopen=function(){$('dot').className='dot';$('st').textContent='Connected';};
+  es.onmessage=function(ev){try{addC(JSON.parse(ev.data))}catch(e){}};
+  es.onerror=function(){
+    $('dot').className='dot off';
+    $('st').textContent='Reconnecting...';
+    setTimeout(connectSSE,3000);
+  };
+}
+
+onSel();
+connectSSE();
+</script>
+</body>
+</html>

@@ -940,6 +940,14 @@ public final class ReflectionHelper {
             dbg("takeScreenshot: MC native FAILED - " + e.getMessage());
         }
         try {
+            dbg("takeScreenshot: trying Robot window capture...");
+            byte[] winResult = takeWindowScreenshot();
+            if (winResult != null) { dbg("takeScreenshot: OK via Robot window " + winResult.length + " bytes"); return winResult; }
+        } catch (Exception e) {
+            failChain += "window:" + e.getMessage() + " ";
+            dbg("takeScreenshot: Robot window FAILED - " + e.getMessage());
+        }
+        try {
             dbg("takeScreenshot: trying glReadPixels + glFinish...");
             byte[] glResult = takeGlScreenshot(mc, width, height);
             if (glResult != null) { dbg("takeScreenshot: OK via glReadPixels " + glResult.length + " bytes"); return glResult; }
@@ -1045,50 +1053,143 @@ public final class ReflectionHelper {
             throw new RuntimeException("bad dims " + width + "x" + height);
         }
 
+        Object fb = null;
         try {
             Method m = mc.getClass().getMethod("getMainRenderTarget");
-            Object fb = m.invoke(mc);
-            if (fb != null) {
-                int origW = width, origH = height;
-                try {
-                    Field fw = fb.getClass().getDeclaredField("width");
-                    fw.setAccessible(true);
-                    int fbw = fw.getInt(fb);
-                    Field fh = fb.getClass().getDeclaredField("height");
-                    fh.setAccessible(true);
-                    int fbh = fh.getInt(fb);
-                    if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
-                } catch (Exception fbEx) {
-                    for (Field f : fb.getClass().getDeclaredFields()) {
-                        if (f.getType() == int.class) {
-                            try { f.setAccessible(true); } catch (Exception ignored) {}
-                        }
-                    }
-                    try {
-                        for (Method mm : fb.getClass().getMethods()) {
-                            if (mm.getName().contains("width") && mm.getParameterCount() == 0) {
-                                int v = ((Number) mm.invoke(fb)).intValue();
-                                if (v > 0) { width = v; break; }
-                            }
-                        }
-                    } catch (Exception ignored) {}
-                    try {
-                        for (Method mm : fb.getClass().getMethods()) {
-                            if (mm.getName().contains("height") && mm.getParameterCount() == 0) {
-                                int v = ((Number) mm.invoke(fb)).intValue();
-                                if (v > 0) { height = v; break; }
-                            }
-                        }
-                    } catch (Exception ignored) {}
-                }
-            }
+            fb = m.invoke(mc);
         } catch (NoSuchMethodException e) {}
+
+        int fboId = 0;
+        if (fb != null) {
+            try {
+                dbg("takeGl: render target class=" + fb.getClass().getName());
+
+                for (Field f : getAllFields(fb.getClass())) {
+                    String fn = f.getName();
+                    f.setAccessible(true);
+                    if (f.getType() == int.class) {
+                        int fv = f.getInt(fb);
+                        dbg("takeGl: RT field " + fn + " (int)=" + fv);
+                        if ((fn.equals("frameBufferId") || fn.equals("fbo") || fn.equals("framebuffer")
+                                || fn.contains("Fbo") || fn.contains("frameBuffer") || fn.contains("FrameBuffer"))
+                                && fv > 0) { fboId = fv; }
+                    }
+                }
+                for (Method fm : fb.getClass().getMethods()) {
+                    String fn = fm.getName();
+                    if ((fn.equals("getFrameBufferId") || fn.equals("getFbo") || fn.contains("FrameBufferId") || fn.equals("getColorTextureId"))
+                            && fm.getParameterCount() == 0 && (fm.getReturnType() == int.class || fm.getReturnType() == long.class)) {
+                        try {
+                            Object v = fm.invoke(fb);
+                            int vint = ((Number) v).intValue();
+                            dbg("takeGl: RT method " + fn + "()=" + vint);
+                            if (vint > 0) { fboId = vint; }
+                        } catch (Exception ignored) {}
+                    }
+                }
+
+                if (fboId == 0) {
+                    try {
+                        for (Field cf : getAllFields(fb.getClass())) {
+                            if (java.lang.reflect.Modifier.isStatic(cf.getModifiers())) continue;
+                            cf.setAccessible(true);
+                            Object colorTex = cf.get(fb);
+                            if (colorTex == null) continue;
+                            Class<?> texClass = colorTex.getClass();
+                            if (texClass.getName().contains("GpuTexture") || texClass.getName().contains("GlTexture")) {
+                                dbg("takeGl: found texture field '" + cf.getName() + "' type=" + texClass.getName());
+                                for (Field idf : getAllFields(texClass)) {
+                                    if (idf.getName().equals("id") && idf.getType() == int.class) {
+                                        idf.setAccessible(true);
+                                        int texId = idf.getInt(colorTex);
+                                        dbg("takeGl: texture id=" + texId);
+                                        if (texId > 0) {
+                                            for (Method gm : texClass.getMethods()) {
+                                                if (gm.getName().equals("getFbo") && gm.getParameterCount() == 2) {
+                                                    try {
+                                                        Class<?> dsaClass = gm.getParameterTypes()[0];
+                                                        Object dsa = null;
+                                                        try {
+                                                            for (Field df : dsaClass.getDeclaredFields()) {
+                                                                if (java.lang.reflect.Modifier.isStatic(df.getModifiers())) {
+                                                                    df.setAccessible(true);
+                                                                    Object dv = df.get(null);
+                                                                    if (dsaClass.isInstance(dv)) { dsa = dv; break; }
+                                                                }
+                                                            }
+                                                        } catch (Exception ignored) {}
+                                                        if (dsa == null) {
+                                                            try {
+                                                                for (Method dm : dsaClass.getMethods()) {
+                                                                    if (dm.getName().contains("getInstance") && dm.getParameterCount() == 0) {
+                                                                        dsa = dm.invoke(null); break;
+                                                                    }
+                                                                }
+                                                            } catch (Exception ignored) {}
+                                                        }
+                                                        Field depthField = null;
+                                                        for (Field df2 : getAllFields(fb.getClass())) {
+                                                            if (df2.getName().contains("depth") && df2.getName().contains("Texture")) {
+                                                                df2.setAccessible(true); depthField = df2; break;
+                                                            }
+                                                        }
+                                                        Object depthTex = depthField != null ? depthField.get(fb) : null;
+                                                        if (dsa != null) {
+                                                            int fbo = (Integer) gm.invoke(colorTex, dsa, depthTex);
+                                                            dbg("takeGl: getFbo()=" + fbo);
+                                                            if (fbo > 0) { fboId = fbo; }
+                                                        }
+                                                    } catch (Exception ex) { dbg("takeGl: getFbo failed: " + ex.getMessage()); }
+                                                    break;
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (fboId > 0) break;
+                            }
+                        }
+                    } catch (Exception ex) { dbg("takeGl: texture FBO lookup failed: " + ex.getMessage()); }
+                }
+
+                if (fboId > 0) dbg("takeGl: using fboId=" + fboId);
+                else dbg("takeGl: no fboId found, will use FRONT buffer");
+            } catch (Exception e) {
+                dbg("takeGl: failed to get fboId: " + e.getMessage());
+            }
+        }
+
+        if (fb != null) {
+            try {
+                Field fw = fb.getClass().getDeclaredField("width");
+                fw.setAccessible(true);
+                int fbw = fw.getInt(fb);
+                Field fh = fb.getClass().getDeclaredField("height");
+                fh.setAccessible(true);
+                int fbh = fh.getInt(fb);
+                if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
+            } catch (Exception ignored) {}
+        }
 
         int w = width;
         int h = height;
         ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
+
+        if (fb != null) {
+            try {
+                for (Method bm : fb.getClass().getMethods()) {
+                    if (bm.getName().equals("blitToScreen") && bm.getParameterCount() == 0) {
+                        try { bm.setAccessible(true); bm.invoke(fb); dbg("takeGl: called blitToScreen"); }
+                        catch (Exception ex) { dbg("takeGl: blitToScreen failed: " + ex.getMessage()); }
+                        break;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
         try {
-            doGlReadPixels(0, 0, w, h, bb);
+            doGlReadPixels(0, 0, w, h, bb, fboId);
         } catch (Exception e) {
             Throwable cause = e;
             while (cause.getCause() != null) cause = cause.getCause();
@@ -1123,18 +1224,57 @@ public final class ReflectionHelper {
         return result;
     }
 
-    private static void doGlReadPixels(int x, int y, int w, int h, ByteBuffer bb) throws Exception {
+    private static void doGlReadPixels(int x, int y, int w, int h, ByteBuffer bb, int fboId) throws Exception {
         if (!LWJGL3) {
             try {
                 Class<?> displayClass = Class.forName("org.lwjgl.opengl.Display");
-                try {
-                    displayClass.getMethod("makeCurrent").invoke(null);
-                } catch (Exception ignored) {}
+                try { displayClass.getMethod("makeCurrent").invoke(null); } catch (Exception ignored) {}
             } catch (Exception ignored) {}
         }
         Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
         int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
         int GL_UB = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
+
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glFinish") && m.getParameterCount() == 0) {
+                try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}
+                break;
+            }
+        }
+
+        if (fboId > 0) {
+            try {
+                Class<?> gl30 = Class.forName("org.lwjgl.opengl.GL30");
+                int GL_READ_FRAMEBUFFER = gl30.getDeclaredField("GL_READ_FRAMEBUFFER").getInt(null);
+                for (Method m : gl30.getMethods()) {
+                    if (m.getName().equals("glBindFramebuffer") && m.getParameterCount() == 2) {
+                        try { m.setAccessible(true); m.invoke(null, GL_READ_FRAMEBUFFER, fboId);
+                            dbg("doGlRead: bound READ_FRAMEBUFFER=" + fboId); } catch (Exception ignored) {}
+                        break;
+                    }
+                }
+            } catch (ClassNotFoundException e) {
+                try {
+                    Class<?> gl21 = Class.forName("org.lwjgl.opengl.GL21");
+                    int GL_READ_FRAMEBUFFER = gl21.getDeclaredField("GL_READ_FRAMEBUFFER").getInt(null);
+                    for (Method m : gl21.getMethods()) {
+                        if (m.getName().equals("glBindFramebuffer") && m.getParameterCount() == 2) {
+                            try { m.setAccessible(true); m.invoke(null, GL_READ_FRAMEBUFFER, fboId); } catch (Exception ignored) {}
+                            break;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        } else {
+            int GL_BACK = 0x0405;
+            for (Method m : gl11.getMethods()) {
+                if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) {
+                    try { m.setAccessible(true); m.invoke(null, GL_BACK); dbg("doGlRead: set read buffer to BACK"); }
+                    catch (Exception ignored3) {}
+                    break;
+                }
+            }
+        }
 
         for (Method m : gl11.getMethods()) {
             if (m.getName().equals("glFinish") && m.getParameterCount() == 0) {
@@ -2080,7 +2220,7 @@ public final class ReflectionHelper {
             int h = getGlfwWindowSize(mc, false);
             if (w <= 0 || h <= 0) return null;
             ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
-            doGlReadPixels(0, 0, w, h, bb);
+            doGlReadPixels(0, 0, w, h, bb, 0);
             bb.rewind();
             BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
             for (int y = 0; y < h; y++) {

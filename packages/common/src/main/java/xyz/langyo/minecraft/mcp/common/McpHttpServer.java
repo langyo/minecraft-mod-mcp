@@ -21,6 +21,15 @@ public class McpHttpServer {
     private final List<CallEvent> callHistory = new CopyOnWriteArrayList<>();
     private final List<SseClient> sseClients = new CopyOnWriteArrayList<>();
     private static final int MAX_HISTORY = 200;
+    private static final Map<String, String> MIME_TYPES = new HashMap<>();
+    static {
+        MIME_TYPES.put(".html", "text/html; charset=utf-8");
+        MIME_TYPES.put(".css", "text/css; charset=utf-8");
+        MIME_TYPES.put(".js", "application/javascript; charset=utf-8");
+        MIME_TYPES.put(".json", "application/json");
+        MIME_TYPES.put(".png", "image/png");
+        MIME_TYPES.put(".svg", "image/svg+xml");
+    }
 
     public static class CallEvent {
         public long timestamp;
@@ -46,6 +55,8 @@ public class McpHttpServer {
         this(handler, DEFAULT_PORT);
     }
 
+    public int getPort() { return port; }
+
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         server.setExecutor(Executors.newFixedThreadPool(4));
@@ -55,6 +66,8 @@ public class McpHttpServer {
         server.createContext("/api/status", exchange -> {
             sendJson(exchange, 200, "{\"ok\":true,\"port\":" + port + "}");
         });
+        server.createContext("/debug", new StaticHandler());
+        server.createContext("/", new RootHandler());
         server.start();
         ReflectionHelper.dbg("McpHttpServer: started on port " + port);
     }
@@ -103,6 +116,55 @@ public class McpHttpServer {
 
     private static String esc(String s) { return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n"); }
     private static String quote(String s) { return "\"" + esc(s) + "\""; }
+
+    class StaticHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            serveResource(exchange, "index.html");
+        }
+    }
+
+    class RootHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String path = exchange.getRequestURI().getPath();
+            if (path.equals("/") || path.equals("/index.html") || path.equals("/debug")) {
+                serveResource(exchange, "index.html");
+                return;
+            }
+            String resource = path.startsWith("/") ? path.substring(1) : path;
+            if (resource.startsWith("mcp-debug/")) resource = resource.substring("mcp-debug/".length());
+            if (resource.isEmpty()) resource = "index.html";
+            if (resource.contains("..")) {
+                sendJson(exchange, 403, "{\"error\":\"forbidden\"}");
+                return;
+            }
+            serveResource(exchange, resource);
+        }
+    }
+
+    private void serveResource(HttpExchange exchange, String name) throws IOException {
+        String path = "mcp-debug/" + name;
+        InputStream is = McpHttpServer.class.getClassLoader().getResourceAsStream(path);
+        if (is == null) {
+            sendJson(exchange, 404, "{\"error\":\"not found\"}");
+            return;
+        }
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int n;
+        while ((n = is.read(buf)) != -1) baos.write(buf, 0, n);
+        is.close();
+        byte[] data = baos.toByteArray();
+        String mime = "application/octet-stream";
+        int dot = name.lastIndexOf('.');
+        if (dot >= 0) mime = MIME_TYPES.getOrDefault(name.substring(dot).toLowerCase(), mime);
+        exchange.getResponseHeaders().set("Content-Type", mime);
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.sendResponseHeaders(200, data.length);
+        exchange.getResponseBody().write(data);
+        exchange.getResponseBody().close();
+    }
 
     class ScreenshotHandler implements HttpHandler {
         @Override

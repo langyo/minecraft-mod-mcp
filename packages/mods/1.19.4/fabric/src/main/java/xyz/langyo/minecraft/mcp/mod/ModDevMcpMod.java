@@ -4,21 +4,25 @@ import xyz.langyo.minecraft.mcp.common.*;
 import net.fabricmc.api.ClientModInitializer;
 
 public class ModDevMcpMod implements ClientModInitializer {
-    private McpWebSocketClient wsClient;
+    private McpHttpServer httpServer;
 
     @Override
     public void onInitializeClient() {
-        String serverUrl = McpConfig.getServerUrl();
-        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
+        boolean depsOk = false;
+        try { Class.forName("com.sun.jna.Library"); depsOk = true; } catch (Exception ignored) {}
+        if (!depsOk) {
+            System.err.println("[MCP-MOD] JNA not on classpath. External control unavailable.");
+            return;
+        }
         new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(50);
-                    if (wsClient != null) wsClient.handleMessages();
-                } catch (Exception e) { break; }
-            }
-        }).start();
+            try {
+                Thread.sleep(5000);
+                ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+                int port = McpConfig.getServerPort();
+                httpServer = new McpHttpServer(handler, port);
+                httpServer.start();
+                System.out.println("[MCP-MOD] Debug page: http://127.0.0.1:" + port + "/debug");
+            } catch (Exception e) { System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage()); }
+        }, "MCP-HTTP").start();
     }
 }

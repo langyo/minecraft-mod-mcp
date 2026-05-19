@@ -3,30 +3,33 @@ package xyz.langyo.minecraft.mcp.mod;
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.common.MinecraftForge;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     public ModDevMcpMod() {
         INSTANCE = this;
         net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
-        MinecraftForge.EVENT_BUS.register(this);
     }
 
     private void setup(final FMLCommonSetupEvent event) {
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
-    }
-
-    @net.minecraftforge.eventbus.api.SubscribeEvent
-    public void onTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+        boolean depsOk = false;
+        try { Class.forName("com.sun.jna.Library"); depsOk = true; } catch (Exception ignored) {}
+        if (!depsOk) {
+            System.err.println("[MCP-MOD] JNA not on classpath. External control unavailable.");
+            return;
+        }
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+                int port = McpConfig.getServerPort();
+                httpServer = new McpHttpServer(handler, port);
+                httpServer.start();
+                System.out.println("[MCP-MOD] Debug page: http://127.0.0.1:" + port + "/debug");
+            } catch (Exception e) { System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage()); }
+        }, "MCP-HTTP").start();
     }
 }
