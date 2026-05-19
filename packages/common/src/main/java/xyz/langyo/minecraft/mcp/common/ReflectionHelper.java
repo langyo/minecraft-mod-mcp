@@ -1864,25 +1864,25 @@ public final class ReflectionHelper {
     public static boolean isMcpControlMode() { return mcpControlMode; }
 
     private static volatile boolean forceCursorNormal = false;
-    private static Method glfwSetInputMode;
+    private static Method glfwSetInputModeMethod;
+    private static Method glfwHideWindowMethod;
     private static int GLFW_CURSOR_VAL = -1;
     private static int GLFW_CURSOR_NORMAL_VAL = -1;
     private static boolean cursorCacheInit = false;
     private static Field mouseGrabbedField = null;
     private static Field accumulatedDXField = null;
     private static Field accumulatedDYField = null;
-    private static Field mcScreenField = null;
     private static boolean mouseFieldsInit = false;
-    private static boolean screenFieldInit = false;
-    private static volatile boolean dummyInjected = false;
     private static volatile boolean lastForceState = false;
+    private static volatile boolean windowHidden = false;
 
     private static void initCursorCache() throws Exception {
         if (cursorCacheInit) return;
         Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
         GLFW_CURSOR_VAL = glfw.getField("GLFW_CURSOR").getInt(null);
         GLFW_CURSOR_NORMAL_VAL = glfw.getField("GLFW_CURSOR_NORMAL").getInt(null);
-        glfwSetInputMode = glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class);
+        glfwSetInputModeMethod = glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class);
+        try { glfwHideWindowMethod = glfw.getMethod("glfwHideWindow", long.class); } catch (Exception ignored) {}
         cursorCacheInit = true;
     }
 
@@ -1909,118 +1909,48 @@ public final class ReflectionHelper {
         }
     }
 
-    private static void initScreenField(Object mc) throws Exception {
-        if (screenFieldInit) return;
-        screenFieldInit = true;
-        Class<?> screenClass = Class.forName("net.minecraft.client.gui.screens.Screen");
-        for (Field f : getAllFields(mc.getClass())) {
-            if (screenClass.isAssignableFrom(f.getType()) && f.getName().toLowerCase().contains("screen")) {
-                f.setAccessible(true);
-                mcScreenField = f;
-                dbg("cursor: found screen field: " + f.getName() + " type=" + f.getType().getName());
-                break;
-            }
-        }
-        if (mcScreenField == null) {
-            for (Field f : mc.getClass().getDeclaredFields()) {
-                if (screenClass.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true);
-                    mcScreenField = f;
-                    dbg("cursor: found screen field (alt): " + f.getName());
-                    break;
-                }
-            }
-        }
-    }
-
-    private static Object createDummyScreen() {
-        String[] concreteClasses = {
-            "net.minecraft.client.gui.screens.ReceivingLevelScreen",
-            "net.minecraft.client.gui.screens.ProgressScreen",
-            "net.minecraft.client.gui.screens.GenericMessageScreen",
-            "net.minecraft.client.gui.screens.TitleScreen",
-        };
-        Object unsafe = null;
-        Method allocate = null;
-        try {
-            Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
-            Field uf = unsafeClass.getDeclaredField("theUnsafe");
-            uf.setAccessible(true);
-            unsafe = uf.get(null);
-            allocate = unsafeClass.getMethod("allocateInstance", Class.class);
-        } catch (Exception e) {
-            dbg("cursor: Unsafe unavailable: " + e);
-            return null;
-        }
-
-        for (String className : concreteClasses) {
-            try {
-                Class<?> cls = Class.forName(className);
-                try {
-                    java.lang.reflect.Constructor<?> ctor = cls.getDeclaredConstructor();
-                    ctor.setAccessible(true);
-                    Object screen = ctor.newInstance();
-                    dbg("cursor: created " + className + " via constructor");
-                    return screen;
-                } catch (Exception nsme) {
-                    // no no-arg constructor or instantiation failed, try Unsafe
-                }
-                try {
-                    Object screen = allocate.invoke(unsafe, cls);
-                    if (screen != null) {
-                        dbg("cursor: created " + className + " via Unsafe");
-                        return screen;
-                    }
-                } catch (Exception e) {
-                    dbg("cursor: Unsafe failed for " + className + ": " + e);
-                }
-            } catch (ClassNotFoundException cnfe) {
-                // try next
-            }
-        }
-
-        // Try Screen itself via Unsafe (it's abstract but Unsafe might still work)
-        try {
-            Class<?> screenClass = Class.forName("net.minecraft.client.gui.screens.Screen");
-            Object screen = allocate.invoke(unsafe, screenClass);
-            if (screen != null) {
-                dbg("cursor: created Screen via Unsafe (abstract)");
-                return screen;
-            }
-        } catch (Exception e) {
-            dbg("cursor: Screen Unsafe failed: " + e);
-        }
-
-        // Last resort: try Component.literal + constructor with Component
-        try {
-            Class<?> compClass = Class.forName("net.minecraft.network.chat.Component");
-            Method literal = compClass.getMethod("literal", String.class);
-            Object emptyComp = literal.invoke(null, "");
-            Class<?> screenClass = Class.forName("net.minecraft.client.gui.screens.Screen");
-            for (java.lang.reflect.Constructor<?> ctor : screenClass.getDeclaredConstructors()) {
-                if (ctor.getParameterCount() == 1 && ctor.getParameterTypes()[0].isInstance(emptyComp)) {
-                    ctor.setAccessible(true);
-                    Object screen = ctor.newInstance(emptyComp);
-                    dbg("cursor: created Screen(Component) via constructor");
-                    return screen;
-                }
-            }
-        } catch (Exception e) {
-            dbg("cursor: Screen(Component) failed: " + e);
-        }
-
-        dbg("cursor: ALL screen creation methods failed");
-        return null;
-    }
-
     public static void setForceCursorNormal(boolean v) { forceCursorNormal = v; }
 
     public static boolean isForceCursorNormal() { return forceCursorNormal; }
 
+    public static boolean isWindowHidden() { return windowHidden; }
+
+    public static void hideWindow(Object mc) {
+        if (windowHidden) return;
+        try {
+            long handle = getWindowHandle(mc);
+            if (handle == 0 || !LWJGL3) return;
+            initCursorCache();
+            if (glfwHideWindowMethod != null) {
+                glfwHideWindowMethod.invoke(null, handle);
+                windowHidden = true;
+                dbg("cursor: window hidden via glfwHideWindow");
+            }
+        } catch (Exception e) {
+            dbg("cursor: hideWindow failed: " + e.getMessage());
+        }
+    }
+
+    public static void showWindow(Object mc) {
+        if (!windowHidden) return;
+        try {
+            long handle = getWindowHandle(mc);
+            if (handle == 0 || !LWJGL3) return;
+            initCursorCache();
+            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+            Method showMethod = glfw.getMethod("glfwShowWindow", long.class);
+            showMethod.invoke(null, handle);
+            windowHidden = false;
+            dbg("cursor: window shown via glfwShowWindow");
+        } catch (Exception e) {
+            dbg("cursor: showWindow failed: " + e.getMessage());
+        }
+    }
+
     public static void tickForceCursorNormal(Object mc) {
         if (!forceCursorNormal) {
             if (lastForceState) {
-                dummyInjected = false;
+                showWindow(mc);
                 lastForceState = false;
             }
             return;
@@ -2030,48 +1960,16 @@ public final class ReflectionHelper {
             if (handle == 0 || !LWJGL3) return;
             initCursorCache();
 
-            Object currentScreen = getCurrentScreen(mc);
-            if (currentScreen != null) {
-                dummyInjected = false;
-                return;
-            }
+            hideWindow(mc);
 
-            initScreenField(mc);
-            if (mcScreenField != null && !dummyInjected) {
-                Object dummy = createDummyScreen();
-                if (dummy != null) {
-                    try {
-                        mcScreenField.set(mc, dummy);
-                        dummyInjected = true;
-                        dbg("cursor: injected dummy screen, releasing mouse");
-                        Object mouseHandler = getMouseHandler(mc);
-                        if (mouseHandler != null) {
-                            initMouseFields(mouseHandler);
-                            if (mouseGrabbedField != null) {
-                                mouseGrabbedField.setBoolean(mouseHandler, false);
-                            }
-                        }
-                        // Call releaseMouse via method
-                        for (Method m : getAllMethods(mouseHandler.getClass())) {
-                            if (m.getName().equals("releaseMouse") && m.getParameterCount() == 0) {
-                                m.setAccessible(true);
-                                m.invoke(mouseHandler);
-                                dbg("cursor: called releaseMouse");
-                                break;
-                            }
-                        }
-                    } catch (Exception e) {
-                        dbg("cursor: inject failed: " + e);
-                        dummyInjected = false;
-                    }
-                }
-            }
-
-            glfwSetInputMode.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+            glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
 
             Object mouseHandler = getMouseHandler(mc);
             if (mouseHandler != null) {
                 initMouseFields(mouseHandler);
+                if (mouseGrabbedField != null) {
+                    mouseGrabbedField.setBoolean(mouseHandler, false);
+                }
                 if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
                 if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
             }
