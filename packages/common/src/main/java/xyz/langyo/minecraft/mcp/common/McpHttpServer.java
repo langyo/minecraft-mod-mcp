@@ -59,7 +59,7 @@ public class McpHttpServer {
 
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
-        server.setExecutor(Executors.newFixedThreadPool(4));
+        server.setExecutor(Executors.newFixedThreadPool(8));
         server.createContext("/api/screenshot", new ScreenshotHandler());
         server.createContext("/api/cmd", new CmdHandler());
         server.createContext("/api/events", new EventHandler());
@@ -288,9 +288,11 @@ public class McpHttpServer {
                 os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
                 os.flush();
             }
-            while (client.active) {
-                try { Thread.sleep(1000); } catch (InterruptedException e) { break; }
+            int timeout = 300;
+            while (client.active && timeout > 0) {
+                try { Thread.sleep(1000); timeout--; } catch (InterruptedException e) { break; }
             }
+            client.active = false;
             sseClients.remove(client);
             os.close();
         }

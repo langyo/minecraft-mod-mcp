@@ -74,6 +74,7 @@ public class McpMessageHandler {
         if (method.equals("set_view_angle")) return handleSetViewAngle(params);
         if (method.equals("look_delta")) return handleLookDelta(params);
         if (method.equals("right_click")) return handleRightClick();
+        if (method.equals("use_item")) return handleUseItem();
         if (method.equals("ping")) return "pong";
         if (method.equals("win32_borderless")) return handleWin32Borderless();
         if (method.equals("win32_container")) return handleWin32Container();
@@ -306,6 +307,11 @@ public class McpMessageHandler {
     protected Object handleRightClick() {
         if (minecraftInput != null) minecraftInput.rightClick();
         return "right_clicked";
+    }
+
+    protected Object handleUseItem() {
+        if (minecraftInput != null) return ReflectionHelper.doUseItem(ReflectionHelper.getMinecraftInstance());
+        return "no input handler";
     }
 
     protected Object handleWin32Status() {

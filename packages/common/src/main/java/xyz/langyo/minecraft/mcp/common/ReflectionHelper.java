@@ -215,10 +215,9 @@ public final class ReflectionHelper {
             Object screen = getCurrentScreen(mc);
             if (screen == null) return "{\"error\":\"no screen\"}";
             String screenName = screen.getClass().getSimpleName();
-            double scale = getGuiScale(mc);
-            double gx = x / scale;
-            double gy = y / scale;
-            dbg("guiClick: raw(" + x + "," + y + ") -> gui(" + (int)gx + "," + (int)gy + ") scale=" + scale + " screen=" + screenName);
+            double gx = (double) x;
+            double gy = (double) y;
+            dbg("guiClick: gui(" + (int)gx + "," + (int)gy + ") screen=" + screenName);
             dbg("guiClick: listing all boolean methods on " + screen.getClass().getName());
             for (Method dm : getAllMethods(screen.getClass())) {
                 if (dm.getParameterCount() <= 4 && (dm.getReturnType() == boolean.class)) {
@@ -333,7 +332,7 @@ public final class ReflectionHelper {
                 }
             }
             if (results.length() > 0 || !widgetResult.isEmpty())
-                return "{\"clicked\":true,\"screen\":\"" + screenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"scale\":" + scale + ",\"results\":{" + results.toString() + "}" + widgetResult + "}";
+                return "{\"clicked\":true,\"screen\":\"" + screenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"results\":{" + results.toString() + "}" + widgetResult + "}";
             return "{\"error\":\"no click method on " + screen.getClass().getName() + "\"}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
@@ -902,16 +901,31 @@ public final class ReflectionHelper {
                 if (conn == null) conn = fieldOrNull(player, "field_71174_a");
             }
             if (conn != null) {
-                // Try conn.sendPacket or similar
+                dbg("sendCommand: found connection " + conn.getClass().getName());
+                for (Method m : getAllMethods(conn.getClass())) {
+                    String mn = m.getName().toLowerCase();
+                    if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class
+                            && (mn.contains("chat") || mn.contains("send") || mn.contains("command"))) {
+                        try { m.setAccessible(true); m.invoke(conn, msg); return "{\"sent\":true,\"method\":\"conn." + m.getName() + "\"}"; }
+                        catch (Exception ignored) {}
+                    }
+                }
                 for (Method m : getAllMethods(conn.getClass())) {
                     if ((m.getName().equals("sendPacket") || m.getName().contains("sendPacket") || m.getName().contains("func_147297_a"))
                             && m.getParameterCount() == 1) {
                         try {
-                            // Construct CPacketChatMessage
-                            Class<?> pktClass = Class.forName("net.minecraft.network.play.client.CPacketChatMessage");
-                            Object packet = pktClass.getConstructor(String.class).newInstance(msg);
-                            m.setAccessible(true); m.invoke(conn, packet);
-                            return "{\"sent\":true,\"method\":\"packet\"}";
+                            for (String pktName : new String[]{
+                                "net.minecraft.network.play.client.CPacketChatMessage",
+                                "net.minecraft.network.protocol.game.ServerboundChatPacket",
+                                "net.minecraft.network.protocol.game.ServerboundChatCommandPacket"
+                            }) {
+                                try {
+                                    Class<?> pktClass = Class.forName(pktName);
+                                    Object packet = pktClass.getConstructor(String.class).newInstance(msg);
+                                    m.setAccessible(true); m.invoke(conn, packet);
+                                    return "{\"sent\":true,\"method\":\"packet:" + pktName + "\"}";
+                                } catch (ClassNotFoundException ignored2) {}
+                            }
                         } catch (Exception ignored) {}
                     }
                 }
@@ -1720,10 +1734,22 @@ public final class ReflectionHelper {
     private static double getDouble(Object obj, String... names) throws Exception {
         for (String name : names) {
             try {
-                Field f = obj.getClass().getDeclaredField(name);
-                f.setAccessible(true);
-                return f.getDouble(obj);
-            } catch (NoSuchFieldException ignored) {}
+                for (Method m : getAllMethods(obj.getClass())) {
+                    if (m.getName().equals(name) && m.getParameterCount() == 0 && (m.getReturnType() == double.class || m.getReturnType() == float.class)) {
+                        m.setAccessible(true);
+                        Object v = m.invoke(obj);
+                        return ((Number) v).doubleValue();
+                    }
+                }
+            } catch (Exception ignored) {}
+            try {
+                for (Field f : getAllFields(obj.getClass())) {
+                    if (f.getName().equals(name) && (f.getType() == double.class || f.getType() == float.class)) {
+                        f.setAccessible(true);
+                        return f.getDouble(obj);
+                    }
+                }
+            } catch (Exception ignored) {}
         }
         return 0.0;
     }
@@ -1927,6 +1953,35 @@ public final class ReflectionHelper {
             Thread.sleep(100);
             sendMouseButton(handle, 1, 0);
             return "{\"right_click\":true,\"via\":\"sendMouseButton\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    public static String doUseItem(Object mc) {
+        try {
+            for (Method m : getAllMethods(mc.getClass())) {
+                String mn = m.getName();
+                if ((mn.equals("startUseItem") || mn.equals("rightClickMouse") || mn.equals("func_147121_ag") || mn.equals("func_147118_ci"))
+                        && m.getParameterCount() == 0) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(mc);
+                        return "{\"use_item\":true,\"method\":\"" + mn + "\"}";
+                    } catch (Exception ignored) {}
+                }
+            }
+            for (Method m : getAllMethods(mc.getClass())) {
+                String mn = m.getName().toLowerCase();
+                if (m.getParameterCount() == 0 && mn.contains("useitem") && !mn.contains("tick") && !mn.contains("render")) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(mc);
+                        return "{\"use_item\":true,\"method\":\"" + m.getName() + "\"}";
+                    } catch (Exception ignored) {}
+                }
+            }
+            return "{\"error\":\"no useItem method found\"}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
         }
