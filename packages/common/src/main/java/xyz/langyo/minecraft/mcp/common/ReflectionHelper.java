@@ -1137,49 +1137,133 @@ public final class ReflectionHelper {
     }
 
     public static byte[] takeScreenshot(Object mc, int width, int height) {
-        String failChain = "";
+        screenshotInProgress = true;
         try {
-            dbg("takeScreenshot: trying MC native Screenshot.takeScreenshot()...");
-            byte[] nativeResult = takeMcNativeScreenshot(mc);
-            if (nativeResult != null) { dbg("takeScreenshot: OK via MC native " + nativeResult.length + " bytes"); return nativeResult; }
-        } catch (Exception e) {
-            failChain += "native:" + e.getMessage() + " ";
-            dbg("takeScreenshot: MC native FAILED - " + e.getMessage());
+            return takeScreenshot0(mc, width, height);
+        } finally {
+            screenshotInProgress = false;
         }
-        try {
-            dbg("takeScreenshot: trying Robot window capture...");
-            byte[] winResult = takeWindowScreenshot();
-            if (winResult != null) { dbg("takeScreenshot: OK via Robot window " + winResult.length + " bytes"); return winResult; }
-        } catch (Exception e) {
-            failChain += "window:" + e.getMessage() + " ";
-            dbg("takeScreenshot: Robot window FAILED - " + e.getMessage());
+    }
+
+    private static byte[] takeScreenshot0(Object mc, int width, int height) {
+        byte[] cached = cachedScreenshot;
+        if (cached != null && System.currentTimeMillis() - cachedScreenshotTime < 2000) {
+            dbg("takeScreenshot: returning cached screenshot " + cached.length + " bytes (age " + (System.currentTimeMillis() - cachedScreenshotTime) + "ms)");
+            return cached;
         }
-        try {
-            dbg("takeScreenshot: trying glReadPixels + glFinish...");
-            byte[] glResult = takeGlScreenshot(mc, width, height);
-            if (glResult != null) { dbg("takeScreenshot: OK via glReadPixels " + glResult.length + " bytes"); return glResult; }
-        } catch (Exception e) {
-            Throwable c = e; while (c.getCause() != null) c = c.getCause();
-            failChain += "gl:" + c.getClass().getSimpleName() + ":" + c.getMessage() + " ";
-            dbg("takeScreenshot: glReadPixels FAILED - " + failChain);
+        dbg("takeScreenshot: no recent cached screenshot, trying direct read");
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                byte[] glResult = takeGlScreenshot0(mc, width, height);
+                if (glResult != null) { return glResult; }
+            } catch (Exception ignored) {}
+            try { Thread.sleep(16); } catch (InterruptedException ignored) {}
         }
-        try {
-            dbg("takeScreenshot: trying Robot window capture...");
-            byte[] winResult = takeWindowScreenshot();
-            if (winResult != null) { dbg("takeScreenshot: OK via Robot window " + winResult.length + " bytes"); return winResult; }
-        } catch (Exception e) {
-            failChain += "window:" + e.getMessage() + " ";
-            dbg("takeScreenshot: Robot window FAILED - " + e.getMessage());
+        return null;
+    }
+
+    private static byte[] takeScreenshotOnMainThread(Object mc, int width, int height) throws Exception {
+        final int w = width, h = height;
+        final byte[][] resultHolder = new byte[1][];
+        final Exception[] errorHolder = new Exception[1];
+        final CountDownLatch latch = new CountDownLatch(1);
+        Runnable capturer = new Runnable() {
+            public void run() {
+                dbg("takeScreenshotOnMainThread: capturer running on thread: " + Thread.currentThread().getName());
+                try {
+                    Object rt = null;
+                    try { Method m = mc.getClass().getMethod("getMainRenderTarget"); rt = m.invoke(mc); } catch (Exception ignored) {}
+                    int texId = 0, fboId = 0;
+                    if (rt != null) {
+                        for (Field f : getAllFields(rt.getClass())) { 
+                            f.setAccessible(true);
+                            Object val = f.get(rt);
+                            if (val != null && val.getClass().getName().contains("GlTexture")) {
+                                for (Field idf : getAllFields(val.getClass())) {
+                                    if (idf.getName().equals("id") && idf.getType() == int.class) { idf.setAccessible(true); int tid = idf.getInt(val); if (tid > 0) texId = tid; }
+                                }
+                                for (Method gm : val.getClass().getMethods()) {
+                                    if (gm.getName().equals("getFbo") && gm.getParameterCount() == 2) {
+                                        try { Object dsa = resolveDSA(); Field df = null;
+                                            for (Field df2 : getAllFields(rt.getClass())) { if (df2.getName().contains("depth") && df2.getName().contains("Texture")) { df2.setAccessible(true); df = df2; break; } }
+                                            Object dt = df != null ? df.get(rt) : null;
+                                            if (dsa != null) { int fb = (Integer) gm.invoke(val, dsa, dt); if (fb > 0) fboId = fb; }
+                                        } catch (Exception ignored) {}
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
+                    int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null), GL_UB = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
+                    for (Method m : gl11.getMethods()) { if (m.getName().equals("glFinish") && m.getParameterCount() == 0) { try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {} break; } }
+                    dbg("mainThread: texId=" + texId + " fboId=" + fboId);
+                    byte[] texResult = null;
+                    if (texId > 0) {
+                        try { texResult = readTextureViaGetTexImage(texId, w, h); } catch (Exception e) { dbg("mainThread: glGetTexImage failed: " + e.getMessage()); }
+                    }
+                    if (texResult != null) { resultHolder[0] = texResult; return; }
+                    ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
+                    boolean ok = false;
+                    if (fboId > 0) {
+                        try {
+                            Class<?> gl30 = Class.forName("org.lwjgl.opengl.GL30");
+                            int GL_READ_FB = gl30.getDeclaredField("GL_READ_FRAMEBUFFER").getInt(null);
+                            for (Method m : gl30.getMethods()) { if (m.getName().equals("glBindFramebuffer") && m.getParameterCount() == 2) { m.setAccessible(true); m.invoke(null, GL_READ_FB, fboId); break; } }
+                        } catch (Exception ignored) {}
+                    }
+                    for (Method m : gl11.getMethods()) {
+                        if (m.getName().equals("glReadPixels") && m.getParameterCount() == 7) {
+                            Class<?>[] pts = m.getParameterTypes();
+                            if (pts[6] == java.nio.ByteBuffer.class) { m.setAccessible(true); m.invoke(null, 0, 0, w, h, GL_RGBA, GL_UB, bb); ok = true; break; }
+                        }
+                    }
+                    if (!ok) throw new RuntimeException("glReadPixels not found on main thread");
+                    bb.rewind(); int[] raw = new int[w * h];
+                    for (int i = 0; i < raw.length; i++) { int r = bb.get() & 0xFF, g = bb.get() & 0xFF, b = bb.get() & 0xFF, a = bb.get() & 0xFF; raw[i] = (a << 24) | (r << 16) | (g << 8) | b; }
+                    int[] flipped = new int[w * h];
+                    for (int y2 = 0; y2 < h; y2++) for (int x2 = 0; x2 < w; x2++) flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
+                    BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB); img.setRGB(0, 0, w, h, flipped, 0, w);
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream(); ImageIO.write(img, "png", baos);
+                    resultHolder[0] = baos.toByteArray();
+                } catch (Exception e) { errorHolder[0] = e; }
+                finally { latch.countDown(); }
+            }
+        };
+        Method execMethod = null;
+        String threadName = Thread.currentThread().getName();
+        dbg("takeScreenshotOnMainThread: current thread=" + threadName);
+        boolean isSameThread = false;
+        for (Method m : getAllMethods(mc.getClass())) {
+            if (m.getName().equals("isSameThread") && m.getParameterCount() == 0) {
+                try { m.setAccessible(true); isSameThread = (boolean) m.invoke(mc); } catch (Exception ignored) {}
+                break;
+            }
         }
-        try {
-            dbg("takeScreenshot: trying platform native capture...");
-            byte[] platResult = takePlatformScreenshot();
-            if (platResult != null) { dbg("takeScreenshot: OK via platform native " + platResult.length + " bytes"); return platResult; }
-        } catch (Exception e) {
-            failChain += "platform:" + e.getMessage() + " ";
-            dbg("takeScreenshot: platform native FAILED - " + e.getMessage());
+        dbg("takeScreenshotOnMainThread: isSameThread=" + isSameThread);
+        if (isSameThread) {
+            dbg("takeScreenshotOnMainThread: already on main thread, running directly");
+            capturer.run();
+        } else {
+            for (Method m : mc.getClass().getMethods()) { if (m.getName().equals("execute") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) { execMethod = m; break; } }
+            if (execMethod == null) {
+                for (Method m : getAllMethods(mc.getClass())) {
+                    if (m.getName().equals("execute") && m.getParameterCount() == 1) {
+                        Class<?> pt = m.getParameterTypes()[0];
+                        if (pt == Runnable.class || pt.getName().equals("java.lang.Runnable")) { execMethod = m; break; }
+                    }
+                }
+            }
+            if (execMethod == null) throw new RuntimeException("no execute(Runnable) method found");
+            dbg("takeScreenshotOnMainThread: found execute method: " + execMethod);
+            execMethod.setAccessible(true); execMethod.invoke(mc, capturer);
         }
-        throw new RuntimeException("ALL failed (" + failChain + ") w=" + width + " h=" + height);
+        if (!latch.await(5, TimeUnit.SECONDS)) throw new RuntimeException("main thread screenshot timeout");
+        if (errorHolder[0] != null) throw errorHolder[0];
+        if (resultHolder[0] == null || resultHolder[0].length == 0) return null;
+        return resultHolder[0];
     }
 
     private static byte[] takeMcNativeScreenshot(Object mc) {
@@ -1256,154 +1340,251 @@ public final class ReflectionHelper {
     }
 
     private static byte[] takeGlScreenshot0(Object mc, int width, int height) throws Exception {
-        if (width <= 0 || height <= 0) {
-            throw new RuntimeException("bad dims " + width + "x" + height);
-        }
-
+        if (width <= 0 || height <= 0) throw new RuntimeException("bad dims " + width + "x" + height);
         Object fb = null;
-        try {
-            Method m = mc.getClass().getMethod("getMainRenderTarget");
-            fb = m.invoke(mc);
-        } catch (NoSuchMethodException e) {}
-
+        try { Method m = mc.getClass().getMethod("getMainRenderTarget"); fb = m.invoke(mc); } catch (NoSuchMethodException e) {}
+        int colorTexId = 0;
         int fboId = 0;
         if (fb != null) {
             try {
                 dbg("takeGl: render target class=" + fb.getClass().getName());
-
                 for (Field f : getAllFields(fb.getClass())) {
-                    String fn = f.getName();
-                    f.setAccessible(true);
+                    String fn = f.getName(); f.setAccessible(true);
                     if (f.getType() == int.class) {
                         int fv = f.getInt(fb);
                         dbg("takeGl: RT field " + fn + " (int)=" + fv);
-                        if ((fn.equals("frameBufferId") || fn.equals("fbo") || fn.equals("framebuffer")
-                                || fn.contains("Fbo") || fn.contains("frameBuffer") || fn.contains("FrameBuffer"))
-                                && fv > 0) { fboId = fv; }
+                        if ((fn.equals("frameBufferId")||fn.equals("fbo")||fn.equals("framebuffer")||fn.contains("Fbo")||fn.contains("frameBuffer")) && fv > 0) fboId = fv;
                     }
                 }
-                for (Method fm : fb.getClass().getMethods()) {
-                    String fn = fm.getName();
-                    if ((fn.equals("getFrameBufferId") || fn.equals("getFbo") || fn.contains("FrameBufferId") || fn.equals("getColorTextureId"))
-                            && fm.getParameterCount() == 0 && (fm.getReturnType() == int.class || fm.getReturnType() == long.class)) {
-                        try {
-                            Object v = fm.invoke(fb);
-                            int vint = ((Number) v).intValue();
-                            dbg("takeGl: RT method " + fn + "()=" + vint);
-                            if (vint > 0) { fboId = vint; }
-                        } catch (Exception ignored) {}
-                    }
-                }
-
                 if (fboId == 0) {
-                    try {
-                        for (Field cf : getAllFields(fb.getClass())) {
-                            if (java.lang.reflect.Modifier.isStatic(cf.getModifiers())) continue;
-                            cf.setAccessible(true);
-                            Object colorTex = cf.get(fb);
-                            if (colorTex == null) continue;
-                            Class<?> texClass = colorTex.getClass();
-                            if (texClass.getName().contains("GpuTexture") || texClass.getName().contains("GlTexture")) {
-                                dbg("takeGl: found texture field '" + cf.getName() + "' type=" + texClass.getName());
-                                for (Field idf : getAllFields(texClass)) {
-                                    if (idf.getName().equals("id") && idf.getType() == int.class) {
-                                        idf.setAccessible(true);
-                                        int texId = idf.getInt(colorTex);
-                                        dbg("takeGl: texture id=" + texId);
-                                        if (texId > 0) {
-                                            for (Method gm : texClass.getMethods()) {
-                                                if (gm.getName().equals("getFbo") && gm.getParameterCount() == 2) {
-                                                    try {
-                                                        Class<?> dsaClass = gm.getParameterTypes()[0];
-                                                        Object dsa = null;
-                                                        try {
-                                                            for (Field df : dsaClass.getDeclaredFields()) {
-                                                                if (java.lang.reflect.Modifier.isStatic(df.getModifiers())) {
-                                                                    df.setAccessible(true);
-                                                                    Object dv = df.get(null);
-                                                                    if (dsaClass.isInstance(dv)) { dsa = dv; break; }
-                                                                }
-                                                            }
-                                                        } catch (Exception ignored) {}
-                                                        if (dsa == null) {
-                                                            try {
-                                                                for (Method dm : dsaClass.getMethods()) {
-                                                                    if (dm.getName().contains("getInstance") && dm.getParameterCount() == 0) {
-                                                                        dsa = dm.invoke(null); break;
-                                                                    }
-                                                                }
-                                                            } catch (Exception ignored) {}
-                                                        }
-                                                        Field depthField = null;
-                                                        for (Field df2 : getAllFields(fb.getClass())) {
-                                                            if (df2.getName().contains("depth") && df2.getName().contains("Texture")) {
-                                                                df2.setAccessible(true); depthField = df2; break;
-                                                            }
-                                                        }
-                                                        Object depthTex = depthField != null ? depthField.get(fb) : null;
-                                                        if (dsa != null) {
-                                                            int fbo = (Integer) gm.invoke(colorTex, dsa, depthTex);
-                                                            dbg("takeGl: getFbo()=" + fbo);
-                                                            if (fbo > 0) { fboId = fbo; }
-                                                        }
-                                                    } catch (Exception ex) { dbg("takeGl: getFbo failed: " + ex.getMessage()); }
-                                                    break;
-                                                }
-                                            }
-                                            break;
-                                        }
-                                    }
+                    for (Field cf : getAllFields(fb.getClass())) {
+                        if (java.lang.reflect.Modifier.isStatic(cf.getModifiers())) continue;
+                        cf.setAccessible(true); Object colorTex = cf.get(fb);
+                        if (colorTex == null) continue;
+                        Class<?> texClass = colorTex.getClass();
+                        if (texClass.getName().contains("GpuTexture") || texClass.getName().contains("GlTexture")) {
+                            dbg("takeGl: found texture '" + cf.getName() + "' type=" + texClass.getName());
+                            for (Field idf : getAllFields(texClass)) {
+                                if (idf.getName().equals("id") && idf.getType() == int.class) {
+                                    idf.setAccessible(true); int tid = idf.getInt(colorTex);
+                                    dbg("takeGl: texture id=" + tid);
+                                    if (tid > 0) colorTexId = tid;
                                 }
-                                if (fboId > 0) break;
                             }
+                            for (Method gm : texClass.getMethods()) {
+                                if (gm.getName().equals("getFbo") && gm.getParameterCount() == 2) {
+                                    try {
+                                        Object dsa = resolveDSA();
+                                        Field depthField = null;
+                                        for (Field df2 : getAllFields(fb.getClass())) {
+                                            if (df2.getName().contains("depth") && df2.getName().contains("Texture")) { df2.setAccessible(true); depthField = df2; break; }
+                                        }
+                                        Object depthTex = depthField != null ? depthField.get(fb) : null;
+                                        if (dsa != null) { int fbo = (Integer) gm.invoke(colorTex, dsa, depthTex); dbg("takeGl: getFbo()=" + fbo); if (fbo > 0) fboId = fbo; }
+                                    } catch (Exception ex) { dbg("takeGl: getFbo failed: " + ex.getMessage()); }
+                                    break;
+                                }
+                            }
+                            break;
                         }
-                    } catch (Exception ex) { dbg("takeGl: texture FBO lookup failed: " + ex.getMessage()); }
+                    }
                 }
-
                 if (fboId > 0) dbg("takeGl: using fboId=" + fboId);
-                else dbg("takeGl: no fboId found, will use FRONT buffer");
-            } catch (Exception e) {
-                dbg("takeGl: failed to get fboId: " + e.getMessage());
-            }
+                else dbg("takeGl: no fboId found");
+            } catch (Exception e) { dbg("takeGl: failed to get fboId: " + e.getMessage()); }
         }
-
         if (fb != null) {
             try {
-                Field fw = fb.getClass().getDeclaredField("width");
-                fw.setAccessible(true);
-                int fbw = fw.getInt(fb);
-                Field fh = fb.getClass().getDeclaredField("height");
-                fh.setAccessible(true);
-                int fbh = fh.getInt(fb);
+                Field fw = fb.getClass().getDeclaredField("width"); fw.setAccessible(true); int fbw = fw.getInt(fb);
+                Field fh = fb.getClass().getDeclaredField("height"); fh.setAccessible(true); int fbh = fh.getInt(fb);
                 if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
             } catch (Exception ignored) {}
         }
-
-        int w = width;
-        int h = height;
+        int w = width, h = height;
+        if (fboId > 0) {
+            try { dbg("takeGl: trying glReadPixels from FBO " + fboId); byte[] r = readFboDirect(fboId, w, h, fb); if (r != null) return r; }
+            catch (Exception ex) { dbg("takeGl: FBO direct read failed: " + ex.getMessage()); }
+        }
+        if (colorTexId > 0) {
+            try { dbg("takeGl: trying glGetTexImage on texture " + colorTexId); byte[] r = readTextureViaGetTexImage(colorTexId, w, h); if (r != null) return r; }
+            catch (Exception ex) { dbg("takeGl: glGetTexImage failed: " + ex.getMessage()); }
+        }
         ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
-
         if (fb != null) {
-            try {
-                for (Method bm : fb.getClass().getMethods()) {
-                    if (bm.getName().equals("blitToScreen") && bm.getParameterCount() == 0) {
-                        try { bm.setAccessible(true); bm.invoke(fb); dbg("takeGl: called blitToScreen"); }
-                        catch (Exception ex) { dbg("takeGl: blitToScreen failed: " + ex.getMessage()); }
-                        break;
+            try { for (Method bm : fb.getClass().getMethods()) { if (bm.getName().equals("blitToScreen") && bm.getParameterCount() == 0) { bm.setAccessible(true); bm.invoke(fb); dbg("takeGl: blitToScreen"); break; } } }
+            catch (Exception ignored) {}
+        }
+        doGlReadPixels(0, 0, w, h, bb, fboId);
+        bb.rewind(); int[] raw = new int[w * h];
+        for (int i = 0; i < raw.length; i++) { int r = bb.get() & 0xFF, g = bb.get() & 0xFF, b = bb.get() & 0xFF, a = bb.get() & 0xFF; raw[i] = (a << 24) | (r << 16) | (g << 8) | b; }
+        int[] flipped = new int[w * h];
+        for (int y2 = 0; y2 < h; y2++) for (int x2 = 0; x2 < w; x2++) flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB); img.setRGB(0, 0, w, h, flipped, 0, w);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(img, "png", baos); byte[] result = baos.toByteArray();
+        if (result.length == 0) throw new RuntimeException("empty PNG w=" + w + " h=" + h);
+        return result;
+    }
+
+    private static Object resolveDSA() {
+        try {
+            Class<?> dsaCore = Class.forName("com.mojang.blaze3d.opengl.DirectStateAccess$Core");
+            for (Field f : dsaCore.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+                    try { f.setAccessible(true); Object v = f.get(null); if (v != null) return v; } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+        try {
+            Class<?> dsaEmu = Class.forName("com.mojang.blaze3d.opengl.DirectStateAccess$Emulated");
+            for (Field f : dsaEmu.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+                    try { f.setAccessible(true); Object v = f.get(null); if (v != null) return v; } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+        try {
+            Class<?> dsaIface = Class.forName("com.mojang.blaze3d.opengl.DirectStateAccess");
+            for (Method m : dsaIface.getMethods()) {
+                if ((m.getName().equals("getInstance") || m.getName().equals("instance")) && m.getParameterCount() == 0) {
+                    try { m.setAccessible(true); return m.invoke(null); } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+        try {
+            Object renderSystem = null;
+            for (Method m : Class.forName("com.mojang.blaze3d.systems.RenderSystem").getMethods()) {
+                if (m.getName().equals("getDevice") && m.getParameterCount() == 0) {
+                    try { m.setAccessible(true); renderSystem = m.invoke(null); break; } catch (Exception ignored) {}
+                }
+            }
+            if (renderSystem != null) {
+                for (Method m : renderSystem.getClass().getMethods()) {
+                    if (m.getName().equals("directStateAccess") && m.getParameterCount() == 0) {
+                        try { m.setAccessible(true); return m.invoke(renderSystem); } catch (Exception ignored) {}
                     }
                 }
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private static byte[] readFboDirect(int fboId, int w, int h, Object fb) throws Exception {
+        if (!LWJGL3) { try { Class.forName("org.lwjgl.opengl.Display").getMethod("makeCurrent").invoke(null); } catch (Exception ignored) {} }
+        Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
+        int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
+        int GL_UB = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
+        int GL_FRONT = 0x0404;
+        for (Method m : gl11.getMethods()) { if (m.getName().equals("glFinish") && m.getParameterCount() == 0) { try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}; break; } }
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) { try { m.setAccessible(true); m.invoke(null, GL_FRONT); dbg("readFbo: reading from FRONT buffer"); } catch (Exception ignored) {}; break; }
+        }
+        for (Method m : gl11.getMethods()) { if (m.getName().equals("glFinish") && m.getParameterCount() == 0) { try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}; break; } }
+        ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
+        boolean ok = false;
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glReadPixels") && m.getParameterCount() == 7) {
+                Class<?>[] pts = m.getParameterTypes();
+                if (pts[6] == java.nio.ByteBuffer.class) { m.setAccessible(true); m.invoke(null, 0, 0, w, h, GL_RGBA, GL_UB, bb); ok = true; break; }
+            }
+        }
+        if (!ok) throw new RuntimeException("glReadPixels not found");
+        bb.rewind(); int[] raw = new int[w * h];
+        for (int i = 0; i < raw.length; i++) { int r = bb.get() & 0xFF, g = bb.get() & 0xFF, b = bb.get() & 0xFF, a = bb.get() & 0xFF; raw[i] = (a << 24) | (r << 16) | (g << 8) | b; }
+        int[] flipped = new int[w * h];
+        for (int y2 = 0; y2 < h; y2++) for (int x2 = 0; x2 < w; x2++) flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB); img.setRGB(0, 0, w, h, flipped, 0, w);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(); ImageIO.write(img, "png", baos); byte[] result = baos.toByteArray();
+        if (result.length == 0) throw new RuntimeException("empty PNG from FBO read"); return result;
+    }
+
+    private static long getAddressOfBuffer(ByteBuffer bb) throws Exception {
+        try {
+            Class<?> muClass = Class.forName("org.lwjgl.system.MemoryUtil");
+            for (Method m : muClass.getMethods()) {
+                if (m.getName().equals("memAddress") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == java.nio.ByteBuffer.class) {
+                    m.setAccessible(true);
+                    return (Long) m.invoke(null, bb);
+                }
+            }
+        } catch (Exception ignored) {}
+        throw new RuntimeException("Cannot get buffer address: MemoryUtil.memAddress not found");
+    }
+
+    private static byte[] readTextureViaGetTexImage(int texId, int w, int h) throws Exception {
+        if (!LWJGL3) {
+            try {
+                Class<?> displayClass = Class.forName("org.lwjgl.opengl.Display");
+                try { displayClass.getMethod("makeCurrent").invoke(null); } catch (Exception ignored) {}
             } catch (Exception ignored) {}
         }
+        Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
+        int GL_TEXTURE_2D = gl11.getDeclaredField("GL_TEXTURE_2D").getInt(null);
+        int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
+        int GL_UNSIGNED_BYTE = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
 
-        try {
-            doGlReadPixels(0, 0, w, h, bb, fboId);
-        } catch (Exception e) {
-            Throwable cause = e;
-            while (cause.getCause() != null) cause = cause.getCause();
-            throw new RuntimeException("glReadPixels failed: " + cause.getClass().getName() + ": " + cause.getMessage(), e);
+        int prevTex = 0;
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glGetInteger") && m.getParameterCount() == 1) {
+                try { m.setAccessible(true); prevTex = (Integer) m.invoke(null, GL_TEXTURE_2D); } catch (Exception ignored) {}
+                break;
+            }
         }
-        bb.rewind();
 
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glBindTexture") && m.getParameterCount() == 2) {
+                try { m.setAccessible(true); m.invoke(null, GL_TEXTURE_2D, texId);
+                    dbg("readTexImg: bound texture " + texId); } catch (Exception ignored) {}
+                break;
+            }
+        }
+
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glFinish") && m.getParameterCount() == 0) {
+                try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}
+                break;
+            }
+        }
+
+        ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
+        boolean gotPixels = false;
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glGetTexImage")) {
+                try {
+                    m.setAccessible(true);
+                    Class<?>[] pts = m.getParameterTypes();
+                    if (pts.length == 5 && pts[4] == java.nio.ByteBuffer.class) {
+                        m.invoke(null, GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, bb);
+                        gotPixels = true; dbg("readTexImg: glGetTexImage(ByteBuffer) OK");
+                    } else if (pts.length == 5 && pts[4] == long.class) {
+                        long addr = getAddressOfBuffer(bb);
+                        m.invoke(null, GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, addr);
+                        gotPixels = true; dbg("readTexImg: glGetTexImage(long addr) OK");
+                    } else if (pts.length == 6) {
+                        Object[] args = new Object[6];
+                        args[0] = GL_TEXTURE_2D; args[1] = 0; args[2] = GL_RGBA; args[3] = GL_UNSIGNED_BYTE;
+                        if (pts[4] == int.class) args[4] = 0; else args[4] = 0L;
+                        if (pts[5] == java.nio.ByteBuffer.class) args[5] = bb;
+                        else if (pts[5] == long.class) args[5] = getAddressOfBuffer(bb);
+                        m.invoke(null, args);
+                        gotPixels = true; dbg("readTexImg: glGetTexImage(6 params) OK");
+                    }
+                } catch (Exception e) {
+                    dbg("readTexImg: glGetTexImage failed: " + e.getMessage());
+                }
+                break;
+            }
+        }
+        if (!gotPixels) throw new RuntimeException("glGetTexImage method not found");
+
+        for (Method m : gl11.getMethods()) {
+            if (m.getName().equals("glBindTexture") && m.getParameterCount() == 2) {
+                try { m.setAccessible(true); m.invoke(null, GL_TEXTURE_2D, prevTex); } catch (Exception ignored) {}
+                break;
+            }
+        }
+
+        bb.rewind();
         int[] raw = new int[w * h];
         for (int i = 0; i < raw.length; i++) {
             int r = bb.get() & 0xFF;
@@ -1412,22 +1593,18 @@ public final class ReflectionHelper {
             int a = bb.get() & 0xFF;
             raw[i] = (a << 24) | (r << 16) | (g << 8) | b;
         }
-
         int[] flipped = new int[w * h];
         for (int y2 = 0; y2 < h; y2++) {
             for (int x2 = 0; x2 < w; x2++) {
                 flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
             }
         }
-
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         img.setRGB(0, 0, w, h, flipped, 0, w);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try { ImageIO.write(img, "png", baos); } catch (java.io.IOException e) {
-            throw new RuntimeException("ImageIO.write failed", e);
-        }
+        ImageIO.write(img, "png", baos);
         byte[] result = baos.toByteArray();
-        if (result.length == 0) throw new RuntimeException("empty PNG w=" + w + " h=" + h);
+        if (result.length == 0) throw new RuntimeException("empty PNG from glGetTexImage w=" + w + " h=" + h);
         return result;
     }
 
@@ -1489,17 +1666,6 @@ public final class ReflectionHelper {
                 break;
             }
         }
-
-        try {
-            int GL_FRONT = 0x0404;
-            for (Method m : gl11.getMethods()) {
-                if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) {
-                    try { m.setAccessible(true); m.invoke(null, GL_FRONT); dbg("doGlRead: set read buffer to FRONT"); }
-                    catch (Exception ignored) {}
-                    break;
-                }
-            }
-        } catch (Exception ignored) {}
 
         for (Method m : gl11.getMethods()) {
             if (m.getName().equals("glReadPixels") && m.getParameterCount() == 7) {
@@ -2180,6 +2346,74 @@ public final class ReflectionHelper {
         }
     }
 
+    public static String doPlaceBlock(Object mc) {
+        try {
+            Object player = getPlayer(mc);
+            if (player == null) return "{\"error\":\"no player\"}";
+            Object gameMode = null;
+            try { gameMode = mc.getClass().getMethod("gameMode").invoke(mc); } catch (Exception ignored) {}
+            if (gameMode == null) {
+                for (Field f : getAllFields(mc.getClass())) {
+                    String fn = f.getName().toLowerCase();
+                    if (fn.contains("gamemode") || fn.contains("interaction") || fn.contains("multiplayer")) {
+                        try { f.setAccessible(true); gameMode = f.get(mc); dbg("doPlaceBlock: found gameMode via field " + f.getName()); break; } catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (gameMode == null) return "{\"error\":\"no gameMode\"}";
+            double px = 0, py = 0, pz = 0;
+            for (Method m : getAllMethods(player.getClass())) {
+                if ((m.getName().equals("getX") || m.getName().equals("func_223148_aQ")) && m.getParameterCount() == 0) { m.setAccessible(true); px = ((Number)m.invoke(player)).doubleValue(); }
+                if ((m.getName().equals("getY") || m.getName().equals("func_223149_e")) && m.getParameterCount() == 0) { m.setAccessible(true); py = ((Number)m.invoke(player)).doubleValue(); }
+                if ((m.getName().equals("getZ") || m.getName().equals("func_223143_g")) && m.getParameterCount() == 0) { m.setAccessible(true); pz = ((Number)m.invoke(player)).doubleValue(); }
+            }
+            int bx = (int)Math.floor(px), by = (int)Math.floor(py) - 1, bz = (int)Math.floor(pz);
+            dbg("doPlaceBlock: player at " + px + "," + py + "," + pz + " placing at " + bx + "," + by + "," + bz);
+            Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
+            Object hitVec = vec3Class.getConstructor(double.class, double.class, double.class).newInstance(px, by + 1.0, pz);
+            Class<?> dirClass = Class.forName("net.minecraft.core.Direction");
+            Object dirUp = null;
+            for (Object d : (Enum[])dirClass.getMethod("values").invoke(null)) { if (((Enum)d).name().equals("UP")) { dirUp = d; break; } }
+            Class<?> bpClass = Class.forName("net.minecraft.core.BlockPos");
+            Object blockPos = bpClass.getConstructor(int.class, int.class, int.class).newInstance(bx, by, bz);
+            Class<?> bhrClass = Class.forName("net.minecraft.world.phys.BlockHitResult");
+            Object hitResult = bhrClass.getConstructor(vec3Class, dirClass, bpClass, boolean.class).newInstance(hitVec, dirUp, blockPos, false);
+            Class<?> handClass = Class.forName("net.minecraft.world.InteractionHand");
+            Object mainHand = null;
+            for (Object h : (Enum[])handClass.getMethod("values").invoke(null)) { if (((Enum)h).name().equals("MAIN_HAND")) { mainHand = h; break; } }
+            boolean placed = false;
+            for (Method m : getAllMethods(gameMode.getClass())) {
+                String mn = m.getName();
+                if ((mn.equals("useItemOn") || mn.equals("func_180517_b") || mn.contains("useItemOn"))
+                        && m.getParameterCount() >= 3) {
+                    Class<?>[] pts = m.getParameterTypes();
+                    if (pts.length == 3 && pts[0].isInstance(player) && pts[1] == handClass) {
+                        try { m.setAccessible(true); m.invoke(gameMode, player, mainHand, hitResult); placed = true; dbg("doPlaceBlock: OK via " + mn + "(3)"); break; }
+                        catch (Exception ignored) {}
+                    }
+                }
+                if (!placed && (mn.equals("useItemOn") || mn.equals("func_180517_b") || mn.contains("useItemOn"))
+                        && m.getParameterCount() >= 4) {
+                    try { m.setAccessible(true); m.invoke(gameMode, player, mainHand, hitResult); placed = true; dbg("doPlaceBlock: OK via " + mn); break; }
+                    catch (Exception ignored) {}
+                }
+            }
+            if (!placed) {
+                for (Method m : getAllMethods(gameMode.getClass())) {
+                    String mn = m.getName().toLowerCase();
+                    if (mn.contains("useitem") && !mn.contains("continue") && m.getParameterCount() >= 2) {
+                        try { m.setAccessible(true); m.invoke(gameMode, player, mainHand, hitResult); placed = true; dbg("doPlaceBlock: OK via " + m.getName()); break; }
+                        catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (!placed) return "{\"error\":\"no useItemOn method found on gameMode\"}";
+            return "{\"placed\":true,\"at\":[" + bx + "," + by + "," + bz + "]}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
     public static String openChatScreen(Object mc) {
         try {
             Class<?> chatScreenClass = null;
@@ -2500,6 +2734,8 @@ public final class ReflectionHelper {
     public static String enterMcpControlMode(Object mc) {
         try {
             mcpControlMode = true;
+            mouseReleaseActive = false;
+            forceCursorNormal = false;
             McpPlatformControl ctrl = McpControlFactory.get();
 
             long nativeHwnd = 0;
@@ -2531,8 +2767,6 @@ public final class ReflectionHelper {
             boolean hookOk = ctrl.installMouseHook(nativeHwnd);
             dbg("enterMcpControlMode: platform=" + ctrl.getPlatformName() + " hook=" + hookOk + " hwnd=" + Long.toHexString(nativeHwnd));
             ctrl.setControlMode(true);
-            forceCursorNormal = true;
-            dbg("enterMcpControlMode: platform=" + ctrl.getPlatformName() + " hook=" + hookOk + " hwnd=" + Long.toHexString(nativeHwnd));
             return "{\"control_mode\":true,\"platform\":\"" + ctrl.getPlatformName() + "\",\"hook\":" + hookOk + "}";
         } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
     }
@@ -2540,6 +2774,7 @@ public final class ReflectionHelper {
     public static String exitMcpControlMode(Object mc) {
         try {
             mcpControlMode = false;
+            mouseReleaseActive = false;
             forceCursorNormal = false;
             McpPlatformControl ctrl = McpControlFactory.get();
             ctrl.setControlMode(false);
@@ -2565,6 +2800,26 @@ public final class ReflectionHelper {
     }
 
     public static boolean isMcpControlMode() { return mcpControlMode; }
+
+    public static String getMcpControlOverlayTranslationKey() { return "mcpmod.control.overlay"; }
+
+    public static String getMcpControlPauseTransferTranslationKey() { return "mcpmod.control.transfer"; }
+
+    public static boolean shouldRenderMcpControlOverlay(Object mc) {
+        return mcpControlMode;
+    }
+
+    public static boolean shouldBlockUserMouseInput(Object mc) {
+        return mcpControlMode;
+    }
+
+    public static boolean shouldBlockUserKeyboardInput(Object mc) {
+        return mcpControlMode;
+    }
+
+    public static void handleMcpOverlayClicked(Object mc) {
+        exitMcpControlMode(mc);
+    }
 
     private static volatile boolean forceCursorNormal = false;
     private static Method glfwSetInputModeMethod;
@@ -2771,12 +3026,55 @@ public final class ReflectionHelper {
     public static boolean isLWJGL3() { return LWJGL3; }
 
     private static volatile boolean mouseReleaseActive = false;
+    private static volatile boolean screenshotInProgress = false;
+    private static volatile byte[] cachedScreenshot = null;
+    private static volatile long cachedScreenshotTime = 0;
 
     public static void setMouseReleaseActive(boolean v) { mouseReleaseActive = v; }
+
+    private static long lastCacheFrameLog = 0;
+    public static void cacheFrameFromRenderThread(Object mc) {
+        if (System.currentTimeMillis() - cachedScreenshotTime < 50) return;
+        try {
+            Object rt = null;
+            try { Method m = mc.getClass().getMethod("getMainRenderTarget"); rt = m.invoke(mc); }
+            catch (Exception e) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: getMainRenderTarget failed: " + e.getMessage()); lastCacheFrameLog = System.currentTimeMillis(); } return; }
+            if (rt == null) return;
+            int w = 0, h = 0;
+            for (Field f : getAllFields(rt.getClass())) {
+                f.setAccessible(true);
+                if (f.getName().equals("width") && f.getType() == int.class) { try { w = f.getInt(rt); } catch (Exception ignored) {} }
+                if (f.getName().equals("height") && f.getType() == int.class) { try { h = f.getInt(rt); } catch (Exception ignored) {} }
+            }
+            if (w <= 0 || h <= 0) return;
+            int texId = 0;
+            for (Field f : getAllFields(rt.getClass())) {
+                f.setAccessible(true);
+                Object val = f.get(rt);
+                if (val != null && val.getClass().getName().contains("GlTexture")) {
+                    for (Field idf : getAllFields(val.getClass())) {
+                        if (idf.getName().equals("id") && idf.getType() == int.class) { idf.setAccessible(true); texId = idf.getInt(val); }
+                    }
+                    break;
+                }
+            }
+            if (texId <= 0) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: no texId found, rt=" + rt.getClass().getName()); lastCacheFrameLog = System.currentTimeMillis(); } return; }
+            byte[] result = readTextureViaGetTexImage(texId, w, h);
+            if (result != null && result.length > 0) {
+                cachedScreenshot = result;
+                cachedScreenshotTime = System.currentTimeMillis();
+                if (System.currentTimeMillis() - lastCacheFrameLog > 10000) { dbg("cacheFrame: cached " + result.length + " bytes"); lastCacheFrameLog = System.currentTimeMillis(); }
+            }
+        } catch (Exception e) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: exception: " + e.getMessage()); lastCacheFrameLog = System.currentTimeMillis(); } }
+    }
+
+    public static byte[] getCachedScreenshot() {
+        return cachedScreenshot;
+    }
     public static boolean isMouseReleaseActive() { return mouseReleaseActive; }
 
     public static void tickMouseRelease(Object mc) {
-        if (!mouseReleaseActive) return;
+        if (!mouseReleaseActive || screenshotInProgress) return;
         try {
             long handle = getWindowHandle(mc);
             if (handle == 0 || !LWJGL3) return;
@@ -2792,6 +3090,26 @@ public final class ReflectionHelper {
                 if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
             }
         } catch (Exception ignored) {}
+    }
+
+    public static void tickMcpControlMode(Object mc) {
+        if (!mcpControlMode) return;
+        try {
+            tickForceCursorNormal(mc);
+            long handle = getWindowHandle(mc);
+            if (handle == 0 || !LWJGL3) return;
+            initCursorCache();
+            glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+            Object mouseHandler = getMouseHandler(mc);
+            if (mouseHandler != null) {
+                initMouseFields(mouseHandler);
+                if (mouseGrabbedField != null) mouseGrabbedField.setBoolean(mouseHandler, false);
+                if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
+                if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
+            }
+        } catch (Exception e) {
+            dbg("tickMcpControlMode: " + e.getMessage());
+        }
     }
 
     private static volatile boolean videoCaptureActive = false;

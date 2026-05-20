@@ -2,6 +2,7 @@ package xyz.langyo.minecraft.mcp.common;
 
 import com.sun.jna.*;
 import com.sun.jna.win32.StdCallLibrary;
+import java.lang.reflect.Method;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -10,11 +11,11 @@ public class McpWin32Control implements McpPlatformControl {
     private interface MyUser32 extends StdCallLibrary {
         MyUser32 INSTANCE = Native.load("user32", MyUser32.class);
 
-        long SetWindowsHookExW(int idHook, LowLevelMouseProc lpfn, long hMod, long dwThreadId);
+        long SetWindowsHookExW(int idHook, Callback lpfn, long hMod, long dwThreadId);
         boolean UnhookWindowsHookEx(long hhk);
         long CallNextHookEx(long hhk, int nCode, long wParam, Pointer lParam);
         boolean GetWindowRect(long hWnd, RECT rect);
-        long SetWindowsHookExA(int idHook, LowLevelMouseProc lpfn, long hMod, long dwThreadId);
+        long SetWindowsHookExA(int idHook, Callback lpfn, long hMod, long dwThreadId);
 
         boolean SetLayeredWindowAttributes(long hWnd, int crKey, byte bAlpha, int dwFlags);
         boolean PostMessageW(long hWnd, int Msg, long wParam, long lParam);
@@ -63,6 +64,7 @@ public class McpWin32Control implements McpPlatformControl {
         boolean EnableWindow(long hWnd, boolean bEnable);
         long SetFocus(long hWnd);
         boolean SetForegroundWindow(long hWnd);
+        long GetForegroundWindow();
         int GetSystemMetrics(int nIndex);
         boolean RegisterHotKey(long hWnd, int id, int fsModifiers, int vk);
         boolean UnregisterHotKey(long hWnd, int id);
@@ -85,6 +87,10 @@ public class McpWin32Control implements McpPlatformControl {
     }
 
     public interface LowLevelMouseProc extends Callback {
+        long callback(int nCode, long wParam, Pointer lParam);
+    }
+
+    public interface LowLevelKeyboardProc extends Callback {
         long callback(int nCode, long wParam, Pointer lParam);
     }
 
@@ -174,18 +180,51 @@ public class McpWin32Control implements McpPlatformControl {
         protected java.util.List<String> getFieldOrder() { return java.util.Arrays.asList("bmiHeader"); }
     }
 
+    public static class MSLLHOOKSTRUCT extends Structure {
+        public POINT pt = new POINT();
+        public int mouseData;
+        public int flags;
+        public int time;
+        public Pointer dwExtraInfo;
+        public MSLLHOOKSTRUCT() {}
+        public MSLLHOOKSTRUCT(Pointer p) { super(p); read(); }
+        protected java.util.List<String> getFieldOrder() {
+            return java.util.Arrays.asList("pt", "mouseData", "flags", "time", "dwExtraInfo");
+        }
+    }
+
+    public static class KBDLLHOOKSTRUCT extends Structure {
+        public int vkCode;
+        public int scanCode;
+        public int flags;
+        public int time;
+        public Pointer dwExtraInfo;
+        public KBDLLHOOKSTRUCT() {}
+        public KBDLLHOOKSTRUCT(Pointer p) { super(p); read(); }
+        protected java.util.List<String> getFieldOrder() {
+            return java.util.Arrays.asList("vkCode", "scanCode", "flags", "time", "dwExtraInfo");
+        }
+    }
+
+    private static final int HC_ACTION = 0;
+    private static final int WH_KEYBOARD_LL = 13;
     private static final int WH_MOUSE_LL = 14;
+    private static final int WM_MOUSEMOVE = 0x0200;
     private static final int WM_PAINT = 0x000F;
     private static final int WM_ERASEBKGND = 0x0014;
     private static final int WM_DESTROY = 0x0002;
     private static final int WM_LBUTTONDOWN = 0x0201;
     private static final int WM_LBUTTONUP = 0x0202;
+    private static final int WM_MBUTTONDOWN = 0x0207;
+    private static final int WM_MBUTTONUP = 0x0208;
     private static final int WM_RBUTTONDOWN = 0x0204;
     private static final int WM_RBUTTONUP = 0x0205;
     private static final int WM_MOUSEWHEEL = 0x020A;
     private static final int WM_KEYDOWN = 0x0100;
     private static final int WM_KEYUP = 0x0101;
     private static final int WM_CHAR = 0x0102;
+    private static final int WM_SYSKEYDOWN = 0x0104;
+    private static final int WM_SYSKEYUP = 0x0105;
     private static final int MK_LBUTTON = 0x0001;
     private static final int WHEEL_DELTA = 120;
     private static final int PW_RENDERFULLCONTENT = 2;
@@ -221,14 +260,21 @@ public class McpWin32Control implements McpPlatformControl {
     private static final int VK_ESCAPE = 0x1B;
     private static final int PM_REMOVE = 1;
     private static final int CONTAINER_MARGIN = 40;
+    private static final int LLMHF_INJECTED = 0x00000001;
+    private static final int LLMHF_LOWER_IL_INJECTED = 0x00000002;
+    private static final int LLKHF_LOWER_IL_INJECTED = 0x00000002;
+    private static final int LLKHF_INJECTED = 0x00000010;
 
     private static final MyUser32 U = MyUser32.INSTANCE;
     private static final MyKernel32 K = MyKernel32.INSTANCE;
 
     private volatile long mouseHookHandle;
+    private volatile long keyboardHookHandle;
     private volatile boolean controlMode;
+    private volatile boolean controlModeExitRequested;
     private volatile Thread hookThread;
     private LowLevelMouseProc mouseHookCallback;
+    private LowLevelKeyboardProc keyboardHookCallback;
 
     private volatile long overlayHwnd;
     private volatile String overlayText = "";
@@ -244,6 +290,59 @@ public class McpWin32Control implements McpPlatformControl {
     private volatile Thread containerThread;
     private volatile WindowProc containerWndProc;
 
+    private static boolean isMouseExitTrigger(long wParam) {
+        int msg = (int) wParam;
+        return msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_MBUTTONDOWN;
+    }
+
+    private static boolean isInjectedMouseEvent(Pointer lParam) {
+        if (lParam == null) return false;
+        try {
+            int flags = new MSLLHOOKSTRUCT(lParam).flags;
+            return (flags & (LLMHF_INJECTED | LLMHF_LOWER_IL_INJECTED)) != 0;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isInjectedKeyboardEvent(Pointer lParam) {
+        if (lParam == null) return false;
+        try {
+            int flags = new KBDLLHOOKSTRUCT(lParam).flags;
+            return (flags & (LLKHF_INJECTED | LLKHF_LOWER_IL_INJECTED)) != 0;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void requestExitControlMode() {
+        if (controlModeExitRequested) return;
+        controlModeExitRequested = true;
+        try {
+            ReflectedInputHandler.executeOnRenderThread(() -> {
+                try {
+                    ReflectionHelper.exitMcpControlMode(ReflectionHelper.getMinecraftInstance());
+                } catch (Exception e) {
+                    ReflectionHelper.dbg("McpWin32Control: exit control click failed: " + e.getMessage());
+                } finally {
+                    controlModeExitRequested = false;
+                }
+            });
+        } catch (Exception e) {
+            controlModeExitRequested = false;
+            ReflectionHelper.dbg("McpWin32Control: exit control schedule failed: " + e.getMessage());
+        }
+    }
+
+    private boolean isMinecraftForeground() {
+        try {
+            long foreground = U.GetForegroundWindow();
+            return mcHwnd == 0 || foreground == 0 || foreground == mcHwnd;
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
     @Override
     public String getPlatformName() { return "win32"; }
 
@@ -251,8 +350,19 @@ public class McpWin32Control implements McpPlatformControl {
     public boolean installMouseHook(long mcNativeWindowHandle) {
         if (mouseHookHandle != 0) return true;
         mcHwnd = mcNativeWindowHandle;
+        controlModeExitRequested = false;
 
-        mouseHookCallback = (nCode, wParam, lParam) -> U.CallNextHookEx(mouseHookHandle, nCode, wParam, lParam);
+        mouseHookCallback = (nCode, wParam, lParam) -> {
+            if (nCode < HC_ACTION || !controlMode || isInjectedMouseEvent(lParam) || !isMinecraftForeground()) {
+                return U.CallNextHookEx(mouseHookHandle, nCode, wParam, lParam);
+            }
+            int msg = (int) wParam;
+            if (msg == WM_MOUSEWHEEL || msg == WM_LBUTTONUP || msg == WM_RBUTTONUP || msg == WM_MBUTTONUP || isMouseExitTrigger(wParam)) {
+                if (isMouseExitTrigger(wParam)) requestExitControlMode();
+                return 1L;
+            }
+            return U.CallNextHookEx(mouseHookHandle, nCode, wParam, lParam);
+        };
 
         CountDownLatch latch = new CountDownLatch(1);
         boolean[] ok = {false};
@@ -261,9 +371,10 @@ public class McpWin32Control implements McpPlatformControl {
             try {
                 long hMod = K.GetModuleHandleW(null);
                 mouseHookHandle = U.SetWindowsHookExW(WH_MOUSE_LL, mouseHookCallback, hMod, 0);
+                keyboardHookHandle = 0;
                 if (mouseHookHandle == 0) { ok[0] = false; latch.countDown(); return; }
                 ok[0] = true;
-                ReflectionHelper.dbg("McpWin32Control: hook installed " + Long.toHexString(mouseHookHandle));
+                ReflectionHelper.dbg("McpWin32Control: mouse hook installed " + Long.toHexString(mouseHookHandle));
                 latch.countDown();
                 MSG msg = new MSG();
                 while (mouseHookHandle != 0) {
@@ -286,22 +397,29 @@ public class McpWin32Control implements McpPlatformControl {
 
     @Override
     public boolean uninstallMouseHook() {
-        if (mouseHookHandle == 0) return true;
-        long h = mouseHookHandle;
+        if (mouseHookHandle == 0 && keyboardHookHandle == 0) return true;
+        long mouse = mouseHookHandle;
+        long keyboard = keyboardHookHandle;
         mouseHookHandle = 0;
-        U.UnhookWindowsHookEx(h);
+        keyboardHookHandle = 0;
+        controlModeExitRequested = false;
+        if (mouse != 0) U.UnhookWindowsHookEx(mouse);
+        if (keyboard != 0) U.UnhookWindowsHookEx(keyboard);
         if (hookThread != null) { hookThread.interrupt(); hookThread = null; }
         return true;
     }
 
     @Override
-    public void setControlMode(boolean enabled) { controlMode = enabled; }
+    public void setControlMode(boolean enabled) {
+        controlMode = enabled;
+        if (!enabled) controlModeExitRequested = false;
+    }
 
     @Override
     public boolean isControlMode() { return controlMode; }
 
     @Override
-    public boolean isHookInstalled() { return mouseHookHandle != 0; }
+    public boolean isHookInstalled() { return mouseHookHandle != 0 || keyboardHookHandle != 0; }
 
     @Override
     public boolean showOverlay(String text, int port) {
@@ -517,57 +635,7 @@ public class McpWin32Control implements McpPlatformControl {
 
     @Override
     public byte[] takePlatformScreenshot() {
-        if (mcHwnd == 0) return null;
-        try {
-            RECT rc = new RECT();
-            U.GetWindowRect(mcHwnd, rc);
-            int w = rc.right - rc.left;
-            int h = rc.bottom - rc.top;
-            if (w <= 0 || h <= 0) return null;
-
-            long hdcScreen = U.GetWindowDC(mcHwnd);
-            if (hdcScreen == 0) return null;
-            long hdcMem = U.CreateCompatibleDC(hdcScreen);
-            long hBmp = U.CreateCompatibleBitmap(hdcScreen, w, h);
-            U.SelectObject(hdcMem, hBmp);
-            boolean ok = U.PrintWindow(mcHwnd, hdcMem, PW_RENDERFULLCONTENT);
-            if (!ok) {
-                ok = U.BitBlt(hdcMem, 0, 0, w, h, hdcScreen, 0, 0, SRCCOPY);
-            }
-            if (!ok) { U.DeleteObject(hBmp); U.DeleteDC(hdcMem); U.ReleaseDC(mcHwnd, hdcScreen); return null; }
-
-            BITMAPINFO bmi = new BITMAPINFO();
-            bmi.bmiHeader.biWidth = w;
-            bmi.bmiHeader.biHeight = -h;
-            bmi.bmiHeader.biSize = bmi.bmiHeader.size();
-            int rowBytes = w * 4;
-            Memory px = new Memory((long) rowBytes * h);
-            int scan = U.GetDIBits(hdcMem, hBmp, 0, h, px, bmi, DIB_RGB_COLORS);
-            if (scan == 0) { U.DeleteObject(hBmp); U.DeleteDC(hdcMem); U.ReleaseDC(mcHwnd, hdcScreen); return null; }
-
-            byte[] raw = px.getByteArray(0, rowBytes * h);
-            int[] pixels = new int[w * h];
-            for (int i = 0; i < pixels.length; i++) {
-                int b = raw[i * 4] & 0xFF;
-                int g = raw[i * 4 + 1] & 0xFF;
-                int r = raw[i * 4 + 2] & 0xFF;
-                int a = raw[i * 4 + 3] & 0xFF;
-                pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
-            }
-            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-            img.setRGB(0, 0, w, h, pixels, 0, w);
-            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-            javax.imageio.ImageIO.write(img, "png", baos);
-            byte[] result = baos.toByteArray();
-
-            U.DeleteObject(hBmp);
-            U.DeleteDC(hdcMem);
-            U.ReleaseDC(mcHwnd, hdcScreen);
-            return result;
-        } catch (Exception e) {
-            ReflectionHelper.dbg("McpWin32Control.takePlatformScreenshot: " + e.getMessage());
-            return null;
-        }
+        return null;
     }
 
     @Override

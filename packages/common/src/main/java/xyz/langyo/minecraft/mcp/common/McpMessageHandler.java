@@ -75,6 +75,7 @@ public class McpMessageHandler {
         if (method.equals("look_delta")) return handleLookDelta(params);
         if (method.equals("right_click")) return handleRightClick();
         if (method.equals("use_item")) return handleUseItem();
+        if (method.equals("place_block")) return handlePlaceBlock();
         if (method.equals("pause_game")) return handlePauseGame();
         if (method.equals("open_chat")) return handleOpenChat();
         if (method.equals("close_screen")) return handleCloseScreen();
@@ -317,6 +318,11 @@ public class McpMessageHandler {
 
     protected Object handleUseItem() {
         if (minecraftInput != null) return ReflectionHelper.doUseItem(ReflectionHelper.getMinecraftInstance());
+        return "no input handler";
+    }
+
+    protected Object handlePlaceBlock() {
+        if (minecraftInput != null) return ReflectionHelper.doPlaceBlock(ReflectionHelper.getMinecraftInstance());
         return "no input handler";
     }
 

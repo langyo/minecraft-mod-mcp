@@ -1,10 +1,19 @@
 package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ClickEvent;
 
@@ -15,6 +24,144 @@ public class ModDevMcpMod {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
     private final boolean dependenciesAvailable;
+
+    @SuppressWarnings("removal")
+    private static void registerTickListener() {
+        TickEvent.ClientTickEvent.BUS.addListener(event -> {
+            if (INSTANCE == null || INSTANCE.debugUrl == null) return;
+            try {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                ReflectionHelper.tickMouseRelease(mc);
+                ReflectionHelper.tickMcpControlMode(mc);
+                ReflectionHelper.cacheFrameFromRenderThread(mc);
+                ReflectionHelper.tickVideoCapture(mc);
+                xyz.langyo.minecraft.mcp.common.McpPlatformControl ctrl = xyz.langyo.minecraft.mcp.common.McpControlFactory.get();
+                if (ctrl instanceof xyz.langyo.minecraft.mcp.common.McpWin32Control w32ctrl) {
+                    if (w32ctrl.getMcHwnd() == 0) {
+                        long glfwHandle = mc.getWindow().getWindow();
+                        w32ctrl.ensureHwndFromGlfw(glfwHandle);
+                    }
+                }
+            } catch (Exception ignored) {}
+            if (INSTANCE.chatSent) return;
+            try {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                if (mc.gui == null || mc.gui.getChat() == null) return;
+                INSTANCE.chatSent = true;
+                String url = INSTANCE.debugUrl;
+                Component msg = Component.empty()
+                    .append(Component.literal("[MCP] Debug page: ").withStyle(s -> s.withColor(0x55FF55)))
+                    .append(Component.literal(url).withStyle(s -> s
+                        .withColor(0x5555FF)
+                        .withUnderlined(true)
+                        .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(url)))
+                    ));
+                mc.gui.getChat().addMessage(msg);
+            } catch (Exception ignored) {}
+        });
+    }
+
+    private static List<Field> allFields(Class<?> clazz) {
+        List<Field> fields = new ArrayList<>();
+        Class<?> c = clazz;
+        while (c != null && c != Object.class) {
+            for (Field f : c.getDeclaredFields()) fields.add(f);
+            c = c.getSuperclass();
+        }
+        return fields;
+    }
+
+    private static boolean isBottomWideButton(Object obj) {
+        if (!(obj instanceof Button btn)) return false;
+        return btn.getY() >= 180 && btn.getWidth() >= 150;
+    }
+
+    private static boolean addRenderableWidget(Screen screen, Button widget) {
+        try {
+            for (Class<?> c = screen.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+                for (Method m : c.getDeclaredMethods()) {
+                    if (!m.getName().equals("addRenderableWidget") || m.getParameterCount() != 1) continue;
+                    if (!m.getParameterTypes()[0].isAssignableFrom(widget.getClass())) continue;
+                    m.setAccessible(true);
+                    m.invoke(screen, widget);
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    private static boolean addToNamedList(Screen screen, String fieldName, Object widget) {
+        try {
+            for (Field f : allFields(screen.getClass())) {
+                if (!f.getName().equals(fieldName)) continue;
+                f.setAccessible(true);
+                Object val = f.get(screen);
+                if (!(val instanceof List<?> list)) continue;
+                @SuppressWarnings("unchecked")
+                List<Object> mutable = (List<Object>) list;
+                if (!mutable.contains(widget)) mutable.add(widget);
+                return true;
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    private static void patchPauseButtons(PauseScreen screen) {
+        try {
+            Button originalQuit = null;
+            for (Field f : allFields(screen.getClass())) {
+                f.setAccessible(true);
+                Object val = f.get(screen);
+                if (isBottomWideButton(val)) {
+                    originalQuit = (Button) val;
+                    break;
+                }
+            }
+            if (originalQuit == null) {
+                for (Field f : allFields(screen.getClass())) {
+                    f.setAccessible(true);
+                    Object val = f.get(screen);
+                    if (val instanceof List<?> list) {
+                        for (Object entry : list) {
+                            if (isBottomWideButton(entry)) {
+                                originalQuit = (Button) entry;
+                                break;
+                            }
+                        }
+                    }
+                    if (originalQuit != null) break;
+                }
+            }
+            if (originalQuit == null) return;
+
+            int x = originalQuit.getX();
+            int y = originalQuit.getY();
+            int w = originalQuit.getWidth();
+            int h = originalQuit.getHeight();
+            int gap = 8;
+            int leftW = (w - gap) / 2;
+            int rightW = w - gap - leftW;
+
+            originalQuit.setX(x + leftW + gap);
+            originalQuit.setWidth(rightW);
+
+            Button transfer = Button.builder(Component.translatable(ReflectionHelper.getMcpControlPauseTransferTranslationKey()), btn -> {
+                try {
+                    net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                    ReflectionHelper.enterMcpControlMode(mc);
+                    ReflectionHelper.closeScreen(mc);
+                } catch (Exception ignored) {}
+            }).bounds(x, y, leftW, h).build();
+
+            boolean added = addRenderableWidget(screen, transfer);
+            if (!added) {
+                addToNamedList(screen, "renderables", transfer);
+                addToNamedList(screen, "children", transfer);
+                addToNamedList(screen, "narratables", transfer);
+            }
+        } catch (Exception ignored) {}
+    }
 
     public ModDevMcpMod() {
         INSTANCE = this;
@@ -57,34 +204,48 @@ public class ModDevMcpMod {
             if (debugUrl == null) return;
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                ReflectionHelper.tickMouseRelease(mc);
+                ReflectionHelper.tickMcpControlMode(mc);
+                ReflectionHelper.cacheFrameFromRenderThread(mc);
                 net.minecraft.client.gui.GuiGraphics g = event.getGuiGraphics();
                 String text = "[MCP] " + debugUrl;
                 g.drawString(mc.font, text, 4, 4, 0xFF55FF55, true);
             } catch (Exception ignored) {}
         });
 
-        TickEvent.ClientTickEvent.BUS.addListener(event -> {
-            if (event.phase != TickEvent.Phase.END) return;
-            if (debugUrl == null) return;
+        ScreenEvent.Init.Post.BUS.addListener(event -> {
             try {
-                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-                ReflectionHelper.tickMouseRelease(mc);
-                ReflectionHelper.tickVideoCapture(mc);
+                if (event.getScreen() instanceof PauseScreen pauseScreen) {
+                    patchPauseButtons(pauseScreen);
+                }
             } catch (Exception ignored) {}
-            if (chatSent) return;
+        });
+
+        CustomizeGuiOverlayEvent.DebugText.BUS.addListener(event -> {
+            if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-                if (mc.gui == null || mc.gui.getChat() == null) return;
-                chatSent = true;
-                String url = debugUrl;
-                Component msg = Component.empty()
-                    .append(Component.literal("[MCP] Debug page: ").withStyle(s -> s.withColor(0x55FF55)))
-                    .append(Component.literal(url).withStyle(s -> s
-                        .withColor(0x5555FF)
-                        .withUnderlined(true)
-                        .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(url)))
-                    ));
-                mc.gui.getChat().addMessage(msg);
+                if (mc.screen == null) {
+                    ReflectionHelper.tickMouseRelease(mc);
+                    ReflectionHelper.tickMcpControlMode(mc);
+                    ReflectionHelper.cacheFrameFromRenderThread(mc);
+                }
+            } catch (Exception ignored) {}
+        });
+
+        registerTickListener();
+
+        CustomizeGuiOverlayEvent.Chat.BUS.addListener(event -> {
+            try {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                if (!ReflectionHelper.shouldRenderMcpControlOverlay(mc)) return;
+                GuiGraphics g = event.getGuiGraphics();
+                int w = event.getWindow().getGuiScaledWidth();
+                int h = event.getWindow().getGuiScaledHeight();
+                g.fill(0, 0, w, h, 0x88404040);
+                Component title = Component.translatable(ReflectionHelper.getMcpControlOverlayTranslationKey());
+                int textW = mc.font.width(title);
+                g.drawString(mc.font, title, (w - textW) / 2, Math.max(20, h / 5), 0xFFFFFFFF, true);
             } catch (Exception ignored) {}
         });
     }
