@@ -709,6 +709,7 @@ public final class ReflectionHelper {
                     if (m.getName().equals("keyPress") && m.getParameterCount() == 5) {
                         long handle = 0;
                         try { handle = getWindowHandle(mc); } catch (Exception ignored) {}
+                        dbg("guiKeyPress: keyPress(" + handle + "," + keyCode + "," + scanCode + "," + action + "," + modifiers + ") kb=" + kbHandler.getClass().getSimpleName());
                         m.setAccessible(true);
                         m.invoke(kbHandler, handle, keyCode, scanCode, action, modifiers);
                         return "{\"keyPressed\":true,\"via\":\"keyboardHandler\"}";
@@ -724,18 +725,64 @@ public final class ReflectionHelper {
     public static String guiCharType(Object mc, char ch, int modifiers) {
         try {
             Object screen = getCurrentScreen(mc);
+            dbg("guiCharType: ch=" + ch + " screen=" + (screen != null ? screen.getClass().getSimpleName() : "null"));
             if (screen != null) {
                 for (Method m : getAllMethods(screen.getClass())) {
                     String n = m.getName();
-                    if ((n.equals("charTyped") || n.contains("charTyped")) && m.getParameterCount() >= 2) {
+                    Class<?>[] pt = m.getParameterTypes();
+                    if (m.getParameterCount() == 2 && pt[0] == char.class && pt[1] == int.class) {
                         try {
                             m.setAccessible(true);
-                            Object[] args = new Object[m.getParameterCount()];
-                            args[0] = ch;
-                            args[1] = modifiers;
-                            for (int i = 2; i < args.length; i++) args[i] = 0;
-                            m.invoke(screen, args);
-                            return "{\"charTyped\":true}";
+                            m.invoke(screen, ch, modifiers);
+                            return "{\"charTyped\":true,\"method\":\"" + n + "\"}";
+                        } catch (Exception e) {
+                            dbg("guiCharType: " + n + " failed: " + e.getMessage());
+                        }
+                    }
+                }
+                String charStr = String.valueOf(ch);
+                for (Method m : getAllMethods(screen.getClass())) {
+                    String n = m.getName();
+                    Class<?>[] pt = m.getParameterTypes();
+                    if ((n.equals("insertText") || n.equals("charTyped")) && m.getParameterCount() == 2
+                            && pt[0] == String.class && pt[1] == boolean.class) {
+                        try {
+                            m.setAccessible(true);
+                            m.invoke(screen, charStr, false);
+                            return "{\"charTyped\":true,\"method\":\"" + n + "(String)\"}";
+                        } catch (Exception e) {
+                            dbg("guiCharType: " + n + "(String) failed: " + e.getMessage());
+                        }
+                    }
+                }
+            }
+            Object kbHandler = null;
+            try { kbHandler = mc.getClass().getField("keyboardHandler").get(mc); } catch (Exception ignored) {}
+            if (kbHandler == null) {
+                try { kbHandler = mc.getClass().getMethod("keyboardHandler").invoke(mc); } catch (Exception ignored) {}
+            }
+            if (kbHandler != null) {
+                long handle = getWindowHandle(mc);
+                for (Method m : kbHandler.getClass().getDeclaredMethods()) {
+                    String n = m.getName();
+                    if (m.getParameterCount() >= 2 && m.getParameterTypes()[0] == long.class
+                            && m.getParameterTypes()[1] == char.class) {
+                        try {
+                            m.setAccessible(true);
+                            if (m.getParameterCount() == 3) m.invoke(kbHandler, handle, ch, modifiers);
+                            else m.invoke(kbHandler, handle, ch);
+                            return "{\"charTyped\":true,\"via\":\"kb." + n + "\"}";
+                        } catch (Exception ignored) {}
+                    }
+                }
+                for (Method m : kbHandler.getClass().getDeclaredMethods()) {
+                    String n = m.getName().toLowerCase();
+                    if (m.getParameterCount() == 2 && m.getParameterTypes()[0] == char.class
+                            && (n.contains("char") || n.contains("type"))) {
+                        try {
+                            m.setAccessible(true);
+                            m.invoke(kbHandler, ch, modifiers);
+                            return "{\"charTyped\":true,\"via\":\"kb2." + m.getName() + "\"}";
                         } catch (Exception ignored) {}
                     }
                 }
@@ -2024,8 +2071,8 @@ public final class ReflectionHelper {
                     try { screen = screenClass.getConstructor().newInstance(); }
                     catch (Exception ignored2) {}
                 }
-                if (screen != null) {
-                    for (Method m : getAllMethods(mc.getClass())) {
+            if (screen != null) {
+                for (Method m : getAllMethods(mc.getClass())) {
                         if (m.getName().equals("setScreen") && m.getParameterCount() == 1) {
                             try {
                                 m.setAccessible(true);
