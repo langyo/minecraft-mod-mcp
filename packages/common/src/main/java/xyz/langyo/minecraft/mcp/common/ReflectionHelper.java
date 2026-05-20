@@ -2249,6 +2249,67 @@ public final class ReflectionHelper {
         }
     }
 
+    public static String switchTab(Object mc, int tabIndex) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen == null) return "{\"error\":\"no screen\"}";
+            Object tabBar = null;
+            for (Field f : getAllFields(screen.getClass())) {
+                String fn = f.getName();
+                if (fn.equals("tabNavigationBar") || fn.contains("tabNavigation") || fn.contains("tabBar")) {
+                    try {
+                        f.setAccessible(true);
+                        tabBar = f.get(screen);
+                        if (tabBar != null) break;
+                    } catch (Exception ignored) {}
+                }
+            }
+            if (tabBar == null) {
+                for (Field f : getAllFields(screen.getClass())) {
+                    try {
+                        f.setAccessible(true);
+                        Object val = f.get(screen);
+                        if (val != null && val.getClass().getSimpleName().equals("TabNavigationBar")) {
+                            tabBar = val;
+                            break;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            if (tabBar == null) return "{\"error\":\"no TabNavigationBar found on " + screen.getClass().getSimpleName() + "\"}";
+            for (Method m : getAllMethods(tabBar.getClass())) {
+                if (m.getName().equals("selectTab") && m.getParameterCount() == 2) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(tabBar, tabIndex, true);
+                        return "{\"switched\":true,\"tab\":" + tabIndex + ",\"screen\":\"" + screen.getClass().getSimpleName() + "\"}";
+                    } catch (Exception e) {
+                        return "{\"error\":\"selectTab failed: " + e.getMessage() + "\"}";
+                    }
+                }
+            }
+            for (Method m : getAllMethods(tabBar.getClass())) {
+                String mn = m.getName();
+                if (mn.contains("select") && m.getParameterCount() >= 1) {
+                    try {
+                        m.setAccessible(true);
+                        if (m.getParameterCount() == 1) {
+                            m.invoke(tabBar, tabIndex);
+                        } else if (m.getParameterCount() == 2) {
+                            m.invoke(tabBar, tabIndex, true);
+                        }
+                        return "{\"switched\":true,\"tab\":" + tabIndex + ",\"via\":\"" + mn + "\"}";
+                    } catch (Exception e) {
+                        return "{\"error\":\"" + mn + " failed: " + e.getMessage() + "\"}";
+                    }
+                }
+            }
+            return "{\"error\":\"no selectTab method on TabNavigationBar\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
     public static String releaseMouse(Object mc) {
         try {
             long handle = getWindowHandle(mc);

@@ -80,6 +80,7 @@ public class McpMessageHandler {
         if (method.equals("close_screen")) return handleCloseScreen();
         if (method.equals("release_mouse")) return handleReleaseMouse();
         if (method.equals("set_gamemode")) return handleSetGameMode(params);
+        if (method.equals("switch_tab")) return handleSwitchTab(params);
         if (method.equals("ping")) return "pong";
         if (method.equals("win32_borderless")) return handleWin32Borderless();
         if (method.equals("win32_container")) return handleWin32Container();
@@ -373,6 +374,21 @@ public class McpMessageHandler {
         final String[] result = {""};
         ReflectedInputHandler.executeOnRenderThread(() -> {
             try { result[0] = ReflectionHelper.setGameMode(ReflectionHelper.getMinecraftInstance(), mode); }
+            catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+            latch.countDown();
+        });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
+    }
+
+    protected Object handleSwitchTab(java.util.Map<String, String> params) {
+        int tabIndex = 0;
+        try { tabIndex = Integer.parseInt(params.getOrDefault("index", params.get("tab_index"))); } catch (Exception ignored) {}
+        final int fidx = tabIndex;
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {""};
+        ReflectedInputHandler.executeOnRenderThread(() -> {
+            try { result[0] = ReflectionHelper.switchTab(ReflectionHelper.getMinecraftInstance(), fidx); }
             catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
             latch.countDown();
         });
