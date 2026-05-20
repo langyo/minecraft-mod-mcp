@@ -93,58 +93,67 @@ body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',system-ui,sans-seri
 </div>
 <script>
 var polling=false,iv=null,fc=0,tot=0;
-var lastImg='',lastGrid='';
 var showGrid=false;
 var BASE=location.origin;
+var currentES=null;
+var pendingReq=null;
 
 function $(id){return document.getElementById(id)}
 
 function toggleGrid(){
   showGrid=!showGrid;
   var b=$('btnGrid');
-  if(showGrid){b.className='active';if(lastGrid)$('img').src=lastGrid;}
-  else{b.className='';if(lastImg)$('img').src=lastImg;}
+  b.className=showGrid?'active':'';
+  fetchSS();
 }
 
 function togglePoll(){
   polling=!polling;
   var b=$('btnPoll');
-  if(polling){b.textContent='Stop';b.className='active';iv=setInterval(fetchSS,200)}
+  if(polling){b.textContent='Stop';b.className='active';iv=setInterval(fetchSS,500)}
   else{b.textContent='Start Capture';b.className='';clearInterval(iv);iv=null}
 }
-setInterval(function(){$('fps').textContent=Math.round(fc*5)+' fps';fc=0},1000);
+setInterval(function(){$('fps').textContent=Math.round(fc*2)+' fps';fc=0},1000);
 
 function fetchSS(){
+  if(pendingReq){pendingReq.abort();pendingReq=null}
   var t0=performance.now();
   var x=new XMLHttpRequest();
+  pendingReq=x;
   x.open('GET',BASE+'/api/screenshot',true);
   x.responseType='json';
   x.onload=function(){
+    pendingReq=null;
     if(x.status!==200)return;
     var d=x.response;
     if(!d||!d.original)return;
-    lastImg=d.original;
-    lastGrid=d.grid||'';
-    if(showGrid&&lastGrid)$('img').src=lastGrid;
-    else $('img').src=lastImg;
+    var img=$('img');
+    img.src=showGrid&&d.grid?d.grid:d.original;
     fc++;
     $('res').textContent=d.width+'x'+d.height+' '+(performance.now()-t0).toFixed(0)+'ms';
   };
+  x.onerror=function(){pendingReq=null};
   x.send();
 }
+
+var callCache=new WeakMap();
+var callCount=0;
+var MAX_CALLS=100;
 
 function addC(e){
   if(!e.timestamp)e.timestamp=Date.now();
   tot++;$('cc').textContent=tot;
+  var cl=$('cl');
+  while(cl.children.length>=MAX_CALLS)cl.removeChild(cl.lastChild);
   var d=document.createElement('div');d.className='cent';
   var cls=e.error?'err':'res';
   var dur=e.duration_ms>0?e.duration_ms+'ms':'';
   var ts=e.timestamp?new Date(e.timestamp).toISOString().split('T')[1].split('.')[0]:'';
-  var err=e.error?' <span style="color:#f85149">'+esc(e.error.substring(0,120))+'</span>':'';
+  var err=e.error?' <span style="color:#f85149">'+esc(e.error.substring(0,80))+'</span>':'';
   var res='';
   if(e.result!=null){
     var s=typeof e.result==='string'?e.result:JSON.stringify(e.result);
-    if(s.length>500)s=s.substring(0,500);
+    if(s.length>200)s=s.substring(0,200);
     res='<pre>'+esc(s)+'</pre>';
   }
   d.innerHTML='<div class="ch" onclick="this.nextElementSibling.classList.toggle(\'open\')">'
@@ -152,11 +161,11 @@ function addC(e){
     +'<span class="mtd">'+esc(e.method||'?')+'</span>'
     +err+'<span class="dur">'+dur+'</span><span class="ts">'+ts+'</span>'
     +'</div><div class="cb">'+res+'</div>';
-  $('cl').prepend(d);
-  while($('cl').children.length>300)$('cl').removeChild($('cl').lastChild);
+  cl.prepend(d);
 }
 function clearC(){$('cl').innerHTML='';tot=0;$('cc').textContent='0'}
-function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+var escDiv=document.createElement('div');
+function esc(s){escDiv.textContent=s;return escDiv.innerHTML}
 
 function onSel(){
   var v=$('sel').value;
@@ -184,17 +193,21 @@ function sendC(){
 }
 
 function connectSSE(){
+  if(currentES){currentES.close();currentES=null}
   var url=BASE.replace(/^http:/,'');
   var link=$('mcpUrl');
   link.textContent=url;
   link.href=BASE;
   link.target='_blank';
   var es=new EventSource(BASE+'/api/events');
+  currentES=es;
   es.onopen=function(){$('dot').className='dot';$('st').textContent='Connected';};
   es.onmessage=function(ev){try{addC(JSON.parse(ev.data))}catch(e){}};
   es.onerror=function(){
     $('dot').className='dot off';
     $('st').textContent='Reconnecting...';
+    es.close();
+    if(currentES===es)currentES=null;
     setTimeout(connectSSE,3000);
   };
 }

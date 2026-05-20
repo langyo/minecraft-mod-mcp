@@ -271,6 +271,10 @@ public class McpHttpServer {
     class EventHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            if (sseClients.size() >= 4) {
+                sendJson(exchange, 503, "{\"error\":\"too many SSE clients\"}");
+                return;
+            }
             exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
             exchange.getResponseHeaders().set("Cache-Control", "no-cache");
             exchange.getResponseHeaders().set("Connection", "keep-alive");
@@ -280,9 +284,11 @@ public class McpHttpServer {
             SseClient client = new SseClient();
             client.os = os;
             sseClients.add(client);
+            int histSize = callHistory.size();
+            int start = Math.max(0, histSize - 20);
             StringBuilder sb = new StringBuilder();
-            for (CallEvent ev : callHistory) {
-                sb.append("data: ").append(eventToJson(ev)).append("\n\n");
+            for (int i = start; i < histSize; i++) {
+                sb.append("data: ").append(eventToJson(callHistory.get(i))).append("\n\n");
             }
             if (sb.length() > 0) {
                 os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
