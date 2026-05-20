@@ -65,7 +65,13 @@ public class ModDevMcpMod {
 
         TickEvent.ClientTickEvent.BUS.addListener(event -> {
             if (event.phase != TickEvent.Phase.END) return;
-            if (chatSent || debugUrl == null) return;
+            if (debugUrl == null) return;
+            try {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                ReflectionHelper.tickMouseRelease(mc);
+                ReflectionHelper.tickVideoCapture(mc);
+            } catch (Exception ignored) {}
+            if (chatSent) return;
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 if (mc.gui == null || mc.gui.getChat() == null) return;
