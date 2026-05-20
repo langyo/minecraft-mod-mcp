@@ -75,6 +75,7 @@ public class McpMessageHandler {
         if (method.equals("look_delta")) return handleLookDelta(params);
         if (method.equals("right_click")) return handleRightClick();
         if (method.equals("use_item")) return handleUseItem();
+        if (method.equals("pause_game")) return handlePauseGame();
         if (method.equals("ping")) return "pong";
         if (method.equals("win32_borderless")) return handleWin32Borderless();
         if (method.equals("win32_container")) return handleWin32Container();
@@ -312,6 +313,18 @@ public class McpMessageHandler {
     protected Object handleUseItem() {
         if (minecraftInput != null) return ReflectionHelper.doUseItem(ReflectionHelper.getMinecraftInstance());
         return "no input handler";
+    }
+
+    protected Object handlePauseGame() {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {""};
+        ReflectedInputHandler.executeOnRenderThread(() -> {
+            try { result[0] = ReflectionHelper.openPauseMenu(ReflectionHelper.getMinecraftInstance()); }
+            catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+            latch.countDown();
+        });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
     }
 
     protected Object handleWin32Status() {

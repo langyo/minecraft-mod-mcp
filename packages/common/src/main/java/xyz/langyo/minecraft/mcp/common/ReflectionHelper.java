@@ -1987,6 +1987,61 @@ public final class ReflectionHelper {
         }
     }
 
+    public static String openPauseMenu(Object mc) {
+        try {
+            for (Method m : getAllMethods(mc.getClass())) {
+                String mn = m.getName();
+                if (m.getParameterCount() == 0 && (mn.equals("pauseGame") || mn.equals("func_147108_a"))) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(mc);
+                        return "{\"paused\":true,\"method\":\"" + mn + "\"}";
+                    } catch (Exception ignored) {}
+                }
+            }
+            for (Method m : getAllMethods(mc.getClass())) {
+                String mn = m.getName();
+                if (m.getParameterCount() == 1 && mn.equals("pause")) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(mc, false);
+                        return "{\"paused\":true,\"method\":\"" + mn + "\"}";
+                    } catch (Exception ignored) {}
+                }
+            }
+            Class<?> screenClass = null;
+            for (String cn : new String[]{
+                "net.minecraft.client.gui.screens.PauseScreen",
+                "net.minecraft.client.gui.screens.GameMenuScreen",
+                "net.minecraft.client.gui.screen.IngameMenuScreen"
+            }) {
+                try { screenClass = Class.forName(cn); break; } catch (ClassNotFoundException ignored) {}
+            }
+            if (screenClass != null) {
+                Object screen = null;
+                try { screen = screenClass.getConstructor(boolean.class).newInstance(true); }
+                catch (Exception ignored) {
+                    try { screen = screenClass.getConstructor().newInstance(); }
+                    catch (Exception ignored2) {}
+                }
+                if (screen != null) {
+                    for (Method m : getAllMethods(mc.getClass())) {
+                        if (m.getName().equals("setScreen") && m.getParameterCount() == 1) {
+                            try {
+                                m.setAccessible(true);
+                                m.invoke(mc, screen);
+                                return "{\"paused\":true,\"method\":\"setScreen(" + screenClass.getSimpleName() + ")\"}";
+                            } catch (Exception ignored3) {}
+                        }
+                    }
+                }
+            }
+            return "{\"error\":\"no pause method found\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
     private static volatile boolean mcpControlMode = false;
 
     public static String enterMcpControlMode(Object mc) {
