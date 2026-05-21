@@ -24,6 +24,44 @@ public final class ReflectionHelper {
     private static final boolean HAS_VULKAN;
     private static Robot awtRobot;
 
+    private static Class<?> glfwClass, gl11Class, gl30Class, displayClass, mcClass;
+    private static Method mcGetInstanceMethod;
+    private static Method glfwSetInputModeMethod, glfwSetCursorPosMethod;
+    private static int GLFW_CURSOR, GLFW_CURSOR_NORMAL, GLFW_CURSOR_DISABLED;
+    private static volatile boolean classCacheInit = false;
+
+    static void initClassCache() {
+        if (classCacheInit) return;
+        try {
+            try { mcClass = Class.forName("net.minecraft.client.Minecraft"); } catch (Exception ignored) {}
+            if (mcClass != null) {
+                try { mcGetInstanceMethod = mcClass.getMethod("getInstance"); } catch (Exception ignored) {}
+                if (mcGetInstanceMethod == null) try { mcGetInstanceMethod = mcClass.getMethod("getMinecraft"); } catch (Exception ignored) {}
+                if (mcGetInstanceMethod == null) {
+                    for (Method m : mcClass.getMethods()) {
+                        if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) && m.getReturnType() == mcClass && m.getParameterCount() == 0) {
+                            mcGetInstanceMethod = m; break;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        try { glfwClass = Class.forName("org.lwjgl.glfw.GLFW"); } catch (Exception ignored) {}
+        try { gl11Class = Class.forName("org.lwjgl.opengl.GL11"); } catch (Exception ignored) {}
+        try { gl30Class = Class.forName("org.lwjgl.opengl.GL30"); } catch (Exception ignored) {}
+        try { displayClass = Class.forName("org.lwjgl.opengl.Display"); } catch (Exception ignored) {}
+        if (glfwClass != null) {
+            try {
+                GLFW_CURSOR = glfwClass.getDeclaredField("GLFW_CURSOR").getInt(null);
+                GLFW_CURSOR_NORMAL = glfwClass.getDeclaredField("GLFW_CURSOR_NORMAL").getInt(null);
+                GLFW_CURSOR_DISABLED = glfwClass.getDeclaredField("GLFW_CURSOR_DISABLED").getInt(null);
+                try { glfwSetInputModeMethod = glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class); } catch (Exception ignored) {}
+                try { glfwSetCursorPosMethod = glfwClass.getMethod("glfwSetCursorPos", long.class, double.class, double.class); } catch (Exception ignored) {}
+            } catch (Exception ignored) {}
+        }
+        classCacheInit = true;
+    }
+
     static {
         boolean v = false;
         try { Class.forName("org.lwjgl.glfw.GLFW"); v = true; } catch (ClassNotFoundException e) {}
@@ -70,22 +108,10 @@ public final class ReflectionHelper {
     }
 
     public static Object getMinecraftInstance() {
+        initClassCache();
         try {
-            Class<?> mc = Class.forName("net.minecraft.client.Minecraft");
-            try {
-                return mc.getMethod("getInstance").invoke(null);
-            } catch (NoSuchMethodException e) {
-                try {
-                    return mc.getMethod("getMinecraft").invoke(null);
-                } catch (NoSuchMethodException e2) {
-                    for (Method m : mc.getMethods()) {
-                        if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) && m.getReturnType() == mc && m.getParameterCount() == 0) {
-                            return m.invoke(null);
-                        }
-                    }
-                    throw new RuntimeException("No static getter found on " + mc.getName());
-                }
-            }
+            if (mcGetInstanceMethod != null) return mcGetInstanceMethod.invoke(null);
+            throw new RuntimeException("No Minecraft static getter found");
         } catch (Exception e) {
             throw new RuntimeException("Failed to get Minecraft instance", e);
         }
@@ -2288,11 +2314,15 @@ public final class ReflectionHelper {
     }
 
     public static void setCursorPos(long handle, double x, double y) {
+        initClassCache();
         if (LWJGL3) {
             try {
-                Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-                Method setPos = glfw.getMethod("glfwSetCursorPos", long.class, double.class, double.class);
-                setPos.invoke(null, handle, x, y);
+                if (glfwSetCursorPosMethod != null) {
+                    glfwSetCursorPosMethod.invoke(null, handle, x, y);
+                } else {
+                    Method setPos = glfwClass.getMethod("glfwSetCursorPos", long.class, double.class, double.class);
+                    setPos.invoke(null, handle, x, y);
+                }
 
                 Object mc = getMinecraftInstance();
                 Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
@@ -2997,14 +3027,17 @@ public final class ReflectionHelper {
     }
 
     public static String releaseMouse(Object mc) {
+        initClassCache();
         try {
             long handle = getWindowHandle(mc);
             if (handle == 0 || !LWJGL3) return "{\"error\":\"no window handle\"}";
-            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-            int GLFW_CURSOR = glfw.getField("GLFW_CURSOR").getInt(null);
-            int GLFW_CURSOR_NORMAL = glfw.getField("GLFW_CURSOR_NORMAL").getInt(null);
-            glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class)
-                .invoke(null, handle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            if (glfwSetInputModeMethod != null) {
+                glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            } else {
+                Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+                glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class)
+                    .invoke(null, handle, glfw.getField("GLFW_CURSOR").getInt(null), glfw.getField("GLFW_CURSOR_NORMAL").getInt(null));
+            }
             Object mouseHandler = getMouseHandler(mc);
             if (mouseHandler != null) {
                 for (Field f : getAllFields(mouseHandler.getClass())) {
@@ -3184,6 +3217,7 @@ public final class ReflectionHelper {
     private static volatile boolean mcpControlMode = false;
 
     public static String enterMcpControlMode(Object mc) {
+        initClassCache();
         try {
             mcpControlMode = true;
             mouseReleaseActive = false;
@@ -3192,18 +3226,12 @@ public final class ReflectionHelper {
 
             long nativeHwnd = 0;
             long glfwHandle = getWindowHandle(mc);
-            if (glfwHandle != 0 && LWJGL3) {
+            if (glfwHandle != 0 && LWJGL3 && glfwClass != null) {
                 try {
-                    Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-                    nativeHwnd = (long) glfw.getMethod("glfwGetWin32Window", long.class).invoke(null, glfwHandle);
-                    try {
-                        int GLFW_CURSOR_NORMAL = glfw.getField("GLFW_CURSOR_NORMAL").getInt(null);
-                        int GLFW_CURSOR = glfw.getField("GLFW_CURSOR").getInt(null);
-                        glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class)
-                            .invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                    nativeHwnd = (long) glfwClass.getMethod("glfwGetWin32Window", long.class).invoke(null, glfwHandle);
+                    if (glfwSetInputModeMethod != null) {
+                        glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
                         dbg("enterMcpControlMode: GLFW cursor set to NORMAL");
-                    } catch (Exception ce) {
-                        dbg("enterMcpControlMode: glfwSetInputMode failed: " + ce.getMessage());
                     }
                 } catch (Exception e1) {
                     try {
@@ -3233,13 +3261,9 @@ public final class ReflectionHelper {
             ctrl.uninstallMouseHook();
 
             long glfwHandle = getWindowHandle(mc);
-            if (glfwHandle != 0 && LWJGL3) {
+            if (glfwHandle != 0 && LWJGL3 && glfwSetInputModeMethod != null) {
                 try {
-                    Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-                    int GLFW_CURSOR_DISABLED = glfw.getField("GLFW_CURSOR_DISABLED").getInt(null);
-                    int GLFW_CURSOR = glfw.getField("GLFW_CURSOR").getInt(null);
-                    glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class)
-                        .invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                    glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
                     dbg("exitMcpControlMode: GLFW cursor set back to DISABLED");
                 } catch (Exception ce) {
                     dbg("exitMcpControlMode: glfwSetInputMode failed: " + ce.getMessage());
@@ -3274,7 +3298,6 @@ public final class ReflectionHelper {
     }
 
     private static volatile boolean forceCursorNormal = false;
-    private static Method glfwSetInputModeMethod;
     private static Method glfwHideWindowMethod;
     private static Method glfwShowWindowMethod;
     private static int GLFW_CURSOR_VAL = -1;
@@ -3291,12 +3314,16 @@ public final class ReflectionHelper {
 
     private static void initCursorCache() throws Exception {
         if (cursorCacheInit) return;
-        Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-        GLFW_CURSOR_VAL = glfw.getField("GLFW_CURSOR").getInt(null);
-        GLFW_CURSOR_NORMAL_VAL = glfw.getField("GLFW_CURSOR_NORMAL").getInt(null);
-        glfwSetInputModeMethod = glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class);
-        try { glfwHideWindowMethod = glfw.getMethod("glfwHideWindow", long.class); } catch (Exception ignored) {}
-        try { glfwShowWindowMethod = glfw.getMethod("glfwShowWindow", long.class); } catch (Exception ignored) {}
+        initClassCache();
+        if (glfwSetInputModeMethod == null && glfwClass != null) {
+            glfwSetInputModeMethod = glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class);
+        }
+        GLFW_CURSOR_VAL = GLFW_CURSOR;
+        GLFW_CURSOR_NORMAL_VAL = GLFW_CURSOR_NORMAL;
+        if (glfwClass != null) {
+            try { glfwHideWindowMethod = glfwClass.getMethod("glfwHideWindow", long.class); } catch (Exception ignored) {}
+            try { glfwShowWindowMethod = glfwClass.getMethod("glfwShowWindow", long.class); } catch (Exception ignored) {}
+        }
         cursorCacheInit = true;
     }
 
