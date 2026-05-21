@@ -3712,13 +3712,17 @@ public final class ReflectionHelper {
     public static void tickMcpControlMode(Object mc) {
         if (!mcpControlMode) return;
         try {
+            Object screen = getCurrentScreen(mc);
+            if (screen != null && !screen.getClass().getName().contains("McpControlOverlayScreen")) {
+                closeScreen(mc);
+                dbgR("tickMcpControlMode: force closed screen " + screen.getClass().getSimpleName());
+            }
             forceCursorAndReleaseMouse(mc);
             Object mouseHandler = getMouseHandler(mc);
             if (mouseHandler != null) {
                 initMouseFields(mouseHandler);
                 if (mouseGrabbedField != null && mouseGrabbedField.getBoolean(mouseHandler)) {
                     mouseGrabbedField.setBoolean(mouseHandler, false);
-                    dbgR("tickMcpControlMode: ungrabbed mouse");
                 }
                 if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
                 if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);

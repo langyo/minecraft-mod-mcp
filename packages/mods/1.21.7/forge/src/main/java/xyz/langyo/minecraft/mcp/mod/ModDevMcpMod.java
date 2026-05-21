@@ -12,7 +12,6 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -32,12 +31,6 @@ public class ModDevMcpMod {
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 if (!ReflectionHelper.isMcpControlMode()) return false;
-                if (event.getButton() != 0) return true;
-                int w = mc.getWindow().getGuiScaledWidth();
-                int h = mc.getWindow().getGuiScaledHeight();
-                int guiX = (int) (mc.mouseHandler.xpos() * w / mc.getWindow().getGuiScaledWidth());
-                int guiY = (int) (mc.mouseHandler.ypos() * h / mc.getWindow().getGuiScaledHeight());
-                ReflectionHelper.handleOverlayClick(guiX, guiY, mc);
                 return true;
             } catch (Exception ignored) { return false; }
         });
@@ -167,7 +160,7 @@ public class ModDevMcpMod {
                 try {
                     net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                     ReflectionHelper.enterMcpControlMode(mc);
-                    ReflectionHelper.closeScreen(mc);
+                    mc.setScreen(new McpControlOverlayScreen(INSTANCE != null ? INSTANCE.debugUrl : null));
                 } catch (Exception ignored) {}
             }).bounds(x, y, leftW, h).build();
 
@@ -211,25 +204,6 @@ public class ModDevMcpMod {
             }, "MCP-HTTP").start();
         }
 
-        CustomizeGuiOverlayEvent.DebugText.BUS.addListener(event -> {
-            if (debugUrl != null && event.getSide() == CustomizeGuiOverlayEvent.DebugText.Side.Left) {
-                event.getText().add("\u00a7a[MCP] " + debugUrl);
-            }
-        });
-
-        ScreenEvent.Render.Post.BUS.addListener(event -> {
-            if (debugUrl == null) return;
-            try {
-                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-                ReflectionHelper.tickMouseRelease(mc);
-                ReflectionHelper.tickMcpControlMode(mc);
-                net.minecraft.client.gui.GuiGraphics g = event.getGuiGraphics();
-                String text = "[MCP] " + debugUrl;
-                g.drawString(mc.font, text, 4, 4, 0xFF55FF55, true);
-                ReflectionHelper.cacheFrameFromRenderThread(mc);
-            } catch (Exception ignored) {}
-        });
-
         ScreenEvent.Init.Post.BUS.addListener(event -> {
             try {
                 if (event.getScreen() instanceof PauseScreen pauseScreen) {
@@ -249,68 +223,15 @@ public class ModDevMcpMod {
             } catch (Exception ignored) {}
         });
 
-        registerInputInterception();
-        registerTickListener();
-
-        CustomizeGuiOverlayEvent.Chat.BUS.addListener(event -> {
+        ScreenEvent.Render.Post.BUS.addListener(event -> {
+            if (debugUrl == null) return;
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-                if (ReflectionHelper.shouldRenderMcpControlOverlay(mc) && !ReflectionHelper.isScreenshotInProgress()) {
-                    ReflectionHelper.tickMcpControlMode(mc);
-                    GuiGraphics g = event.getGuiGraphics();
-                    int w = event.getWindow().getGuiScaledWidth();
-                    int h = event.getWindow().getGuiScaledHeight();
-                    g.fill(0, 0, w, h, 0x88404040);
-
-                    Component title = Component.translatable(ReflectionHelper.getMcpControlOverlayTranslationKey());
-                    int textW = mc.font.width(title);
-                    g.drawString(mc.font, title, (w - textW) / 2, Math.max(20, h / 5), 0xFFFFFFFF, true);
-
-                    int btnW = 150;
-                    int btnH = 20;
-                    int gap = 10;
-                    int totalW = btnW * 2 + gap;
-                    int startX = (w - totalW) / 2;
-                    int btnY = h - 40;
-
-                    int mouseX = (int) (mc.mouseHandler.xpos() * w / mc.getWindow().getGuiScaledWidth());
-                    int mouseY = (int) (mc.mouseHandler.ypos() * h / mc.getWindow().getGuiScaledHeight());
-
-                    int resumeX = startX;
-                    int menuX = startX + btnW + gap;
-
-                    boolean hoverResume = mouseX >= resumeX && mouseX <= resumeX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-                    boolean hoverMenu = mouseX >= menuX && mouseX <= menuX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-
-                    int resumeColor = hoverResume ? 0xFF555555 : 0xFF333333;
-                    int menuColor = hoverMenu ? 0xFF555555 : 0xFF333333;
-
-                    g.fill(resumeX, btnY, resumeX + btnW, btnY + btnH, resumeColor);
-                    g.fill(menuX, btnY, menuX + btnW, btnY + btnH, menuColor);
-
-                    int border = 0xFFAAAAAA;
-                    g.fill(resumeX, btnY, resumeX + btnW, btnY + 1, border);
-                    g.fill(resumeX, btnY + btnH - 1, resumeX + btnW, btnY + btnH, border);
-                    g.fill(resumeX, btnY, resumeX + 1, btnY + btnH, border);
-                    g.fill(resumeX + btnW - 1, btnY, resumeX + btnW, btnY + btnH, border);
-                    g.fill(menuX, btnY, menuX + btnW, btnY + 1, border);
-                    g.fill(menuX, btnY + btnH - 1, menuX + btnW, btnY + btnH, border);
-                    g.fill(menuX, btnY, menuX + 1, btnY + btnH, border);
-                    g.fill(menuX + btnW - 1, btnY, menuX + btnW, btnY + btnH, border);
-
-                    Component resumeText = Component.translatable("mcpmod.control.resume");
-                    Component menuText = Component.translatable("mcpmod.control.menu");
-                    int resumeTextW = mc.font.width(resumeText);
-                    int menuTextW = mc.font.width(menuText);
-                    g.drawString(mc.font, resumeText, resumeX + (btnW - resumeTextW) / 2, btnY + (btnH - 8) / 2, 0xFFFFFFFF, false);
-                    g.drawString(mc.font, menuText, menuX + (btnW - menuTextW) / 2, btnY + (btnH - 8) / 2, 0xFFFFFFFF, false);
-
-                    ReflectionHelper.setOverlayButtonBounds(resumeX, btnY, btnW, btnH, menuX, btnY, btnW, btnH);
-                }
-                if (debugUrl != null) {
-                    ReflectionHelper.cacheFrameFromRenderThread(mc);
-                }
+                ReflectionHelper.cacheFrameFromRenderThread(mc);
             } catch (Exception ignored) {}
         });
+
+        registerInputInterception();
+        registerTickListener();
     }
 }
