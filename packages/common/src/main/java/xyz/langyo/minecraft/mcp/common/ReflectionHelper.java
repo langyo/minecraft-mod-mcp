@@ -3343,53 +3343,29 @@ public final class ReflectionHelper {
     }
 
     private static volatile boolean mcpControlMode = false;
-    private static volatile int overlayResumeX, overlayResumeY, overlayResumeW, overlayResumeH;
-    private static volatile int overlayMenuX, overlayMenuY, overlayMenuW, overlayMenuH;
+    private static volatile int overlayResumeX = -999, overlayResumeY = -999, overlayResumeW, overlayResumeH;
+    private static volatile int overlayMenuX = -999, overlayMenuY = -999, overlayMenuW, overlayMenuH;
+    private static volatile long mcpControlModeEnterTime = 0;
 
     public static String enterMcpControlMode(Object mc) {
         initClassCache();
         try {
             mcpControlMode = true;
+            mcpControlModeEnterTime = System.currentTimeMillis();
             mouseReleaseActive = false;
             forceCursorNormal = false;
-            McpPlatformControl ctrl = McpControlFactory.get();
-
-            long nativeHwnd = 0;
-            long glfwHandle = getWindowHandle(mc);
-            if (glfwHandle != 0 && LWJGL3 && glfwClass != null) {
-                try {
-                    nativeHwnd = (long) glfwClass.getMethod("glfwGetWin32Window", long.class).invoke(null, glfwHandle);
-                    if (glfwSetInputModeMethod != null) {
-                        glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                        dbg("enterMcpControlMode: GLFW cursor set to NORMAL");
-                    }
-                } catch (Exception e1) {
-                    try {
-                        nativeHwnd = (long) Class.forName("org.lwjgl.glfw.GLFWNativeWin32")
-                                .getMethod("glfwGetWin32Window", long.class).invoke(null, glfwHandle);
-                    } catch (Exception e2) {
-                        dbg("enterMcpControlMode: native hwnd resolution failed (non-Windows?): " + e2.getMessage());
-                    }
-                }
-            }
-            if (nativeHwnd == 0) nativeHwnd = glfwHandle;
-
-            boolean hookOk = ctrl.installMouseHook(nativeHwnd);
-            dbg("enterMcpControlMode: platform=" + ctrl.getPlatformName() + " hook=" + hookOk + " hwnd=" + Long.toHexString(nativeHwnd));
-            ctrl.setControlMode(true);
-            return "{\"control_mode\":true,\"platform\":\"" + ctrl.getPlatformName() + "\",\"hook\":" + hookOk + "}";
+            forceCursorAndReleaseMouse(mc);
+            dbg("enterMcpControlMode: cursor forced to NORMAL, no hook");
+            return "{\"control_mode\":true,\"platform\":\"internal\",\"hook\":false}";
         } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
     }
 
     public static String exitMcpControlMode(Object mc) {
         try {
+            dbg("exitMcpControlMode: CALLED FROM " + Thread.currentThread().getName() + " - " + new Exception().getStackTrace()[1]);
             mcpControlMode = false;
             mouseReleaseActive = false;
             forceCursorNormal = false;
-            McpPlatformControl ctrl = McpControlFactory.get();
-            ctrl.setControlMode(false);
-            ctrl.uninstallMouseHook();
-
             long glfwHandle = getWindowHandle(mc);
             if (glfwHandle != 0 && LWJGL3 && glfwSetInputModeMethod != null) {
                 try {
@@ -3399,8 +3375,7 @@ public final class ReflectionHelper {
                     dbg("exitMcpControlMode: glfwSetInputMode failed: " + ce.getMessage());
                 }
             }
-
-            dbg("exitMcpControlMode: OFF platform=" + ctrl.getPlatformName());
+            dbg("exitMcpControlMode: OFF");
             return "{\"control_mode\":false}";
         } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
     }
@@ -3414,6 +3389,7 @@ public final class ReflectionHelper {
 
     public static String handleOverlayClick(int guiX, int guiY, Object mc) {
         if (!mcpControlMode) return "not_in_control_mode";
+        if (System.currentTimeMillis() - mcpControlModeEnterTime < 1000) return "cooldown";
         boolean hitResume = guiX >= overlayResumeX && guiX <= overlayResumeX + overlayResumeW
                          && guiY >= overlayResumeY && guiY <= overlayResumeY + overlayResumeH;
         boolean hitMenu = guiX >= overlayMenuX && guiX <= overlayMenuX + overlayMenuW
@@ -3736,8 +3712,17 @@ public final class ReflectionHelper {
     public static void tickMcpControlMode(Object mc) {
         if (!mcpControlMode) return;
         try {
-            tickForceCursorNormal(mc);
             forceCursorAndReleaseMouse(mc);
+            Object mouseHandler = getMouseHandler(mc);
+            if (mouseHandler != null) {
+                initMouseFields(mouseHandler);
+                if (mouseGrabbedField != null && mouseGrabbedField.getBoolean(mouseHandler)) {
+                    mouseGrabbedField.setBoolean(mouseHandler, false);
+                    dbgR("tickMcpControlMode: ungrabbed mouse");
+                }
+                if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
+                if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
+            }
         } catch (Exception e) {
             dbg("tickMcpControlMode: " + e.getMessage());
         }

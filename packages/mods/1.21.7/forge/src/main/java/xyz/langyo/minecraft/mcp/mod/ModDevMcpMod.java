@@ -256,6 +256,7 @@ public class ModDevMcpMod {
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 if (ReflectionHelper.shouldRenderMcpControlOverlay(mc) && !ReflectionHelper.isScreenshotInProgress()) {
+                    ReflectionHelper.tickMcpControlMode(mc);
                     GuiGraphics g = event.getGuiGraphics();
                     int w = event.getWindow().getGuiScaledWidth();
                     int h = event.getWindow().getGuiScaledHeight();

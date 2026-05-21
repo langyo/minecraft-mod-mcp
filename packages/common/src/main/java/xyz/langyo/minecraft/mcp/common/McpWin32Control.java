@@ -317,6 +317,7 @@ public class McpWin32Control implements McpPlatformControl {
 
     private void requestExitControlMode() {
         if (controlModeExitRequested) return;
+        ReflectionHelper.dbg("requestExitControlMode: CALLED FROM " + Thread.currentThread().getName() + " - " + new Exception().getStackTrace()[1]);
         controlModeExitRequested = true;
         try {
             ReflectedInputHandler.executeOnRenderThread(() -> {
@@ -353,12 +354,18 @@ public class McpWin32Control implements McpPlatformControl {
         controlModeExitRequested = false;
 
         mouseHookCallback = (nCode, wParam, lParam) -> {
-            if (nCode < HC_ACTION || !controlMode || isInjectedMouseEvent(lParam) || !isMinecraftForeground()) {
+            if (nCode < HC_ACTION || !controlMode || isInjectedMouseEvent(lParam)) {
                 return U.CallNextHookEx(mouseHookHandle, nCode, wParam, lParam);
             }
             int msg = (int) wParam;
-            if (msg == WM_MOUSEWHEEL || msg == WM_LBUTTONUP || msg == WM_RBUTTONUP || msg == WM_MBUTTONUP || isMouseExitTrigger(wParam)) {
-                if (isMouseExitTrigger(wParam)) requestExitControlMode();
+            if (msg == WM_LBUTTONUP || msg == WM_RBUTTONUP || msg == WM_MBUTTONUP
+                || msg == WM_MOUSEWHEEL) {
+                return U.CallNextHookEx(mouseHookHandle, nCode, wParam, lParam);
+            }
+            if (!isMinecraftForeground()) {
+                return U.CallNextHookEx(mouseHookHandle, nCode, wParam, lParam);
+            }
+            if (msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_MBUTTONDOWN) {
                 return 1L;
             }
             return U.CallNextHookEx(mouseHookHandle, nCode, wParam, lParam);

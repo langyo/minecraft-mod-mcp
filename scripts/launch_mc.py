@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+import glob
 import json
 import os
 import platform
@@ -735,6 +736,39 @@ def main():
                 print(f"[LAUNCH] Added {artifact} to classpath (gradle cache -> lib dir)")
             else:
                 print(f"[LAUNCH] WARNING: {artifact}-{version} not found")
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    mods_dir = os.path.join(mc_dir, "mods")
+    os.makedirs(mods_dir, exist_ok=True)
+
+    mod_jar_dirs = sorted(glob.glob(os.path.join(project_root, "packages", "mods", "*", "forge", "build", "libs")))
+    if not mod_jar_dirs:
+        mod_jar_dirs = sorted(glob.glob(os.path.join(project_root, "packages", "mods", "*", "*", "build", "libs")))
+    for lib_dir in mod_jar_dirs:
+        for jar in glob.glob(os.path.join(lib_dir, "*.jar")):
+            if "sources" in os.path.basename(jar):
+                continue
+            dest = os.path.join(mods_dir, os.path.basename(jar))
+            if os.path.isfile(dest):
+                old_size = os.path.getsize(dest)
+                new_size = os.path.getsize(jar)
+                old_time = os.path.getmtime(dest)
+                new_time = os.path.getmtime(jar)
+                if new_size == old_size and new_time <= old_time:
+                    continue
+            shutil.copy2(jar, dest)
+            print(f"[LAUNCH] Synced mod jar: {os.path.basename(jar)} ({os.path.getsize(dest)} bytes)")
+
+    common_jars = sorted(glob.glob(os.path.join(project_root, "packages", "common", "build", "libs", "*.jar")))
+    for jar in common_jars:
+        if "sources" in os.path.basename(jar):
+            continue
+        dest = os.path.join(mods_dir, os.path.basename(jar))
+        if os.path.isfile(dest) and os.path.getsize(dest) == os.path.getsize(jar):
+            continue
+        shutil.copy2(jar, dest)
+        print(f"[LAUNCH] Synced common jar: {os.path.basename(jar)} ({os.path.getsize(dest)} bytes)")
 
     sep = ";" if platform.system() == "Windows" else ":"
     cp_str = sep.join(cp)
