@@ -31,6 +31,7 @@ public class ModDevMcpMod {
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 if (!ReflectionHelper.isMcpControlMode()) return false;
+                if (mc.screen instanceof McpControlOverlayScreen) return false;
                 return true;
             } catch (Exception ignored) { return false; }
         });
