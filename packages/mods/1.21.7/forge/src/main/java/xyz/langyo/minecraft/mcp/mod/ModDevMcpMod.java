@@ -33,7 +33,6 @@ public class ModDevMcpMod {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
-                ReflectionHelper.cacheFrameFromRenderThread(mc);
                 ReflectionHelper.tickVideoCapture(mc);
                 xyz.langyo.minecraft.mcp.common.McpPlatformControl ctrl = xyz.langyo.minecraft.mcp.common.McpControlFactory.get();
                 if (ctrl instanceof xyz.langyo.minecraft.mcp.common.McpWin32Control w32ctrl) {
@@ -206,10 +205,10 @@ public class ModDevMcpMod {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
-                ReflectionHelper.cacheFrameFromRenderThread(mc);
                 net.minecraft.client.gui.GuiGraphics g = event.getGuiGraphics();
                 String text = "[MCP] " + debugUrl;
                 g.drawString(mc.font, text, 4, 4, 0xFF55FF55, true);
+                ReflectionHelper.cacheFrameFromRenderThread(mc);
             } catch (Exception ignored) {}
         });
 
@@ -228,7 +227,6 @@ public class ModDevMcpMod {
                 if (mc.screen == null) {
                     ReflectionHelper.tickMouseRelease(mc);
                     ReflectionHelper.tickMcpControlMode(mc);
-                    ReflectionHelper.cacheFrameFromRenderThread(mc);
                 }
             } catch (Exception ignored) {}
         });
@@ -238,14 +236,18 @@ public class ModDevMcpMod {
         CustomizeGuiOverlayEvent.Chat.BUS.addListener(event -> {
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-                if (!ReflectionHelper.shouldRenderMcpControlOverlay(mc)) return;
-                GuiGraphics g = event.getGuiGraphics();
-                int w = event.getWindow().getGuiScaledWidth();
-                int h = event.getWindow().getGuiScaledHeight();
-                g.fill(0, 0, w, h, 0x88404040);
-                Component title = Component.translatable(ReflectionHelper.getMcpControlOverlayTranslationKey());
-                int textW = mc.font.width(title);
-                g.drawString(mc.font, title, (w - textW) / 2, Math.max(20, h / 5), 0xFFFFFFFF, true);
+                if (ReflectionHelper.shouldRenderMcpControlOverlay(mc)) {
+                    GuiGraphics g = event.getGuiGraphics();
+                    int w = event.getWindow().getGuiScaledWidth();
+                    int h = event.getWindow().getGuiScaledHeight();
+                    g.fill(0, 0, w, h, 0x88404040);
+                    Component title = Component.translatable(ReflectionHelper.getMcpControlOverlayTranslationKey());
+                    int textW = mc.font.width(title);
+                    g.drawString(mc.font, title, (w - textW) / 2, Math.max(20, h / 5), 0xFFFFFFFF, true);
+                }
+                if (debugUrl != null) {
+                    ReflectionHelper.cacheFrameFromRenderThread(mc);
+                }
             } catch (Exception ignored) {}
         });
     }

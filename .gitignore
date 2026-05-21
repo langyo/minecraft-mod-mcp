@@ -19,3 +19,9 @@ gradle.properties
 rpc_*
 .cache/
 target/
+.bf
+.build_done
+.build_flag
+.minecraft/
+tmp_fbo_extract/
+mcp_debug.log
