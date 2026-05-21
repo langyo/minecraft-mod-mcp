@@ -2,11 +2,13 @@ package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.ReflectionHelper;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.Util;
+import java.lang.reflect.Field;
 import java.net.URI;
 
 public class McpControlOverlayScreen extends Screen {
@@ -70,21 +72,33 @@ public class McpControlOverlayScreen extends Screen {
         ).bounds(startX + btnW + gap, btnY, btnW, btnH).build());
     }
 
-    @Override
-    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        if (!ReflectionHelper.isScreenshotInProgress()) {
-            g.fill(0, 0, this.width, this.height, 0x88404040);
+    private static volatile Field deltaTrackerField;
+
+    private static DeltaTracker getDeltaTracker(Minecraft mc) {
+        try {
+            if (deltaTrackerField == null) {
+                deltaTrackerField = Minecraft.class.getDeclaredField("deltaTracker");
+                deltaTrackerField.setAccessible(true);
+            }
+            return (DeltaTracker) deltaTrackerField.get(mc);
+        } catch (Exception e) {
+            return null;
         }
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        ReflectionHelper.cacheFrameFromRenderThread(Minecraft.getInstance());
+        Minecraft mc = Minecraft.getInstance();
 
-        boolean capturing = ReflectionHelper.isScreenshotInProgress();
+        DeltaTracker dt = getDeltaTracker(mc);
+        if (dt != null) {
+            mc.gui.render(g, dt);
+        }
 
-        if (!capturing) {
-            this.renderBackground(g, mouseX, mouseY, partialTick);
+        ReflectionHelper.cacheFrameFromRenderThread(mc);
+
+        if (!ReflectionHelper.isScreenshotInProgress()) {
+            g.fill(0, 0, this.width, this.height, 0x88404040);
 
             Component title = Component.translatable("mcpmod.control.overlay");
             int textW = this.font.width(title);
