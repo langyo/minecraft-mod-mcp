@@ -3404,33 +3404,21 @@ public final class ReflectionHelper {
             return;
         }
         try {
-            long handle = getWindowHandle(mc);
-            if (handle == 0 || !LWJGL3) return;
-
             if (!isMcReady(mc)) return;
-
-            initCursorCache();
-
-            if (!windowHidden) {
-                hideWindow(mc);
-            }
-
+            if (!windowHidden) hideWindow(mc);
             if (!cursorApplied) {
-                glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+                forceCursorAndReleaseMouse(mc);
                 cursorApplied = true;
                 dbg("cursor: GLFW_CURSOR_NORMAL applied once");
-            }
-
-            Object mouseHandler = getMouseHandler(mc);
-            if (mouseHandler != null) {
-                initMouseFields(mouseHandler);
-                if (mouseGrabbedField != null) {
-                    mouseGrabbedField.setBoolean(mouseHandler, false);
+            } else {
+                Object mouseHandler = getMouseHandler(mc);
+                if (mouseHandler != null) {
+                    initMouseFields(mouseHandler);
+                    if (mouseGrabbedField != null) mouseGrabbedField.setBoolean(mouseHandler, false);
+                    if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
+                    if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
                 }
-                if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
-                if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
             }
-
             lastForceState = true;
         } catch (Exception e) {
             dbg("cursor: " + e.getMessage());
@@ -3560,22 +3548,28 @@ public final class ReflectionHelper {
     }
     public static boolean isMouseReleaseActive() { return mouseReleaseActive; }
 
+    private static void forceCursorAndReleaseMouse(Object mc) throws Exception {
+        long handle = getWindowHandle(mc);
+        if (handle == 0 || !LWJGL3) return;
+        initCursorCache();
+        if (glfwSetInputModeMethod != null) {
+            glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+        }
+        Object mouseHandler = getMouseHandler(mc);
+        if (mouseHandler != null) {
+            initMouseFields(mouseHandler);
+            if (mouseGrabbedField != null) mouseGrabbedField.setBoolean(mouseHandler, false);
+            if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
+            if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
+        }
+    }
+
     public static void tickMouseRelease(Object mc) {
         if (!mouseReleaseActive || screenshotInProgress) return;
         try {
-            long handle = getWindowHandle(mc);
-            if (handle == 0 || !LWJGL3) return;
             Object screen = getCurrentScreen(mc);
             if (screen != null) return;
-            initCursorCache();
-            glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
-            Object mouseHandler = getMouseHandler(mc);
-            if (mouseHandler != null) {
-                initMouseFields(mouseHandler);
-                if (mouseGrabbedField != null) mouseGrabbedField.setBoolean(mouseHandler, false);
-                if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
-                if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
-            }
+            forceCursorAndReleaseMouse(mc);
         } catch (Exception ignored) {}
     }
 
@@ -3583,17 +3577,7 @@ public final class ReflectionHelper {
         if (!mcpControlMode) return;
         try {
             tickForceCursorNormal(mc);
-            long handle = getWindowHandle(mc);
-            if (handle == 0 || !LWJGL3) return;
-            initCursorCache();
-            glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
-            Object mouseHandler = getMouseHandler(mc);
-            if (mouseHandler != null) {
-                initMouseFields(mouseHandler);
-                if (mouseGrabbedField != null) mouseGrabbedField.setBoolean(mouseHandler, false);
-                if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
-                if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
-            }
+            forceCursorAndReleaseMouse(mc);
         } catch (Exception e) {
             dbg("tickMcpControlMode: " + e.getMessage());
         }
