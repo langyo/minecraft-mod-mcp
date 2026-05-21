@@ -79,9 +79,13 @@ public class McpControlOverlayScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(g, mouseX, mouseY, partialTick);
+        ReflectionHelper.cacheFrameFromRenderThread(Minecraft.getInstance());
 
-        if (!ReflectionHelper.isScreenshotInProgress()) {
+        boolean capturing = ReflectionHelper.isScreenshotInProgress();
+
+        if (!capturing) {
+            this.renderBackground(g, mouseX, mouseY, partialTick);
+
             Component title = Component.translatable("mcpmod.control.overlay");
             int textW = this.font.width(title);
             g.drawString(this.font, title, (this.width - textW) / 2, Math.max(20, this.height / 5), 0xFFFFFFFF, true);
@@ -100,13 +104,11 @@ public class McpControlOverlayScreen extends Screen {
                 urlHeight = 9;
                 g.drawString(this.font, urlLabel, cx, cy, 0xFF55FF55, false);
             }
-        }
 
-        for (var renderable : this.renderables) {
-            renderable.render(g, mouseX, mouseY, partialTick);
+            for (var renderable : this.renderables) {
+                renderable.render(g, mouseX, mouseY, partialTick);
+            }
         }
-
-        ReflectionHelper.cacheFrameFromRenderThread(Minecraft.getInstance());
     }
 
     @Override
