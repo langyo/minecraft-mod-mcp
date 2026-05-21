@@ -12,6 +12,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
@@ -218,12 +220,6 @@ public final class ReflectionHelper {
             double gx = (double) x;
             double gy = (double) y;
             dbg("guiClick: gui(" + (int)gx + "," + (int)gy + ") screen=" + screenName);
-            dbg("guiClick: listing all boolean methods on " + screen.getClass().getName());
-            for (Method dm : getAllMethods(screen.getClass())) {
-                if (dm.getParameterCount() <= 4 && (dm.getReturnType() == boolean.class)) {
-                    dbg("guiClick: bool method: " + dm.getName() + java.util.Arrays.toString(dm.getParameterTypes()) + " from " + dm.getDeclaringClass().getSimpleName());
-                }
-            }
             StringBuilder results = new StringBuilder();
             for (Method m : getAllMethods(screen.getClass())) {
                 String n = m.getName();
@@ -983,16 +979,28 @@ public final class ReflectionHelper {
         return 2.0; // default Normal scale
     }
 
+    private static final Map<Class<?>, List<Method>> methodCache = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, List<Field>> fieldCache = new ConcurrentHashMap<>();
+
     private static List<Method> getAllMethods(Class<?> clazz) {
-        List<Method> methods = new java.util.ArrayList<>();
-        Class<?> c = clazz;
-        while (c != null && c != Object.class) {
-            for (Method m : c.getDeclaredMethods()) {
-                methods.add(m);
+        if (clazz.getName().startsWith("org.lwjgl.") || clazz.getName().startsWith("com.mojang.blaze3d.")) {
+            List<Method> methods = new java.util.ArrayList<>();
+            Class<?> cur = clazz;
+            while (cur != null && cur != Object.class) {
+                for (Method m : cur.getDeclaredMethods()) methods.add(m);
+                cur = cur.getSuperclass();
             }
-            c = c.getSuperclass();
+            return methods;
         }
-        return methods;
+        return methodCache.computeIfAbsent(clazz, c -> {
+            List<Method> methods = new java.util.ArrayList<>();
+            Class<?> cur = c;
+            while (cur != null && cur != Object.class) {
+                for (Method m : cur.getDeclaredMethods()) methods.add(m);
+                cur = cur.getSuperclass();
+            }
+            return methods;
+        });
     }
 
     private static Object castParam(Class<?> type, double value) {
@@ -1407,12 +1415,10 @@ public final class ReflectionHelper {
         int fboId = 0;
         if (fb != null) {
             try {
-                dbg("takeGl: render target class=" + fb.getClass().getName());
                 for (Field f : getAllFields(fb.getClass())) {
                     String fn = f.getName(); f.setAccessible(true);
                     if (f.getType() == int.class) {
                         int fv = f.getInt(fb);
-                        dbg("takeGl: RT field " + fn + " (int)=" + fv);
                         if ((fn.equals("frameBufferId")||fn.equals("fbo")||fn.equals("framebuffer")||fn.contains("Fbo")||fn.contains("frameBuffer")) && fv > 0) fboId = fv;
                     }
                 }
@@ -1423,11 +1429,9 @@ public final class ReflectionHelper {
                         if (colorTex == null) continue;
                         Class<?> texClass = colorTex.getClass();
                         if (texClass.getName().contains("GpuTexture") || texClass.getName().contains("GlTexture")) {
-                            dbg("takeGl: found texture '" + cf.getName() + "' type=" + texClass.getName());
                             for (Field idf : getAllFields(texClass)) {
                                 if (idf.getName().equals("id") && idf.getType() == int.class) {
                                     idf.setAccessible(true); int tid = idf.getInt(colorTex);
-                                    dbg("takeGl: texture id=" + tid);
                                     if (tid > 0) colorTexId = tid;
                                 }
                             }
@@ -1440,7 +1444,7 @@ public final class ReflectionHelper {
                                             if (df2.getName().contains("depth") && df2.getName().contains("Texture")) { df2.setAccessible(true); depthField = df2; break; }
                                         }
                                         Object depthTex = depthField != null ? depthField.get(fb) : null;
-                                        if (dsa != null) { int fbo = (Integer) gm.invoke(colorTex, dsa, depthTex); dbg("takeGl: getFbo()=" + fbo); if (fbo > 0) fboId = fbo; }
+                                        if (dsa != null) { int fbo = (Integer) gm.invoke(colorTex, dsa, depthTex); if (fbo > 0) fboId = fbo; }
                                     } catch (Exception ex) { dbg("takeGl: getFbo failed: " + ex.getMessage()); }
                                     break;
                                 }
@@ -1449,8 +1453,7 @@ public final class ReflectionHelper {
                         }
                     }
                 }
-                if (fboId > 0) dbg("takeGl: using fboId=" + fboId);
-                else dbg("takeGl: no fboId found");
+                dbgR("takeGl: fboId=" + fboId + " texId=" + colorTexId);
             } catch (Exception e) { dbg("takeGl: failed to get fboId: " + e.getMessage()); }
         }
         if (fb != null) {
@@ -1462,16 +1465,16 @@ public final class ReflectionHelper {
         }
         int w = width, h = height;
         if (fboId > 0) {
-            try { dbg("takeGl: trying glReadPixels from FBO " + fboId); byte[] r = readFboDirect(fboId, w, h, fb); if (r != null) return r; }
+            try { byte[] r = readFboDirect(fboId, w, h, fb); if (r != null) return r; }
             catch (Exception ex) { dbg("takeGl: FBO direct read failed: " + ex.getMessage()); }
         }
         if (colorTexId > 0) {
-            try { dbg("takeGl: trying glGetTexImage on texture " + colorTexId); byte[] r = readTextureViaGetTexImage(colorTexId, w, h); if (r != null) return r; }
+            try { byte[] r = readTextureViaGetTexImage(colorTexId, w, h); if (r != null) return r; }
             catch (Exception ex) { dbg("takeGl: glGetTexImage failed: " + ex.getMessage()); }
         }
         ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
         if (fb != null) {
-            try { for (Method bm : fb.getClass().getMethods()) { if (bm.getName().equals("blitToScreen") && bm.getParameterCount() == 0) { bm.setAccessible(true); bm.invoke(fb); dbg("takeGl: blitToScreen"); break; } } }
+            try { for (Method bm : fb.getClass().getMethods()) { if (bm.getName().equals("blitToScreen") && bm.getParameterCount() == 0) { bm.setAccessible(true); bm.invoke(fb); break; } } }
             catch (Exception ignored) {}
         }
         doGlReadPixels(0, 0, w, h, bb, fboId);
@@ -1529,6 +1532,31 @@ public final class ReflectionHelper {
         return null;
     }
 
+    private static byte[] pixelsToPng(ByteBuffer bb, int w, int h) throws Exception {
+        bb.rewind();
+        int[] raw = new int[w * h];
+        for (int i = 0; i < raw.length; i++) {
+            int r = bb.get() & 0xFF;
+            int g = bb.get() & 0xFF;
+            int b = bb.get() & 0xFF;
+            int a = bb.get() & 0xFF;
+            raw[i] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+        int[] flipped = new int[w * h];
+        for (int y2 = 0; y2 < h; y2++) {
+            for (int x2 = 0; x2 < w; x2++) {
+                flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
+            }
+        }
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        img.setRGB(0, 0, w, h, flipped, 0, w);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(img, "png", baos);
+        byte[] result = baos.toByteArray();
+        if (result.length == 0) throw new RuntimeException("empty PNG w=" + w + " h=" + h);
+        return result;
+    }
+
     private static byte[] readFboDirect(int fboId, int w, int h, Object fb) throws Exception {
         if (!LWJGL3) { try { Class.forName("org.lwjgl.opengl.Display").getMethod("makeCurrent").invoke(null); } catch (Exception ignored) {} }
         Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
@@ -1537,7 +1565,7 @@ public final class ReflectionHelper {
         int GL_FRONT = 0x0404;
         for (Method m : gl11.getMethods()) { if (m.getName().equals("glFinish") && m.getParameterCount() == 0) { try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}; break; } }
         for (Method m : gl11.getMethods()) {
-            if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) { try { m.setAccessible(true); m.invoke(null, GL_FRONT); dbg("readFbo: reading from FRONT buffer"); } catch (Exception ignored) {}; break; }
+            if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) { try { m.setAccessible(true); m.invoke(null, GL_FRONT); } catch (Exception ignored) {}; break; }
         }
         for (Method m : gl11.getMethods()) { if (m.getName().equals("glFinish") && m.getParameterCount() == 0) { try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}; break; } }
         ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
@@ -1592,6 +1620,66 @@ public final class ReflectionHelper {
         } catch (Exception ignored) {}
     }
 
+    private static byte[] readTextureViaGetTexImageFrom(Class<?> glClass, int texId, int w, int h) throws Exception {
+        int GL_TEXTURE_2D = glClass.getDeclaredField("GL_TEXTURE_2D").getInt(null);
+        int GL_RGBA = glClass.getDeclaredField("GL_RGBA").getInt(null);
+        int GL_UNSIGNED_BYTE = glClass.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
+        int prevTex = 0;
+        for (Method m : glClass.getMethods()) {
+            if (m.getName().equals("glGetInteger") && m.getParameterCount() == 1) {
+                try { m.setAccessible(true); prevTex = (Integer) m.invoke(null, GL_TEXTURE_2D); } catch (Exception ignored) {}
+                break;
+            }
+        }
+        for (Method m : glClass.getMethods()) {
+            if (m.getName().equals("glBindTexture") && m.getParameterCount() == 2) {
+                try { m.setAccessible(true); m.invoke(null, GL_TEXTURE_2D, texId); } catch (Exception ignored) {}
+                break;
+            }
+        }
+        for (Method m : glClass.getMethods()) {
+            if (m.getName().equals("glFinish") && m.getParameterCount() == 0) {
+                try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}
+                break;
+            }
+        }
+        ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
+        for (Method m : glClass.getMethods()) {
+            if (m.getName().equals("glGetTexImage")) {
+                m.setAccessible(true);
+                Class<?>[] pts = m.getParameterTypes();
+                if (pts.length == 5 && pts[4] == java.nio.ByteBuffer.class) {
+                    m.invoke(null, GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, bb);
+                } else if (pts.length == 5 && pts[4] == long.class) {
+                    m.invoke(null, GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, getAddressOfBuffer(bb));
+                } else if (pts.length == 6) {
+                    Object[] args = new Object[6];
+                    args[0] = GL_TEXTURE_2D; args[1] = 0; args[2] = GL_RGBA; args[3] = GL_UNSIGNED_BYTE;
+                    if (pts[4] == int.class) args[4] = 0; else args[4] = 0L;
+                    if (pts[5] == java.nio.ByteBuffer.class) args[5] = bb;
+                    else if (pts[5] == long.class) args[5] = getAddressOfBuffer(bb);
+                    m.invoke(null, args);
+                } else if (pts.length == 5 && pts[4].isArray() && pts[4].getComponentType() == float.class) {
+                    float[] floatBuf = new float[w * h * 4];
+                    m.invoke(null, GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, floatBuf);
+                    bb = ByteBuffer.allocate(w * h * 4);
+                    for (float fv : floatBuf) bb.put((byte) (fv * 255));
+                    bb.rewind();
+                } else {
+                    throw new RuntimeException("glGetTexImage sig mismatch: " + java.util.Arrays.toString(pts));
+                }
+                for (Method bm : glClass.getMethods()) {
+                    if (bm.getName().equals("glBindTexture") && bm.getParameterCount() == 2) {
+                        try { bm.setAccessible(true); bm.invoke(null, GL_TEXTURE_2D, prevTex); } catch (Exception ignored) {}
+                        break;
+                    }
+                }
+                return pixelsToPng(bb, w, h);
+            }
+        }
+        throw new RuntimeException("glGetTexImage not found in " + glClass.getName());
+    }
+
     private static byte[] readTextureViaGetTexImage(int texId, int w, int h) throws Exception {
         if (!LWJGL3) {
             try {
@@ -1614,8 +1702,7 @@ public final class ReflectionHelper {
 
         for (Method m : gl11.getMethods()) {
             if (m.getName().equals("glBindTexture") && m.getParameterCount() == 2) {
-                try { m.setAccessible(true); m.invoke(null, GL_TEXTURE_2D, texId);
-                    dbg("readTexImg: bound texture " + texId); } catch (Exception ignored) {}
+                try { m.setAccessible(true); m.invoke(null, GL_TEXTURE_2D, texId); } catch (Exception ignored) {}
                 break;
             }
         }
@@ -1636,11 +1723,11 @@ public final class ReflectionHelper {
                     Class<?>[] pts = m.getParameterTypes();
                     if (pts.length == 5 && pts[4] == java.nio.ByteBuffer.class) {
                         m.invoke(null, GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, bb);
-                        gotPixels = true; dbg("readTexImg: glGetTexImage(ByteBuffer) OK");
+                        gotPixels = true;
                     } else if (pts.length == 5 && pts[4] == long.class) {
                         long addr = getAddressOfBuffer(bb);
                         m.invoke(null, GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, addr);
-                        gotPixels = true; dbg("readTexImg: glGetTexImage(long addr) OK");
+                        gotPixels = true;
                     } else if (pts.length == 6) {
                         Object[] args = new Object[6];
                         args[0] = GL_TEXTURE_2D; args[1] = 0; args[2] = GL_RGBA; args[3] = GL_UNSIGNED_BYTE;
@@ -1648,10 +1735,21 @@ public final class ReflectionHelper {
                         if (pts[5] == java.nio.ByteBuffer.class) args[5] = bb;
                         else if (pts[5] == long.class) args[5] = getAddressOfBuffer(bb);
                         m.invoke(null, args);
-                        gotPixels = true; dbg("readTexImg: glGetTexImage(6 params) OK");
+                        gotPixels = true;
+                    } else {
+                        if (pts.length == 5 && pts[4].isArray() && pts[4].getComponentType() == float.class) {
+                            float[] floatBuf = new float[w * h * 4];
+                            m.invoke(null, GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, floatBuf);
+                            bb = ByteBuffer.allocate(w * h * 4);
+                            for (float fv : floatBuf) bb.put((byte) (fv * 255));
+                            bb.rewind();
+                            gotPixels = true;
+                        } else {
+                            dbgR("readTexImg: glGetTexImage sig mismatch: " + java.util.Arrays.toString(pts));
+                        }
                     }
                 } catch (Exception e) {
-                    dbg("readTexImg: glGetTexImage failed: " + e.getMessage());
+                    dbgR("readTexImg: glGetTexImage failed: " + e.getMessage());
                 }
                 break;
             }
@@ -1665,28 +1763,7 @@ public final class ReflectionHelper {
             }
         }
 
-        bb.rewind();
-        int[] raw = new int[w * h];
-        for (int i = 0; i < raw.length; i++) {
-            int r = bb.get() & 0xFF;
-            int g = bb.get() & 0xFF;
-            int b = bb.get() & 0xFF;
-            int a = bb.get() & 0xFF;
-            raw[i] = (a << 24) | (r << 16) | (g << 8) | b;
-        }
-        int[] flipped = new int[w * h];
-        for (int y2 = 0; y2 < h; y2++) {
-            for (int x2 = 0; x2 < w; x2++) {
-                flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
-            }
-        }
-        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        img.setRGB(0, 0, w, h, flipped, 0, w);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(img, "png", baos);
-        byte[] result = baos.toByteArray();
-        if (result.length == 0) throw new RuntimeException("empty PNG from glGetTexImage w=" + w + " h=" + h);
-        return result;
+        return pixelsToPng(bb, w, h);
     }
 
     private static void doGlReadPixels(int x, int y, int w, int h, ByteBuffer bb, int fboId) throws Exception {
@@ -1714,7 +1791,7 @@ public final class ReflectionHelper {
                 for (Method m : gl30.getMethods()) {
                     if (m.getName().equals("glBindFramebuffer") && m.getParameterCount() == 2) {
                         try { m.setAccessible(true); m.invoke(null, GL_READ_FRAMEBUFFER, fboId);
-                            dbg("doGlRead: bound READ_FRAMEBUFFER=" + fboId); } catch (Exception ignored) {}
+                            } catch (Exception ignored) {}
                         break;
                     }
                 }
@@ -1734,7 +1811,7 @@ public final class ReflectionHelper {
             int GL_BACK = 0x0405;
             for (Method m : gl11.getMethods()) {
                 if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) {
-                    try { m.setAccessible(true); m.invoke(null, GL_BACK); dbg("doGlRead: set read buffer to BACK"); }
+                    try { m.setAccessible(true); m.invoke(null, GL_BACK); }
                     catch (Exception ignored3) {}
                     break;
                 }
@@ -1808,17 +1885,35 @@ public final class ReflectionHelper {
         } catch (Exception e) { System.err.println("[Input] sendKey: " + e.getMessage()); }
     }
 
+    private static java.io.BufferedWriter dbgWriter;
+    private static long dbgWriterOpenTime;
+    private static final Map<String, Long> dbgRateLimit = new ConcurrentHashMap<>();
+    private static volatile boolean dbgEnabled = true;
+
     static void dbg(String msg) {
+        if (!dbgEnabled) return;
         try {
-            String home = System.getProperty("user.home");
-            java.io.FileWriter fw = new java.io.FileWriter(home + java.io.File.separator + "mcp_debug.log", true);
-            fw.write(System.currentTimeMillis() + " " + msg + "\n");
-            fw.close();
+            long now = System.currentTimeMillis();
+            if (dbgWriter == null || now - dbgWriterOpenTime > 300000) {
+                if (dbgWriter != null) try { dbgWriter.close(); } catch (Exception ignored) {}
+                String home = System.getProperty("user.home");
+                dbgWriter = new java.io.BufferedWriter(new java.io.FileWriter(home + java.io.File.separator + "mcp_debug.log", true));
+                dbgWriterOpenTime = now;
+            }
+            dbgWriter.write(now + " " + msg + "\n");
+            dbgWriter.flush();
         } catch (Exception e) {
-            try {
-                System.err.println("[MCP-DBG] " + msg + " (write err: " + e.getMessage() + ")");
-            } catch (Exception ignored2) {}
+            try { System.err.println("[MCP-DBG] " + msg); } catch (Exception ignored2) {}
         }
+    }
+
+    static void dbgR(String msg) {
+        if (!dbgEnabled) return;
+        long now = System.currentTimeMillis();
+        Long last = dbgRateLimit.get(msg);
+        if (last != null && now - last < 5000) return;
+        dbgRateLimit.put(msg, now);
+        dbg(msg);
     }
 
     private static Method findMouseButtonMethod(Class<?> mouseHandlerClass) {
@@ -2407,15 +2502,24 @@ public final class ReflectionHelper {
     }
 
     private static List<Field> getAllFields(Class<?> clazz) {
-        List<Field> fields = new java.util.ArrayList<>();
-        Class<?> c = clazz;
-        while (c != null && c != Object.class) {
-            for (Field f : c.getDeclaredFields()) {
-                fields.add(f);
+        if (clazz.getName().startsWith("org.lwjgl.") || clazz.getName().startsWith("com.mojang.blaze3d.")) {
+            List<Field> fields = new java.util.ArrayList<>();
+            Class<?> cur = clazz;
+            while (cur != null && cur != Object.class) {
+                for (Field f : cur.getDeclaredFields()) fields.add(f);
+                cur = cur.getSuperclass();
             }
-            c = c.getSuperclass();
+            return fields;
         }
-        return fields;
+        return fieldCache.computeIfAbsent(clazz, c -> {
+            List<Field> fields = new java.util.ArrayList<>();
+            Class<?> cur = c;
+            while (cur != null && cur != Object.class) {
+                for (Field f : cur.getDeclaredFields()) fields.add(f);
+                cur = cur.getSuperclass();
+            }
+            return fields;
+        });
     }
 
     private static Object fieldOrNull(Object obj, String fieldName) {
@@ -3408,8 +3512,14 @@ public final class ReflectionHelper {
             }
             if (texId <= 0) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: no texId found, rt=" + rt.getClass().getName()); lastCacheFrameLog = System.currentTimeMillis(); } return; }
             suppressGlDebug(true);
-            byte[] result;
-            try { result = readTextureViaGetTexImage(texId, w, h); } finally { suppressGlDebug(false); }
+            byte[] result = null;
+            try { result = readTextureViaGetTexImage(texId, w, h); }
+            catch (Exception texEx) {
+                try {
+                    Class<?> gl11c = Class.forName("org.lwjgl.opengl.GL11C");
+                    result = readTextureViaGetTexImageFrom(gl11c, texId, w, h);
+                } catch (Exception ignored) {}
+            } finally { suppressGlDebug(false); }
             if (result != null && result.length > 0) {
                 cachedScreenshot = result;
                 cachedScreenshotTime = System.currentTimeMillis();
