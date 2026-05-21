@@ -3713,7 +3713,7 @@ public final class ReflectionHelper {
         if (!mcpControlMode) return;
         try {
             Object screen = getCurrentScreen(mc);
-            if (screen != null && !screen.getClass().getName().contains("McpControlOverlayScreen")) {
+            if (screen != null) {
                 closeScreen(mc);
                 dbgR("tickMcpControlMode: force closed screen " + screen.getClass().getSimpleName());
             }
