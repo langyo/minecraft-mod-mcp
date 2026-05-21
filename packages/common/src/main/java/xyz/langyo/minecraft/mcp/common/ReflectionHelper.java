@@ -1867,6 +1867,235 @@ public final class ReflectionHelper {
         }
     }
 
+    public static String directScroll(Object mc, double mouseX, double mouseY, double delta) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen == null) return "{\"error\":\"no screen\"}";
+            String sn = screen.getClass().getSimpleName();
+            double mx = mouseX, my = mouseY;
+            if (mx < 0 || my < 0) {
+                try {
+                    Object mh = mc.getClass().getField("mouseHandler").get(mc);
+                    for (Field f : getAllFields(mh.getClass())) {
+                        if (f.getName().equals("xpos") || f.getName().equals("field_192635_i")) {
+                            try { f.setAccessible(true); mx = f.getDouble(mh); } catch (Exception ignored) {}
+                        }
+                    }
+                    for (Field f : getAllFields(mh.getClass())) {
+                        if (f.getName().equals("ypos") || f.getName().equals("field_192636_j")) {
+                            try { f.setAccessible(true); my = f.getDouble(mh); } catch (Exception ignored) {}
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+            double guiScale = 1.0;
+            try {
+                Object window = null;
+                for (Method m : mc.getClass().getMethods()) {
+                    if (m.getName().equals("getWindow") && m.getParameterCount() == 0) {
+                        window = m.invoke(mc); break;
+                    }
+                }
+                if (window != null) {
+                    for (Method m : window.getClass().getMethods()) {
+                        if (m.getName().equals("getGuiScale") && m.getParameterCount() == 0) {
+                            guiScale = ((Number) m.invoke(window)).doubleValue();
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            double scaledX = mx / guiScale;
+            double scaledY = my / guiScale;
+            Method target = null;
+            for (Method m : getAllMethods(screen.getClass())) {
+                if (m.getName().equals("mouseScrolled")) {
+                    Class<?>[] pt = m.getParameterTypes();
+                    if (pt.length == 4 && pt[0] == double.class && pt[1] == double.class
+                        && pt[2] == double.class && pt[3] == double.class) {
+                        target = m; break;
+                    }
+                    if (pt.length == 3 && pt[0] == double.class && pt[1] == double.class && pt[2] == double.class) {
+                        target = m; break;
+                    }
+                }
+            }
+            if (target == null) return "{\"error\":\"mouseScrolled not found on " + sn + "\"}";
+            target.setAccessible(true);
+            if (target.getParameterCount() == 4) {
+                target.invoke(screen, scaledX, scaledY, 0.0, delta);
+            } else {
+                target.invoke(screen, scaledX, scaledY, delta);
+            }
+            return "{\"direct_scroll\":true,\"screen\":\"" + sn + "\",\"mouseX\":" + scaledX + ",\"mouseY\":" + scaledY + ",\"delta\":" + delta + ",\"guiScale\":" + guiScale + "}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + (e.getMessage() != null ? e.getMessage().replace("\\","\\\\").replace("\"","\\\"") : "null") + "\"}";
+        }
+    }
+
+    public static String selectListItem(Object mc, int targetIndex) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen == null) return "{\"error\":\"no screen\"}";
+            String sn = screen.getClass().getSimpleName();
+
+            Method childrenMethod = null;
+            for (Method m : getAllMethods(screen.getClass())) {
+                if (m.getName().equals("children") && m.getParameterCount() == 0) {
+                    childrenMethod = m; break;
+                }
+            }
+            if (childrenMethod == null) return "{\"error\":\"no children() on " + sn + "\"}";
+            childrenMethod.setAccessible(true);
+            Object children = childrenMethod.invoke(screen);
+            if (!(children instanceof java.util.List)) return "{\"error\":\"children not a List\"}";
+            java.util.List<?> childList = (java.util.List<?>) children;
+
+            Object listWidget = null;
+            for (Object child : childList) {
+                String cn = child.getClass().getSimpleName();
+                if (cn.contains("List") || cn.contains("SelectionList")) {
+                    listWidget = child; break;
+                }
+            }
+            if (listWidget == null) return "{\"error\":\"no list widget in children\"}";
+
+            String lcn = listWidget.getClass().getName();
+            dbg("selectListItem: found " + lcn);
+
+            int setSize = 0;
+            for (Method m : getAllMethods(listWidget.getClass())) {
+                if (m.getName().equals("getRowCount") && m.getParameterCount() == 0) {
+                    try { m.setAccessible(true); setSize = ((Number) m.invoke(listWidget)).intValue(); } catch (Exception ignored) {}
+                    break;
+                }
+            }
+            if (setSize == 0) {
+                try {
+                    for (Method m : getAllMethods(listWidget.getClass())) {
+                        if (m.getName().equals("size") && m.getParameterCount() == 0) {
+                            m.setAccessible(true); setSize = ((Number) m.invoke(listWidget)).intValue(); break;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+            if (setSize > 0 && targetIndex >= setSize) return "{\"error\":\"index " + targetIndex + " >= size " + setSize + "\"}";
+
+            boolean selected = false;
+            boolean setSelectedCalled = false;
+            for (Method m : getAllMethods(listWidget.getClass())) {
+                String mn = m.getName();
+                if ((mn.equals("setSelected") || mn.equals("selectItemIndex") || mn.equals("setSelectedIndex"))
+                    && m.getParameterCount() == 1) {
+                    Class<?> pt = m.getParameterTypes()[0];
+                    try {
+                        m.setAccessible(true);
+                        if (pt == int.class) m.invoke(listWidget, targetIndex);
+                        else if (pt == Integer.class) m.invoke(listWidget, Integer.valueOf(targetIndex));
+                        setSelectedCalled = true;
+                        dbg("selectListItem: called " + mn + "(" + targetIndex + ")");
+                        break;
+                    } catch (Exception e) { dbg("selectListItem: " + mn + " failed: " + e.getMessage()); }
+                }
+            }
+
+            if (!setSelectedCalled) {
+                for (Field f : getAllFields(listWidget.getClass())) {
+                    String fn = f.getName();
+                    if ((fn.equals("selected") || fn.equals("selectedIndex") || fn.equals("selectedItem") || fn.contains("selectedRow"))
+                        && (f.getType() == int.class || f.getType() == Integer.class)) {
+                        try {
+                            f.setAccessible(true);
+                            f.setInt(listWidget, targetIndex);
+                            selected = true;
+                            dbg("selectListItem: set field " + fn + "=" + targetIndex);
+                            break;
+                        } catch (Exception e) { dbg("selectListItem: field " + fn + " failed: " + e.getMessage()); }
+                    }
+                }
+            }
+
+            if (!selected) {
+                try {
+                    for (Method m : getAllMethods(listWidget.getClass())) {
+                        if (m.getName().equals("ensureVisible") && m.getParameterCount() == 1) {
+                            m.setAccessible(true);
+                            m.invoke(listWidget, targetIndex);
+                            dbg("selectListItem: ensureVisible(" + targetIndex + ")");
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            {
+                try {
+                    java.util.List<?> entries = null;
+                    for (Method m : getAllMethods(listWidget.getClass())) {
+                        if (m.getName().equals("children") && m.getParameterCount() == 0) {
+                            m.setAccessible(true);
+                            Object result = m.invoke(listWidget);
+                            if (result instanceof java.util.List) { entries = (java.util.List<?>) result; break; }
+                        }
+                    }
+                    if (entries == null) {
+                        for (Field f : getAllFields(listWidget.getClass())) {
+                            if (java.util.List.class.isAssignableFrom(f.getType())) {
+                                try { f.setAccessible(true); entries = (java.util.List<?>) f.get(listWidget); } catch (Exception ignored) {}
+                                if (entries != null) break;
+                            }
+                        }
+                    }
+                    if (entries != null && targetIndex < entries.size()) {
+                        Object entry = entries.get(targetIndex);
+                        dbg("selectListItem: got entry " + targetIndex + " of " + entries.size() + ": " + entry.getClass().getName());
+                        for (Method m : getAllMethods(entry.getClass())) {
+                            String mn = m.getName();
+                            if ((mn.equals("select") || mn.equals("onClick") || mn.equals("onSelect") || mn.equals("setSelected"))
+                                && m.getParameterCount() == 0) {
+                                try {
+                                    m.setAccessible(true);
+                                    m.invoke(entry);
+                                    selected = true;
+                                    dbg("selectListItem: called " + mn + "() on entry " + targetIndex);
+                                    break;
+                                } catch (Exception e) { dbg("selectListItem: " + mn + "() failed: " + e.getMessage()); }
+                            }
+                        }
+                    } else if (entries != null) {
+                        dbg("selectListItem: entries.size=" + entries.size() + " targetIndex=" + targetIndex);
+                    } else {
+                        dbg("selectListItem: no entries found on " + lcn);
+                    }
+                } catch (Exception e) { dbg("selectListItem: entry fallback: " + e.getMessage()); }
+            }
+
+            if (!selected) {
+                StringBuilder methods = new StringBuilder();
+                for (Method m : getAllMethods(listWidget.getClass())) {
+                    if (m.getName().toLowerCase().contains("select") || m.getName().toLowerCase().contains("row") || m.getName().toLowerCase().contains("index")) {
+                        methods.append(m.getName()).append("(").append(m.getParameterCount()).append(") ");
+                    }
+                }
+                StringBuilder fields = new StringBuilder();
+                for (Field f : getAllFields(listWidget.getClass())) {
+                    fields.append(f.getName()).append(":").append(f.getType().getSimpleName()).append(" ");
+                }
+                return "{\"error\":\"could not select on " + lcn + "\",\"methods\":\"" + methods + "\",\"fields\":\"" + fields + "\"}";
+            }
+
+            for (Method m : getAllMethods(screen.getClass())) {
+                if (m.getName().equals("updateButtonValidity") && m.getParameterCount() == 1) {
+                    try { m.setAccessible(true); m.invoke(screen, true); } catch (Exception ignored) {}
+                    break;
+                }
+            }
+
+            return "{\"selectListItem\":true,\"screen\":\"" + sn + "\",\"listWidget\":\"" + listWidget.getClass().getSimpleName() + "\",\"index\":" + targetIndex + ",\"setSize\":" + setSize + "}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + (e.getMessage() != null ? e.getMessage().replace("\\","\\\\").replace("\"","\\\"") : "null") + "\"}";
+        }
+    }
+
     public static void sendMouseDrag(long handle, int x1, int y1, int x2, int y2, int button, int steps) {
         setCursorPos(handle, x1, y1);
         try { Thread.sleep(20); } catch (Exception ignored) {}

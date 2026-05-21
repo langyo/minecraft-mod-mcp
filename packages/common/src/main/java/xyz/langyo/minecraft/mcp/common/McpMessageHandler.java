@@ -60,6 +60,8 @@ public class McpMessageHandler {
         if (method.equals("type_text")) return handleTypeText(params);
         if (method.equals("scroll")) return handleScroll(params);
         if (method.equals("scroll_at")) return handleScrollAt(params);
+        if (method.equals("direct_scroll")) return handleDirectScroll(params);
+        if (method.equals("select_list_item")) return handleSelectListItem(params);
         if (method.equals("mouse_drag") || method.equals("drag")) return handleMouseDrag(params);
         if (method.equals("hotkey")) return handleHotkey(params);
         if (method.equals("execute_command")) return handleExecuteCommand(params);
@@ -181,6 +183,20 @@ public class McpMessageHandler {
         }
         if (minecraftInput != null) minecraftInput.scrollAt(x, y, clicks);
         return "{\"scroll_at\":true,\"x\":"+x+",\"y\":"+y+",\"clicks\":"+clicks+"}";
+    }
+
+    protected Object handleSelectListItem(java.util.Map<String, String> p) {
+        int index = 0;
+        try { index = Integer.parseInt(p.getOrDefault("index", "0")); } catch (Exception ignored) {}
+        return ReflectionHelper.selectListItem(ReflectionHelper.getMinecraftInstance(), index);
+    }
+
+    protected Object handleDirectScroll(java.util.Map<String, String> p) {
+        double mouseX = -1, mouseY = -1, delta = 1.0;
+        try { mouseX = Double.parseDouble(p.getOrDefault("mouseX", "-1")); } catch (Exception ignored) {}
+        try { mouseY = Double.parseDouble(p.getOrDefault("mouseY", "-1")); } catch (Exception ignored) {}
+        try { delta = Double.parseDouble(p.getOrDefault("delta", "1")); } catch (Exception ignored) {}
+        return ReflectionHelper.directScroll(ReflectionHelper.getMinecraftInstance(), mouseX, mouseY, delta);
     }
 
     protected Object handleMouseDrag(java.util.Map<String, String> p) {
