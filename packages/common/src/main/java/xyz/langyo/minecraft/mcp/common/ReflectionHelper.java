@@ -1145,21 +1145,81 @@ public final class ReflectionHelper {
         }
     }
 
+    private static void forceRenderOneFrame(Object mc) {
+        try {
+            Object gameRenderer = null;
+            for (Method m : mc.getClass().getMethods()) {
+                if (m.getName().equals("gameRenderer") && m.getParameterCount() == 0) {
+                    m.setAccessible(true); gameRenderer = m.invoke(mc); break;
+                }
+            }
+            if (gameRenderer == null) {
+                for (Field f : getAllFields(mc.getClass())) {
+                    if (f.getName().equals("gameRenderer")) { f.setAccessible(true); gameRenderer = f.get(mc); break; }
+                }
+            }
+            if (gameRenderer == null) { dbg("forceRender: no gameRenderer"); return; }
+            for (Method m : getAllMethods(gameRenderer.getClass())) {
+                if (m.getName().equals("render") && m.getParameterCount() == 2) {
+                    Class<?>[] pts = m.getParameterTypes();
+                    if (pts[0] == float.class && pts[1] == long.class) {
+                        m.setAccessible(true); m.invoke(gameRenderer, 1.0f, System.nanoTime());
+                        dbg("forceRender: called GameRenderer.render()"); return;
+                    }
+                }
+            }
+            dbg("forceRender: render(float,long) not found");
+        } catch (Exception e) { dbg("forceRender: " + e.getMessage()); }
+    }
+
     private static byte[] takeScreenshot0(Object mc, int width, int height) {
         byte[] cached = cachedScreenshot;
         if (cached != null && System.currentTimeMillis() - cachedScreenshotTime < 2000) {
             dbg("takeScreenshot: returning cached screenshot " + cached.length + " bytes (age " + (System.currentTimeMillis() - cachedScreenshotTime) + "ms)");
             return cached;
         }
-        dbg("takeScreenshot: no recent cached screenshot, trying direct read");
-        for (int attempt = 0; attempt < 3; attempt++) {
-            try {
-                byte[] glResult = takeGlScreenshot0(mc, width, height);
-                if (glResult != null) { return glResult; }
-            } catch (Exception ignored) {}
-            try { Thread.sleep(16); } catch (InterruptedException ignored) {}
+        dbg("takeScreenshot: no recent cached screenshot, forcing render + reading on render thread");
+        final int w = width, h = height;
+        final byte[][] resultHolder = new byte[1][];
+        final CountDownLatch latch = new CountDownLatch(1);
+        Runnable task = new Runnable() {
+            public void run() {
+                try {
+                    dbg("takeScreenshot0: on thread " + Thread.currentThread().getName());
+                    forceRenderOneFrame(mc);
+                    try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+                    suppressGlDebug(true);
+                    byte[] r;
+                    try { r = takeGlScreenshot0(mc, w, h); } finally { suppressGlDebug(false); }
+                    resultHolder[0] = r;
+                    if (r != null) {
+                        cachedScreenshot = r;
+                        cachedScreenshotTime = System.currentTimeMillis();
+                        dbg("takeScreenshot0: captured " + r.length + " bytes via forceRender");
+                    }
+                } catch (Exception e) { dbg("takeScreenshot0: " + e.getMessage()); }
+                latch.countDown();
+            }
+        };
+        boolean isSameThread = false;
+        for (Method m : getAllMethods(mc.getClass())) {
+            if (m.getName().equals("isSameThread") && m.getParameterCount() == 0) {
+                try { m.setAccessible(true); isSameThread = (boolean) m.invoke(mc); } catch (Exception ignored) {}
+                break;
+            }
         }
-        return null;
+        if (isSameThread) {
+            task.run();
+        } else {
+            for (Method m : mc.getClass().getMethods()) {
+                if (m.getName().equals("execute") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) {
+                    try { m.setAccessible(true); m.invoke(mc, task); } catch (Exception e) { dbg("takeScreenshot0: execute failed: " + e.getMessage()); return null; }
+                    break;
+                }
+            }
+        }
+        try { latch.await(10, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+        return resultHolder[0];
     }
 
     private static byte[] takeScreenshotOnMainThread(Object mc, int width, int height) throws Exception {
@@ -1509,6 +1569,27 @@ public final class ReflectionHelper {
             }
         } catch (Exception ignored) {}
         throw new RuntimeException("Cannot get buffer address: MemoryUtil.memAddress not found");
+    }
+
+    private static void suppressGlDebug(boolean suppress) {
+        try {
+            Class<?> gl43 = Class.forName("org.lwjgl.opengl.GL43");
+            int GL_DEBUG_OUTPUT = gl43.getDeclaredField("GL_DEBUG_OUTPUT").getInt(null);
+            Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
+            if (suppress) {
+                for (Method m : gl11.getMethods()) {
+                    if (m.getName().equals("glDisable") && m.getParameterCount() == 1) {
+                        m.setAccessible(true); m.invoke(null, GL_DEBUG_OUTPUT); break;
+                    }
+                }
+            } else {
+                for (Method m : gl11.getMethods()) {
+                    if (m.getName().equals("glEnable") && m.getParameterCount() == 1) {
+                        m.setAccessible(true); m.invoke(null, GL_DEBUG_OUTPUT); break;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
     }
 
     private static byte[] readTextureViaGetTexImage(int texId, int w, int h) throws Exception {
@@ -3301,7 +3382,7 @@ public final class ReflectionHelper {
 
     private static long lastCacheFrameLog = 0;
     public static void cacheFrameFromRenderThread(Object mc) {
-        if (System.currentTimeMillis() - cachedScreenshotTime < 50) return;
+        if (System.currentTimeMillis() - cachedScreenshotTime < 1000) return;
         try {
             Object rt = null;
             try { Method m = mc.getClass().getMethod("getMainRenderTarget"); rt = m.invoke(mc); }
@@ -3326,7 +3407,9 @@ public final class ReflectionHelper {
                 }
             }
             if (texId <= 0) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: no texId found, rt=" + rt.getClass().getName()); lastCacheFrameLog = System.currentTimeMillis(); } return; }
-            byte[] result = readTextureViaGetTexImage(texId, w, h);
+            suppressGlDebug(true);
+            byte[] result;
+            try { result = readTextureViaGetTexImage(texId, w, h); } finally { suppressGlDebug(false); }
             if (result != null && result.length > 0) {
                 cachedScreenshot = result;
                 cachedScreenshotTime = System.currentTimeMillis();
