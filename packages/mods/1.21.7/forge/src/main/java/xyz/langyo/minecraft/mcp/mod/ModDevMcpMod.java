@@ -8,6 +8,7 @@ import java.util.List;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
+import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -24,6 +25,23 @@ public class ModDevMcpMod {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
     private final boolean dependenciesAvailable;
+
+    @SuppressWarnings("removal")
+    private static void registerInputInterception() {
+        InputEvent.MouseButton.Pre.BUS.addListener(event -> {
+            try {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                if (!ReflectionHelper.isMcpControlMode()) return false;
+                if (event.getButton() != 0) return true;
+                int w = mc.getWindow().getGuiScaledWidth();
+                int h = mc.getWindow().getGuiScaledHeight();
+                int guiX = (int) (mc.mouseHandler.xpos() * w / mc.getWindow().getGuiScaledWidth());
+                int guiY = (int) (mc.mouseHandler.ypos() * h / mc.getWindow().getGuiScaledHeight());
+                ReflectionHelper.handleOverlayClick(guiX, guiY, mc);
+                return true;
+            } catch (Exception ignored) { return false; }
+        });
+    }
 
     @SuppressWarnings("removal")
     private static void registerTickListener() {
@@ -231,19 +249,62 @@ public class ModDevMcpMod {
             } catch (Exception ignored) {}
         });
 
+        registerInputInterception();
         registerTickListener();
 
         CustomizeGuiOverlayEvent.Chat.BUS.addListener(event -> {
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-                if (ReflectionHelper.shouldRenderMcpControlOverlay(mc)) {
+                if (ReflectionHelper.shouldRenderMcpControlOverlay(mc) && !ReflectionHelper.isScreenshotInProgress()) {
                     GuiGraphics g = event.getGuiGraphics();
                     int w = event.getWindow().getGuiScaledWidth();
                     int h = event.getWindow().getGuiScaledHeight();
                     g.fill(0, 0, w, h, 0x88404040);
+
                     Component title = Component.translatable(ReflectionHelper.getMcpControlOverlayTranslationKey());
                     int textW = mc.font.width(title);
                     g.drawString(mc.font, title, (w - textW) / 2, Math.max(20, h / 5), 0xFFFFFFFF, true);
+
+                    int btnW = 150;
+                    int btnH = 20;
+                    int gap = 10;
+                    int totalW = btnW * 2 + gap;
+                    int startX = (w - totalW) / 2;
+                    int btnY = h - 40;
+
+                    int mouseX = (int) (mc.mouseHandler.xpos() * w / mc.getWindow().getGuiScaledWidth());
+                    int mouseY = (int) (mc.mouseHandler.ypos() * h / mc.getWindow().getGuiScaledHeight());
+
+                    int resumeX = startX;
+                    int menuX = startX + btnW + gap;
+
+                    boolean hoverResume = mouseX >= resumeX && mouseX <= resumeX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+                    boolean hoverMenu = mouseX >= menuX && mouseX <= menuX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+
+                    int resumeColor = hoverResume ? 0xFF555555 : 0xFF333333;
+                    int menuColor = hoverMenu ? 0xFF555555 : 0xFF333333;
+
+                    g.fill(resumeX, btnY, resumeX + btnW, btnY + btnH, resumeColor);
+                    g.fill(menuX, btnY, menuX + btnW, btnY + btnH, menuColor);
+
+                    int border = 0xFFAAAAAA;
+                    g.fill(resumeX, btnY, resumeX + btnW, btnY + 1, border);
+                    g.fill(resumeX, btnY + btnH - 1, resumeX + btnW, btnY + btnH, border);
+                    g.fill(resumeX, btnY, resumeX + 1, btnY + btnH, border);
+                    g.fill(resumeX + btnW - 1, btnY, resumeX + btnW, btnY + btnH, border);
+                    g.fill(menuX, btnY, menuX + btnW, btnY + 1, border);
+                    g.fill(menuX, btnY + btnH - 1, menuX + btnW, btnY + btnH, border);
+                    g.fill(menuX, btnY, menuX + 1, btnY + btnH, border);
+                    g.fill(menuX + btnW - 1, btnY, menuX + btnW, btnY + btnH, border);
+
+                    Component resumeText = Component.translatable("mcpmod.control.resume");
+                    Component menuText = Component.translatable("mcpmod.control.menu");
+                    int resumeTextW = mc.font.width(resumeText);
+                    int menuTextW = mc.font.width(menuText);
+                    g.drawString(mc.font, resumeText, resumeX + (btnW - resumeTextW) / 2, btnY + (btnH - 8) / 2, 0xFFFFFFFF, false);
+                    g.drawString(mc.font, menuText, menuX + (btnW - menuTextW) / 2, btnY + (btnH - 8) / 2, 0xFFFFFFFF, false);
+
+                    ReflectionHelper.setOverlayButtonBounds(resumeX, btnY, btnW, btnH, menuX, btnY, btnW, btnH);
                 }
                 if (debugUrl != null) {
                     ReflectionHelper.cacheFrameFromRenderThread(mc);

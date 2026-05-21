@@ -1111,8 +1111,106 @@ public final class ReflectionHelper {
         try {
             Object player = getPlayer(mc);
             if (player == null) return "{\"error\":\"no player\"}";
-            String msg = cmd.startsWith("/") ? cmd : "/" + cmd;
-            // Try sendChatMessage on player (works in most versions)
+            String stripped = cmd.startsWith("/") ? cmd.substring(1) : cmd;
+
+            // Priority 1: Direct server execution via getCommands().getDispatcher()
+            try {
+                Object server = null;
+                // Try method first
+                try { server = mc.getClass().getMethod("getSingleplayerServer").invoke(mc); } catch (Exception ignored) {}
+                if (server == null) {
+                    try { server = mc.getClass().getMethod("getServer").invoke(mc); } catch (Exception ignored) {}
+                }
+                // Try field
+                if (server == null) {
+                    Object f = fieldOrNull(mc, "singleplayerServer");
+                    if (f != null) server = f;
+                }
+                if (server == null) {
+                    Object level = getLevel(mc);
+                    if (level != null) server = invokeOrNull(level, "getServer");
+                }
+                if (server != null) {
+                    dbg("sendCommand: got server " + server.getClass().getName());
+                    Object commands = invokeOrNull(server, "getCommands");
+                    dbg("sendCommand: commands=" + (commands != null ? commands.getClass().getName() : "null"));
+                    if (commands != null) {
+                        Object dispatcher = invokeOrNull(commands, "getDispatcher");
+                        dbg("sendCommand: dispatcher=" + (dispatcher != null ? dispatcher.getClass().getName() : "null"));
+                        if (dispatcher != null) {
+                            // Get a command source - try createCommandSourceStack on server
+                            Object source = null;
+                            for (String mname : new String[]{"createCommandSourceStack", "createCommandSource", "getSource"}) {
+                                try {
+                                    for (Method sm : getAllMethods(server.getClass())) {
+                                        if (sm.getName().equals(mname) && sm.getParameterCount() == 0) {
+                                            sm.setAccessible(true);
+                                            source = sm.invoke(server);
+                                            break;
+                                        }
+                                    }
+                                } catch (Exception ignored) {}
+                                if (source != null) break;
+                            }
+                            // Also try getting source from commands object
+                            if (source == null) {
+                                try {
+                                    for (Method sm : getAllMethods(commands.getClass())) {
+                                        if ((sm.getName().contains("Source") || sm.getName().contains("source")) && sm.getParameterCount() == 0) {
+                                            sm.setAccessible(true);
+                                            source = sm.invoke(commands);
+                                            break;
+                                        }
+                                    }
+                                } catch (Exception ignored) {}
+                            }
+                            if (source != null) {
+                                Object parseResult = dispatcher.getClass().getMethod("parse", String.class, Object.class)
+                                        .invoke(dispatcher, stripped, source);
+                                for (Method m : getAllMethods(parseResult.getClass())) {
+                                    if (m.getName().equals("execute") && m.getParameterCount() == 0) {
+                                        m.setAccessible(true);
+                                        try { m.invoke(parseResult); return "{\"sent\":true,\"method\":\"dispatcher.execute\"}"; }
+                                        catch (Exception e) { return "{\"sent\":false,\"method\":\"dispatcher\",\"error\":\"" + e.getMessage() + "\"}"; }
+                                    }
+                                }
+                            }
+                            // Fallback: try performCommand or execute on Commands/Server
+                            for (Method m : getAllMethods(commands.getClass())) {
+                                String mn = m.getName();
+                                if ((mn.equals("performCommand") || mn.equals("execute")) && m.getParameterCount() == 2) {
+                                    try {
+                                        if (source == null) source = invokeOrNull(server, "createCommandSourceStack");
+                                        if (source != null) {
+                                            Class<?>[] ptypes = m.getParameterTypes();
+                                            if (ptypes[0].isAssignableFrom(source.getClass()) && ptypes[1] == String.class) {
+                                                m.setAccessible(true);
+                                                m.invoke(commands, source, stripped);
+                                                return "{\"sent\":true,\"method\":\"commands." + mn + "\"}";
+                                            }
+                                        }
+                                    } catch (Exception e) { dbg("sendCommand: " + mn + " failed: " + e.getMessage()); }
+                                }
+                            }
+                            // Also try server.executeCommand or server.runCommand
+                            for (Method m : getAllMethods(server.getClass())) {
+                                String mn = m.getName();
+                                if ((mn.contains("executeCommand") || mn.contains("runCommand") || mn.equals("execute"))
+                                        && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
+                                    try {
+                                        m.setAccessible(true);
+                                        m.invoke(server, stripped);
+                                        return "{\"sent\":true,\"method\":\"server." + mn + "\"}";
+                                    } catch (Exception e) { dbg("sendCommand: server." + mn + " failed: " + e.getMessage()); }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) { dbg("sendCommand: dispatcher path failed: " + e.getMessage()); }
+
+            // Priority 2: sendChatMessage on player
+            String msg = "/" + stripped;
             for (Method m : getAllMethods(player.getClass())) {
                 if ((m.getName().equals("sendChatMessage") || m.getName().contains("sendChat") || m.getName().contains("func_146158_b"))
                         && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
@@ -1120,7 +1218,7 @@ public final class ReflectionHelper {
                     catch (Exception ignored) {}
                 }
             }
-            // Try connection-based approach: get connection, send CPacketChatMessage
+            // Priority 3: connection-based approach
             Object conn = null;
             try { conn = player.getClass().getMethod("connection").invoke(player); }
             catch (NoSuchMethodException ignored) {
@@ -1129,11 +1227,41 @@ public final class ReflectionHelper {
             }
             if (conn != null) {
                 dbg("sendCommand: found connection " + conn.getClass().getName());
+                // First try command packet (sends /command without chat display)
                 for (Method m : getAllMethods(conn.getClass())) {
-                    String mn = m.getName().toLowerCase();
+                    if ((m.getName().equals("sendPacket") || m.getName().contains("sendPacket") || m.getName().contains("func_147297_a"))
+                            && m.getParameterCount() == 1) {
+                        try {
+                            for (String pktName : new String[]{
+                                "net.minecraft.network.protocol.game.ServerboundChatCommandPacket"
+                            }) {
+                                try {
+                                    Class<?> pktClass = Class.forName(pktName);
+                                    Object packet = pktClass.getConstructor(String.class).newInstance(stripped);
+                                    m.setAccessible(true);
+                                    m.invoke(conn, packet);
+                                    return "{\"sent\":true,\"method\":\"packet:" + pktName + "\"}";
+                                } catch (ClassNotFoundException ignored2) {}
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+                // Then try named methods
+                for (Method m : getAllMethods(conn.getClass())) {
+                    String mn = m.getName();
                     if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class
-                            && (mn.contains("chat") || mn.contains("send") || mn.contains("command"))) {
-                        try { m.setAccessible(true); m.invoke(conn, msg); return "{\"sent\":true,\"method\":\"conn." + m.getName() + "\"}"; }
+                            && (mn.equals("sendCommand") || mn.equals("sendUnsignedCommand"))
+                            && !mn.contains("verify") && !mn.contains("Valid") && !mn.contains("check")) {
+                        try { m.setAccessible(true); m.invoke(conn, stripped); return "{\"sent\":true,\"method\":\"conn." + mn + "\"}"; }
+                        catch (Exception ignored) {}
+                    }
+                }
+                for (Method m : getAllMethods(conn.getClass())) {
+                    String mn = m.getName();
+                    if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class
+                            && (mn.equals("send") || mn.equals("sendChat") || mn.equals("sendChatMessage") || mn.equals("chat"))
+                            && !mn.contains("verify") && !mn.contains("Valid") && !mn.contains("check") && !mn.contains("Command")) {
+                        try { m.setAccessible(true); m.invoke(conn, msg); return "{\"sent\":true,\"method\":\"conn." + mn + "\"}"; }
                         catch (Exception ignored) {}
                     }
                 }
@@ -1144,12 +1272,12 @@ public final class ReflectionHelper {
                             for (String pktName : new String[]{
                                 "net.minecraft.network.play.client.CPacketChatMessage",
                                 "net.minecraft.network.protocol.game.ServerboundChatPacket",
-                                "net.minecraft.network.protocol.game.ServerboundChatCommandPacket"
                             }) {
                                 try {
                                     Class<?> pktClass = Class.forName(pktName);
                                     Object packet = pktClass.getConstructor(String.class).newInstance(msg);
-                                    m.setAccessible(true); m.invoke(conn, packet);
+                                    m.setAccessible(true);
+                                    m.invoke(conn, packet);
                                     return "{\"sent\":true,\"method\":\"packet:" + pktName + "\"}";
                                 } catch (ClassNotFoundException ignored2) {}
                             }
@@ -3215,6 +3343,8 @@ public final class ReflectionHelper {
     }
 
     private static volatile boolean mcpControlMode = false;
+    private static volatile int overlayResumeX, overlayResumeY, overlayResumeW, overlayResumeH;
+    private static volatile int overlayMenuX, overlayMenuY, overlayMenuW, overlayMenuH;
 
     public static String enterMcpControlMode(Object mc) {
         initClassCache();
@@ -3276,6 +3406,31 @@ public final class ReflectionHelper {
     }
 
     public static boolean isMcpControlMode() { return mcpControlMode; }
+
+    public static void setOverlayButtonBounds(int rx, int ry, int rw, int rh, int mx, int my, int mw, int mh) {
+        overlayResumeX = rx; overlayResumeY = ry; overlayResumeW = rw; overlayResumeH = rh;
+        overlayMenuX = mx; overlayMenuY = my; overlayMenuW = mw; overlayMenuH = mh;
+    }
+
+    public static String handleOverlayClick(int guiX, int guiY, Object mc) {
+        if (!mcpControlMode) return "not_in_control_mode";
+        boolean hitResume = guiX >= overlayResumeX && guiX <= overlayResumeX + overlayResumeW
+                         && guiY >= overlayResumeY && guiY <= overlayResumeY + overlayResumeH;
+        boolean hitMenu = guiX >= overlayMenuX && guiX <= overlayMenuX + overlayMenuW
+                       && guiY >= overlayMenuY && guiY <= overlayMenuY + overlayMenuH;
+        if (hitResume) {
+            exitMcpControlMode(mc);
+            return "resume_manual";
+        }
+        if (hitMenu) {
+            exitMcpControlMode(mc);
+            openPauseMenu(mc);
+            return "system_menu";
+        }
+        return "blocked";
+    }
+
+    public static boolean isScreenshotInProgress() { return screenshotInProgress; }
 
     public static String getMcpControlOverlayTranslationKey() { return "mcpmod.control.overlay"; }
 
@@ -3442,6 +3597,11 @@ public final class ReflectionHelper {
     public static String showMcpOverlay(String text, int port) {
         McpPlatformControl ctrl = McpControlFactory.get();
         boolean ok = ctrl.showOverlay(text, port);
+        mouseReleaseActive = true;
+        try {
+            Object mc = getMinecraftInstance();
+            if (mc != null) forceCursorAndReleaseMouse(mc);
+        } catch (Exception ignored) {}
         return "{\"overlay_shown\":" + ok + ",\"text\":\"" + text + "\",\"port\":" + port + ",\"platform\":\"" + ctrl.getPlatformName() + "\"}";
     }
 

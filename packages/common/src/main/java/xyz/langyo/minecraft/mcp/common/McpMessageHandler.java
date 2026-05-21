@@ -49,12 +49,28 @@ public class McpMessageHandler {
         }
     }
 
+    private static final java.util.Set<String> ALWAYS_ALLOWED = java.util.Set.of(
+        "ping", "screenshot", "get_player_info", "get_world_info", "debug_fields",
+        "get_screen_buttons", "enumerate_widgets", "overlay_click",
+        "enter_control_mode", "exit_control_mode", "platform_status",
+        "set_gamemode", "release_mouse", "pause_game", "close_screen", "open_chat",
+        "win32_status", "mouse_hook_status", "overlay_show", "overlay_hide", "overlay_text"
+    );
+
     protected Object dispatch(String method, java.util.Map<String, String> params, Object wsClient) {
         McpProtocol.MinecraftInput inp = minecraftInput;
         if (inp == null) {
             return "error: no input handler bound";
         }
+        if (method.equals("ping")) return "pong";
         if (method.equals("screenshot")) return handleScreenshot();
+        if (method.equals("overlay_click")) return handleOverlayClick(params);
+        if (method.equals("enter_control_mode") || method.equals("exit_control_mode")) return handleControlMode(params, method);
+
+        boolean inControl = ReflectionHelper.isMcpControlMode();
+        if (!inControl && !ALWAYS_ALLOWED.contains(method)) {
+            return "{\"error\":\"not in control mode\",\"hint\":\"Enter control mode via ESC > MCP Take Over\"}";
+        }
         if (method.equals("click")) return handleClick(params);
         if (method.equals("press_key")) return handlePressKey(params);
         if (method.equals("type_text")) return handleTypeText(params);
@@ -73,7 +89,6 @@ public class McpMessageHandler {
         if (method.equals("click_button_index")) return handleClickButtonIndex(params);
         if (method.equals("enumerate_widgets")) return handleEnumerateWidgets(params);
         if (method.equals("call_screen_method")) return handleCallScreenMethod(params);
-        if (method.equals("enter_control_mode") || method.equals("exit_control_mode")) return handleControlMode(params, method);
         if (method.equals("paste_text")) return handlePasteText(params);
         if (method.equals("set_view_angle")) return handleSetViewAngle(params);
         if (method.equals("look_delta")) return handleLookDelta(params);
@@ -86,7 +101,6 @@ public class McpMessageHandler {
         if (method.equals("release_mouse")) return handleReleaseMouse();
         if (method.equals("set_gamemode")) return handleSetGameMode(params);
         if (method.equals("switch_tab")) return handleSwitchTab(params);
-        if (method.equals("ping")) return "pong";
         if (method.equals("win32_borderless")) return handleWin32Borderless();
         if (method.equals("win32_container")) return handleWin32Container();
         if (method.equals("win32_status")) return handleWin32Status();
@@ -110,6 +124,42 @@ public class McpMessageHandler {
         resp.add("result", GSON.toJsonTree(result));
         resp.addProperty("id", requestId != null ? requestId : String.valueOf(reqId++));
         ws.send(GSON.toJson(resp));
+    }
+
+    protected Object handleOverlayClick(java.util.Map<String, String> params) {
+        int x = 0, y = 0;
+        try { x = Integer.parseInt(params.getOrDefault("x", "0")); } catch (Exception ignored) {}
+        try { y = Integer.parseInt(params.getOrDefault("y", "0")); } catch (Exception ignored) {}
+        final int fx = x, fy = y;
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {""};
+        ReflectedInputHandler.executeOnRenderThread(() -> {
+            try {
+                Object mc = ReflectionHelper.getMinecraftInstance();
+                result[0] = ReflectionHelper.handleOverlayClick(fx, fy, mc);
+            } catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+            latch.countDown();
+        });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
+    }
+
+    protected Object handleControlMode(java.util.Map<String, String> params, String method) {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {""};
+        ReflectedInputHandler.executeOnRenderThread(() -> {
+            try {
+                Object mc = ReflectionHelper.getMinecraftInstance();
+                if (method.equals("enter_control_mode")) {
+                    result[0] = ReflectionHelper.enterMcpControlMode(mc);
+                } else {
+                    result[0] = ReflectionHelper.exitMcpControlMode(mc);
+                }
+            } catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+            latch.countDown();
+        });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
     }
 
     protected Object handleScreenshot() {
@@ -304,22 +354,6 @@ public class McpMessageHandler {
         ReflectedInputHandler.executeOnRenderThread(() -> {
             try { result[0] = ReflectionHelper.callScreenMethod(ReflectionHelper.getMinecraftInstance(), fm); }
             catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
-            latch.countDown();
-        });
-        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
-        return result[0];
-    }
-
-    protected Object handleControlMode(java.util.Map<String, String> params, String method) {
-        final CountDownLatch latch = new CountDownLatch(1);
-        final String[] result = {""};
-        ReflectedInputHandler.executeOnRenderThread(() -> {
-            try {
-                if ("enter_control_mode".equals(method))
-                    result[0] = ReflectionHelper.enterMcpControlMode(ReflectionHelper.getMinecraftInstance());
-                else
-                    result[0] = ReflectionHelper.exitMcpControlMode(ReflectionHelper.getMinecraftInstance());
-            } catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
             latch.countDown();
         });
         try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
