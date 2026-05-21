@@ -4,11 +4,8 @@ import xyz.langyo.minecraft.mcp.common.ReflectionHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
 import net.minecraft.Util;
 import java.net.URI;
 
@@ -90,10 +87,9 @@ public class McpControlOverlayScreen extends Screen {
             g.drawString(this.font, title, (this.width - textW) / 2, Math.max(20, this.height / 5), 0xFFFFFFFF, true);
 
             if (debugUrl != null) {
-                Component urlLabel = Component.literal("[MCP] " + debugUrl).withStyle(s -> s
+                Component urlLabel = Component.literal(debugUrl).withStyle(s -> s
                     .withColor(0x55FF55)
                     .withUnderlined(true)
-                    .withClickEvent(new ClickEvent.OpenUrl(URI.create(debugUrl)))
                 );
                 int urlTextW = this.font.width(urlLabel);
                 int cx = (this.width - urlTextW) / 2;
@@ -117,19 +113,7 @@ public class McpControlOverlayScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && debugUrl != null && !ReflectionHelper.isScreenshotInProgress()) {
             if (mouseX >= urlX && mouseX <= urlX + urlWidth && mouseY >= urlY && mouseY <= urlY + urlHeight) {
-                Minecraft mc = Minecraft.getInstance();
-                if (mc.options.chatLinks().get()) {
-                    if (mc.options.chatLinksPrompt().get()) {
-                        mc.setScreen(new ConfirmLinkScreen(confirmed -> {
-                            if (confirmed) {
-                                Util.getPlatform().openUri(URI.create(debugUrl));
-                            }
-                            mc.setScreen(this);
-                        }, debugUrl, false));
-                    } else {
-                        Util.getPlatform().openUri(URI.create(debugUrl));
-                    }
-                }
+                Util.getPlatform().openUri(URI.create(debugUrl));
                 return true;
             }
         }
