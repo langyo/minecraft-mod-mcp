@@ -195,6 +195,32 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         });
     }
 
+    public void scrollAt(int x, int y, int clicks) {
+        executor.executeOnRenderThread(() -> {
+            try {
+                long h = getWindowHandle();
+                ReflectionHelper.setCursorPos(h, x, y);
+                Thread.sleep(30);
+                // Also send mouse move so MC knows cursor is at (x,y)
+                ReflectionHelper.sendMouseMoveInternal(h, x, y);
+                Thread.sleep(20);
+                ReflectionHelper.sendScroll(h, clicks * 1.0);
+            } catch (Exception ignored) {}
+        });
+    }
+
+    @Override
+    public void mouseDrag(int x1, int y1, int x2, int y2, String button) {
+        executor.executeOnRenderThread(() -> {
+            try {
+                int b = "right".equals(button) ? 1 : "middle".equals(button) ? 2 : 0;
+                int steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) / 10;
+                if (steps < 3) steps = 3;
+                ReflectionHelper.sendMouseDrag(getWindowHandle(), x1, y1, x2, y2, b, steps);
+            } catch (Exception e) { System.err.println("[Input] Drag: " + e.getMessage()); }
+        });
+    }
+
     @Override
     public void hotkey(String[] keys) {
         executor.executeOnRenderThread(() -> {

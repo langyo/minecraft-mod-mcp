@@ -1844,6 +1844,44 @@ public final class ReflectionHelper {
         } catch (Exception e) { System.err.println("[Input] sendScroll: " + e.getMessage()); }
     }
 
+    public static void sendMouseMoveInternal(long handle, double x, double y) {
+        if (LWJGL3) {
+            try {
+                Object mc = getMinecraftInstance();
+                Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
+                for (Method m : mouseHandler.getClass().getDeclaredMethods()) {
+                    String name = m.getName();
+                    if ((name.contains("cursor") || name.equals("lambda$setup$0") || name.equals("lambda$setup$1"))
+                        && !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+                        Class<?>[] pt = m.getParameterTypes();
+                        if (pt.length == 3 && pt[0] == long.class && pt[1] == double.class && pt[2] == double.class) {
+                            m.setAccessible(true);
+                            m.invoke(mouseHandler, handle, x, y);
+                            return;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[Input] sendMouseMove GLFW: " + e.getMessage());
+            }
+        }
+    }
+
+    public static void sendMouseDrag(long handle, int x1, int y1, int x2, int y2, int button, int steps) {
+        setCursorPos(handle, x1, y1);
+        try { Thread.sleep(20); } catch (Exception ignored) {}
+        sendMouseButton(handle, button, 1);
+        try { Thread.sleep(20); } catch (Exception ignored) {}
+        if (steps < 1) steps = 1;
+        for (int i = 1; i <= steps; i++) {
+            int cx = x1 + (x2 - x1) * i / steps;
+            int cy = y1 + (y2 - y1) * i / steps;
+            setCursorPos(handle, cx, cy);
+            try { Thread.sleep(10); } catch (Exception ignored) {}
+        }
+        sendMouseButton(handle, button, 0);
+    }
+
     public static void setCursorPos(long handle, double x, double y) {
         if (LWJGL3) {
             try {

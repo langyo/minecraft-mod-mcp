@@ -261,7 +261,12 @@ public class McpHttpServer {
                     }
                 }
                 Object r = handler.dispatch(cmd, params, null);
-                return r instanceof String ? (String) r : McpProtocol.GSON.toJson(r);
+                if (r instanceof String) {
+                    String s = (String) r;
+                    if (s.startsWith("data:image") || s.startsWith("{") || s.startsWith("[")) return s;
+                    return "{\"result\":\"" + esc(s) + "\"}";
+                }
+                return McpProtocol.GSON.toJson(r);
             } catch (Exception e) {
                 return "{\"error\":\"" + esc(e.getMessage()) + "\"}";
             }

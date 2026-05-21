@@ -59,6 +59,8 @@ public class McpMessageHandler {
         if (method.equals("press_key")) return handlePressKey(params);
         if (method.equals("type_text")) return handleTypeText(params);
         if (method.equals("scroll")) return handleScroll(params);
+        if (method.equals("scroll_at")) return handleScrollAt(params);
+        if (method.equals("mouse_drag") || method.equals("drag")) return handleMouseDrag(params);
         if (method.equals("hotkey")) return handleHotkey(params);
         if (method.equals("execute_command")) return handleExecuteCommand(params);
         if (method.equals("get_player_info")) return handleGetPlayerInfo();
@@ -136,14 +138,14 @@ public class McpMessageHandler {
 
     protected Object handlePressKey(java.util.Map<String, String> p) {
         String key = p.get("key");
-        if (key == null) return "missing key";
+        if (key == null) return "{\"error\":\"missing key\"}";
         float hold = 0f;
         String holdStr = p.get("hold_seconds");
         if (holdStr != null) {
             try { hold = Float.parseFloat(holdStr); } catch (NumberFormatException ignored) {}
         }
         if (minecraftInput != null) minecraftInput.pressKey(key, hold);
-        return key;
+        return "{\"pressed\":\"" + key + "\"}";
     }
 
     protected Object handleTypeText(java.util.Map<String, String> p) {
@@ -165,7 +167,31 @@ public class McpMessageHandler {
             try { clicks = Integer.parseInt(clicksStr); } catch (NumberFormatException ignored) {}
         }
         if (minecraftInput != null) minecraftInput.scroll(clicks);
-        return clicks + " scrolls";
+        return "{\"scrolls\":" + clicks + "}";
+    }
+
+    protected Object handleScrollAt(java.util.Map<String, String> p) {
+        int x = 0, y = 0;
+        try { x = Integer.parseInt(p.getOrDefault("x", "0")); } catch (Exception ignored) {}
+        try { y = Integer.parseInt(p.getOrDefault("y", "0")); } catch (Exception ignored) {}
+        int clicks = 1;
+        String clicksStr = p.get("clicks");
+        if (clicksStr != null) {
+            try { clicks = Integer.parseInt(clicksStr); } catch (NumberFormatException ignored) {}
+        }
+        if (minecraftInput != null) minecraftInput.scrollAt(x, y, clicks);
+        return "{\"scroll_at\":true,\"x\":"+x+",\"y\":"+y+",\"clicks\":"+clicks+"}";
+    }
+
+    protected Object handleMouseDrag(java.util.Map<String, String> p) {
+        int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+        try { x1 = Integer.parseInt(p.getOrDefault("x1", p.getOrDefault("x_start", "0"))); } catch (Exception ignored) {}
+        try { y1 = Integer.parseInt(p.getOrDefault("y1", p.getOrDefault("y_start", "0"))); } catch (Exception ignored) {}
+        try { x2 = Integer.parseInt(p.getOrDefault("x2", p.getOrDefault("x_end", "0"))); } catch (Exception ignored) {}
+        try { y2 = Integer.parseInt(p.getOrDefault("y2", p.getOrDefault("y_end", "0"))); } catch (Exception ignored) {}
+        String button = p.getOrDefault("button", "left");
+        if (minecraftInput != null) minecraftInput.mouseDrag(x1, y1, x2, y2, button);
+        return "{\"drag\":true,\"from\":[" + x1 + "," + y1 + "],\"to\":[" + x2 + "," + y2 + "]}";
     }
 
     protected Object handleHotkey(java.util.Map<String, String> p) {
@@ -254,6 +280,7 @@ public class McpMessageHandler {
 
     protected Object handleCallScreenMethod(java.util.Map<String, String> params) {
         String methodName = params.get("method");
+        if (methodName == null || methodName.isEmpty()) methodName = params.get("methodName");
         if (methodName == null) return "missing method";
         final String fm = methodName;
         final CountDownLatch latch = new CountDownLatch(1);
