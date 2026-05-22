@@ -83,9 +83,9 @@ public class ModDevMcpMod {
                 INSTANCE.chatSent = true;
                 String url = INSTANCE.debugUrl;
                 Component msg = Component.empty()
-                    .append(Component.literal("[MCP] Debug page: ").withStyle(s -> s.withColor(0x55FF55)))
+                    .append(Component.literal("[MCP] Debug page: ").withStyle(s -> s.withColor(0xFFFFFF)))
                     .append(Component.literal(url).withStyle(s -> s
-                        .withColor(0x5555FF)
+                        .withColor(0xFFFFFF)
                         .withUnderlined(true)
                         .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(url)))
                     ));
