@@ -3731,40 +3731,58 @@ public final class ReflectionHelper {
     public static void setVideoCaptureActive(boolean v) { videoCaptureActive = v; }
     public static boolean isVideoCaptureActive() { return videoCaptureActive; }
 
+    private static int cachedSkyColor = 0x7FB5E3;
+
+    private static void updateSkyColor(Object mc) {
+        try {
+            Object lr = null;
+            for (Field f : mc.getClass().getDeclaredFields()) {
+                if (f.getType().getSimpleName().equals("LevelRenderer")) {
+                    f.setAccessible(true); lr = f.get(mc); break;
+                }
+            }
+            if (lr == null) { for (Method m : mc.getClass().getMethods()) { if (m.getName().equals("levelRenderer") && m.getParameterCount() == 0) { lr = m.invoke(mc); break; } } }
+            if (lr == null) return;
+            Object lrs = null;
+            for (Field f : lr.getClass().getDeclaredFields()) {
+                String tn = f.getType().getSimpleName();
+                if (tn.equals("LevelRenderState")) { f.setAccessible(true); lrs = f.get(lr); break; }
+            }
+            if (lrs == null) return;
+            Object srs = null;
+            for (Field f : lrs.getClass().getDeclaredFields()) {
+                if (f.getType().getSimpleName().equals("SkyRenderState")) { f.setAccessible(true); srs = f.get(lrs); break; }
+            }
+            if (srs == null) return;
+            for (Field f : srs.getClass().getDeclaredFields()) {
+                if (f.getName().equals("skyColor") && f.getType() == int.class) {
+                    f.setAccessible(true);
+                    int c = f.getInt(srs);
+                    if (c != 0) cachedSkyColor = c;
+                    return;
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
     public static byte[] captureFrameJpeg(Object mc) {
         try {
+            updateSkyColor(mc);
             int w = getGlfwWindowSize(mc, true);
             int h = getGlfwWindowSize(mc, false);
             if (w <= 0 || h <= 0) return null;
             ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
             doGlReadPixels(0, 0, w, h, bb, 0);
             bb.rewind();
-            int[] rawR = new int[w * h];
-            int[] rawG = new int[w * h];
-            int[] rawB = new int[w * h];
-            int[] rawA = new int[w * h];
-            for (int i = 0; i < w * h; i++) {
-                rawR[i] = bb.get() & 0xFF;
-                rawG[i] = bb.get() & 0xFF;
-                rawB[i] = bb.get() & 0xFF;
-                rawA[i] = bb.get() & 0xFF;
-            }
-            int skyR = 0x7F, skyG = 0xB5, skyB = 0xE3;
-            int sampleY = Math.max(0, (int)(h * 0.15));
-            long sr = 0, sg = 0, sb = 0; int sc = 0;
-            for (int x = 0; x < w; x++) {
-                int idx = sampleY * w + x;
-                int brightness = rawR[idx] + rawG[idx] + rawB[idx];
-                if (brightness > 150 && rawA[idx] > 128) {
-                    sr += rawR[idx]; sg += rawG[idx]; sb += rawB[idx]; sc++;
-                }
-            }
-            if (sc > w / 4) { skyR = (int)(sr / sc); skyG = (int)(sg / sc); skyB = (int)(sb / sc); }
+            int sc = cachedSkyColor;
+            int skyR = (sc >> 16) & 0xFF, skyG = (sc >> 8) & 0xFF, skyB = sc & 0xFF;
             BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
             for (int y = 0; y < h; y++) {
                 for (int x = 0; x < w; x++) {
-                    int i = y * w + x;
-                    int r = rawR[i], g = rawG[i], b = rawB[i], a = rawA[i];
+                    int r = bb.get() & 0xFF;
+                    int g = bb.get() & 0xFF;
+                    int b = bb.get() & 0xFF;
+                    int a = bb.get() & 0xFF;
                     if (a < 16 || (r + g + b < 24 && y < h / 2)) {
                         r = skyR; g = skyG; b = skyB;
                     }
