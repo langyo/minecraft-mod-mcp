@@ -17,7 +17,6 @@ import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.Util;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
@@ -29,7 +28,6 @@ public class ModDevMcpMod {
 
     private static volatile int btnResumeX, btnResumeY, btnResumeW, btnResumeH;
     private static volatile int btnMenuX, btnMenuY, btnMenuW, btnMenuH;
-    private static volatile int urlX, urlY, urlW, urlH;
 
     @SuppressWarnings("removal")
     private static void registerInputInterception() {
@@ -43,11 +41,6 @@ public class ModDevMcpMod {
                     String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                     if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                         return false;
-                    }
-                    if (mx >= urlX && mx <= urlX + urlW && my >= urlY && my <= urlY + urlH) {
-                        String url = INSTANCE != null ? INSTANCE.debugUrl : null;
-                        if (url != null) Util.getPlatform().openUri(java.net.URI.create(url));
-                        return true;
                     }
                 }
                 return true;
@@ -192,60 +185,25 @@ public class ModDevMcpMod {
     }
 
     private static void renderOverlay(GuiGraphics g, Minecraft mc, int screenW, int screenH, int mouseX, int mouseY) {
-        g.fill(0, 0, screenW, screenH, 0x88404040);
+        Component label = Component.translatable("mcpmod.control.resume");
+        int textW = mc.font.width(label);
+        int pad = 4;
+        int btnW = textW + pad * 2 + 4;
+        int btnH = 16;
+        int margin = 4;
+        int bx = screenW - btnW - margin;
+        int by = margin;
 
-        Component title = Component.translatable("mcpmod.control.overlay");
-        int textW = mc.font.width(title);
-        g.drawString(mc.font, title, (screenW - textW) / 2, Math.max(20, screenH / 5), 0xFFFFFFFF, true);
+        btnResumeX = bx; btnResumeY = by; btnResumeW = btnW; btnResumeH = btnH;
 
-        String debugUrl = INSTANCE != null ? INSTANCE.debugUrl : null;
-        if (debugUrl != null) {
-            Component urlLabel = Component.literal(debugUrl).withStyle(s -> s
-                .withColor(0x55FF55)
-                .withUnderlined(true)
-            );
-            int urlTextW = mc.font.width(urlLabel);
-            int cx = (screenW - urlTextW) / 2;
-            int cy = Math.max(20, screenH / 5) + 14;
-            urlX = cx; urlY = cy; urlW = urlTextW; urlH = 9;
-            g.drawString(mc.font, urlLabel, cx, cy, 0xFF55FF55, false);
-        }
+        ReflectionHelper.setOverlayButtonBounds(bx, by, btnW, btnH, 0, 0, 0, 0);
 
-        int btnW = 150, btnH = 20, gap = 10;
-        int totalW = btnW * 2 + gap;
-        int startX = (screenW - totalW) / 2;
-        int btnY = screenH - 40;
-
-        int rx = startX, ry = btnY;
-        int mx = startX + btnW + gap, my = btnY;
-
-        btnResumeX = rx; btnResumeY = ry; btnResumeW = btnW; btnResumeH = btnH;
-        btnMenuX = mx; btnMenuY = my; btnMenuW = btnW; btnMenuH = btnH;
-
-        ReflectionHelper.setOverlayButtonBounds(rx, ry, btnW, btnH, mx, my, btnW, btnH);
-
-        boolean hoverResume = mouseX >= rx && mouseX <= rx + btnW && mouseY >= ry && mouseY <= ry + btnH;
-        boolean hoverMenu = mouseX >= mx && mouseX <= mx + btnW && mouseY >= my && mouseY <= my + btnH;
-
-        int bgNormal = 0xFF555555;
-        int bgHover = 0xFF777777;
-        g.fill(rx, ry, rx + btnW, ry + btnH, hoverResume ? bgHover : bgNormal);
-        g.fill(rx, ry, rx + btnW, ry, 0xFFAAAAAA);
-        g.fill(rx, ry + btnH - 1, rx + btnW, ry + btnH, 0xFF333333);
-        g.fill(rx, ry, rx, ry + btnH, 0xFF999999);
-        g.fill(rx + btnW, ry, rx + btnW, ry + btnH, 0xFF444444);
-        Component resumeText = Component.translatable("mcpmod.control.resume");
-        int rtw = mc.font.width(resumeText);
-        g.drawString(mc.font, resumeText, rx + (btnW - rtw) / 2, ry + (btnH - 8) / 2, 0xFFFFFFFF, false);
-
-        g.fill(mx, my, mx + btnW, my + btnH, hoverMenu ? bgHover : bgNormal);
-        g.fill(mx, my, mx + btnW, my, 0xFFAAAAAA);
-        g.fill(mx, my + btnH - 1, mx + btnW, my + btnH, 0xFF333333);
-        g.fill(mx, my, mx, my + btnH, 0xFF999999);
-        g.fill(mx + btnW, my, mx + btnW, my + btnH, 0xFF444444);
-        Component menuText = Component.translatable("mcpmod.control.menu");
-        int mtw = mc.font.width(menuText);
-        g.drawString(mc.font, menuText, mx + (btnW - mtw) / 2, my + (btnH - 8) / 2, 0xFFFFFFFF, false);
+        boolean hover = mouseX >= bx && mouseX <= bx + btnW && mouseY >= by && mouseY <= by + btnH;
+        int bg = hover ? 0xDD666666 : 0xBB444444;
+        g.fill(bx, by, bx + btnW, by + btnH, bg);
+        g.fill(bx, by, bx + btnW, by, 0xFF888888);
+        g.fill(bx, by + btnH - 1, bx + btnW, by + btnH, 0xFF333333);
+        g.drawString(mc.font, label, bx + pad + 2, by + (btnH - 8) / 2, 0xFFFFFFFF, false);
     }
 
     public ModDevMcpMod() {
@@ -315,9 +273,7 @@ public class ModDevMcpMod {
             if (ReflectionHelper.isScreenshotInProgress()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
-                if (!ReflectionHelper.isScreenshotInProgress()) {
-                    ReflectionHelper.cacheFrameFromRenderThread(mc);
-                }
+                ReflectionHelper.cacheFrameFromRenderThread(mc);
                 int w = mc.getWindow().getGuiScaledWidth();
                 int h = mc.getWindow().getGuiScaledHeight();
                 double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
