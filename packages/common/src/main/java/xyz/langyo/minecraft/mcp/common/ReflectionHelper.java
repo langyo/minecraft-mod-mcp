@@ -3739,13 +3739,15 @@ public final class ReflectionHelper {
             ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
             doGlReadPixels(0, 0, w, h, bb, 0);
             bb.rewind();
+            int skyR = 0x7F, skyG = 0xB5, skyB = 0xE3;
             BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
             for (int y = 0; y < h; y++) {
                 for (int x = 0; x < w; x++) {
                     int r = bb.get() & 0xFF;
                     int g = bb.get() & 0xFF;
                     int b = bb.get() & 0xFF;
-                    bb.get();
+                    int a = bb.get() & 0xFF;
+                    if (a < 16) { r = skyR; g = skyG; b = skyB; }
                     img.setRGB(x, h - 1 - y, (r << 16) | (g << 8) | b);
                 }
             }
