@@ -3322,6 +3322,14 @@ public final class ReflectionHelper {
     private static volatile int overlayResumeX = -999, overlayResumeY = -999, overlayResumeW, overlayResumeH;
     private static volatile int overlayMenuX = -999, overlayMenuY = -999, overlayMenuW, overlayMenuH;
     private static volatile long mcpControlModeEnterTime = 0;
+    private static volatile long mcpControlModeExitTime = 0;
+
+    public static boolean shouldSuppressInput() {
+        if (!mcpControlMode && mcpControlModeExitTime > 0) {
+            return System.currentTimeMillis() - mcpControlModeExitTime < 200;
+        }
+        return false;
+    }
 
     public static String enterMcpControlMode(Object mc) {
         initClassCache();
@@ -3340,6 +3348,7 @@ public final class ReflectionHelper {
         try {
             dbg("exitMcpControlMode: CALLED FROM " + Thread.currentThread().getName() + " - " + new Exception().getStackTrace()[1]);
             mcpControlMode = false;
+            mcpControlModeExitTime = System.currentTimeMillis();
             mouseReleaseActive = false;
             forceCursorNormal = false;
             long glfwHandle = getWindowHandle(mc);
@@ -3372,6 +3381,23 @@ public final class ReflectionHelper {
     public static void setOverlayButtonBounds(int rx, int ry, int rw, int rh, int mx, int my, int mw, int mh) {
         overlayResumeX = rx; overlayResumeY = ry; overlayResumeW = rw; overlayResumeH = rh;
         overlayMenuX = mx; overlayMenuY = my; overlayMenuW = mw; overlayMenuH = mh;
+    }
+
+    private static volatile int overlayTransferX = -999, overlayTransferY = -999, overlayTransferW, overlayTransferH;
+
+    public static void setTransferButtonBounds(int x, int y, int w, int h) {
+        overlayTransferX = x; overlayTransferY = y; overlayTransferW = w; overlayTransferH = h;
+    }
+
+    public static String handleTransferOverlayClick(int guiX, int guiY, Object mc) {
+        if (mcpControlMode) return "already_in_control_mode";
+        boolean hit = guiX >= overlayTransferX && guiX <= overlayTransferX + overlayTransferW
+                   && guiY >= overlayTransferY && guiY <= overlayTransferY + overlayTransferH;
+        if (hit) {
+            enterMcpControlMode(mc);
+            return "transfer_to_mcp";
+        }
+        return "missed";
     }
 
     public static String handleOverlayClick(int guiX, int guiY, Object mc) {

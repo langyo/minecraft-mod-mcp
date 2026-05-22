@@ -28,22 +28,34 @@ public class ModDevMcpMod {
 
     private static volatile int btnResumeX, btnResumeY, btnResumeW, btnResumeH;
     private static volatile int btnMenuX, btnMenuY, btnMenuW, btnMenuH;
+    private static volatile int btnTransferX, btnTransferY, btnTransferW, btnTransferH;
 
     @SuppressWarnings("removal")
     private static void registerInputInterception() {
         InputEvent.MouseButton.Pre.BUS.addListener(event -> {
             try {
                 Minecraft mc = Minecraft.getInstance();
-                if (!ReflectionHelper.isMcpControlMode()) return false;
-                if (event.getButton() == 0) {
+                if (ReflectionHelper.shouldSuppressInput()) return true;
+                if (ReflectionHelper.isMcpControlMode()) {
+                    if (event.getButton() == 0) {
+                        double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
+                        double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
+                        String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                        if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                if (mc.screen != null && !(mc.screen instanceof PauseScreen) && event.getButton() == 0) {
                     double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
                     double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
-                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
-                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                        return false;
+                    if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {
+                        mc.setScreen(null);
+                        return true;
                     }
                 }
-                return true;
+                return false;
             } catch (Exception ignored) { return false; }
         });
     }
@@ -207,6 +219,27 @@ public class ModDevMcpMod {
         g.drawString(mc.font, label, bx + pad + 2, by + (btnH - 8) / 2, 0xFFFFFFFF, false);
     }
 
+    private static void renderTransferOverlay(GuiGraphics g, Minecraft mc, int screenW, int screenH, int mouseX, int mouseY) {
+        Component label = Component.translatable("mcpmod.control.pause_button");
+        int textW = mc.font.width(label);
+        int pad = 4;
+        int btnW = textW + pad * 2 + 4;
+        int btnH = 16;
+        int margin = 4;
+        int bx = screenW - btnW - margin;
+        int by = margin;
+
+        btnTransferX = bx; btnTransferY = by; btnTransferW = btnW; btnTransferH = btnH;
+        ReflectionHelper.setTransferButtonBounds(bx, by, btnW, btnH);
+
+        boolean hover = mouseX >= bx && mouseX <= bx + btnW && mouseY >= by && mouseY <= by + btnH;
+        int bg = hover ? 0xDD446644 : 0xBB335533;
+        g.fill(bx, by, bx + btnW, by + btnH, bg);
+        g.fill(bx, by, bx + btnW, by, 0xFF88AA88);
+        g.fill(bx, by + btnH - 1, bx + btnW, by + btnH, 0xFF336633);
+        g.drawString(mc.font, label, bx + pad + 2, by + (btnH - 8) / 2, 0xFFFFFFFF, false);
+    }
+
     public ModDevMcpMod() {
         INSTANCE = this;
         boolean depsOk = false;
@@ -270,16 +303,21 @@ public class ModDevMcpMod {
         });
 
         ScreenEvent.Render.Post.BUS.addListener(event -> {
-            if (!ReflectionHelper.isMcpControlMode()) return;
             if (ReflectionHelper.isScreenshotInProgress()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
-                ReflectionHelper.cacheFrameFromRenderThread(mc);
+                Screen screen = event.getScreen();
                 int w = mc.getWindow().getGuiScaledWidth();
                 int h = mc.getWindow().getGuiScaledHeight();
                 double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
                 double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-                renderOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
+
+                if (ReflectionHelper.isMcpControlMode()) {
+                    ReflectionHelper.cacheFrameFromRenderThread(mc);
+                    renderOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
+                } else if (screen != null && !(screen instanceof PauseScreen)) {
+                    renderTransferOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
+                }
             } catch (Exception ignored) {}
         });
 
