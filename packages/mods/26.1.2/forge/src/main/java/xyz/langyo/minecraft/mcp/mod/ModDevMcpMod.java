@@ -131,7 +131,7 @@ public class ModDevMcpMod {
             if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
-                if (ReflectionHelper.isMcpControlMode() && mc.screen != null) {
+                if (ReflectionHelper.isMcpControlMode() && mc.screen instanceof PauseScreen) {
                     mc.screen = null;
                 }
                 if (mc.screen == null) {
@@ -177,7 +177,7 @@ public class ModDevMcpMod {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 if (ReflectionHelper.isMcpControlMode()) {
-                    if (mc.screen != null) mc.screen = null;
+                    if (mc.screen instanceof PauseScreen) mc.screen = null;
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
                     int w = mc.getWindow().getGuiScaledWidth();
                     int h = mc.getWindow().getGuiScaledHeight();
