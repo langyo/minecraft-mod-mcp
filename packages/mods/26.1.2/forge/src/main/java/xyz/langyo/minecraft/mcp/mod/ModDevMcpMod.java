@@ -63,6 +63,21 @@ public class ModDevMcpMod {
                 return false;
             } catch (Exception ignored) { return false; }
         });
+
+        try {
+            InputEvent.Key.BUS.addListener(event -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    try {
+                        for (java.lang.reflect.Method m : event.getClass().getMethods()) {
+                            if (m.getName().equals("setCanceled") || m.getName().equals("setCancelled")) {
+                                m.invoke(event, true);
+                                break;
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+            });
+        } catch (Exception ignored) {}
     }
 
     private static void tick(Minecraft mc) {
@@ -166,7 +181,7 @@ public class ModDevMcpMod {
                                 }
                             }
                             if (!sent) System.out.println("[MCP-MOD] Debug page: " + url);
-                        } catch (Exception ignored) {}
+                        } catch (Exception e2) { System.err.println("[MCP-MOD] chat err: " + e2.getMessage()); }
                     }
                 } else if (ReflectionHelper.isMcpControlMode()) {
                     tick(mc);
@@ -174,7 +189,7 @@ public class ModDevMcpMod {
                         ReflectionHelper.cacheFrameFromRenderThread(mc);
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) { e.printStackTrace(); }
         });
 
         ScreenEvent.Render.Post.BUS.addListener(event -> {
@@ -198,7 +213,7 @@ public class ModDevMcpMod {
                     double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
                     McpOverlayLogic.renderTransferButton(wrapRenderer(event.getGuiGraphics(), mc, false), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) { e.printStackTrace(); }
         });
 
         registerInputInterception();
