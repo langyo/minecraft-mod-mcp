@@ -570,6 +570,29 @@ public class McpWin32Control implements McpPlatformControl {
         return mcHwnd;
     }
 
+    public boolean ensureHwndFromLwjgl2Display() {
+        if (mcHwnd != 0) return true;
+        String[] titles = new String[]{
+            "Minecraft*",
+            "Minecraft 1.12.2*",
+            "Minecraft 1.11.2*",
+            "Minecraft 1.10.2*",
+            "Minecraft 1.9.4*",
+            "Minecraft 1.8.9*",
+            "Minecraft"
+        };
+        for (String title : titles) {
+            long hwnd = U.FindWindowW(null, title);
+            if (hwnd != 0) {
+                mcHwnd = hwnd;
+                ReflectionHelper.dbg("ensureHwndFromLwjgl2Display: found hwnd=" + Long.toHexString(mcHwnd) + " title=" + title);
+                return true;
+            }
+        }
+        findMcHwnd();
+        return mcHwnd != 0;
+    }
+
     public boolean ensureHwndFromGlfw(long glfwHandle) {
         if (mcHwnd != 0) return true;
         try {

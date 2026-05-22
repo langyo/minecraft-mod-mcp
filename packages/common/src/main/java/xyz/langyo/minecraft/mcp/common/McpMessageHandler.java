@@ -49,13 +49,16 @@ public class McpMessageHandler {
         }
     }
 
-    private static final java.util.Set<String> ALWAYS_ALLOWED = java.util.Set.of(
-        "ping", "screenshot", "get_player_info", "get_world_info", "debug_fields",
-        "get_screen_buttons", "enumerate_widgets", "overlay_click",
-        "enter_control_mode", "exit_control_mode", "platform_status",
-        "set_gamemode", "release_mouse", "pause_game", "close_screen", "open_chat",
-        "win32_status", "mouse_hook_status", "overlay_show", "overlay_hide", "overlay_text"
-    );
+    private static final java.util.Set<String> ALWAYS_ALLOWED;
+    static {
+        java.util.Set<String> s = new java.util.HashSet<>();
+        s.add("ping"); s.add("screenshot"); s.add("get_player_info"); s.add("get_world_info"); s.add("debug_fields");
+        s.add("get_screen_buttons"); s.add("enumerate_widgets"); s.add("overlay_click");
+        s.add("enter_control_mode"); s.add("exit_control_mode"); s.add("platform_status");
+        s.add("set_gamemode"); s.add("release_mouse"); s.add("pause_game"); s.add("close_screen"); s.add("open_chat");
+        s.add("win32_status"); s.add("mouse_hook_status"); s.add("overlay_show"); s.add("overlay_hide"); s.add("overlay_text");
+        ALWAYS_ALLOWED = java.util.Collections.unmodifiableSet(s);
+    }
 
     protected Object dispatch(String method, java.util.Map<String, String> params, Object wsClient) {
         McpProtocol.MinecraftInput inp = minecraftInput;

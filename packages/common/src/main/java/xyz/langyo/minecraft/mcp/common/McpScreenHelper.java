@@ -52,7 +52,8 @@ public class McpScreenHelper {
         for (Field f : getAllFields(screen.getClass())) {
             f.setAccessible(true);
             Object val = f.get(screen);
-            if (val instanceof List<?> list) {
+            if (val instanceof List<?>) {
+                List<?> list = (List<?>) val;
                 for (Object entry : list) {
                     if (isBottomWideButton(entry)) return entry;
                 }
@@ -82,6 +83,7 @@ public class McpScreenHelper {
                 return;
             }
         }
+        addToNamedList(screen, "buttonList", widget);
         addToNamedList(screen, "renderables", widget);
         addToNamedList(screen, "children", widget);
         addToNamedList(screen, "narratables", widget);
@@ -92,9 +94,9 @@ public class McpScreenHelper {
             if (!f.getName().equals(fieldName)) continue;
             f.setAccessible(true);
             Object val = f.get(screen);
-            if (val instanceof List<?> list) {
+            if (val instanceof List<?>) {
                 @SuppressWarnings("unchecked")
-                List<Object> mutable = (List<Object>) list;
+                List<Object> mutable = (List<Object>) val;
                 if (!mutable.contains(widget)) mutable.add(widget);
                 return;
             }
