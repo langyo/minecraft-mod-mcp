@@ -35,8 +35,8 @@ public class McpOverlayLogic {
         boolean hover = b.hit(mouseX, mouseY);
         int bg = hover ? 0xDD666666 : 0xBB444444;
         r.fill(b.x, b.y, b.x + b.w, b.y + b.h, bg);
-        r.fill(b.x, b.y, b.x + b.w, b.y, 0xFF888888);
-        r.fill(b.x, b.y + b.h - 1, b.x + b.w, b.y + b.h, 0xFF333333);
+        r.fill(b.x, b.y, b.x + b.w, b.y + 1, 0xFF888888);
+        r.fill(b.x, b.y + b.h - 2, b.x + b.w, b.y + b.h, 0xFF333333);
         int pad = 4;
         r.drawString(font, label, b.x + pad + 2, b.y + (b.h - 8) / 2, 0xFFFFFFFF, false);
 
