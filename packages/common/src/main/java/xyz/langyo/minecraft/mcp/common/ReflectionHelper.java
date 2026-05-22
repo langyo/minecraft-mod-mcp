@@ -3739,15 +3739,35 @@ public final class ReflectionHelper {
             ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
             doGlReadPixels(0, 0, w, h, bb, 0);
             bb.rewind();
+            int[] rawR = new int[w * h];
+            int[] rawG = new int[w * h];
+            int[] rawB = new int[w * h];
+            int[] rawA = new int[w * h];
+            for (int i = 0; i < w * h; i++) {
+                rawR[i] = bb.get() & 0xFF;
+                rawG[i] = bb.get() & 0xFF;
+                rawB[i] = bb.get() & 0xFF;
+                rawA[i] = bb.get() & 0xFF;
+            }
             int skyR = 0x7F, skyG = 0xB5, skyB = 0xE3;
+            int sampleY = Math.max(0, (int)(h * 0.15));
+            long sr = 0, sg = 0, sb = 0; int sc = 0;
+            for (int x = 0; x < w; x++) {
+                int idx = sampleY * w + x;
+                int brightness = rawR[idx] + rawG[idx] + rawB[idx];
+                if (brightness > 150 && rawA[idx] > 128) {
+                    sr += rawR[idx]; sg += rawG[idx]; sb += rawB[idx]; sc++;
+                }
+            }
+            if (sc > w / 4) { skyR = (int)(sr / sc); skyG = (int)(sg / sc); skyB = (int)(sb / sc); }
             BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
             for (int y = 0; y < h; y++) {
                 for (int x = 0; x < w; x++) {
-                    int r = bb.get() & 0xFF;
-                    int g = bb.get() & 0xFF;
-                    int b = bb.get() & 0xFF;
-                    int a = bb.get() & 0xFF;
-                    if (a < 16) { r = skyR; g = skyG; b = skyB; }
+                    int i = y * w + x;
+                    int r = rawR[i], g = rawG[i], b = rawB[i], a = rawA[i];
+                    if (a < 16 || (r + g + b < 24 && y < h / 2)) {
+                        r = skyR; g = skyG; b = skyB;
+                    }
                     img.setRGB(x, h - 1 - y, (r << 16) | (g << 8) | b);
                 }
             }
