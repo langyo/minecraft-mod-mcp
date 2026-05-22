@@ -3331,6 +3331,14 @@ public final class ReflectionHelper {
     private static volatile int overlayMenuX = -999, overlayMenuY = -999, overlayMenuW, overlayMenuH;
     private static volatile long mcpControlModeEnterTime = 0;
     private static volatile long mcpControlModeExitTime = 0;
+    private static volatile java.util.function.Consumer<String[]> eventLogger = null;
+
+    public static void setEventLogger(java.util.function.Consumer<String[]> logger) { eventLogger = logger; }
+
+    private static void logModEvent(String method, String detail) {
+        java.util.function.Consumer<String[]> l = eventLogger;
+        if (l != null) try { l.accept(new String[]{method, detail}); } catch (Exception ignored) {}
+    }
 
     public static boolean shouldSuppressInput() {
         if (!mcpControlMode && mcpControlModeExitTime > 0) {
@@ -3347,6 +3355,7 @@ public final class ReflectionHelper {
             mouseReleaseActive = false;
             forceCursorNormal = false;
             forceCursorAndReleaseMouse(mc);
+            logModEvent("enter_control_mode", "MCP took control");
             dbg("enterMcpControlMode: cursor forced to NORMAL, no hook");
             return "{\"control_mode\":true,\"platform\":\"internal\",\"hook\":false}";
         } catch (Exception e) { return "{\"error\":\"" + e.getMessage() + "\"}"; }
@@ -3357,6 +3366,7 @@ public final class ReflectionHelper {
             dbg("exitMcpControlMode: CALLED FROM " + Thread.currentThread().getName() + " - " + new Exception().getStackTrace()[1]);
             mcpControlMode = false;
             mcpControlModeExitTime = System.currentTimeMillis();
+            logModEvent("exit_control_mode", "Manual control restored");
             mouseReleaseActive = false;
             forceCursorNormal = false;
             long glfwHandle = getWindowHandle(mc);

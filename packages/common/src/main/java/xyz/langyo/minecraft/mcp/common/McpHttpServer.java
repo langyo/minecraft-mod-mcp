@@ -57,12 +57,24 @@ public class McpHttpServer {
 
     public int getPort() { return port; }
 
+    public void logEvent(String method, String params, String result, String error) {
+        CallEvent ev = new CallEvent();
+        ev.timestamp = System.currentTimeMillis();
+        ev.direction = "mod";
+        ev.method = method;
+        ev.params = params;
+        ev.result = result;
+        ev.error = error;
+        emitEvent(ev);
+    }
+
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         server.setExecutor(Executors.newFixedThreadPool(8));
         server.createContext("/api/screenshot", new ScreenshotHandler());
         server.createContext("/api/cmd", new CmdHandler());
         server.createContext("/api/events", new EventHandler());
+        server.createContext("/api/calls", new CallsHandler());
         server.createContext("/api/status", exchange -> {
             sendJson(exchange, 200, "{\"ok\":true,\"port\":" + port + "}");
         });
@@ -169,12 +181,21 @@ public class McpHttpServer {
     class ScreenshotHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            CallEvent ev = new CallEvent();
+            ev.timestamp = System.currentTimeMillis();
+            ev.direction = "request";
+            ev.method = "screenshot";
+            long start = System.nanoTime();
             try {
                 java.util.Map<String, String> empty = new java.util.LinkedHashMap<>();
                 Object result = handler.dispatch("screenshot", empty, null);
                 String b64Data = result instanceof String ? (String) result : McpProtocol.GSON.toJson(result);
                 if (b64Data == null || !b64Data.startsWith("data:image/png;base64,")) {
                     sendJson(exchange, 500, "{\"error\":\"" + esc(b64Data != null ? b64Data : "null") + "\"}");
+                    ev.error = "bad screenshot data";
+                    ev.direction = "response";
+                    ev.durationMs = (System.nanoTime() - start) / 1_000_000;
+                    emitEvent(ev);
                     return;
                 }
                 String rawB64 = b64Data.substring("data:image/png;base64,".length());
@@ -184,8 +205,16 @@ public class McpHttpServer {
                 int h = img != null ? img.getHeight() : 0;
                 String b64Grid = generateGridBase64(pngBytes, w, h);
                 String json = "{\"original\":\"" + b64Data + "\",\"grid\":\"data:image/png;base64," + b64Grid + "\",\"width\":" + w + ",\"height\":" + h + "}";
+                ev.result = "png " + w + "x" + h;
+                ev.durationMs = (System.nanoTime() - start) / 1_000_000;
+                ev.direction = "response";
+                emitEvent(ev);
                 sendJson(exchange, 200, json);
             } catch (Exception e) {
+                ev.error = e.getMessage();
+                ev.durationMs = (System.nanoTime() - start) / 1_000_000;
+                ev.direction = "response";
+                emitEvent(ev);
                 sendJson(exchange, 500, "{\"error\":\"" + esc(e.getMessage()) + "\"}");
             }
         }
@@ -306,6 +335,21 @@ public class McpHttpServer {
             client.active = false;
             sseClients.remove(client);
             os.close();
+        }
+    }
+
+    class CallsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            StringBuilder sb = new StringBuilder("[");
+            int sz = callHistory.size();
+            int start = Math.max(0, sz - 50);
+            for (int i = start; i < sz; i++) {
+                if (i > start) sb.append(",");
+                sb.append(eventToJson(callHistory.get(i)));
+            }
+            sb.append("]");
+            sendJson(exchange, 200, sb.toString());
         }
     }
 

@@ -164,6 +164,20 @@ function addC(e){
   cl.prepend(d);
 }
 function clearC(){$('cl').innerHTML='';tot=0;$('cc').textContent='0'}
+
+function fetchCalls(){
+  var x=new XMLHttpRequest();
+  x.open('GET',BASE+'/api/calls',true);
+  x.responseType='json';
+  x.onload=function(){
+    if(x.status!==200)return;
+    var arr=x.response;
+    if(!Array.isArray(arr))return;
+    $('cl').innerHTML='';tot=0;
+    for(var i=0;i<arr.length;i++)addC(arr[i]);
+  };
+  x.send();
+}
 var escDiv=document.createElement('div');
 function esc(s){escDiv.textContent=s;return escDiv.innerHTML}
 
@@ -214,6 +228,7 @@ function connectSSE(){
 
 onSel();
 fetchSS();
+fetchCalls();
 connectSSE();
 </script>
 </body>
