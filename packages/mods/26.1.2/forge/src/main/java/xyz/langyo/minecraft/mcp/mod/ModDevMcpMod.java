@@ -1,21 +1,15 @@
 package xyz.langyo.minecraft.mcp.mod;
-
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
-
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;
-
     public ModDevMcpMod() {
         INSTANCE = this;
         boolean depsOk = false;
         try { Class.forName("com.sun.jna.Library"); depsOk = true; } catch (Exception ignored) {}
-        if (!depsOk) {
-            System.err.println("[MCP-MOD] JNA not on classpath. External control unavailable.");
-            return;
-        }
+        if (!depsOk) { System.err.println("[MCP-MOD] JNA not on classpath."); return; }
         new Thread(() -> {
             try {
                 Thread.sleep(5000);

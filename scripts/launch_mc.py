@@ -652,10 +652,13 @@ def main():
     parser.add_argument("--username", default="Player", help="Username")
     parser.add_argument("--dry-run", action="store_true", help="Print command but don't launch")
     parser.add_argument("--extra-jvm", default="", help="Extra JVM system properties")
+    parser.add_argument("--loader", default=None, help="Loader type filter (forge/neoforge/fabric)")
     args = parser.parse_args()
 
     mc_dir = args.mc_dir or MC_DIR
     version_name = args.version
+
+    mc_version = version_name.split("-")[0] if "-" in version_name else version_name
 
     print(f"[LAUNCH] MC version: {version_name}")
     print(f"[LAUNCH] MC dir: {mc_dir}")
@@ -742,21 +745,39 @@ def main():
     mods_dir = os.path.join(mc_dir, "mods")
     os.makedirs(mods_dir, exist_ok=True)
 
-    mod_jar_dirs = sorted(glob.glob(os.path.join(project_root, "packages", "mods", "*", "forge", "build", "libs")))
-    if not mod_jar_dirs:
-        mod_jar_dirs = sorted(glob.glob(os.path.join(project_root, "packages", "mods", "*", "*", "build", "libs")))
+    loader_filter = args.loader
+    if not loader_filter:
+        if "neoforge" in version_name.lower() or "neoforge" in (vj.get("id", "") + vj.get("inheritsFrom", "")).lower():
+            loader_filter = "neoforge"
+        elif "fabric" in version_name.lower() or "fabric" in (vj.get("id", "") + vj.get("inheritsFrom", "")).lower():
+            loader_filter = "fabric"
+        else:
+            loader_filter = "forge"
+
+    mod_base_dir = os.path.join(project_root, "packages", "mods", mc_version)
+    mod_jar_dirs = []
+    if os.path.isdir(mod_base_dir):
+        loader_dir = os.path.join(mod_base_dir, loader_filter, "build", "libs")
+        if os.path.isdir(loader_dir):
+            mod_jar_dirs.append(loader_dir)
+        else:
+            for ld in os.listdir(mod_base_dir):
+                ld_path = os.path.join(mod_base_dir, ld, "build", "libs")
+                if os.path.isdir(ld_path):
+                    mod_jar_dirs.append(ld_path)
+
+    for existing in glob.glob(os.path.join(mods_dir, "*.jar")):
+        try:
+            os.remove(existing)
+            print(f"[LAUNCH] Removed old jar: {os.path.basename(existing)}")
+        except Exception:
+            pass
+
     for lib_dir in mod_jar_dirs:
         for jar in glob.glob(os.path.join(lib_dir, "*.jar")):
             if "sources" in os.path.basename(jar):
                 continue
             dest = os.path.join(mods_dir, os.path.basename(jar))
-            if os.path.isfile(dest):
-                old_size = os.path.getsize(dest)
-                new_size = os.path.getsize(jar)
-                old_time = os.path.getmtime(dest)
-                new_time = os.path.getmtime(jar)
-                if new_size == old_size and new_time <= old_time:
-                    continue
             shutil.copy2(jar, dest)
             print(f"[LAUNCH] Synced mod jar: {os.path.basename(jar)} ({os.path.getsize(dest)} bytes)")
 
