@@ -1,10 +1,6 @@
 package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
@@ -24,11 +20,21 @@ public class ModDevMcpMod {
     McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
-    private final boolean dependenciesAvailable;
 
-    private static volatile int btnResumeX, btnResumeY, btnResumeW, btnResumeH;
-    private static volatile int btnMenuX, btnMenuY, btnMenuW, btnMenuH;
-    private static volatile int btnTransferX, btnTransferY, btnTransferW, btnTransferH;
+    private static McpRenderer wrapRenderer(GuiGraphics g, Minecraft mc) {
+        return new McpRenderer() {
+            @Override public void fill(int x1, int y1, int x2, int y2, int color) {
+                g.fill(x1, y1, x2, y2, color);
+            }
+            @Override public int drawString(Object font, String text, int x, int y, int color, boolean shadow) {
+                g.drawString(mc.font, text, x, y, color, shadow);
+                return mc.font.width(text);
+            }
+            @Override public int getStringWidth(Object font, String text) {
+                return mc.font.width(text);
+            }
+        };
+    }
 
     @SuppressWarnings("removal")
     private static void registerInputInterception() {
@@ -94,151 +100,6 @@ public class ModDevMcpMod {
         });
     }
 
-    private static List<Field> allFields(Class<?> clazz) {
-        List<Field> fields = new ArrayList<>();
-        Class<?> c = clazz;
-        while (c != null && c != Object.class) {
-            for (Field f : c.getDeclaredFields()) fields.add(f);
-            c = c.getSuperclass();
-        }
-        return fields;
-    }
-
-    private static boolean isBottomWideButton(Object obj) {
-        if (!(obj instanceof Button btn)) return false;
-        return btn.getY() >= 180 && btn.getWidth() >= 150;
-    }
-
-    private static boolean addRenderableWidget(Screen screen, Button widget) {
-        try {
-            for (Class<?> c = screen.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
-                for (Method m : c.getDeclaredMethods()) {
-                    if (!m.getName().equals("addRenderableWidget") || m.getParameterCount() != 1) continue;
-                    if (!m.getParameterTypes()[0].isAssignableFrom(widget.getClass())) continue;
-                    m.setAccessible(true);
-                    m.invoke(screen, widget);
-                    return true;
-                }
-            }
-        } catch (Exception ignored) {}
-        return false;
-    }
-
-    private static boolean addToNamedList(Screen screen, String fieldName, Object widget) {
-        try {
-            for (Field f : allFields(screen.getClass())) {
-                if (!f.getName().equals(fieldName)) continue;
-                f.setAccessible(true);
-                Object val = f.get(screen);
-                if (!(val instanceof List<?> list)) continue;
-                @SuppressWarnings("unchecked")
-                List<Object> mutable = (List<Object>) list;
-                if (!mutable.contains(widget)) mutable.add(widget);
-                return true;
-            }
-        } catch (Exception ignored) {}
-        return false;
-    }
-
-    private static void patchPauseButtons(PauseScreen screen) {
-        try {
-            Button originalQuit = null;
-            for (Field f : allFields(screen.getClass())) {
-                f.setAccessible(true);
-                Object val = f.get(screen);
-                if (isBottomWideButton(val)) {
-                    originalQuit = (Button) val;
-                    break;
-                }
-            }
-            if (originalQuit == null) {
-                for (Field f : allFields(screen.getClass())) {
-                    f.setAccessible(true);
-                    Object val = f.get(screen);
-                    if (val instanceof List<?> list) {
-                        for (Object entry : list) {
-                            if (isBottomWideButton(entry)) {
-                                originalQuit = (Button) entry;
-                                break;
-                            }
-                        }
-                    }
-                    if (originalQuit != null) break;
-                }
-            }
-            if (originalQuit == null) return;
-
-            int x = originalQuit.getX();
-            int y = originalQuit.getY();
-            int w = originalQuit.getWidth();
-            int h = originalQuit.getHeight();
-            int gap = 8;
-            int leftW = (w - gap) / 2;
-            int rightW = w - gap - leftW;
-
-            originalQuit.setX(x + leftW + gap);
-            originalQuit.setWidth(rightW);
-
-            Button transfer = Button.builder(Component.translatable(ReflectionHelper.getMcpControlPauseTransferTranslationKey()), btn -> {
-                try {
-                    Minecraft mc = Minecraft.getInstance();
-                    ReflectionHelper.enterMcpControlMode(mc);
-                    mc.setScreen(null);
-                } catch (Exception ignored) {}
-            }).bounds(x, y, leftW, h).build();
-
-            boolean added = addRenderableWidget(screen, transfer);
-            if (!added) {
-                addToNamedList(screen, "renderables", transfer);
-                addToNamedList(screen, "children", transfer);
-                addToNamedList(screen, "narratables", transfer);
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private static void renderOverlay(GuiGraphics g, Minecraft mc, int screenW, int screenH, int mouseX, int mouseY) {
-        Component label = Component.translatable("mcpmod.control.resume");
-        int textW = mc.font.width(label);
-        int pad = 4;
-        int btnW = textW + pad * 2 + 4;
-        int btnH = 16;
-        int margin = 4;
-        int bx = screenW - btnW - margin;
-        int by = margin;
-
-        btnResumeX = bx; btnResumeY = by; btnResumeW = btnW; btnResumeH = btnH;
-
-        ReflectionHelper.setOverlayButtonBounds(bx, by, btnW, btnH, 0, 0, 0, 0);
-
-        boolean hover = mouseX >= bx && mouseX <= bx + btnW && mouseY >= by && mouseY <= by + btnH;
-        int bg = hover ? 0xDD666666 : 0xBB444444;
-        g.fill(bx, by, bx + btnW, by + btnH, bg);
-        g.fill(bx, by, bx + btnW, by, 0xFF888888);
-        g.fill(bx, by + btnH - 1, bx + btnW, by + btnH, 0xFF333333);
-        g.drawString(mc.font, label, bx + pad + 2, by + (btnH - 8) / 2, 0xFFFFFFFF, false);
-    }
-
-    private static void renderTransferOverlay(GuiGraphics g, Minecraft mc, int screenW, int screenH, int mouseX, int mouseY) {
-        Component label = Component.translatable("mcpmod.control.pause_button");
-        int textW = mc.font.width(label);
-        int pad = 4;
-        int btnW = textW + pad * 2 + 4;
-        int btnH = 16;
-        int margin = 4;
-        int bx = screenW - btnW - margin;
-        int by = margin;
-
-        btnTransferX = bx; btnTransferY = by; btnTransferW = btnW; btnTransferH = btnH;
-        ReflectionHelper.setTransferButtonBounds(bx, by, btnW, btnH);
-
-        boolean hover = mouseX >= bx && mouseX <= bx + btnW && mouseY >= by && mouseY <= by + btnH;
-        int bg = hover ? 0xDD446644 : 0xBB335533;
-        g.fill(bx, by, bx + btnW, by + btnH, bg);
-        g.fill(bx, by, bx + btnW, by, 0xFF88AA88);
-        g.fill(bx, by + btnH - 1, bx + btnW, by + btnH, 0xFF336633);
-        g.drawString(mc.font, label, bx + pad + 2, by + (btnH - 8) / 2, 0xFFFFFFFF, false);
-    }
-
     public ModDevMcpMod() {
         INSTANCE = this;
         boolean depsOk = false;
@@ -250,7 +111,6 @@ public class ModDevMcpMod {
         } catch (Error e) {
             System.err.println("[MCP-MOD] Dependency error: " + e.getMessage());
         }
-        dependenciesAvailable = depsOk;
 
         if (depsOk) {
             new Thread(() -> {
@@ -273,7 +133,11 @@ public class ModDevMcpMod {
         ScreenEvent.Init.Post.BUS.addListener(event -> {
             try {
                 if (event.getScreen() instanceof PauseScreen pauseScreen) {
-                    patchPauseButtons(pauseScreen);
+                    McpScreenHelper.patchPauseScreen(pauseScreen, new McpScreenHelper.ButtonFactory() {
+                        @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
+                            return Button.builder(Component.translatable(translationKey), btn -> onClick.run()).bounds(x, y, w, h).build();
+                        }
+                    });
                 }
             } catch (Exception ignored) {}
         });
@@ -295,7 +159,7 @@ public class ModDevMcpMod {
                         int h = mc.getWindow().getGuiScaledHeight();
                         double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
                         double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-                        renderOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
+                    McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                     }
                 }
             } catch (Exception ignored) {}
@@ -313,9 +177,9 @@ public class ModDevMcpMod {
 
                 if (ReflectionHelper.isMcpControlMode()) {
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
-                    renderOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
+                    McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                 } else if (mc.level != null && screen != null && !(screen instanceof PauseScreen)) {
-                    renderTransferOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
+                    McpOverlayLogic.renderTransferButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
                 }
             } catch (Exception ignored) {}
         });
