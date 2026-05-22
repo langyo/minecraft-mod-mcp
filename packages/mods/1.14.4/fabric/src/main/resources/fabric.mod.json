@@ -8,5 +8,8 @@
   "environment": "client",
   "entrypoints": {
     "client": ["xyz.langyo.minecraft.mcp.mod.ModDevMcpMod"]
-  }
+  },
+  "mixins": [
+    "mcpmod.mixins.json"
+  ]
 }
