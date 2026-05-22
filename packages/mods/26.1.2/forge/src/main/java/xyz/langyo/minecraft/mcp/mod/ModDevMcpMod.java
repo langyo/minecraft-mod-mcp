@@ -20,8 +20,8 @@ public class ModDevMcpMod {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
 
-    private static McpRenderer wrapRenderer(GuiGraphicsExtractor g, Minecraft mc) {
-        g.nextStratum();
+    private static McpRenderer wrapRenderer(GuiGraphicsExtractor g, Minecraft mc, boolean nextStratum) {
+        if (nextStratum) g.nextStratum();
         return new McpRenderer() {
             @Override public void fill(int x1, int y1, int x2, int y2, int color) {
                 g.fill(x1, y1, x2, y2, color);
@@ -147,7 +147,7 @@ public class ModDevMcpMod {
                         int h = mc.getWindow().getGuiScaledHeight();
                         double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
                         double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-                        McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc, true), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                     }
                     if (!INSTANCE.chatSent && INSTANCE.debugUrl != null) {
                         INSTANCE.chatSent = true;
@@ -188,8 +188,7 @@ public class ModDevMcpMod {
                         int h = mc.getWindow().getGuiScaledHeight();
                         double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
                         double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-                        McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
-                    }
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc, false), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);                    }
                     return;
                 }
                 if (mc.level != null && event.getScreen() != null && !(event.getScreen() instanceof PauseScreen)) {
@@ -197,7 +196,7 @@ public class ModDevMcpMod {
                     int h = mc.getWindow().getGuiScaledHeight();
                     double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
                     double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-                    McpOverlayLogic.renderTransferButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
+                    McpOverlayLogic.renderTransferButton(wrapRenderer(event.getGuiGraphics(), mc, false), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
                 }
             } catch (Exception ignored) {}
         });
