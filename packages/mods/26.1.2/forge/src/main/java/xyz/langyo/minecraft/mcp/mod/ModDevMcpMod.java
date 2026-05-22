@@ -26,13 +26,8 @@ public class ModDevMcpMod {
                 g.fill(x1, y1, x2, y2, color);
             }
             @Override public int drawString(Object font, String text, int x, int y, int color, boolean shadow) {
-                g.nextStratum();
-                int w = mc.font.width(text);
-                if (text.length() > 0 && w == 0) {
-                    System.out.println("[MCP-MOD] Font.width=0 for text '" + text + "' (len=" + text.length() + ")");
-                }
-                g.text(mc.font, Component.literal(text), x, y, color, shadow);
-                return w;
+                g.text(mc.font, text, x, y, color);
+                return mc.font.width(text);
             }
             @Override public int getStringWidth(Object font, String text) {
                 return mc.font.width(text);
@@ -109,7 +104,6 @@ public class ModDevMcpMod {
 
         ScreenEvent.Init.Pre.BUS.addListener(event -> {
             if (ReflectionHelper.isMcpControlMode() && event.getScreen() instanceof PauseScreen) {
-                System.out.println("[MCP-MOD] Blocking PauseScreen in Init.Pre");
                 try {
                     for (java.lang.reflect.Method m : event.getClass().getMethods()) {
                         if (m.getName().equals("setCanceled") || m.getName().equals("setCancelled")) {
@@ -117,7 +111,7 @@ public class ModDevMcpMod {
                             break;
                         }
                     }
-                } catch (Exception e) { System.out.println("[MCP-MOD] cancel err: " + e.getMessage()); }
+                } catch (Exception ignored) {}
             }
         });
 
