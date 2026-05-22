@@ -3345,8 +3345,19 @@ public final class ReflectionHelper {
             long glfwHandle = getWindowHandle(mc);
             if (glfwHandle != 0 && LWJGL3 && glfwSetInputModeMethod != null) {
                 try {
-                    glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                    dbg("exitMcpControlMode: GLFW cursor set back to DISABLED");
+                    Object screen = getCurrentScreen(mc);
+                    if (screen != null) {
+                        glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                        dbg("exitMcpControlMode: screen open (" + screen.getClass().getSimpleName() + "), cursor NORMAL");
+                    } else {
+                        glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                        Object mh = getMouseHandler(mc);
+                        if (mh != null) initMouseFields(mh);
+                        if (mouseGrabbedField != null && mh != null) {
+                            mouseGrabbedField.setBoolean(mh, true);
+                        }
+                        dbg("exitMcpControlMode: no screen, cursor DISABLED + mouse grabbed");
+                    }
                 } catch (Exception ce) {
                     dbg("exitMcpControlMode: glfwSetInputMode failed: " + ce.getMessage());
                 }
@@ -3672,6 +3683,10 @@ public final class ReflectionHelper {
     public static void tickMcpControlMode(Object mc) {
         if (!mcpControlMode) return;
         try {
+            Object screen = getCurrentScreen(mc);
+            if (screen != null && screen.getClass().getName().contains("PauseScreen")) {
+                closeScreen(mc);
+            }
             forceCursorAndReleaseMouse(mc);
             Object mouseHandler = getMouseHandler(mc);
             if (mouseHandler != null) {
