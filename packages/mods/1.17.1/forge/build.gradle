@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath "net.minecraftforge.gradle:ForgeGradle:5.1.+"
+        classpath "net.minecraftforge.gradle:ForgeGradle:6.0.+"
     }
 }
 
@@ -14,7 +14,7 @@ version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 minecraft {
     mappings channel: "official", version: "1.17.1"
