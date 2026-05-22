@@ -724,6 +724,13 @@ def main():
         ("net.java.dev.jna", "jna", "5.15.0"),
         ("net.java.dev.jna", "jna-platform", "5.15.0"),
     ]:
+        already_in_cp = any(
+            os.path.basename(p).lower().startswith(artifact.lower() + "-")
+            for p in cp
+        )
+        if already_in_cp:
+            print(f"[LAUNCH] {artifact} already in classpath, skipping")
+            continue
         lib_dir_jar = os.path.join(mc_dir, "libraries",
                                     group.replace(".", os.sep), artifact, version,
                                     f"{artifact}-{version}.jar")

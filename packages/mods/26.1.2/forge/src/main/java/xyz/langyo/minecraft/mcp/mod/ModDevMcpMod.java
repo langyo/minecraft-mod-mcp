@@ -26,32 +26,9 @@ public class ModDevMcpMod {
                 g.fill(x1, y1, x2, y2, color);
             }
             @Override public int drawString(Object font, String text, int x, int y, int color, boolean shadow) {
-                try {
-                    for (java.lang.reflect.Method m : mc.font.getClass().getMethods()) {
-                        if (m.getName().equals("drawInBatch") && m.getParameterCount() >= 6) {
-                            Class<?>[] pts = m.getParameterTypes();
-                            if (pts[0] == String.class) {
-                                Object[] args = new Object[pts.length];
-                                args[0] = text;
-                                args[1] = (float) x;
-                                args[2] = (float) y;
-                                args[3] = color;
-                                args[4] = shadow;
-                                for (int i = 5; i < pts.length; i++) args[i] = getDefault(pts[i]);
-                                m.invoke(mc.font, args);
-                                break;
-                            }
-                        }
-                    }
-                } catch (Exception ignored) {}
+                g.nextStratum();
+                g.text(mc.font, Component.literal(text), x, y, color, shadow);
                 return mc.font.width(text);
-            }
-            @SuppressWarnings("unused")
-            private static Object getDefault(Class<?> c) {
-                if (c == boolean.class) return false;
-                if (c == int.class) return 0;
-                if (c == float.class) return 0f;
-                return null;
             }
             @Override public int getStringWidth(Object font, String text) {
                 return mc.font.width(text);
@@ -125,6 +102,19 @@ public class ModDevMcpMod {
                 }
             }, "MCP-HTTP").start();
         }
+
+        ScreenEvent.Init.Pre.BUS.addListener(event -> {
+            if (ReflectionHelper.isMcpControlMode() && event.getScreen() instanceof PauseScreen) {
+                try {
+                    for (java.lang.reflect.Method m : event.getClass().getMethods()) {
+                        if (m.getName().equals("setCanceled") || m.getName().equals("setCancelled")) {
+                            m.invoke(event, true);
+                            break;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        });
 
         ScreenEvent.Init.Post.BUS.addListener(event -> {
             try {

@@ -3709,10 +3709,6 @@ public final class ReflectionHelper {
     public static void tickMcpControlMode(Object mc) {
         if (!mcpControlMode) return;
         try {
-            Object screen = getCurrentScreen(mc);
-            if (screen != null && screen.getClass().getName().contains("PauseScreen")) {
-                closeScreen(mc);
-            }
             forceCursorAndReleaseMouse(mc);
             Object mouseHandler = getMouseHandler(mc);
             if (mouseHandler != null) {
