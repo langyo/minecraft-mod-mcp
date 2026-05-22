@@ -1538,6 +1538,7 @@ public final class ReflectionHelper {
     }
 
     private static byte[] takeGlScreenshot0(Object mc, int width, int height) throws Exception {
+        updateSkyColor(mc);
         if (width <= 0 || height <= 0) throw new RuntimeException("bad dims " + width + "x" + height);
         Object fb = null;
         try { Method m = mc.getClass().getMethod("getMainRenderTarget"); fb = m.invoke(mc); } catch (NoSuchMethodException e) {}
@@ -1609,7 +1610,14 @@ public final class ReflectionHelper {
         }
         doGlReadPixels(0, 0, w, h, bb, fboId);
         bb.rewind(); int[] raw = new int[w * h];
-        for (int i = 0; i < raw.length; i++) { int r = bb.get() & 0xFF, g = bb.get() & 0xFF, b = bb.get() & 0xFF, a = bb.get() & 0xFF; raw[i] = (a << 24) | (r << 16) | (g << 8) | b; }
+        int sc = cachedSkyColor;
+        int skyR = (sc >> 16) & 0xFF, skyG = (sc >> 8) & 0xFF, skyB = sc & 0xFF;
+        for (int i = 0; i < raw.length; i++) {
+            int r = bb.get() & 0xFF, g = bb.get() & 0xFF, b = bb.get() & 0xFF, a = bb.get() & 0xFF;
+            int row = i / w;
+            if (a < 16 || (r + g + b < 24 && row > h / 2)) { r = skyR; g = skyG; b = skyB; a = 255; }
+            raw[i] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
         int[] flipped = new int[w * h];
         for (int y2 = 0; y2 < h; y2++) for (int x2 = 0; x2 < w; x2++) flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB); img.setRGB(0, 0, w, h, flipped, 0, w);
@@ -3883,6 +3891,7 @@ public final class ReflectionHelper {
             bb.rewind();
             int sc = cachedSkyColor;
             int skyR = (sc >> 16) & 0xFF, skyG = (sc >> 8) & 0xFF, skyB = sc & 0xFF;
+            int replaced = 0;
             BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
             for (int y = 0; y < h; y++) {
                 for (int x = 0; x < w; x++) {
@@ -3892,10 +3901,12 @@ public final class ReflectionHelper {
                     int a = bb.get() & 0xFF;
                     if (a < 16 || (r + g + b < 24 && y < h / 2)) {
                         r = skyR; g = skyG; b = skyB;
+                        replaced++;
                     }
                     img.setRGB(x, h - 1 - y, (r << 16) | (g << 8) | b);
                 }
             }
+            System.out.println("[MCP-SKY] color=0x" + Integer.toHexString(sc) + " rgb=(" + skyR + "," + skyG + "," + skyB + ") replaced=" + replaced + "/" + (w*h));
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(img, "jpg", baos);
             return baos.toByteArray();
