@@ -4,19 +4,14 @@ import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
-import net.minecraftforge.client.event.AddGuiOverlayLayersEvent;
 import net.minecraftforge.client.event.InputEvent;
-import net.minecraftforge.client.gui.overlay.ForgeLayeredDraw;
-import net.minecraftforge.client.gui.overlay.ForgeLayer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.resources.Identifier;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
@@ -24,6 +19,27 @@ public class ModDevMcpMod {
     McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
+
+    private static void withFullScissor(GuiGraphicsExtractor g, int w, int h, Runnable action) {
+        try {
+            Object stack = g.getScissorStack();
+            java.lang.reflect.Method peekM = null, pushM = null, popM = null;
+            for (java.lang.reflect.Method m : stack.getClass().getDeclaredMethods()) {
+                if (m.getName().equals("peek")) peekM = m;
+                if (m.getName().equals("push") && m.getParameterCount() == 1) pushM = m;
+                if (m.getName().equals("pop") && m.getParameterCount() == 0) popM = m;
+            }
+            Object saved = peekM != null ? peekM.invoke(stack) : null;
+            if (popM != null) popM.invoke(stack);
+            Object fullRect = new net.minecraft.client.gui.navigation.ScreenRectangle(0, 0, w, h);
+            if (pushM != null) pushM.invoke(stack, fullRect);
+            action.run();
+            if (popM != null) popM.invoke(stack);
+            if (saved != null && pushM != null) pushM.invoke(stack, saved);
+        } catch (Exception e) {
+            action.run();
+        }
+    }
 
     private static McpRenderer wrapRenderer(GuiGraphicsExtractor g, Minecraft mc) {
         return new McpRenderer() {
@@ -38,6 +54,30 @@ public class ModDevMcpMod {
                 return mc.font.width(text);
             }
         };
+    }
+
+    private static void renderHudButton(GuiGraphicsExtractor g, Minecraft mc) {
+        int w = mc.getWindow().getGuiScaledWidth();
+        int h = mc.getWindow().getGuiScaledHeight();
+        double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
+        double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
+        if (ReflectionHelper.isMcpControlMode()) {
+            McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
+        } else if (INSTANCE.debugUrl != null || ReflectionHelper.isMouseReleaseActive()) {
+            McpOverlayLogic.renderTransferButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
+        }
+    }
+
+    private static void renderScreenButton(GuiGraphicsExtractor g, Minecraft mc, Screen screen) {
+        int w = mc.getWindow().getGuiScaledWidth();
+        int h = mc.getWindow().getGuiScaledHeight();
+        double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
+        double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
+        if (ReflectionHelper.isMcpControlMode()) {
+            McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
+        } else if (!(screen instanceof PauseScreen)) {
+            McpOverlayLogic.renderTransferButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
+        }
     }
 
     @SuppressWarnings("removal")
@@ -92,33 +132,6 @@ public class ModDevMcpMod {
         } catch (Exception ignored) {}
     }
 
-    private static void renderHudOverlay(GuiGraphicsExtractor g, Minecraft mc) {
-        if (ReflectionHelper.isScreenshotInProgress()) return;
-        if (mc.screen != null) return;
-        int w = mc.getWindow().getGuiScaledWidth();
-        int h = mc.getWindow().getGuiScaledHeight();
-        double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
-        double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-        if (ReflectionHelper.isMcpControlMode()) {
-            McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
-        } else if (mc.level != null) {
-            McpOverlayLogic.renderTransferButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
-        }
-    }
-
-    private static void renderScreenOverlay(GuiGraphicsExtractor g, Minecraft mc, Screen screen) {
-        if (ReflectionHelper.isScreenshotInProgress()) return;
-        int w = mc.getWindow().getGuiScaledWidth();
-        int h = mc.getWindow().getGuiScaledHeight();
-        double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
-        double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-        if (ReflectionHelper.isMcpControlMode()) {
-            McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
-        } else if (!(screen instanceof PauseScreen)) {
-            McpOverlayLogic.renderTransferButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
-        }
-    }
-
     public ModDevMcpMod() {
         INSTANCE = this;
         boolean depsOk = false;
@@ -152,35 +165,33 @@ public class ModDevMcpMod {
             }, "MCP-HTTP").start();
         }
 
-        AddGuiOverlayLayersEvent.BUS.addListener(event -> {
-            ForgeLayeredDraw layers = event.getLayeredDraw();
-            layers.addAbove(ForgeLayeredDraw.CHAT_OVERLAY, Identifier.fromNamespaceAndPath("mcpmod", "hud_overlay"), new ForgeLayer() {
-                @Override public void extract(GuiGraphicsExtractor g, DeltaTracker dt) {
-                    Minecraft mc = Minecraft.getInstance();
-                    if (mc.level == null) return;
-                    if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
-                    tick(mc);
-                    if (!ReflectionHelper.isScreenshotInProgress()) {
-                        ReflectionHelper.cacheFrameFromRenderThread(mc);
-                    }
-                    if (mc.screen instanceof PauseScreen && ReflectionHelper.isMcpControlMode()) {
-                        mc.screen = null;
-                    }
-                    renderHudOverlay(g, mc);
-                }
-            });
-        });
-
         CustomizeGuiOverlayEvent.Chat.BUS.addListener(event -> {
             if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
+
                 if (ReflectionHelper.isMcpControlMode() && mc.screen instanceof PauseScreen) {
                     mc.screen = null;
                 }
-                if (mc.screen == null && !ReflectionHelper.isScreenshotInProgress()) {
-                    ReflectionHelper.cacheFrameFromRenderThread(mc);
+
+                if (mc.screen == null) {
+                    tick(mc);
+                    if (!ReflectionHelper.isScreenshotInProgress()) {
+                        ReflectionHelper.cacheFrameFromRenderThread(mc);
+                    }
+                    if (!ReflectionHelper.isScreenshotInProgress()) {
+                        GuiGraphicsExtractor g = event.getGuiGraphics();
+                        int w = mc.getWindow().getGuiScaledWidth();
+                        int h = mc.getWindow().getGuiScaledHeight();
+                        withFullScissor(g, w, h, () -> renderHudButton(g, mc));
+                    }
+                } else if (ReflectionHelper.isMcpControlMode()) {
+                    tick(mc);
+                    if (!ReflectionHelper.isScreenshotInProgress()) {
+                        ReflectionHelper.cacheFrameFromRenderThread(mc);
+                    }
                 }
+
                 if (!INSTANCE.chatSent && INSTANCE.debugUrl != null) {
                     INSTANCE.chatSent = true;
                     try {
@@ -238,8 +249,8 @@ public class ModDevMcpMod {
                     mc.screen = null;
                     return;
                 }
-                if (mc.level != null && screen != null) {
-                    renderScreenOverlay(event.getGuiGraphics(), mc, screen);
+                if (mc.level != null) {
+                    renderScreenButton(event.getGuiGraphics(), mc, screen);
                 }
             } catch (Exception e) { e.printStackTrace(); }
         });
