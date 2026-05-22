@@ -105,6 +105,7 @@ public class ModDevMcpMod {
 
         ScreenEvent.Init.Pre.BUS.addListener(event -> {
             if (ReflectionHelper.isMcpControlMode() && event.getScreen() instanceof PauseScreen) {
+                System.out.println("[MCP-MOD] Blocking PauseScreen in Init.Pre");
                 try {
                     for (java.lang.reflect.Method m : event.getClass().getMethods()) {
                         if (m.getName().equals("setCanceled") || m.getName().equals("setCancelled")) {
@@ -112,7 +113,7 @@ public class ModDevMcpMod {
                             break;
                         }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) { System.out.println("[MCP-MOD] cancel err: " + e.getMessage()); }
             }
         });
 
