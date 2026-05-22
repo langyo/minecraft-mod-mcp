@@ -3732,37 +3732,144 @@ public final class ReflectionHelper {
     public static boolean isVideoCaptureActive() { return videoCaptureActive; }
 
     private static int cachedSkyColor = 0x7FB5E3;
+    private static boolean skyColorPathChecked = false;
+    private static int skyColorPath = 0;
 
     private static void updateSkyColor(Object mc) {
         try {
+            if (!skyColorPathChecked) {
+                skyColorPathChecked = true;
+                if (trySkyViaRenderState(mc)) skyColorPath = 1;
+                else if (trySkyViaGetSkyColorInt(mc)) skyColorPath = 2;
+                else if (trySkyViaGetSkyColorVec(mc)) skyColorPath = 3;
+                else skyColorPath = -1;
+            }
+            if (skyColorPath == 1) trySkyViaRenderState(mc);
+            else if (skyColorPath == 2) trySkyViaGetSkyColorInt(mc);
+            else if (skyColorPath == 3) trySkyViaGetSkyColorVec(mc);
+        } catch (Exception ignored) {}
+    }
+
+    private static boolean trySkyViaRenderState(Object mc) {
+        try {
             Object lr = null;
             for (Field f : mc.getClass().getDeclaredFields()) {
-                if (f.getType().getSimpleName().equals("LevelRenderer")) {
+                if (f.getType().getSimpleName().equals("LevelRenderer") || f.getType().getSimpleName().equals("WorldRenderer")) {
                     f.setAccessible(true); lr = f.get(mc); break;
                 }
             }
-            if (lr == null) { for (Method m : mc.getClass().getMethods()) { if (m.getName().equals("levelRenderer") && m.getParameterCount() == 0) { lr = m.invoke(mc); break; } } }
-            if (lr == null) return;
+            if (lr == null) return false;
             Object lrs = null;
             for (Field f : lr.getClass().getDeclaredFields()) {
-                String tn = f.getType().getSimpleName();
-                if (tn.equals("LevelRenderState")) { f.setAccessible(true); lrs = f.get(lr); break; }
+                if (f.getType().getSimpleName().equals("LevelRenderState")) { f.setAccessible(true); lrs = f.get(lr); break; }
             }
-            if (lrs == null) return;
+            if (lrs == null) return false;
             Object srs = null;
             for (Field f : lrs.getClass().getDeclaredFields()) {
                 if (f.getType().getSimpleName().equals("SkyRenderState")) { f.setAccessible(true); srs = f.get(lrs); break; }
             }
-            if (srs == null) return;
+            if (srs == null) return false;
             for (Field f : srs.getClass().getDeclaredFields()) {
                 if (f.getName().equals("skyColor") && f.getType() == int.class) {
                     f.setAccessible(true);
                     int c = f.getInt(srs);
                     if (c != 0) cachedSkyColor = c;
-                    return;
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) { return false; }
+    }
+
+    private static boolean trySkyViaGetSkyColorInt(Object mc) {
+        try {
+            Object level = getLevelFromMc(mc);
+            if (level == null) return false;
+            for (Method m : getAllMethods(level.getClass())) {
+                if (m.getName().equals("getSkyColor") && m.getParameterCount() == 2 && m.getReturnType() == int.class) {
+                    m.setAccessible(true);
+                    Object pos = getPlayer(mc);
+                    Object partialTick = getPartialTick(mc);
+                    if (pos == null) return true;
+                    int c = (int) m.invoke(level, pos, partialTick instanceof Float ? (Float) partialTick : 0f);
+                    if (c != 0) cachedSkyColor = c;
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) { return false; }
+    }
+
+    private static boolean trySkyViaGetSkyColorVec(Object mc) {
+        try {
+            Object level = getLevelFromMc(mc);
+            if (level == null) return false;
+            for (Method m : getAllMethods(level.getClass())) {
+                String n = m.getName();
+                if ((n.equals("getSkyColor") || n.equals("func_228318_a_") || n.equals("m_171660_"))
+                        && m.getParameterCount() == 2 && m.getReturnType().getSimpleName().matches("Vec3|Vector3d|Vector3f")) {
+                    m.setAccessible(true);
+                    Object player = getPlayer(mc);
+                    if (player == null) return true;
+                    float tick = 0f;
+                    try {
+                        for (Method pt : mc.getClass().getMethods()) {
+                            if (pt.getName().equals("getDeltaTracker") || pt.getName().equals("getTickDelta")) {
+                                Object dt = pt.invoke(mc);
+                                if (dt != null) { for (Method gf : dt.getClass().getMethods()) { if (gf.getName().equals("getGameTimeDeltaPartialTick") || gf.getName().equals("getTickDelta")) { Object r = gf.invoke(dt); if (r instanceof Float) tick = (Float) r; break; } } break; }
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                    Class<?>[] pts = m.getParameterTypes();
+                    Object arg0 = player;
+                    if (pts[0].getSimpleName().equals("Vec3") || pts[0].getSimpleName().equals("Vector3d")) {
+                        double px = getDouble(player, "getX", "posX"), py = getDouble(player, "getEyeY", "posY") + 1, pz = getDouble(player, "getZ", "posZ");
+                        arg0 = pts[0].getConstructor(double.class, double.class, double.class).newInstance(px, py, pz);
+                    } else if (pts[0].getSimpleName().equals("BlockPos")) {
+                        int px = (int) getDouble(player, "getX", "posX"), py = (int)(getDouble(player, "getEyeY", "posY") + 1), pz = (int) getDouble(player, "getZ", "posZ");
+                        arg0 = pts[0].getConstructor(int.class, int.class, int.class).newInstance(px, py, pz);
+                    }
+                    Object result = m.invoke(level, arg0, tick);
+                    if (result != null) {
+                        double x = getDouble(result, "x", "field_72450_a"), y = getDouble(result, "y", "field_72448_b"), z = getDouble(result, "z", "field_72449_c");
+                        int r = (int)(x * 255), g = (int)(y * 255), b = (int)(z * 255);
+                        cachedSkyColor = (r << 16) | (g << 8) | b;
+                    }
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) { return false; }
+    }
+
+    private static Object getLevelFromMc(Object mc) {
+        try {
+            for (Method m : mc.getClass().getMethods()) {
+                if (m.getName().equals("level") && m.getParameterCount() == 0) return m.invoke(mc);
+            }
+            for (Field f : mc.getClass().getDeclaredFields()) {
+                String tn = f.getType().getSimpleName();
+                if (tn.equals("ClientLevel") || tn.equals("ClientWorld") || tn.equals("World") || tn.equals("WorldClient")) {
+                    f.setAccessible(true); return f.get(mc);
                 }
             }
         } catch (Exception ignored) {}
+        return null;
+    }
+
+    private static Object getPartialTick(Object mc) {
+        try {
+            for (Method m : mc.getClass().getMethods()) {
+                if (m.getName().equals("getDeltaTracker") && m.getParameterCount() == 0) {
+                    Object dt = m.invoke(mc);
+                    if (dt != null) { for (Method gf : dt.getClass().getMethods()) { if (gf.getName().equals("getGameTimeDeltaPartialTick") && m.getParameterCount() == 0) return gf.invoke(dt); } }
+                }
+            }
+            for (Method m : mc.getClass().getMethods()) {
+                if ((m.getName().equals("getTickDelta") || m.getName().equals("getPartialTick")) && m.getParameterCount() == 0) return m.invoke(mc);
+            }
+        } catch (Exception ignored) {}
+        return 0f;
     }
 
     public static byte[] captureFrameJpeg(Object mc) {
