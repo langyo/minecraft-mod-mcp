@@ -287,7 +287,7 @@ public class ModDevMcpMod {
             } catch (Exception ignored) {}
         });
 
-        CustomizeGuiOverlayEvent.DebugText.BUS.addListener(event -> {
+        CustomizeGuiOverlayEvent.Chat.BUS.addListener(event -> {
             if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
