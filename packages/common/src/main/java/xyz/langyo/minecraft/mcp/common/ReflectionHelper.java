@@ -1326,11 +1326,28 @@ public final class ReflectionHelper {
                     Class<?>[] pts = m.getParameterTypes();
                     if (pts[0] == float.class && pts[1] == long.class) {
                         m.setAccessible(true); m.invoke(gameRenderer, 1.0f, System.nanoTime());
-                        dbg("forceRender: called GameRenderer.render()"); return;
+                        dbg("forceRender: called GameRenderer.render(float,long)"); return;
                     }
                 }
             }
-            dbg("forceRender: render(float,long) not found");
+            Object deltaTracker = null;
+            try {
+                for (Field f : getAllFields(mc.getClass())) {
+                    if (f.getName().equals("deltaTracker")) { f.setAccessible(true); deltaTracker = f.get(mc); break; }
+                }
+            } catch (Exception ignored) {}
+            if (deltaTracker != null) {
+                for (Method m : getAllMethods(gameRenderer.getClass())) {
+                    if (m.getName().equals("render") && m.getParameterCount() == 2) {
+                        Class<?>[] pts = m.getParameterTypes();
+                        if (!pts[0].equals(float.class) && !pts[1].equals(long.class)) {
+                            m.setAccessible(true); m.invoke(gameRenderer, deltaTracker, System.nanoTime());
+                            dbg("forceRender: called GameRenderer.render(DeltaTracker,long)"); return;
+                        }
+                    }
+                }
+            }
+            dbg("forceRender: no compatible render method found");
         } catch (Exception e) { dbg("forceRender: " + e.getMessage()); }
     }
 
@@ -3654,7 +3671,7 @@ public final class ReflectionHelper {
             for (Field f : getAllFields(rt.getClass())) {
                 f.setAccessible(true);
                 Object val = f.get(rt);
-                if (val != null && val.getClass().getName().contains("GlTexture")) {
+                if (val != null && (val.getClass().getName().contains("GlTexture") || val.getClass().getName().contains("GpuTexture"))) {
                     for (Field idf : getAllFields(val.getClass())) {
                         if (idf.getName().equals("id") && idf.getType() == int.class) { idf.setAccessible(true); texId = idf.getInt(val); }
                     }
