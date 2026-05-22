@@ -15,15 +15,26 @@ repositories {
         allowInsecureProtocol = false
     }
     mavenCentral()
+    maven {
+        url = 'https://maven.neoforged.net/releases'
+        allowInsecureProtocol = true
+    }
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
 sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
+configurations.all {
+    resolutionStrategy {
+        force 'org.apache.logging.log4j:log4j-api:2.11.2'
+        force 'org.apache.logging.log4j:log4j-core:2.11.2'
+    }
+}
+
 dependencies {
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
-    implementation 'net.java.dev.jna:jna:5.15.0'
-    implementation 'net.java.dev.jna:jna-platform:5.15.0'
+    implementation 'net.java.dev.jna:jna:5.14.0'
+    implementation 'net.java.dev.jna:jna-platform:5.14.0'
 }
 
 neoForge {

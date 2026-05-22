@@ -4,33 +4,187 @@ import xyz.langyo.minecraft.mcp.common.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ClickEvent;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpHttpServer httpServer;
+    McpHttpServer httpServer;
+    volatile String debugUrl = null;
+    volatile boolean chatSent = false;
+
+    private static McpRenderer wrapRenderer(GuiGraphics g, Minecraft mc) {
+        return new McpRenderer() {
+            @Override public void fill(int x1, int y1, int x2, int y2, int color) {
+                g.fill(x1, y1, x2, y2, color);
+            }
+            @Override public int drawString(Object font, String text, int x, int y, int color, boolean shadow) {
+                g.drawString(mc.font, text, x, y, color, shadow);
+                return mc.font.width(text);
+            }
+            @Override public int getStringWidth(Object font, String text) {
+                return mc.font.width(text);
+            }
+        };
+    }
 
     public ModDevMcpMod(IEventBus modBus) {
         INSTANCE = this;
-        modBus.addListener(this::commonSetup);
+        modBus.addListener(this::setup);
+
+        boolean depsOk = false;
+        try {
+            Class.forName("com.sun.jna.Library");
+            depsOk = true;
+        } catch (ClassNotFoundException e) {
+            System.err.println("[MCP-MOD] JNA not on classpath. Use launch_mc.py.");
+        } catch (Error e) {
+            System.err.println("[MCP-MOD] Dependency error: " + e.getMessage());
+        }
+
+        if (depsOk) {
+            new Thread(() -> {
+                try {
+                    Thread.sleep(5000);
+                    ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+                    int port = McpConfig.getServerPort();
+                    httpServer = new McpHttpServer(handler, port);
+                    httpServer.start();
+                    debugUrl = "http://127.0.0.1:" + port + "/debug";
+                    System.out.println("[MCP-MOD] Debug page: " + debugUrl);
+                } catch (Exception e) {
+                    System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
+                } catch (Error e) {
+                    System.err.println("[MCP-MOD] HTTP server error: " + e.getMessage());
+                }
+            }, "MCP-HTTP").start();
+        }
+
+        NeoForge.EVENT_BUS.addListener((ScreenEvent.Init.Post event) -> {
+            try {
+                if (event.getScreen() instanceof PauseScreen pauseScreen) {
+                    McpScreenHelper.patchPauseScreen(pauseScreen, new McpScreenHelper.ButtonFactory() {
+                        @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
+                            return Button.builder(Component.translatable(translationKey), btn -> onClick.run()).bounds(x, y, w, h).build();
+                        }
+                    });
+                }
+            } catch (Exception ignored) {}
+        });
+
+        NeoForge.EVENT_BUS.addListener((CustomizeGuiOverlayEvent.Chat event) -> {
+            if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
+            try {
+                Minecraft mc = Minecraft.getInstance();
+                if (mc.screen == null) {
+                    ReflectionHelper.tickMouseRelease(mc);
+                    ReflectionHelper.tickMcpControlMode(mc);
+
+                    if (!ReflectionHelper.isScreenshotInProgress()) {
+                        ReflectionHelper.cacheFrameFromRenderThread(mc);
+                    }
+
+                    if (ReflectionHelper.isMcpControlMode() && !ReflectionHelper.isScreenshotInProgress()) {
+                        int w = mc.getWindow().getGuiScaledWidth();
+                        int h = mc.getWindow().getGuiScaledHeight();
+                        double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
+                        double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
+                    }
+                }
+            } catch (Exception ignored) {}
+        });
+
+        NeoForge.EVENT_BUS.addListener((ScreenEvent.Render.Post event) -> {
+            if (ReflectionHelper.isScreenshotInProgress()) return;
+            try {
+                Minecraft mc = Minecraft.getInstance();
+                Screen screen = event.getScreen();
+                int w = mc.getWindow().getGuiScaledWidth();
+                int h = mc.getWindow().getGuiScaledHeight();
+                double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
+                double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
+
+                if (ReflectionHelper.isMcpControlMode()) {
+                    ReflectionHelper.cacheFrameFromRenderThread(mc);
+                    McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
+                } else if (mc.level != null && screen != null && !(screen instanceof PauseScreen)) {
+                    McpOverlayLogic.renderTransferButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
+                }
+            } catch (Exception ignored) {}
+        });
+
+        NeoForge.EVENT_BUS.addListener((InputEvent.MouseButton.Pre event) -> {
+            try {
+                Minecraft mc = Minecraft.getInstance();
+                if (ReflectionHelper.shouldSuppressInput()) { event.setCanceled(true); return; }
+                if (ReflectionHelper.isMcpControlMode()) {
+                    if (event.getButton() == 0) {
+                        double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
+                        double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
+                        String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                        if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                            event.setCanceled(true);
+                            return;
+                        }
+                    }
+                    event.setCanceled(true);
+                    return;
+                }
+                if (mc.level != null && mc.screen != null && !(mc.screen instanceof PauseScreen) && event.getButton() == 0) {
+                    double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
+                    double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
+                    if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {
+                        event.setCanceled(true);
+                    }
+                }
+            } catch (Exception ignored) {}
+        });
+
+        NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post event) -> {
+            if (INSTANCE == null || INSTANCE.debugUrl == null) return;
+            try {
+                Minecraft mc = Minecraft.getInstance();
+                ReflectionHelper.tickMouseRelease(mc);
+                ReflectionHelper.tickMcpControlMode(mc);
+                ReflectionHelper.tickVideoCapture(mc);
+                McpPlatformControl ctrl = McpControlFactory.get();
+                if (ctrl instanceof McpWin32Control w32ctrl) {
+                    if (w32ctrl.getMcHwnd() == 0) {
+                        long glfwHandle = mc.getWindow().getWindow();
+                        w32ctrl.ensureHwndFromGlfw(glfwHandle);
+                    }
+                }
+            } catch (Exception ignored) {}
+            if (INSTANCE.chatSent) return;
+            try {
+                Minecraft mc = Minecraft.getInstance();
+                if (mc.gui == null || mc.gui.getChat() == null) return;
+                INSTANCE.chatSent = true;
+                String url = INSTANCE.debugUrl;
+                Component msg = Component.empty()
+                    .append(Component.literal("[MCP] Debug page: ").withStyle(st -> st.withColor(0xFFFFFF)))
+                    .append(Component.literal(url).withStyle(st -> st
+                        .withColor(0xFFFFFF)
+                        .withUnderlined(true)
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url))
+                    ));
+                mc.gui.getChat().addMessage(msg);
+            } catch (Exception ignored) {}
+        });
     }
 
-    private void commonSetup(final FMLCommonSetupEvent event) {
-        boolean depsOk = false;
-        try { Class.forName("com.sun.jna.Library"); depsOk = true; } catch (Exception ignored) {}
-        if (!depsOk) {
-            System.err.println("[MCP-MOD] JNA not on classpath. External control unavailable.");
-            return;
-        }
-        new Thread(() -> {
-            try {
-                Thread.sleep(5000);
-                ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-                int port = McpConfig.getServerPort();
-                httpServer = new McpHttpServer(handler, port);
-                httpServer.start();
-                System.out.println("[MCP-MOD] Debug page: http://127.0.0.1:" + port + "/debug");
-            } catch (Exception e) { System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage()); }
-        }, "MCP-HTTP").start();
+    private void setup(final FMLCommonSetupEvent event) {
     }
 }
