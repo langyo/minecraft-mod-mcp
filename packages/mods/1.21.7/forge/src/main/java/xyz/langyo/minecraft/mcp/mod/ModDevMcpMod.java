@@ -42,16 +42,15 @@ public class ModDevMcpMod {
                         double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
                         String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                         if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                            return false;
+                            return true;
                         }
                     }
                     return true;
                 }
-                if (mc.screen != null && !(mc.screen instanceof PauseScreen) && event.getButton() == 0) {
+                if (mc.level != null && mc.screen != null && !(mc.screen instanceof PauseScreen) && event.getButton() == 0) {
                     double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
                     double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
                     if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {
-                        mc.setScreen(null);
                         return true;
                     }
                 }
@@ -315,7 +314,7 @@ public class ModDevMcpMod {
                 if (ReflectionHelper.isMcpControlMode()) {
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
                     renderOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
-                } else if (screen != null && !(screen instanceof PauseScreen)) {
+                } else if (mc.level != null && screen != null && !(screen instanceof PauseScreen)) {
                     renderTransferOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
                 }
             } catch (Exception ignored) {}
