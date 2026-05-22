@@ -1308,47 +1308,6 @@ public final class ReflectionHelper {
     }
 
     private static void forceRenderOneFrame(Object mc) {
-        try {
-            Object gameRenderer = null;
-            for (Method m : mc.getClass().getMethods()) {
-                if (m.getName().equals("gameRenderer") && m.getParameterCount() == 0) {
-                    m.setAccessible(true); gameRenderer = m.invoke(mc); break;
-                }
-            }
-            if (gameRenderer == null) {
-                for (Field f : getAllFields(mc.getClass())) {
-                    if (f.getName().equals("gameRenderer")) { f.setAccessible(true); gameRenderer = f.get(mc); break; }
-                }
-            }
-            if (gameRenderer == null) { dbg("forceRender: no gameRenderer"); return; }
-            for (Method m : getAllMethods(gameRenderer.getClass())) {
-                if (m.getName().equals("render") && m.getParameterCount() == 2) {
-                    Class<?>[] pts = m.getParameterTypes();
-                    if (pts[0] == float.class && pts[1] == long.class) {
-                        m.setAccessible(true); m.invoke(gameRenderer, 1.0f, System.nanoTime());
-                        dbg("forceRender: called GameRenderer.render(float,long)"); return;
-                    }
-                }
-            }
-            Object deltaTracker = null;
-            try {
-                for (Field f : getAllFields(mc.getClass())) {
-                    if (f.getName().equals("deltaTracker")) { f.setAccessible(true); deltaTracker = f.get(mc); break; }
-                }
-            } catch (Exception ignored) {}
-            if (deltaTracker != null) {
-                for (Method m : getAllMethods(gameRenderer.getClass())) {
-                    if (m.getName().equals("render") && m.getParameterCount() == 2) {
-                        Class<?>[] pts = m.getParameterTypes();
-                        if (!pts[0].equals(float.class) && !pts[1].equals(long.class)) {
-                            m.setAccessible(true); m.invoke(gameRenderer, deltaTracker, System.nanoTime());
-                            dbg("forceRender: called GameRenderer.render(DeltaTracker,long)"); return;
-                        }
-                    }
-                }
-            }
-            dbg("forceRender: no compatible render method found");
-        } catch (Exception e) { dbg("forceRender: " + e.getMessage()); }
     }
 
     private static byte[] takeScreenshot0(Object mc, int width, int height) {
@@ -3658,7 +3617,7 @@ public final class ReflectionHelper {
         try {
             Object rt = null;
             try { Method m = mc.getClass().getMethod("getMainRenderTarget"); rt = m.invoke(mc); }
-            catch (Exception e) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: getMainRenderTarget failed: " + e.getMessage()); lastCacheFrameLog = System.currentTimeMillis(); } return; }
+            catch (Exception e) { return; }
             if (rt == null) return;
             int w = 0, h = 0;
             for (Field f : getAllFields(rt.getClass())) {
@@ -3667,33 +3626,17 @@ public final class ReflectionHelper {
                 if (f.getName().equals("height") && f.getType() == int.class) { try { h = f.getInt(rt); } catch (Exception ignored) {} }
             }
             if (w <= 0 || h <= 0) return;
-            int texId = 0;
-            for (Field f : getAllFields(rt.getClass())) {
-                f.setAccessible(true);
-                Object val = f.get(rt);
-                if (val != null && (val.getClass().getName().contains("GlTexture") || val.getClass().getName().contains("GpuTexture"))) {
-                    for (Field idf : getAllFields(val.getClass())) {
-                        if (idf.getName().equals("id") && idf.getType() == int.class) { idf.setAccessible(true); texId = idf.getInt(val); }
-                    }
-                    break;
-                }
-            }
-            if (texId <= 0) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: no texId found, rt=" + rt.getClass().getName()); lastCacheFrameLog = System.currentTimeMillis(); } return; }
             suppressGlDebug(true);
             byte[] result = null;
-            try { result = readTextureViaGetTexImage(texId, w, h); }
-            catch (Exception texEx) {
-                try {
-                    Class<?> gl11c = Class.forName("org.lwjgl.opengl.GL11C");
-                    result = readTextureViaGetTexImageFrom(gl11c, texId, w, h);
-                } catch (Exception ignored) {}
-            } finally { suppressGlDebug(false); }
+            try {
+                result = takeGlScreenshot0(mc, w, h);
+            } catch (Exception ignored) {} finally { suppressGlDebug(false); }
             if (result != null && result.length > 0) {
                 cachedScreenshot = result;
                 cachedScreenshotTime = System.currentTimeMillis();
-                if (System.currentTimeMillis() - lastCacheFrameLog > 10000) { dbg("cacheFrame: cached " + result.length + " bytes"); lastCacheFrameLog = System.currentTimeMillis(); }
+                if (System.currentTimeMillis() - lastCacheFrameLog > 30000) { dbg("cacheFrame: cached " + result.length + " bytes via takeGl"); lastCacheFrameLog = System.currentTimeMillis(); }
             }
-        } catch (Exception e) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: exception: " + e.getMessage()); lastCacheFrameLog = System.currentTimeMillis(); } }
+        } catch (Exception e) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: " + e.getMessage()); lastCacheFrameLog = System.currentTimeMillis(); } }
     }
 
     public static byte[] getCachedScreenshot() {

@@ -294,17 +294,35 @@ public class ModDevMcpMod {
                 if (mc.screen == null) {
                     ReflectionHelper.tickMouseRelease(mc);
                     ReflectionHelper.tickMcpControlMode(mc);
-                }
 
-                if (ReflectionHelper.isMcpControlMode() && !ReflectionHelper.isScreenshotInProgress()) {
+                    if (!ReflectionHelper.isScreenshotInProgress()) {
+                        ReflectionHelper.cacheFrameFromRenderThread(mc);
+                    }
+
+                    if (ReflectionHelper.isMcpControlMode() && !ReflectionHelper.isScreenshotInProgress()) {
+                        int w = mc.getWindow().getGuiScaledWidth();
+                        int h = mc.getWindow().getGuiScaledHeight();
+                        double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
+                        double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
+                        renderOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
+                    }
+                }
+            } catch (Exception ignored) {}
+        });
+
+        ScreenEvent.Render.Post.BUS.addListener(event -> {
+            if (!ReflectionHelper.isMcpControlMode()) return;
+            if (ReflectionHelper.isScreenshotInProgress()) return;
+            try {
+                Minecraft mc = Minecraft.getInstance();
+                if (!ReflectionHelper.isScreenshotInProgress()) {
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
-
-                    int w = mc.getWindow().getGuiScaledWidth();
-                    int h = mc.getWindow().getGuiScaledHeight();
-                    double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
-                    double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-                    renderOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
                 }
+                int w = mc.getWindow().getGuiScaledWidth();
+                int h = mc.getWindow().getGuiScaledHeight();
+                double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
+                double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
+                renderOverlay(event.getGuiGraphics(), mc, w, h, (int) mx, (int) my);
             } catch (Exception ignored) {}
         });
 
