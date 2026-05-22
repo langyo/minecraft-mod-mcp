@@ -172,6 +172,7 @@ public class ModDevMcpMod {
                 try {
                     Minecraft mc = Minecraft.getInstance();
                     ReflectionHelper.enterMcpControlMode(mc);
+                    mc.setScreen(null);
                 } catch (Exception ignored) {}
             }).bounds(x, y, leftW, h).build();
 
