@@ -3045,29 +3045,35 @@ public final class ReflectionHelper {
             if (screen == null) return "{\"error\":\"no screen to close\"}";
             String sn = screen.getClass().getSimpleName();
             boolean keyPressedWorked = false;
-            int GLFW_KEY_ESCAPE = 256;
-            for (Method m : getAllMethods(screen.getClass())) {
-                String n = m.getName();
-                if ((n.equals("keyPressed") || n.contains("keyPressed"))
-                        && m.getParameterCount() >= 3) {
-                    try {
-                        m.setAccessible(true);
-                        Object[] args = new Object[m.getParameterCount()];
-                        args[0] = GLFW_KEY_ESCAPE;
-                        args[1] = 0;
-                        args[2] = 0;
-                        for (int i = 3; i < args.length; i++) args[i] = 0;
-                        Object result = m.invoke(screen, args);
-                        if (Boolean.TRUE.equals(result)) keyPressedWorked = true;
-                    } catch (Exception ignored) {}
+            int[] escapeKeys = {256, 1}; // GLFW_KEY_ESCAPE, LWJGL2 Keyboard.KEY_ESCAPE
+            for (int escapeKey : escapeKeys) {
+                for (Method m : getAllMethods(screen.getClass())) {
+                    String n = m.getName();
+                    if ((n.equals("keyPressed") || n.contains("keyPressed"))
+                            && m.getParameterCount() >= 3) {
+                        try {
+                            m.setAccessible(true);
+                            Object[] args = new Object[m.getParameterCount()];
+                            args[0] = escapeKey;
+                            args[1] = 0;
+                            args[2] = 0;
+                            for (int i = 3; i < args.length; i++) args[i] = 0;
+                            Object result = m.invoke(screen, args);
+                            if (Boolean.TRUE.equals(result)) keyPressedWorked = true;
+                        } catch (Exception ignored) {}
+                    }
                 }
+                if (keyPressedWorked) break;
             }
             if (!keyPressedWorked) {
-                for (Method m : getAllMethods(mc.getClass())) {
-                    if (m.getName().equals("setScreen") && m.getParameterCount() == 1) {
-                        m.setAccessible(true);
-                        m.invoke(mc, (Object) null);
-                        return "{\"screen_closed\":true,\"method\":\"setScreen(null)\",\"was\":\"" + sn + "\"}";
+                String[] methodNames = {"setScreen", "displayGuiScreen", "setGuiScreen", "openScreen"};
+                for (String methodName : methodNames) {
+                    for (Method m : getAllMethods(mc.getClass())) {
+                        if (m.getName().equals(methodName) && m.getParameterCount() == 1) {
+                            m.setAccessible(true);
+                            m.invoke(mc, (Object) null);
+                            return "{\"screen_closed\":true,\"method\":\"" + methodName + "(null)\",\"was\":\"" + sn + "\"}";
+                        }
                     }
                 }
             }
