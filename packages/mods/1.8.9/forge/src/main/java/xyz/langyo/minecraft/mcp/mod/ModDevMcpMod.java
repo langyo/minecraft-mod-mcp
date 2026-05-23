@@ -97,6 +97,14 @@ public class ModDevMcpMod {
     }
 
     @SubscribeEvent
+    public void onGuiInitPre(GuiScreenEvent.InitGuiEvent.Pre event) {
+        if (ReflectionHelper.isMcpControlMode() && isPauseMenu(event.gui)) {
+            event.setCanceled(true);
+            try { Minecraft.getMinecraft().currentScreen = null; } catch (Exception ignored) {}
+        }
+    }
+
+    @SubscribeEvent
     public void onGuiInit(GuiScreenEvent.InitGuiEvent.Post event) {
         try {
             if (isPauseMenu(event.gui)) {
