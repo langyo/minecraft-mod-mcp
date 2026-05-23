@@ -15,7 +15,9 @@ import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.MouseHelper;
 import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 
 @Mod(modid = "mcpmod", name = "ModDev MCP", version = "1.0")
@@ -116,16 +118,67 @@ public class ModDevMcpMod {
         } catch (Exception ignored) {}
     }
 
+    private static MouseHelper originalMouseHelper;
+    private static NoGrabMouseHelper noGrabMouseHelper;
+
+    private static class NoGrabMouseHelper extends net.minecraft.util.MouseHelper {
+        @Override
+        public void grabMouseCursor() {}
+        @Override
+        public void ungrabMouseCursor() {
+            try { Mouse.setGrabbed(false); } catch (Exception ignored) {}
+        }
+        @Override
+        public void mouseXYChange() {
+            deltaX = 0;
+            deltaY = 0;
+        }
+    }
+
+    private static void forceLwjgl2MouseFree() {
+        try {
+            Minecraft mc = Minecraft.getMinecraft();
+            if (!ReflectionHelper.isMcpControlMode()) {
+                if (originalMouseHelper != null && !(mc.mouseHelper instanceof NoGrabMouseHelper)) {
+                    // already restored
+                } else if (originalMouseHelper != null) {
+                    mc.mouseHelper = originalMouseHelper;
+                    originalMouseHelper = null;
+                }
+                return;
+            }
+            if (originalMouseHelper == null && mc.mouseHelper != null && !(mc.mouseHelper instanceof NoGrabMouseHelper)) {
+                originalMouseHelper = mc.mouseHelper;
+            }
+            if (mc.mouseHelper instanceof NoGrabMouseHelper) {
+                // already installed
+            } else if (originalMouseHelper != null) {
+                if (noGrabMouseHelper == null) noGrabMouseHelper = new NoGrabMouseHelper();
+                mc.mouseHelper = noGrabMouseHelper;
+            }
+            if (Mouse.isGrabbed()) {
+                Mouse.setGrabbed(false);
+            }
+            while (Mouse.next()) {}
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] forceLwjgl2MouseFree error: " + e.getMessage());
+        }
+    }
+
     @SubscribeEvent
     public void onRenderOverlay(RenderGameOverlayEvent.Post event) {
         if (event.type != RenderGameOverlayEvent.ElementType.CHAT) return;
-        if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
+        if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive() && !ReflectionHelper.isMcpControlMode()) return;
         try {
             Minecraft mc = Minecraft.getMinecraft();
-            if (mc.currentScreen == null) {
-                ReflectionHelper.tickMouseRelease(mc);
-                ReflectionHelper.tickMcpControlMode(mc);
+            ReflectionHelper.tickMouseRelease(mc);
+            ReflectionHelper.tickMcpControlMode(mc);
 
+            if (ReflectionHelper.isMcpControlMode()) {
+                forceLwjgl2MouseFree();
+            }
+
+            if (mc.currentScreen == null) {
                 if (!ReflectionHelper.isScreenshotInProgress()) {
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
                 }
@@ -136,6 +189,9 @@ public class ModDevMcpMod {
                     int h = sr.getScaledHeight();
                     int mx = getMouseX(mc);
                     int my = getMouseY(mc);
+                    if (Mouse.isButtonDown(0)) {
+                        ReflectionHelper.handleOverlayClick(mx, my, mc);
+                    }
                     McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, "[MCP] Resume", w, h, mx, my);
                 }
             }
@@ -155,6 +211,7 @@ public class ModDevMcpMod {
             int my = getMouseY(mc);
 
             if (ReflectionHelper.isMcpControlMode()) {
+                forceLwjgl2MouseFree();
                 ReflectionHelper.cacheFrameFromRenderThread(mc);
                 McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, "[MCP] Resume", w, h, mx, my);
             } else if (mc.theWorld != null && screen != null && !isPauseMenu(screen)) {
@@ -166,6 +223,40 @@ public class ModDevMcpMod {
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (INSTANCE == null || INSTANCE.debugUrl == null) return;
+
+        if (ReflectionHelper.isMcpControlMode()) {
+            if (event.phase == TickEvent.Phase.START) {
+                forceLwjgl2MouseFree();
+            } else {
+                Minecraft mc = Minecraft.getMinecraft();
+                ReflectionHelper.tickMouseRelease(mc);
+                ReflectionHelper.tickMcpControlMode(mc);
+                ReflectionHelper.tickVideoCapture(mc);
+                forceLwjgl2MouseFree();
+                McpPlatformControl ctrl = McpControlFactory.get();
+                if (ctrl instanceof McpWin32Control) {
+                    McpWin32Control w32ctrl = (McpWin32Control) ctrl;
+                    if (w32ctrl.getMcHwnd() == 0) {
+                        w32ctrl.ensureHwndFromLwjgl2Display();
+                    }
+                }
+                if (Mouse.isButtonDown(0)) {
+                    int mx = getMouseX(mc);
+                    int my = getMouseY(mc);
+                    ReflectionHelper.handleOverlayClick(mx, my, mc);
+                }
+            }
+            return;
+        }
+
+        if (!ReflectionHelper.isMcpControlMode() && event.phase == TickEvent.Phase.END) {
+            Minecraft mc = Minecraft.getMinecraft();
+            if (mc.currentScreen == null && originalMouseHelper != null) {
+                mc.mouseHelper = originalMouseHelper;
+                originalMouseHelper = null;
+            }
+        }
+
         if (event.phase != TickEvent.Phase.END) return;
         try {
             Minecraft mc = Minecraft.getMinecraft();
@@ -180,19 +271,13 @@ public class ModDevMcpMod {
                 }
             }
 
-            if (ReflectionHelper.isMcpControlMode() && Mouse.isButtonDown(0)) {
-                int mx = getMouseX(mc);
-                int my = getMouseY(mc);
-                String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
-                if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                    return;
-                }
-                return;
-            }
             if (mc.theWorld != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu) && Mouse.isButtonDown(0)) {
                 int mx = getMouseX(mc);
                 int my = getMouseY(mc);
-                ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
+                String result = ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
+                if ("transfer_to_mcp".equals(result)) {
+                    mc.displayGuiScreen(null);
+                }
             }
         } catch (Exception ignored) {}
         if (INSTANCE.chatSent) return;

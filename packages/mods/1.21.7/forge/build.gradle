@@ -46,7 +46,7 @@ dependencies {
 jar {
     manifest {
         attributes 'ModSide' : 'BOTH'
-        attributes 'Automatic-Module' : 'xyz.langyo.minecraft.mcp.mod'
+        attributes 'Automatic-Module-Name': 'mcpmod'
         attributes 'Implementation-Version' : project.version
     }
 }

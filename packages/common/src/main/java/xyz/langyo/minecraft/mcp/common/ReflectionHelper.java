@@ -3369,24 +3369,40 @@ public final class ReflectionHelper {
             logModEvent("exit_control_mode", "Manual control restored");
             mouseReleaseActive = false;
             forceCursorNormal = false;
-            long glfwHandle = getWindowHandle(mc);
-            if (glfwHandle != 0 && LWJGL3 && glfwSetInputModeMethod != null) {
+            if (LWJGL3) {
+                long glfwHandle = getWindowHandle(mc);
+                if (glfwHandle != 0 && glfwSetInputModeMethod != null) {
+                    try {
+                        Object screen = getCurrentScreen(mc);
+                        if (screen != null) {
+                            glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                            dbg("exitMcpControlMode: screen open (" + screen.getClass().getSimpleName() + "), cursor NORMAL");
+                        } else {
+                            glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                            Object mh = getMouseHandler(mc);
+                            if (mh != null) initMouseFields(mh);
+                            if (mouseGrabbedField != null && mh != null) {
+                                mouseGrabbedField.setBoolean(mh, true);
+                            }
+                            dbg("exitMcpControlMode: no screen, cursor DISABLED + mouse grabbed");
+                        }
+                    } catch (Exception ce) {
+                        dbg("exitMcpControlMode: glfwSetInputMode failed: " + ce.getMessage());
+                    }
+                }
+            } else {
                 try {
                     Object screen = getCurrentScreen(mc);
+                    Class<?> mouseClass = Class.forName("org.lwjgl.input.Mouse");
                     if (screen != null) {
-                        glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                        dbg("exitMcpControlMode: screen open (" + screen.getClass().getSimpleName() + "), cursor NORMAL");
+                        mouseClass.getMethod("setGrabbed", boolean.class).invoke(null, false);
+                        dbg("exitMcpControlMode LWJGL2: screen open, cursor ungrabbed");
                     } else {
-                        glfwSetInputModeMethod.invoke(null, glfwHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                        Object mh = getMouseHandler(mc);
-                        if (mh != null) initMouseFields(mh);
-                        if (mouseGrabbedField != null && mh != null) {
-                            mouseGrabbedField.setBoolean(mh, true);
-                        }
-                        dbg("exitMcpControlMode: no screen, cursor DISABLED + mouse grabbed");
+                        mouseClass.getMethod("setGrabbed", boolean.class).invoke(null, true);
+                        dbg("exitMcpControlMode LWJGL2: no screen, mouse grabbed");
                     }
-                } catch (Exception ce) {
-                    dbg("exitMcpControlMode: glfwSetInputMode failed: " + ce.getMessage());
+                } catch (Exception e) {
+                    dbg("exitMcpControlMode LWJGL2: " + e.getMessage());
                 }
             }
             dbg("exitMcpControlMode: OFF");
@@ -3700,11 +3716,21 @@ public final class ReflectionHelper {
     public static boolean isMouseReleaseActive() { return mouseReleaseActive; }
 
     private static void forceCursorAndReleaseMouse(Object mc) throws Exception {
-        long handle = getWindowHandle(mc);
-        if (handle == 0 || !LWJGL3) return;
-        initCursorCache();
-        if (glfwSetInputModeMethod != null) {
-            glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+        if (LWJGL3) {
+            long handle = getWindowHandle(mc);
+            if (handle == 0) return;
+            initCursorCache();
+            if (glfwSetInputModeMethod != null) {
+                glfwSetInputModeMethod.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+            }
+        } else {
+            try {
+                Class<?> mouseClass = Class.forName("org.lwjgl.input.Mouse");
+                Method setGrabbed = mouseClass.getMethod("setGrabbed", boolean.class);
+                setGrabbed.invoke(null, false);
+            } catch (Exception e) {
+                dbg("forceCursor LWJGL2: " + e.getMessage());
+            }
         }
         Object mouseHandler = getMouseHandler(mc);
         if (mouseHandler != null) {

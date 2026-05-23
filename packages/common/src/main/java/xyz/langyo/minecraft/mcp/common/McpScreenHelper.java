@@ -44,10 +44,16 @@ public class McpScreenHelper {
     }
 
     private static Object findBottomWideButton(Object screen) throws Exception {
+        Object best = null;
+        int bestY = -1;
         for (Field f : getAllFields(screen.getClass())) {
             f.setAccessible(true);
             Object val = f.get(screen);
-            if (isBottomWideButton(val)) return val;
+            Object found = pickBottomWide(val, best, bestY);
+            if (found != null && found != best) {
+                best = found;
+                bestY = getIntField(best, "y");
+            }
         }
         for (Field f : getAllFields(screen.getClass())) {
             f.setAccessible(true);
@@ -55,22 +61,28 @@ public class McpScreenHelper {
             if (val instanceof List<?>) {
                 List<?> list = (List<?>) val;
                 for (Object entry : list) {
-                    if (isBottomWideButton(entry)) return entry;
+                    Object found = pickBottomWide(entry, best, bestY);
+                    if (found != null && found != best) {
+                        best = found;
+                        bestY = getIntField(best, "y");
+                    }
                 }
             }
         }
-        return null;
+        return best;
     }
 
-    private static boolean isBottomWideButton(Object obj) {
+    private static Object pickBottomWide(Object obj, Object currentBest, int currentBestY) {
         try {
-            if (obj == null) return false;
+            if (obj == null) return currentBest;
             String cn = obj.getClass().getName();
-            if (!cn.contains("Button") && !cn.contains("AbstractButton")) return false;
-            int y = getIntField(obj, "y");
+            if (!cn.contains("Button") && !cn.contains("AbstractButton")) return currentBest;
             int w = getIntField(obj, "width", "f_96515_");
-            return y >= 180 && w >= 150;
-        } catch (Exception e) { return false; }
+            if (w < 150) return currentBest;
+            int y = getIntField(obj, "y");
+            if (y > currentBestY) return obj;
+            return currentBest;
+        } catch (Exception e) { return currentBest; }
     }
 
     private static void addRenderableWidget(Object screen, Object widget) throws Exception {

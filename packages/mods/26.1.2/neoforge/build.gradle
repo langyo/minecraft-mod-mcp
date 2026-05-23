@@ -50,7 +50,7 @@ tasks.withType(JavaCompile).configureEach {
 jar {
     manifest {
         attributes 'ModSide' : 'CLIENT'
-        attributes 'Automatic-Module' : 'xyz.langyo.minecraft.mcp.mod'
+        attributes 'Automatic-Module-Name': 'mcpmod'
         attributes 'Implementation-Version' : project.version
     }
 }
