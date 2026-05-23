@@ -102,7 +102,8 @@ public class ModDevMcpMod {
             if (isPauseMenu(event.gui)) {
                 McpScreenHelper.patchPauseScreen(event.gui, new McpScreenHelper.ButtonFactory() {
                     @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                        GuiButton btn = new GuiButton(-999, x, y, w, h, "[MCP] Transfer") {
+                        String displayText = net.minecraft.client.resources.I18n.format(translationKey);
+                        GuiButton btn = new GuiButton(-999, x, y, w, h, displayText) {
                             @Override public boolean mousePressed(Minecraft mc2, int mx, int my) {
                                 if (super.mousePressed(mc2, mx, my)) {
                                     try {
@@ -196,7 +197,7 @@ public class ModDevMcpMod {
                     if (Mouse.isButtonDown(0)) {
                         ReflectionHelper.handleOverlayClick(mx, my, mc);
                     }
-                    McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, "[MCP] Resume", w, h, mx, my);
+                    McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, net.minecraft.client.resources.I18n.format("mcpmod.control.resume"), w, h, mx, my);
                 }
             }
         } catch (Exception ignored) {}
@@ -219,11 +220,12 @@ public class ModDevMcpMod {
                 GL11.glEnable(GL11.GL_SCISSOR_TEST);
                 forceLwjgl2MouseFree();
                 ReflectionHelper.cacheFrameFromRenderThread(mc);
-                McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, "[MCP] Resume", w, h, mx, my);
+                McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, net.minecraft.client.resources.I18n.format("mcpmod.control.resume"), w, h, mx, my);
             } else if (mc.theWorld != null && screen != null && !isPauseMenu(screen)) {
                 GL11.glScissor(0, 0, mc.displayWidth, mc.displayHeight);
                 GL11.glEnable(GL11.GL_SCISSOR_TEST);
-                McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRendererObj, "[MCP] Transfer", w, h, mx, my);
+                String label = net.minecraft.client.resources.I18n.format("mcpmod.control.pause_button");
+                McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRendererObj, label, w, h, mx, my);
             }
         } catch (Exception ignored) {}
     }
