@@ -102,7 +102,8 @@ public class ModDevMcpMod {
             if (isPauseMenu(event.gui)) {
                 McpScreenHelper.patchPauseScreen(event.gui, new McpScreenHelper.ButtonFactory() {
                     @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                        GuiButton btn = new GuiButton(-999, x, y, w, h, translationKey) {
+                        String displayText = net.minecraft.client.resources.I18n.format(translationKey);
+                        GuiButton btn = new GuiButton(-999, x, y, w, h, displayText) {
                             @Override public boolean mousePressed(Minecraft mc2, int mx, int my) {
                                 if (super.mousePressed(mc2, mx, my)) {
                                     onClick.run();

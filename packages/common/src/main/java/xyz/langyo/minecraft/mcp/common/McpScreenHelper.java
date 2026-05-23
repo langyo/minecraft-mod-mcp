@@ -16,10 +16,10 @@ public class McpScreenHelper {
             Object originalQuit = findBottomWideButton(screen);
             if (originalQuit == null) return;
 
-            int x = getIntField(originalQuit, "x");
-            int y = getIntField(originalQuit, "y");
-            int w = getIntField(originalQuit, "width", "f_96515_");
-            int h = getIntField(originalQuit, "height", "f_96518_");
+            int x = getIntField(originalQuit, "x", "xPosition", "field_146128_h", "f_146128_h_");
+            int y = getIntField(originalQuit, "y", "yPosition", "field_146129_i", "f_146129_i_");
+            int w = getIntField(originalQuit, "width", "f_96515_", "field_146120_f");
+            int h = getIntField(originalQuit, "height", "f_96518_", "field_146121_g");
             if (w == 0) w = getIntField(originalQuit, "f_96515_");
             if (h == 0) h = getIntField(originalQuit, "f_96518_");
 
@@ -27,8 +27,8 @@ public class McpScreenHelper {
             int leftW = (w - gap) / 2;
             int rightW = w - gap - leftW;
 
-            setIntField(originalQuit, "x", x + leftW + gap);
-            setIntField(originalQuit, "width", rightW);
+            setIntField(originalQuit, x + leftW + gap, "x", "xPosition", "field_146128_h");
+            setIntField(originalQuit, rightW, "width", "field_146120_f");
 
             String transferKey = ReflectionHelper.getMcpControlPauseTransferTranslationKey();
             Object transfer = factory.createButton(transferKey, () -> {
@@ -52,7 +52,7 @@ public class McpScreenHelper {
             Object found = pickBottomWide(val, best, bestY);
             if (found != null && found != best) {
                 best = found;
-                bestY = getIntField(best, "y");
+                bestY = getIntField(best, "y", "yPosition", "field_146129_i", "f_146129_i_");
             }
         }
         for (Field f : getAllFields(screen.getClass())) {
@@ -64,7 +64,7 @@ public class McpScreenHelper {
                     Object found = pickBottomWide(entry, best, bestY);
                     if (found != null && found != best) {
                         best = found;
-                        bestY = getIntField(best, "y");
+                        bestY = getIntField(best, "y", "yPosition", "field_146129_i", "f_146129_i_");
                     }
                 }
             }
@@ -77,9 +77,9 @@ public class McpScreenHelper {
             if (obj == null) return currentBest;
             String cn = obj.getClass().getName();
             if (!cn.contains("Button") && !cn.contains("AbstractButton")) return currentBest;
-            int w = getIntField(obj, "width", "f_96515_");
+            int w = getIntField(obj, "width", "f_96515_", "field_146120_f");
             if (w < 150) return currentBest;
-            int y = getIntField(obj, "y");
+            int y = getIntField(obj, "y", "yPosition", "field_146129_i", "f_146129_i_");
             if (y > currentBestY) return obj;
             return currentBest;
         } catch (Exception e) { return currentBest; }
@@ -96,6 +96,7 @@ public class McpScreenHelper {
             }
         }
         addToNamedList(screen, "buttonList", widget);
+        addToNamedList(screen, "field_146292_n", widget);
         addToNamedList(screen, "renderables", widget);
         addToNamedList(screen, "children", widget);
         addToNamedList(screen, "narratables", widget);
@@ -139,12 +140,14 @@ public class McpScreenHelper {
         return 0;
     }
 
-    private static void setIntField(Object obj, String name, int value) throws Exception {
-        for (Field f : getAllFields(obj.getClass())) {
-            if (f.getName().equals(name)) {
-                f.setAccessible(true);
-                f.setInt(obj, value);
-                return;
+    private static void setIntField(Object obj, int value, String... names) throws Exception {
+        for (String name : names) {
+            for (Field f : getAllFields(obj.getClass())) {
+                if (f.getName().equals(name)) {
+                    f.setAccessible(true);
+                    f.setInt(obj, value);
+                    return;
+                }
             }
         }
     }
