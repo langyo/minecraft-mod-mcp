@@ -211,13 +211,31 @@ public class ModDevMcpMod {
             int my = getMouseY(mc);
 
             if (ReflectionHelper.isMcpControlMode()) {
+                GL11.glScissor(0, 0, mc.displayWidth, mc.displayHeight);
+                GL11.glEnable(GL11.GL_SCISSOR_TEST);
                 forceLwjgl2MouseFree();
                 ReflectionHelper.cacheFrameFromRenderThread(mc);
                 McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, "[MCP] Resume", w, h, mx, my);
             } else if (mc.theWorld != null && screen != null && !isPauseMenu(screen)) {
+                GL11.glScissor(0, 0, mc.displayWidth, mc.displayHeight);
+                GL11.glEnable(GL11.GL_SCISSOR_TEST);
                 McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRendererObj, "[MCP] Transfer", w, h, mx, my);
             }
         } catch (Exception ignored) {}
+    }
+
+    @SubscribeEvent
+    public void onGuiMouseInputPre(GuiScreenEvent.MouseInputEvent.Pre event) {
+        if (ReflectionHelper.isMcpControlMode()) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public void onGuiKeyboardInputPre(GuiScreenEvent.KeyboardInputEvent.Pre event) {
+        if (ReflectionHelper.isMcpControlMode()) {
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent
@@ -274,10 +292,7 @@ public class ModDevMcpMod {
             if (mc.theWorld != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu) && Mouse.isButtonDown(0)) {
                 int mx = getMouseX(mc);
                 int my = getMouseY(mc);
-                String result = ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
-                if ("transfer_to_mcp".equals(result)) {
-                    mc.displayGuiScreen(null);
-                }
+                ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
             }
         } catch (Exception ignored) {}
         if (INSTANCE.chatSent) return;
