@@ -73,6 +73,12 @@ public class ModDevMcpMod {
             }, "MCP-HTTP").start();
         }
 
+        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.Init.Pre event) -> {
+            if (ReflectionHelper.isMcpControlMode() && event.getScreen() instanceof PauseScreen) {
+                event.setCanceled(true);
+            }
+        });
+
         MinecraftForge.EVENT_BUS.addListener((ScreenEvent.Init.Post event) -> {
             try {
                 if (event.getScreen() instanceof PauseScreen pauseScreen) {
@@ -89,6 +95,9 @@ public class ModDevMcpMod {
             if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
+                if (ReflectionHelper.isMcpControlMode() && mc.screen instanceof PauseScreen) {
+                    mc.screen = null;
+                }
                 if (mc.screen == null) {
                     ReflectionHelper.tickMouseRelease(mc);
                     ReflectionHelper.tickMcpControlMode(mc);
@@ -113,6 +122,10 @@ public class ModDevMcpMod {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 Screen screen = event.getScreen();
+                if (ReflectionHelper.isMcpControlMode() && screen instanceof PauseScreen) {
+                    mc.screen = null;
+                    return;
+                }
                 int w = mc.getWindow().getGuiScaledWidth();
                 int h = mc.getWindow().getGuiScaledHeight();
                 double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
@@ -125,6 +138,19 @@ public class ModDevMcpMod {
                     McpOverlayLogic.renderTransferButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
                 }
             } catch (Exception ignored) {}
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((InputEvent.Key event) -> {
+            if (ReflectionHelper.isMcpControlMode()) {
+                try {
+                    for (java.lang.reflect.Method m : event.getClass().getMethods()) {
+                        if (m.getName().equals("setCanceled") || m.getName().equals("setCancelled")) {
+                            m.invoke(event, true);
+                            break;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
         });
 
         MinecraftForge.EVENT_BUS.addListener((InputEvent.MouseButton.Pre event) -> {

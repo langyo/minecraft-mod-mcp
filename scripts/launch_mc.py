@@ -258,6 +258,74 @@ def ensure_asset_index(vj, mc_dir=None):
     print(f"  Downloaded asset index {aid}.json ({len(data)} bytes)")
 
 
+def download_missing_assets(vj, mc_dir=None):
+    import urllib.request
+    import hashlib
+    import concurrent.futures
+    mc_dir = mc_dir or MC_DIR
+    ai = vj.get("assetIndex")
+    if not ai:
+        return
+    aid = vj.get("assets", ai.get("id", ""))
+    if not aid:
+        return
+    index_path = os.path.join(mc_dir, "assets", "indexes", f"{aid}.json")
+    if not os.path.isfile(index_path):
+        return
+    with open(index_path, "r", encoding="utf-8") as f:
+        idx = json.load(f)
+    objects = idx.get("objects", {})
+    if not objects:
+        return
+    objects_dir = os.path.join(mc_dir, "assets", "objects")
+    missing = []
+    for name, info in objects.items():
+        h = info.get("hash", "")
+        sz = info.get("size", 0)
+        if not h:
+            continue
+        obj_path = os.path.join(objects_dir, h[:2], h)
+        if os.path.isfile(obj_path) and os.path.getsize(obj_path) == sz:
+            continue
+        missing.append((name, h, sz))
+    if not missing:
+        return
+    total = len(missing)
+    done = [0]
+    lock = __import__("threading").Lock()
+
+    def dl_one(item):
+        name, h, sz = item
+        obj_path = os.path.join(objects_dir, h[:2], h)
+        os.makedirs(os.path.dirname(obj_path), exist_ok=True)
+        url = f"https://resources.download.minecraft.net/{h[:2]}/{h}"
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = resp.read()
+                if len(data) == sz:
+                    with open(obj_path, "wb") as f:
+                        f.write(data)
+                    with lock:
+                        done[0] += 1
+                        if done[0] % 50 == 0 or done[0] == total:
+                            print(f"  Assets: {done[0]}/{total}", flush=True)
+                    return True
+            except Exception:
+                pass
+        return False
+
+    print(f"[LAUNCH] Downloading {total} missing assets...", flush=True)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(dl_one, missing))
+    failed = sum(1 for r in results if not r)
+    if failed:
+        print(f"[LAUNCH] Warning: {failed} assets failed to download")
+    else:
+        print(f"[LAUNCH] All {total} assets downloaded")
+
+
 def build_classpath(vj, mc_dir=None):
     mc_dir = mc_dir or MC_DIR
     cp = []
@@ -664,6 +732,8 @@ def main():
     print(f"[LAUNCH] MC dir: {mc_dir}")
 
     vj = merge_version_json(version_name, mc_dir)
+    ensure_asset_index(vj, mc_dir)
+    download_missing_assets(vj, mc_dir)
     main_class = vj.get("mainClass")
     if not main_class:
         print("[ERROR] No mainClass found in version JSON")
@@ -792,11 +862,6 @@ def main():
     for jar in common_jars:
         if "sources" in os.path.basename(jar):
             continue
-        dest = os.path.join(mods_dir, os.path.basename(jar))
-        if os.path.isfile(dest) and os.path.getsize(dest) == os.path.getsize(jar):
-            continue
-        shutil.copy2(jar, dest)
-        print(f"[LAUNCH] Synced common jar: {os.path.basename(jar)} ({os.path.getsize(dest)} bytes)")
 
     sep = ";" if platform.system() == "Windows" else ":"
     cp_str = sep.join(cp)
