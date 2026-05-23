@@ -232,13 +232,6 @@ public class ModDevMcpMod {
     }
 
     @SubscribeEvent
-    public void onGuiKeyboardInputPre(GuiScreenEvent.KeyboardInputEvent.Pre event) {
-        if (ReflectionHelper.isMcpControlMode()) {
-            event.setCanceled(true);
-        }
-    }
-
-    @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (INSTANCE == null || INSTANCE.debugUrl == null) return;
 
