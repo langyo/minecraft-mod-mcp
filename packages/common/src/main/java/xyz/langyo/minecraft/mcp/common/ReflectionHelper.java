@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -3514,6 +3515,7 @@ public final class ReflectionHelper {
     private static void initMouseFields(Object mouseHandler) throws Exception {
         if (mouseFieldsInit) return;
         mouseFieldsInit = true;
+        List<Field> booleanFields = new ArrayList<>();
         for (Field f : getAllFields(mouseHandler.getClass())) {
             String fn = f.getName().toLowerCase();
             if ((fn.contains("grabbed")) && f.getType() == boolean.class) {
@@ -3531,6 +3533,25 @@ public final class ReflectionHelper {
                 accumulatedDYField = f;
                 dbg("cursor: found accDY=" + f.getName());
             }
+            if (f.getType() == boolean.class && f.getName().toLowerCase().contains("cursor")) {
+                booleanFields.add(f);
+            }
+        }
+        if (mouseGrabbedField == null) {
+            for (Field f : getAllFields(mouseHandler.getClass())) {
+                if (f.getType() == boolean.class) {
+                    f.setAccessible(true);
+                    booleanFields.add(f);
+                    dbg("cursor: candidate boolean field: " + f.getName());
+                }
+            }
+            if (booleanFields.size() == 1) {
+                mouseGrabbedField = booleanFields.get(0);
+                dbg("cursor: using sole boolean field as mouseGrabbed: " + mouseGrabbedField.getName());
+            }
+        }
+        if (mouseGrabbedField == null) {
+            dbg("cursor: WARNING - mouseGrabbedField not found, camera rotation suppression will not work");
         }
     }
 
