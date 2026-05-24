@@ -57,6 +57,7 @@ public class ModDevMcpMod {
     }
 
     private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
+    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
     private static boolean cursorInterceptorInstalled = false;
     private static java.lang.reflect.Field mousePosXField = null;
     private static java.lang.reflect.Field mousePosYField = null;
@@ -73,6 +74,17 @@ public class ModDevMcpMod {
                     } catch (Exception ignored) {}
                 } else if (originalCursorCallback != null) {
                     originalCursorCallback.invoke(window, xpos, ypos);
+                }
+            });
+            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    if (button == 0 && action == 1) {
+                        handleClick(mc, button, action);
+                    }
+                    return;
+                }
+                if (originalMouseButtonCallback != null) {
+                    originalMouseButtonCallback.invoke(window, button, action, mods);
                 }
             });
             java.lang.reflect.Field[] fields = mc.mouseHelper.getClass().getDeclaredFields();
