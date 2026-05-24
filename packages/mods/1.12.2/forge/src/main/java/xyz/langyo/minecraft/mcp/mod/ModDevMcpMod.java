@@ -143,6 +143,8 @@ public class ModDevMcpMod {
         return t != null ? t : key;
     }
 
+    private static int transferCooldown = 0;
+
     private static boolean isPauseMenu(GuiScreen screen) {
         return screen instanceof GuiIngameMenu;
     }
@@ -302,6 +304,7 @@ public class ModDevMcpMod {
         if (INSTANCE == null || INSTANCE.debugUrl == null) return;
 
         if (ReflectionHelper.isMcpControlMode()) {
+            transferCooldown = 10;
             if (event.phase == TickEvent.Phase.START) {
                 forceLwjgl2MouseFree();
             } else {
@@ -335,6 +338,7 @@ public class ModDevMcpMod {
         }
 
         if (event.phase != TickEvent.Phase.END) return;
+        if (transferCooldown > 0) transferCooldown--;
         try {
             Minecraft mc = Minecraft.getMinecraft();
             ReflectionHelper.tickMouseRelease(mc);
@@ -348,7 +352,7 @@ public class ModDevMcpMod {
                 }
             }
 
-            if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu) && Mouse.isButtonDown(0)) {
+            if (transferCooldown == 0 && mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu) && Mouse.isButtonDown(0)) {
                 int mx = getMouseX(mc);
                 int my = getMouseY(mc);
                 ReflectionHelper.handleTransferOverlayClick(mx, my, mc);

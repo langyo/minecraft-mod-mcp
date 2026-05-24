@@ -15,8 +15,8 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.util.text.TextFormatting;
+import org.lwjgl.glfw.GLFW;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
@@ -52,6 +52,25 @@ public class ModDevMcpMod {
         return mc.mouseHelper.getMouseY() * mc.mainWindow.getScaledHeight() / mc.mainWindow.getHeight();
     }
 
+    private static String translate(String key) {
+        return net.minecraft.client.resources.I18n.format(key);
+    }
+
+    private static void forceGlfwMouseFree(Minecraft mc) {
+        try {
+            long hwnd = mc.mainWindow.getHandle();
+            if (GLFW.glfwGetInputMode(hwnd, GLFW.GLFW_CURSOR) != GLFW.GLFW_CURSOR_NORMAL) {
+                GLFW.glfwSetInputMode(hwnd, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private static int transferCooldown = 0;
+
+    private static boolean isPauseMenu(GuiScreen screen) {
+        return screen instanceof GuiIngameMenu;
+    }
+
     @SuppressWarnings("removal")
     public ModDevMcpMod() {
         INSTANCE = this;
@@ -85,14 +104,26 @@ public class ModDevMcpMod {
             }, "MCP-HTTP").start();
         }
 
+        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Pre event) -> {
+            if (ReflectionHelper.isMcpControlMode() && event.getGui() instanceof GuiIngameMenu) {
+                event.setCanceled(true);
+                try { Minecraft.getInstance().currentScreen = null; } catch (Exception ignored) {}
+            }
+        });
+
         MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Post event) -> {
             try {
                 if (event.getGui() instanceof GuiIngameMenu) {
                     McpScreenHelper.patchPauseScreen(event.getGui(), new McpScreenHelper.ButtonFactory() {
                         @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                            return new GuiButton(-999, x, y, w, h, new TextComponentTranslation(translationKey).getFormattedText()) {
+                            String displayText = translate(translationKey);
+                            return new GuiButton(-999, x, y, w, h, displayText) {
                                 @Override public void onClick(double mouseX, double mouseY) {
-                                    onClick.run();
+                                    try {
+                                        Minecraft mc = Minecraft.getInstance();
+                                        ReflectionHelper.enterMcpControlMode(mc);
+                                        mc.displayGuiScreen(null);
+                                    } catch (Exception ignored) {}
                                 }
                             };
                         }
@@ -103,13 +134,17 @@ public class ModDevMcpMod {
 
         MinecraftForge.EVENT_BUS.addListener((RenderGameOverlayEvent.Post event) -> {
             if (event.getType() != RenderGameOverlayEvent.ElementType.CHAT) return;
-            if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
+            if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive() && !ReflectionHelper.isMcpControlMode()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
-                if (mc.currentScreen == null) {
-                    ReflectionHelper.tickMouseRelease(mc);
-                    ReflectionHelper.tickMcpControlMode(mc);
+                ReflectionHelper.tickMouseRelease(mc);
+                ReflectionHelper.tickMcpControlMode(mc);
 
+                if (ReflectionHelper.isMcpControlMode()) {
+                    forceGlfwMouseFree(mc);
+                }
+
+                if (mc.currentScreen == null) {
                     if (!ReflectionHelper.isScreenshotInProgress()) {
                         ReflectionHelper.cacheFrameFromRenderThread(mc);
                     }
@@ -119,7 +154,8 @@ public class ModDevMcpMod {
                         int h = mc.mainWindow.getScaledHeight();
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
-                        McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, new TextComponentTranslation("mcpmod.control.resume").getFormattedText(), w, h, (int) mx, (int) my);
+                        String label = translate("mcpmod.control.resume");
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
                     }
                 }
             } catch (Exception ignored) {}
@@ -136,10 +172,13 @@ public class ModDevMcpMod {
                 double my = getMouseY(mc);
 
                 if (ReflectionHelper.isMcpControlMode()) {
+                    forceGlfwMouseFree(mc);
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
-                    McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, new TextComponentTranslation("mcpmod.control.resume").getFormattedText(), w, h, (int) mx, (int) my);
-                } else if (mc.world != null && screen != null && !(screen instanceof GuiIngameMenu)) {
-                    McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRenderer, new TextComponentTranslation("mcpmod.control.pause_button").getFormattedText(), w, h, (int) mx, (int) my);
+                    String label = translate("mcpmod.control.resume");
+                    McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
+                } else if (mc.world != null && screen != null && !isPauseMenu(screen)) {
+                    String label = translate("mcpmod.control.pause_button");
+                    McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
                 }
             } catch (Exception ignored) {}
         });
@@ -147,21 +186,20 @@ public class ModDevMcpMod {
         MinecraftForge.EVENT_BUS.addListener((InputEvent.MouseInputEvent event) -> {
             try {
                 Minecraft mc = Minecraft.getInstance();
-                if (ReflectionHelper.shouldSuppressInput()) { event.setCanceled(true); return; }
                 if (ReflectionHelper.isMcpControlMode()) {
-                    if (event.getButton() == 0) {
+                    if (event.getButton() == 0 && event.getAction() == 1) {
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
-                        String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
-                        if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                            event.setCanceled(true);
-                            return;
-                        }
+                        ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                     }
                     event.setCanceled(true);
                     return;
                 }
-                if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu) && event.getButton() == 0) {
+                if (ReflectionHelper.shouldSuppressInput()) {
+                    event.setCanceled(true);
+                    return;
+                }
+                if (transferCooldown == 0 && mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu) && event.getButton() == 0 && event.getAction() == 1) {
                     double mx = getMouseX(mc);
                     double my = getMouseY(mc);
                     if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {
@@ -171,9 +209,41 @@ public class ModDevMcpMod {
             } catch (Exception ignored) {}
         });
 
+        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseInputEvent event) -> {
+            if (ReflectionHelper.isMcpControlMode()) {
+                event.setCanceled(true);
+            }
+        });
+
         MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent event) -> {
             if (INSTANCE == null || INSTANCE.debugUrl == null) return;
+
+            if (ReflectionHelper.isMcpControlMode()) {
+                transferCooldown = 10;
+                if (event.phase == TickEvent.Phase.START) {
+                    try { forceGlfwMouseFree(Minecraft.getInstance()); } catch (Exception ignored) {}
+                } else {
+                    try {
+                        Minecraft mc = Minecraft.getInstance();
+                        ReflectionHelper.tickMouseRelease(mc);
+                        ReflectionHelper.tickMcpControlMode(mc);
+                        ReflectionHelper.tickVideoCapture(mc);
+                        forceGlfwMouseFree(mc);
+                        McpPlatformControl ctrl = McpControlFactory.get();
+                        if (ctrl instanceof McpWin32Control) {
+                            McpWin32Control w32ctrl = (McpWin32Control) ctrl;
+                            if (w32ctrl.getMcHwnd() == 0) {
+                                long glfwHandle = mc.mainWindow.getHandle();
+                                w32ctrl.ensureHwndFromGlfw(glfwHandle);
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+                return;
+            }
+
             if (event.phase != TickEvent.Phase.END) return;
+            if (transferCooldown > 0) transferCooldown--;
             try {
                 Minecraft mc = Minecraft.getInstance();
                 ReflectionHelper.tickMouseRelease(mc);
@@ -185,6 +255,14 @@ public class ModDevMcpMod {
                     if (w32ctrl.getMcHwnd() == 0) {
                         long glfwHandle = mc.mainWindow.getHandle();
                         w32ctrl.ensureHwndFromGlfw(glfwHandle);
+                    }
+                }
+
+                if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu)) {
+                    if (GLFW.glfwGetMouseButton(mc.mainWindow.getHandle(), GLFW.GLFW_MOUSE_BUTTON_1) == GLFW.GLFW_PRESS) {
+                        double mx = getMouseX(mc);
+                        double my = getMouseY(mc);
+                        ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc);
                     }
                 }
             } catch (Exception ignored) {}

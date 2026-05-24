@@ -88,13 +88,16 @@ public class McpScreenHelper {
     private static void addRenderableWidget(Object screen, Object widget) throws Exception {
         for (Class<?> c = screen.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
             for (Method m : c.getDeclaredMethods()) {
-                if (!m.getName().equals("addRenderableWidget") || m.getParameterCount() != 1) continue;
+                String name = m.getName();
+                if (!name.equals("addRenderableWidget") && !name.equals("addButton") && !name.equals("func_212284_a")) continue;
+                if (m.getParameterCount() != 1) continue;
                 if (!m.getParameterTypes()[0].isAssignableFrom(widget.getClass())) continue;
                 m.setAccessible(true);
                 m.invoke(screen, widget);
                 return;
             }
         }
+        addToNamedList(screen, "buttons", widget);
         addToNamedList(screen, "buttonList", widget);
         addToNamedList(screen, "field_146292_n", widget);
         addToNamedList(screen, "renderables", widget);
