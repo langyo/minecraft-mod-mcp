@@ -5,6 +5,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
@@ -145,6 +146,12 @@ public class ModDevMcpMod {
                 }
             }, "MCP-HTTP").start();
         }
+
+        MinecraftForge.EVENT_BUS.addListener((GuiOpenEvent event) -> {
+            if (ReflectionHelper.isMcpControlMode() && event.getGui() instanceof IngameMenuScreen) {
+                event.setCanceled(true);
+            }
+        });
 
         MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Post event) -> {
             try {
