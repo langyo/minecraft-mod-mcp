@@ -1,0 +1,7 @@
+{
+  "mcpmod.control.resume": "手動制御を再開",
+  "mcpmod.control.transfer": "MCPに制御を移行",
+  "mcpmod.control.overlay": "MCPがゲームを制御中",
+  "mcpmod.control.menu": "システムメニュー",
+  "mcpmod.description": "AIエージェント連携のためのMinecraft WebSocketブリッジMOD"
+}

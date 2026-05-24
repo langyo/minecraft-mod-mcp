@@ -1,6 +1,15 @@
 {
   "pack": {
-    "description": "ModDev MCP resources",
+    "description": {
+        "en_us": "ModDev MCP resources",
+        "zh_cn": "ModDev MCP 资源包",
+        "zh_tw": "ModDev MCP 資源包",
+        "ja_jp": "ModDev MCP リソースパック",
+        "ko_kr": "ModDev MCP 리소스 팩",
+        "fr_fr": "Pack de ressources ModDev MCP",
+        "es_es": "Paquete de recursos ModDev MCP",
+        "ru_ru": "Пакет ресурсов ModDev MCP"
+      },
     "pack_format": 32
   }
 }

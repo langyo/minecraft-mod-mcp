@@ -1,0 +1,7 @@
+{
+  "mcpmod.control.resume": "Resume Manual Control",
+  "mcpmod.control.transfer": "Transfer control to MCP",
+  "mcpmod.control.overlay": "MCP is controlling the game",
+  "mcpmod.control.menu": "System Menu",
+  "mcpmod.description": "WebSocket bridge for AI agent interaction for Minecraft"
+}
