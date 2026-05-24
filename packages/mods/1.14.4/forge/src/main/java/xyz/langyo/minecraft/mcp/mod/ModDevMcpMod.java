@@ -18,12 +18,73 @@ import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.util.text.event.ClickEvent;
 
+import org.lwjgl.glfw.GLFW;
+
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
+
+    private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
+    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
+    private static boolean cursorInterceptorInstalled = false;
+    private static java.lang.reflect.Field mousePosXField = null;
+    private static java.lang.reflect.Field mousePosYField = null;
+
+    private static void ensureCursorInterceptor(Minecraft mc) {
+        if (cursorInterceptorInstalled) return;
+        try {
+            long handle = mc.mainWindow.getHandle();
+            originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    try {
+                        if (mousePosXField != null) mousePosXField.setDouble(mc.mouseHelper, xpos);
+                        if (mousePosYField != null) mousePosYField.setDouble(mc.mouseHelper, ypos);
+                    } catch (Exception ignored) {}
+                } else if (originalCursorCallback != null) {
+                    originalCursorCallback.invoke(window, xpos, ypos);
+                }
+            });
+            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    if (button == 0 && action == 1) {
+                        double mx = getMouseX(mc);
+                        double my = getMouseY(mc);
+                        ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                    }
+                    return;
+                }
+                if (originalMouseButtonCallback != null) {
+                    originalMouseButtonCallback.invoke(window, button, action, mods);
+                }
+            });
+            java.lang.reflect.Field[] fields = mc.mouseHelper.getClass().getDeclaredFields();
+            java.lang.reflect.Field firstDouble = null, secondDouble = null;
+            for (java.lang.reflect.Field f : fields) {
+                if (f.getType() == double.class) {
+                    if (firstDouble == null) firstDouble = f;
+                    else if (secondDouble == null) { secondDouble = f; break; }
+                }
+            }
+            if (firstDouble != null) { firstDouble.setAccessible(true); mousePosXField = firstDouble; }
+            if (secondDouble != null) { secondDouble.setAccessible(true); mousePosYField = secondDouble; }
+            cursorInterceptorInstalled = true;
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] Cursor interceptor failed: " + e.getMessage());
+        }
+    }
+
+    private static void forceGlfwMouseFree(Minecraft mc) {
+        ensureCursorInterceptor(mc);
+        try {
+            long hwnd = mc.mainWindow.getHandle();
+            if (GLFW.glfwGetInputMode(hwnd, GLFW.GLFW_CURSOR) != GLFW.GLFW_CURSOR_NORMAL) {
+                GLFW.glfwSetInputMode(hwnd, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
+            }
+        } catch (Exception ignored) {}
+    }
 
     private static McpRenderer wrapRenderer(Minecraft mc) {
         return new McpRenderer() {
@@ -106,6 +167,10 @@ public class ModDevMcpMod {
                     ReflectionHelper.tickMouseRelease(mc);
                     ReflectionHelper.tickMcpControlMode(mc);
 
+                    if (ReflectionHelper.isMcpControlMode()) {
+                        forceGlfwMouseFree(mc);
+                    }
+
                     if (!ReflectionHelper.isScreenshotInProgress()) {
                         ReflectionHelper.cacheFrameFromRenderThread(mc);
                     }
@@ -132,6 +197,7 @@ public class ModDevMcpMod {
                 double my = getMouseY(mc);
 
                 if (ReflectionHelper.isMcpControlMode()) {
+                    forceGlfwMouseFree(mc);
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
                     McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getFormattedText(), w, h, (int) mx, (int) my);
                 } else if (mc.world != null && screen != null && !(screen instanceof IngameMenuScreen)) {
