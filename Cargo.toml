@@ -9,7 +9,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 authors = ["langyo <langyo.china@gmail.com>"]
-license = "MIT"
+license = "MIT OR Apache-2.0"
 description = "Minecraft MCP control server"
 repository = "https://github.com/langyo/minecraft-neoforge-mcp"
 
