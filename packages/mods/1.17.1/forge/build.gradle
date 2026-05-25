@@ -16,6 +16,9 @@ archivesBaseName = "minecraft-moddev-mcp-mod"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+sourceCompatibility = JavaVersion.VERSION_16
+targetCompatibility = JavaVersion.VERSION_16
+
 minecraft {
     mappings channel: "official", version: "1.17.1"
     runs {

@@ -14,7 +14,11 @@ version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+afterEvaluate {
+    tasks.withType(JavaCompile).configureEach {
+        options.release.set(8)
+    }
+}
 
 minecraft {
     mappings channel: "snapshot", version: "20200224-1.15.1"
@@ -34,6 +38,10 @@ repositories {
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
 sourceSets.main.resources.srcDir '../../../common/src/main/resources'
+
+tasks.withType(ProcessResources).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
 
 dependencies {
     minecraft "net.minecraftforge:forge:1.15.2-31.2.60"

@@ -101,7 +101,8 @@ public class ModDevMcpMod implements ClientModInitializer {
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
                 McpPlatformControl ctrl = McpControlFactory.get();
-                if (ctrl instanceof McpWin32Control w32ctrl) {
+                if (ctrl instanceof McpWin32Control) {
+                    McpWin32Control w32ctrl = (McpWin32Control) ctrl;
                     if (w32ctrl.getMcHwnd() == 0) {
                         long glfwHandle = mc.getWindow().getHandle();
                         w32ctrl.ensureHwndFromGlfw(glfwHandle);
