@@ -15,11 +15,6 @@ public class McpScreenHelper {
         void addWidget(Object screen, Object widget) throws Exception;
     }
 
-    private static Runnable pendingCloseScreen = null;
-
-    public static void setPendingCloseScreen(Runnable r) { pendingCloseScreen = r; }
-    public static Runnable consumePendingCloseScreen() { Runnable r = pendingCloseScreen; pendingCloseScreen = null; return r; }
-
     public static void patchPauseScreen(Object screen, ButtonFactory factory) {
         patchPauseScreen(screen, factory, null);
     }
@@ -52,7 +47,7 @@ public class McpScreenHelper {
                 try {
                     Object mc = ReflectionHelper.getMinecraftInstance();
                     ReflectionHelper.enterMcpControlMode(mc);
-                    closeScreenDirect(mc);
+                    ReflectionHelper.closeScreen(mc);
                 } catch (Exception ignored) {}
             }, x, y, leftW, h);
             System.out.println("[MCP] patchPauseScreen: transfer button created: " + transfer.getClass().getName());
@@ -261,20 +256,6 @@ public class McpScreenHelper {
                 m.invoke(obj, value);
                 return;
             } catch (Exception ignored) {}
-        }
-    }
-
-    private static void closeScreenDirect(Object mc) throws Exception {
-        for (Class<?> c = mc.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
-            for (Method m : c.getDeclaredMethods()) {
-                String n = m.getName();
-                if (m.getParameterCount() != 1) continue;
-                if (n.equals("setScreen") || n.equals("displayGuiScreen") || n.equals("func_147108_a")) {
-                    m.setAccessible(true);
-                    m.invoke(mc, (Object) null);
-                    return;
-                }
-            }
         }
     }
 }
