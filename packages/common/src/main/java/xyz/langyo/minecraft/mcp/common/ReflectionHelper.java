@@ -143,18 +143,12 @@ public final class ReflectionHelper {
         }
         for (Field f : getAllFields(mc.getClass())) {
             f.setAccessible(true);
-            Object val = f.get(mc);
-            if (val == null) continue;
-            if (hasLongField(val.getClass())) return val;
+            String tn = f.getType().getSimpleName();
+            if (tn.contains("Window") || tn.contains("MainWindow")) {
+                try { return f.get(mc); } catch (Exception ignored) {}
+            }
         }
         return null;
-    }
-
-    private static boolean hasLongField(Class<?> clazz) {
-        for (Field f : getAllFields(clazz)) {
-            if (f.getType() == long.class) return true;
-        }
-        return false;
     }
 
     private static long extractHandleFromWindow(Object window) throws Exception {
