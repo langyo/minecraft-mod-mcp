@@ -25,3 +25,23 @@ target/
 .minecraft/
 tmp_fbo_extract/
 mcp_debug.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+
+# Misc
+node_modules/
+*.tmp
+*.swp
+*~
+dist/
