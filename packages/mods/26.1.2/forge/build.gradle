@@ -42,6 +42,10 @@ dependencies {
     implementation 'net.java.dev.jna:jna-platform:5.15.0'
 }
 
+tasks.withType(ProcessResources).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }

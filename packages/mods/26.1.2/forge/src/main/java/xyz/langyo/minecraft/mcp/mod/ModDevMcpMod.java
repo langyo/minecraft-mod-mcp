@@ -8,6 +8,7 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -129,8 +130,10 @@ public class ModDevMcpMod {
             ReflectionHelper.tickMouseRelease(mc);
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);
-        } catch (Exception ignored) {}
+        } catch (Exception e) { System.err.println("[MCP-DEBUG] tick exception: " + e.getMessage()); }
     }
+
+    private static volatile boolean tickLogSuppress = false;
 
     public ModDevMcpMod() {
         INSTANCE = this;
@@ -154,12 +157,17 @@ public class ModDevMcpMod {
         }, "MCP-HTTP").start();
 
         CustomizeGuiOverlayEvent.Chat.BUS.addListener(event -> {
-            if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
+            if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive() && !ReflectionHelper.isMcpControlMode()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
 
                 if (ReflectionHelper.isMcpControlMode() && mc.screen instanceof PauseScreen) {
                     mc.screen = null;
+                }
+
+                if (ReflectionHelper.isMcpControlMode() && !tickLogSuppress) {
+                    tickLogSuppress = true;
+                    System.err.println("[MCP-DEBUG] Chat event: mcpControlMode=true, screen=" + (mc.screen != null ? mc.screen.getClass().getSimpleName() : "null") + ", debugUrl=" + (debugUrl != null ? "set" : "null"));
                 }
 
                 if (mc.screen == null) {
@@ -202,27 +210,62 @@ public class ModDevMcpMod {
             } catch (Exception e) { e.printStackTrace(); }
         });
 
-        ScreenEvent.Init.Pre.BUS.addListener(event -> {
-            if (ReflectionHelper.isMcpControlMode() && event.getScreen() instanceof PauseScreen) {
-                try {
-                    for (java.lang.reflect.Method m : event.getClass().getMethods()) {
-                        if (m.getName().equals("setCanceled") || m.getName().equals("setCancelled")) {
-                            m.invoke(event, true);
-                            break;
-                        }
-                    }
-                } catch (Exception ignored) {}
+        ScreenEvent.Opening.BUS.addListener(event -> {
+            if (ReflectionHelper.isMcpControlMode() && event.getNewScreen() instanceof PauseScreen) {
+                event.setNewScreen(null);
             }
         });
 
         ScreenEvent.Init.Post.BUS.addListener(event -> {
             try {
-                if (event.getScreen() instanceof PauseScreen pauseScreen) {
-                    McpScreenHelper.patchPauseScreen(pauseScreen, new McpScreenHelper.ButtonFactory() {
-                        @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                            return Button.builder(Component.translatable(translationKey), btn -> onClick.run()).bounds(x, y, w, h).build();
+                if (event.getScreen() instanceof PauseScreen) {
+                    Screen screen = event.getScreen();
+                    AbstractWidget widest = null;
+                    int maxBottomY = -1;
+                    Class<?> clazz = screen.getClass();
+                    while (clazz != null) {
+                        for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
+                            f.setAccessible(true);
+                            Object val;
+                            try { val = f.get(screen); } catch (Exception ex) { continue; }
+                            if (val instanceof java.util.List) {
+                                for (Object item : (java.util.List<?>) val) {
+                                    if (item instanceof AbstractWidget) {
+                                        AbstractWidget aw = (AbstractWidget) item;
+                                        int bottomY = aw.getY() + aw.getHeight();
+                                        if (aw.getWidth() >= 150 && bottomY > maxBottomY) {
+                                            widest = aw;
+                                            maxBottomY = bottomY;
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    });
+                        clazz = clazz.getSuperclass();
+                    }
+                    if (widest == null) return;
+                    int x = widest.getX();
+                    int y = widest.getY();
+                    int w = widest.getWidth();
+                    int h = widest.getHeight();
+                    int gap = 8;
+                    int leftW = (w - gap) / 2;
+                    int rightW = w - gap - leftW;
+                    widest.setX(x + leftW + gap);
+                    widest.setWidth(rightW);
+                    String transferKey = ReflectionHelper.getMcpControlPauseTransferTranslationKey();
+                    Button transferBtn = Button.builder(Component.translatable(transferKey), btn -> {
+                        try {
+                            Minecraft mc = Minecraft.getInstance();
+                            System.err.println("[MCP-DEBUG] PauseScreen button clicked, calling enterMcpControlMode...");
+                            String result = ReflectionHelper.enterMcpControlMode(mc);
+                            System.err.println("[MCP-DEBUG] enterMcpControlMode result: " + result);
+                            System.err.println("[MCP-DEBUG] isMcpControlMode: " + ReflectionHelper.isMcpControlMode());
+                            mc.setScreen(null);
+                            System.err.println("[MCP-DEBUG] setScreen(null) done");
+                        } catch (Exception e) { System.err.println("[MCP-DEBUG] button exception: " + e.getMessage()); e.printStackTrace(); }
+                    }).bounds(x, y, leftW, h).build();
+                    event.addListener(transferBtn);
                 }
             } catch (Exception ignored) {}
         });
