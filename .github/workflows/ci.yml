@@ -11,25 +11,215 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  JAVA_HOME: "C:\\Program Files\\Amazon Corretto\\jdk21.0.8_9"
-
 jobs:
-  java-build:
-    name: Java Build (common + mod)
+  build-common:
+    name: Build Common
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: corretto
+          distribution: temurin
           java-version: "21"
 
-      - name: Build mcp-common
-        run: .\gradlew.bat :packages:common:clean :packages:common:publishToMavenLocal
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-common-${{ runner.os }}-${{ hashFiles('**/settings.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-common-${{ runner.os }}-
 
-      - name: Build mod (1.21.7/forge)
-        working-directory: packages/mods/1.21.7/forge
-        run: .\gradlew.bat clean jar
+      - name: Build common
+        run: .\gradlew.bat :packages:common:clean :packages:common:publish --no-daemon --console=plain
+
+      - name: Upload .maven-local
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-local
+          path: .maven-local/
+          retention-days: 1
+
+  build-mods:
+    name: Build (JDK ${{ matrix.jdk }})
+    needs: build-common
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - jdk: "8"
+            mods: |
+              1.8.9/forge
+              1.9.4/forge
+              1.10.2/forge
+              1.11.2/forge
+              1.12.2/forge
+              1.13.2/forge
+              1.14.4/forge
+              1.15.2/forge
+          - jdk: "17"
+            mods: |
+              1.16.5/forge
+              1.17.1/forge
+              1.18.2/forge
+              1.19.4/forge
+              1.14.4/fabric
+              1.15.2/fabric
+              1.16.5/fabric
+              1.17.1/fabric
+              1.18.2/fabric
+              1.19.4/fabric
+          - jdk: "21"
+            mods: |
+              1.20.6/forge
+              1.21.7/forge
+              1.20.6/fabric
+              1.20.6/neoforge
+          - jdk: "25"
+            mods: |
+              26.1.2/forge
+              26.1.2/neoforge
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore .maven-local
+        uses: actions/download-artifact@v4
+        with:
+          name: maven-local
+          path: .maven-local/
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.jdk }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.gradle/jdks
+          key: gradle-jdk${{ matrix.jdk }}-${{ runner.os }}-${{ hashFiles('**/build.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-jdk${{ matrix.jdk }}-${{ runner.os }}-
+            gradle-common-${{ runner.os }}-
+
+      - name: Build mods
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $failedMods = @()
+          $mods = @'
+          ${{ matrix.mods }}
+          '@ -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+
+          foreach ($mod in $mods) {
+            $modPath = "packages/mods/$mod"
+            Write-Host "`n========================================"
+            Write-Host "  Building: $modPath"
+            Write-Host "========================================"
+
+            Push-Location $modPath
+            try {
+              $result = .\gradlew.bat clean jar --no-daemon --console=plain --warning-mode=summary 2>&1
+              if ($LASTEXITCODE -ne 0) {
+                $errFile = "build-error.log"
+                $result | Out-File -FilePath $errFile -Encoding UTF8
+                Write-Host "::error file=$modPath/$errFile::Build failed for $mod"
+                Write-Host $result
+                $failedMods += $mod
+              } else {
+                Write-Host "  [OK] $mod"
+              }
+            } catch {
+              Write-Host "::error::Exception building $mod : $_"
+              $failedMods += $mod
+            } finally {
+              Pop-Location
+            }
+          }
+
+          if ($failedMods.Count -gt 0) {
+            Write-Host "::error::Failed builds: $($failedMods -join ', ')"
+            exit 1
+          }
+
+      - name: Collect JARs
+        shell: pwsh
+        run: |
+          $sha = "${{ github.sha }}".Substring(0, 7)
+          $outDir = "release-jars"
+          New-Item -ItemType Directory -Path $outDir -Force
+
+          $mods = @'
+          ${{ matrix.mods }}
+          '@ -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+
+          foreach ($mod in $mods) {
+            $parts = $mod -split '/'
+            $mc = $parts[0]
+            $loader = $parts[1]
+            $jarDir = "packages/mods/$mod/build/libs"
+
+            if (Test-Path $jarDir) {
+              Get-ChildItem $jarDir -Filter "*.jar" | ForEach-Object {
+                if ($_.Name -notmatch "-sources|-dev|-slim") {
+                  $newName = "minecraft-mcp-$mc-$loader-$sha.jar"
+                  Copy-Item $_.FullName "$outDir/$newName"
+                  Write-Host "  Collected: $newName ($('{0:N1}' -f ($_.Length / 1KB)) KB)"
+                }
+              }
+            } else {
+              Write-Host "::warning::No build/libs found for $mod"
+            }
+          }
+
+          Write-Host "`nTotal JARs collected: $((Get-ChildItem $outDir).Count)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mods-jdk${{ matrix.jdk }}
+          path: release-jars/
+          retention-days: 1
+
+  dev-release:
+    name: Dev Release
+    runs-on: windows-latest
+    needs: build-mods
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mods-jdk*
+          path: release-jars/
+
+      - name: Flatten and list all JARs
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force
+
+          Get-ChildItem release-jars -Recurse -Filter "*.jar" | ForEach-Object {
+            Copy-Item $_.FullName "dist/" -Force
+          }
+
+          Write-Host "`n=== All JARs for dev release ==="
+          Get-ChildItem dist | ForEach-Object {
+            Write-Host "  $($_.Name)  ($('{0:N1}' -f ($_.Length / 1KB)) KB)"
+          }
+          Write-Host "Total: $((Get-ChildItem dist).Count) JARs"
+
+      - name: Create/Update Dev Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev/${{ github.sha }}
+          name: "Dev Build (${{ github.sha }})"
+          body: |
+            Development build from commit `${{ github.sha }}`
+            Branch: `${{ github.ref_name }}`
+          prerelease: true
+          files: dist/*.jar
