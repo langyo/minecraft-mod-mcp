@@ -18,7 +18,7 @@
 
 ## 什麼是 Minecraft MCP
 
-Minecraft MCP 是 AI 助手與 Minecraft 之間的橋樑。它以遊戲內模組的方式執行，暴露一個 HTTP 伺服器，讓 AI 工具——**Claude Code、Cursor、Cline、GitHub Copilot 以及其他 20 多種**——能夠透過標準的 MCP 協定連接。透過這座橋樑，AI 可以觀察遊戲畫面、點擊按鈕、輸入指令，並與世界互動。
+Minecraft MCP 是 AI 助手與 Minecraft 之間的橋樑。它以遊戲內模組的方式執行，暴露一個 HTTP 伺服器，讓 AI 工具能夠透過標準的 MCP 協定連接。透過這座橋樑，AI 可以觀察遊戲畫面、點擊按鈕、輸入指令，並與世界互動。
 
 > 想要讓你的 AI 建造一座城堡？執行煙霧測試？操作模組包選單？Minecraft MCP 讓這一切成為可能。
 
