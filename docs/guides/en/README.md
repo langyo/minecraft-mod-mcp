@@ -9,7 +9,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
-[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mcp)](https://github.com/langyo/minecraft-mcp/releases)
+[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mod-mcp)](https://github.com/langyo/minecraft-mod-mcp/releases)
 
 **English** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
@@ -18,7 +18,7 @@
 
 ## What is Minecraft MCP
 
-Minecraft MCP is a bridge between AI assistants and Minecraft. It runs as a mod inside the game, exposing an HTTP server that AI tools — **Claude Code, Cursor, Cline, GitHub Copilot, and 20+ others** — can connect to via the standard MCP protocol. Through this bridge, AI can see the game, click buttons, type commands, and interact with the world.
+Minecraft MCP is a bridge between AI assistants and Minecraft. It runs as a mod inside the game, exposing an HTTP server that AI tools can connect to via the standard MCP protocol. Through this bridge, AI can see the game, click buttons, type commands, and interact with the world.
 
 > Want your AI to build a castle? Run a smoke test? Navigate a modpack menu? Minecraft MCP makes it possible.
 
@@ -33,21 +33,21 @@ Minecraft MCP is a bridge between AI assistants and Minecraft. It runs as a mod 
 
 | MC Version | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
-| 1.8.9 | ✓ | | |
-| 1.9.4 | ✓ | | |
-| 1.10.2 | ✓ | | |
-| 1.11.2 | ✓ | | |
-| 1.12.2 | ✓ | | |
-| 1.13.2 | ✓ | | |
-| 1.14.4 | ✓ | 🚧 | |
-| 1.15.2 | ✓ | 🚧 | |
-| 1.16.5 | ✓ | 🚧 | |
-| 1.17.1 | ✓ | 🚧 | |
-| 1.18.2 | ✓ | 🚧 | |
-| 1.19.4 | ✓ | 🚧 | |
+| 1.8.9 | ✓ | — | — |
+| 1.9.4 | ✓ | — | — |
+| 1.10.2 | ✓ | — | — |
+| 1.11.2 | ✓ | — | — |
+| 1.12.2 | ✓ | — | — |
+| 1.13.2 | ✓ | — | — |
+| 1.14.4 | ✓ | 🚧 | — |
+| 1.15.2 | ✓ | 🚧 | — |
+| 1.16.5 | ✓ | 🚧 | — |
+| 1.17.1 | ✓ | 🚧 | — |
+| 1.18.2 | ✓ | 🚧 | — |
+| 1.19.4 | ✓ | 🚧 | — |
 | 1.20.6 | ✓ | 🚧 | 🚧 |
-| 1.21.7 | ✓ | | |
-| 26.1.2 | ✓ | | 🚧 |
+| 1.21.7 | ✓ | — | — |
+| 26.1.2 | ✓ | — | 🚧 |
 
 > 🚧 = Work In Progress
 

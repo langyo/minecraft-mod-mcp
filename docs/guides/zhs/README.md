@@ -9,7 +9,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
-[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mcp)](https://github.com/langyo/minecraft-mcp/releases)
+[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mod-mcp)](https://github.com/langyo/minecraft-mod-mcp/releases)
 
 **[English](../en/README.md)** &bull; **简体中文** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
@@ -18,7 +18,7 @@
 
 ## 什么是 Minecraft MCP
 
-Minecraft MCP 是 AI 助手与 Minecraft 之间的桥梁。它以游戏内模组的形式运行，启动一个 HTTP 服务器，使 AI 工具 —— **Claude Code、Cursor、Cline、GitHub Copilot 以及 20 多种其他工具** —— 可以通过标准 MCP 协议连接到它。通过这座桥梁，AI 可以看到游戏画面、点击按钮、输入命令并与世界交互。
+Minecraft MCP 是 AI 助手与 Minecraft 之间的桥梁。它以游戏内模组的形式运行，启动一个 HTTP 服务器，使 AI 工具 可以通过标准 MCP 协议连接到它。通过这座桥梁，AI 可以看到游戏画面、点击按钮、输入命令并与世界交互。
 
 > 想让你的 AI 建造一座城堡？运行冒烟测试？浏览整合包菜单？Minecraft MCP 让这一切成为可能。
 
@@ -33,21 +33,21 @@ Minecraft MCP 是 AI 助手与 Minecraft 之间的桥梁。它以游戏内模组
 
 | MC 版本 | Forge | Fabric | NeoForge |
 |---------|:-----:|:------:|:--------:|
-| 1.8.9 | ✓ | | |
-| 1.9.4 | ✓ | | |
-| 1.10.2 | ✓ | | |
-| 1.11.2 | ✓ | | |
-| 1.12.2 | ✓ | | |
-| 1.13.2 | ✓ | | |
-| 1.14.4 | ✓ | 🚧 | |
-| 1.15.2 | ✓ | 🚧 | |
-| 1.16.5 | ✓ | 🚧 | |
-| 1.17.1 | ✓ | 🚧 | |
-| 1.18.2 | ✓ | 🚧 | |
-| 1.19.4 | ✓ | 🚧 | |
+| 1.8.9 | ✓ | — | — |
+| 1.9.4 | ✓ | — | — |
+| 1.10.2 | ✓ | — | — |
+| 1.11.2 | ✓ | — | — |
+| 1.12.2 | ✓ | — | — |
+| 1.13.2 | ✓ | — | — |
+| 1.14.4 | ✓ | 🚧 | — |
+| 1.15.2 | ✓ | 🚧 | — |
+| 1.16.5 | ✓ | 🚧 | — |
+| 1.17.1 | ✓ | 🚧 | — |
+| 1.18.2 | ✓ | 🚧 | — |
+| 1.19.4 | ✓ | 🚧 | — |
 | 1.20.6 | ✓ | 🚧 | 🚧 |
-| 1.21.7 | ✓ | | |
-| 26.1.2 | ✓ | | 🚧 |
+| 1.21.7 | ✓ | — | — |
+| 26.1.2 | ✓ | — | 🚧 |
 
 > 🚧 = 开发中
 

@@ -9,7 +9,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
-[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mcp)](https://github.com/langyo/minecraft-mcp/releases)
+[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mod-mcp)](https://github.com/langyo/minecraft-mod-mcp/releases)
 
 **[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **Français** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
@@ -18,7 +18,7 @@
 
 ## Qu'est-ce que Minecraft MCP
 
-Minecraft MCP est un pont entre les assistants IA et Minecraft. Il s'exécute comme un mod à l'intérieur du jeu, exposant un serveur HTTP auquel les outils IA — **Claude Code, Cursor, Cline, GitHub Copilot, et plus de 20 autres** — peuvent se connecter via le protocole MCP standard. Grâce à ce pont, l'IA peut voir le jeu, cliquer sur des boutons, taper des commandes et interagir avec le monde.
+Minecraft MCP est un pont entre les assistants IA et Minecraft. Il s'exécute comme un mod à l'intérieur du jeu, exposant un serveur HTTP auquel les outils IA peuvent se connecter via le protocole MCP standard. Grâce à ce pont, l'IA peut voir le jeu, cliquer sur des boutons, taper des commandes et interagir avec le monde.
 
 > Vous voulez que votre IA construise un château ? Lance un test de fumée ? Navigue dans le menu d'un modpack ? Minecraft MCP rend cela possible.
 
@@ -33,21 +33,21 @@ Minecraft MCP est un pont entre les assistants IA et Minecraft. Il s'exécute co
 
 | Version MC | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
-| 1.8.9 | ✓ | | |
-| 1.9.4 | ✓ | | |
-| 1.10.2 | ✓ | | |
-| 1.11.2 | ✓ | | |
-| 1.12.2 | ✓ | | |
-| 1.13.2 | ✓ | | |
-| 1.14.4 | ✓ | 🚧 | |
-| 1.15.2 | ✓ | 🚧 | |
-| 1.16.5 | ✓ | 🚧 | |
-| 1.17.1 | ✓ | 🚧 | |
-| 1.18.2 | ✓ | 🚧 | |
-| 1.19.4 | ✓ | 🚧 | |
+| 1.8.9 | ✓ | — | — |
+| 1.9.4 | ✓ | — | — |
+| 1.10.2 | ✓ | — | — |
+| 1.11.2 | ✓ | — | — |
+| 1.12.2 | ✓ | — | — |
+| 1.13.2 | ✓ | — | — |
+| 1.14.4 | ✓ | 🚧 | — |
+| 1.15.2 | ✓ | 🚧 | — |
+| 1.16.5 | ✓ | 🚧 | — |
+| 1.17.1 | ✓ | 🚧 | — |
+| 1.18.2 | ✓ | 🚧 | — |
+| 1.19.4 | ✓ | 🚧 | — |
 | 1.20.6 | ✓ | 🚧 | 🚧 |
-| 1.21.7 | ✓ | | |
-| 26.1.2 | ✓ | | 🚧 |
+| 1.21.7 | ✓ | — | — |
+| 26.1.2 | ✓ | — | 🚧 |
 
 > 🚧 = En cours de développement
 
