@@ -31,26 +31,16 @@ public class ModDevMcpMod {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
 
-    private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
     private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
-    private static boolean cursorInterceptorInstalled = false;
+    private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
+    private static boolean mouseInterceptorInstalled = false;
     private static java.lang.reflect.Field mousePosXField = null;
     private static java.lang.reflect.Field mousePosYField = null;
 
-    private static void ensureCursorInterceptor(Minecraft mc) {
-        if (cursorInterceptorInstalled) return;
+    private static void ensureMouseInterceptor(Minecraft mc) {
+        if (mouseInterceptorInstalled) return;
         try {
             long handle = mc.getWindow().getWindow();
-            originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
-                if (ReflectionHelper.isMcpControlMode()) {
-                    try {
-                        if (mousePosXField != null) mousePosXField.setDouble(mc.mouseHandler, xpos);
-                        if (mousePosYField != null) mousePosYField.setDouble(mc.mouseHandler, ypos);
-                    } catch (Exception ignored) {}
-                } else if (originalCursorCallback != null) {
-                    originalCursorCallback.invoke(window, xpos, ypos);
-                }
-            });
             originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
                 if (ReflectionHelper.isMcpControlMode()) {
                     if (button == 0 && action == 1) {
@@ -64,6 +54,18 @@ public class ModDevMcpMod {
                     originalMouseButtonCallback.invoke(window, button, action, mods);
                 }
             });
+            originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    try {
+                        if (mousePosXField != null) mousePosXField.setDouble(mc.mouseHandler, xpos);
+                        if (mousePosYField != null) mousePosYField.setDouble(mc.mouseHandler, ypos);
+                    } catch (Exception ignored) {}
+                    return;
+                }
+                if (originalCursorCallback != null) {
+                    originalCursorCallback.invoke(window, xpos, ypos);
+                }
+            });
             java.lang.reflect.Field[] fields = mc.mouseHandler.getClass().getDeclaredFields();
             java.lang.reflect.Field firstDouble = null, secondDouble = null;
             for (java.lang.reflect.Field f : fields) {
@@ -74,20 +76,10 @@ public class ModDevMcpMod {
             }
             if (firstDouble != null) { firstDouble.setAccessible(true); mousePosXField = firstDouble; }
             if (secondDouble != null) { secondDouble.setAccessible(true); mousePosYField = secondDouble; }
-            cursorInterceptorInstalled = true;
+            mouseInterceptorInstalled = true;
         } catch (Exception e) {
-            System.err.println("[MCP-MOD] Cursor interceptor failed: " + e.getMessage());
+            System.err.println("[MCP-MOD] Mouse interceptor failed: " + e.getMessage());
         }
-    }
-
-    private static void forceGlfwMouseFree(Minecraft mc) {
-        ensureCursorInterceptor(mc);
-        try {
-            long hwnd = mc.getWindow().getWindow();
-            if (GLFW.glfwGetInputMode(hwnd, GLFW.GLFW_CURSOR) != GLFW.GLFW_CURSOR_NORMAL) {
-                GLFW.glfwSetInputMode(hwnd, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
-            }
-        } catch (Exception ignored) {}
     }
 
     private static McpRenderer wrapRenderer(PoseStack ps, Minecraft mc) {
@@ -161,20 +153,49 @@ public class ModDevMcpMod {
             try {
                 if (event.getGui() instanceof PauseScreen) {
                     Screen screen = event.getGui();
-                    McpScreenHelper.patchPauseScreen(screen, new McpScreenHelper.ButtonFactory() {
-                        @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                            return new Button(x, y, w, h, new TranslatableComponent(translationKey), btn -> onClick.run());
+                    AbstractWidget widest = null;
+                    int widestW = 0;
+                    Class<?> clazz = screen.getClass();
+                    while (clazz != null) {
+                        for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
+                            f.setAccessible(true);
+                            Object val;
+                            try { val = f.get(screen); } catch (Exception ex) { continue; }
+                            if (val instanceof java.util.List) {
+                                for (Object item : (java.util.List<?>) val) {
+                                    if (item instanceof AbstractWidget) {
+                                        AbstractWidget aw = (AbstractWidget) item;
+                                        if (aw.getWidth() >= 150 && aw.getWidth() >= widestW) {
+                                            widest = aw;
+                                            widestW = aw.getWidth();
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    }, new McpScreenHelper.WidgetAdder() {
-                        @Override public void addWidget(Object scr, Object widget) throws Exception {
-                            event.addWidget((AbstractWidget) widget);
-                        }
+                        clazz = clazz.getSuperclass();
+                    }
+                    if (widest == null) return;
+                    int x = widest.x;
+                    int y = widest.y;
+                    int w = widest.getWidth();
+                    int h = widest.getHeight();
+                    int gap = 8;
+                    int leftW = (w - gap) / 2;
+                    int rightW = w - gap - leftW;
+                    widest.x = x + leftW + gap;
+                    widest.setWidth(rightW);
+                    String transferKey = ReflectionHelper.getMcpControlPauseTransferTranslationKey();
+                    Button transferBtn = new Button(x, y, leftW, h, new TranslatableComponent(transferKey), btn -> {
+                        try {
+                            Minecraft mc = Minecraft.getInstance();
+                            ReflectionHelper.enterMcpControlMode(mc);
+                            mc.setScreen(null);
+                        } catch (Exception ignored) {}
                     });
+                    event.addWidget(transferBtn);
                 }
-            } catch (Exception e) {
-                System.err.println("[MCP-MOD] InitGuiEvent.Post error: " + e.getMessage());
-                e.printStackTrace();
-            }
+            } catch (Exception ignored) {}
         });
 
         MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseClickedEvent.Pre event) -> {
@@ -208,12 +229,9 @@ public class ModDevMcpMod {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.screen == null) {
+                    ensureMouseInterceptor(mc);
                     ReflectionHelper.tickMouseRelease(mc);
                     ReflectionHelper.tickMcpControlMode(mc);
-
-                    if (ReflectionHelper.isMcpControlMode()) {
-                        forceGlfwMouseFree(mc);
-                    }
 
                     if (!ReflectionHelper.isScreenshotInProgress()) {
                         ReflectionHelper.cacheFrameFromRenderThread(mc);
@@ -241,7 +259,6 @@ public class ModDevMcpMod {
                 double my = getMouseY(mc);
 
                 if (ReflectionHelper.isMcpControlMode()) {
-                    forceGlfwMouseFree(mc);
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
                     McpOverlayLogic.renderResumeButton(wrapRenderer(event.getMatrixStack(), mc), mc.font, new TranslatableComponent("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                 } else if (mc.level != null && screen != null && !(screen instanceof PauseScreen)) {
