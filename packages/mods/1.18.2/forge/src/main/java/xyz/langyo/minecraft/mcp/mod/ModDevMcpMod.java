@@ -31,23 +31,54 @@ public class ModDevMcpMod {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
 
+    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
     private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
-    private static boolean cursorInterceptorInstalled = false;
+    private static boolean mouseInterceptorInstalled = false;
+    private static java.lang.reflect.Field mousePosXField = null;
+    private static java.lang.reflect.Field mousePosYField = null;
 
-    private static void ensureCursorInterceptor(Minecraft mc) {
-        if (cursorInterceptorInstalled) return;
+    private static void ensureMouseInterceptor(Minecraft mc) {
+        if (mouseInterceptorInstalled) return;
         try {
             long handle = mc.getWindow().getWindow();
+            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    if (button == 0 && action == 1) {
+                        double mx = getMouseX(mc);
+                        double my = getMouseY(mc);
+                        ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                    }
+                    return;
+                }
+                if (originalMouseButtonCallback != null) {
+                    originalMouseButtonCallback.invoke(window, button, action, mods);
+                }
+            });
             originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
                 if (ReflectionHelper.isMcpControlMode()) {
-                    // swallow cursor events to prevent camera rotation
-                } else if (originalCursorCallback != null) {
+                    try {
+                        if (mousePosXField != null) mousePosXField.setDouble(mc.mouseHandler, xpos);
+                        if (mousePosYField != null) mousePosYField.setDouble(mc.mouseHandler, ypos);
+                    } catch (Exception ignored) {}
+                    return;
+                }
+                if (originalCursorCallback != null) {
                     originalCursorCallback.invoke(window, xpos, ypos);
                 }
             });
-            cursorInterceptorInstalled = true;
+            java.lang.reflect.Field[] fields = mc.mouseHandler.getClass().getDeclaredFields();
+            java.lang.reflect.Field firstDouble = null, secondDouble = null;
+            for (java.lang.reflect.Field f : fields) {
+                if (f.getType() == double.class) {
+                    if (firstDouble == null) firstDouble = f;
+                    else if (secondDouble == null) { secondDouble = f; break; }
+                }
+            }
+            if (firstDouble != null) { firstDouble.setAccessible(true); mousePosXField = firstDouble; }
+            if (secondDouble != null) { secondDouble.setAccessible(true); mousePosYField = secondDouble; }
+            mouseInterceptorInstalled = true;
         } catch (Exception e) {
-            System.err.println("[MCP-MOD] Cursor interceptor failed: " + e.getMessage());
+            System.err.println("[MCP-MOD] Mouse interceptor failed: " + e.getMessage());
         }
     }
 
@@ -189,7 +220,7 @@ public class ModDevMcpMod {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.screen == null) {
-                    ensureCursorInterceptor(mc);
+                    ensureMouseInterceptor(mc);
                     ReflectionHelper.tickMouseRelease(mc);
                     ReflectionHelper.tickMcpControlMode(mc);
 
