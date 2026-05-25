@@ -523,14 +523,12 @@ You can pair Minecraft MCP with **vision-capable MCP servers** to let AI agents 
 2. A vision MCP server reads that file and analyzes it
 3. The AI agent coordinates both — screenshot → analyze → act
 
-```
-AI Agent
-  │
-  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
-  │
-  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "Main menu, 3 buttons visible"
-  │
-  └──► Minecraft MCP:  click x=400,y=300 → enters game
+```mermaid
+flowchart TD
+    A["AI Agent"]
+    A --> B["Minecraft MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
+    A --> D["Minecraft MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### GLM Vision MCP Server

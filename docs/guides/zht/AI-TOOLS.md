@@ -523,14 +523,12 @@ curl http://localhost:9876/api/events
 2. 視覺 MCP 伺服器讀取該檔案並進行分析
 3. AI 代理協調兩者 — 截圖 → 分析 → 行動
 
-```
-AI Agent
-  │
-  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
-  │
-  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "主選單，可見 3 個按鈕"
-  │
-  └──► Minecraft MCP:  click x=400,y=300 → 進入遊戲
+```mermaid
+flowchart TD
+    A["AI Agent"]
+    A --> B["Minecraft MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
+    A --> D["Minecraft MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### GLM Vision MCP 伺服器

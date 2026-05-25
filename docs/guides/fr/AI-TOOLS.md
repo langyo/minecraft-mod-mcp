@@ -523,14 +523,12 @@ Vous pouvez associer Minecraft MCP à des **serveurs MCP compatibles vision** po
 2. Un serveur MCP vision lit ce fichier et l'analyse
 3. L'agent IA coordonne les deux — capture → analyser → agir
 
-```
-AI Agent
-  │
-  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
-  │
-  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "Main menu, 3 buttons visible"
-  │
-  └──► Minecraft MCP:  click x=400,y=300 → enters game
+```mermaid
+flowchart TD
+    A["AI Agent"]
+    A --> B["Minecraft MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
+    A --> D["Minecraft MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### Serveur MCP GLM Vision

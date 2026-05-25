@@ -523,14 +523,12 @@ Minecraft MCPを**視覚対応MCPサーバー**と組み合わせることで、
 2. 視覚MCPサーバーがそのファイルを読み取り、分析します
 3. AIエージェントが両方を調整します — スクリーンショット → 分析 → アクション
 
-```
-AI Agent
-  │
-  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
-  │
-  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "Main menu, 3 buttons visible"
-  │
-  └──► Minecraft MCP:  click x=400,y=300 → enters game
+```mermaid
+flowchart TD
+    A["AI Agent"]
+    A --> B["Minecraft MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
+    A --> D["Minecraft MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### GLM Vision MCP Server
