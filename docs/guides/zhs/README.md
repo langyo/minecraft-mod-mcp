@@ -5,26 +5,28 @@
 
 # Minecraft MCP
 
-**多版本、多 Mod 加载器的 Minecraft MCP（模型上下文协议）桥接 Mod**
+**让 AI 畅玩 Minecraft —— 支持任意版本、任意模组加载器**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
-[![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
 
 **[English](../en/README.md)** &bull; **简体中文** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **版本 0.1.0** — 活跃开发中。Java Mod 插件以及 HTTP 控制服务器均已可用。CI 已覆盖 1.21.7 Forge Mod 构建。Fabric 和 NeoForge 支持为 WIP。
-
 ## 什么是 Minecraft MCP
 
-Minecraft MCP（Master Control Program，主控程序）是一个多版本、多 Mod 加载器的 Minecraft UI 自动化框架，由两层组成：
+Minecraft MCP 是 AI 助手与 Minecraft 之间的桥梁。它以游戏内模组的形式运行，启动一个 HTTP 服务器，使 AI 工具 —— **Claude Code、Cursor、Cline、GitHub Copilot 以及 20 多种其他工具** —— 可以通过标准 MCP 协议连接到它。通过这座桥梁，AI 可以看到游戏画面、点击按钮、输入命令并与世界交互。
 
-- **Java Mod 插件**（`packages/mods/`）— 24 个 Mod 项目，覆盖 Forge、Fabric 和 NeoForge 加载器，支持 MC 1.8.9 至 26.1.2，共享公共代码库（`packages/common/`）
-- **Python 自动化**（`scripts/`）— 构建自动化、守护进程管理、测试运行器和冒烟测试
+> 想让你的 AI 建造一座城堡？运行冒烟测试？浏览整合包菜单？Minecraft MCP 让这一切成为可能。
+
+- **看** —— 截取带有坐标网格的屏幕截图
+- **动** —— 点击、输入、滚动、拖拽、按下任意按键
+- **知** —— 查询玩家位置、世界信息、屏幕按钮和调试字段
+- **录** —— 通过 SSE 实时推送事件流，捕获视频帧
+
+[AI 工具集成指南 →](./AI-TOOLS.md)
 
 ## 支持的版本
 
@@ -46,65 +48,58 @@ Minecraft MCP（Master Control Program，主控程序）是一个多版本、多
 | 1.21.7 | ✓ | | |
 | 26.1.2 | ✓ | | 🚧 |
 
-> 🚧 = WIP（开发中）
+> 🚧 = 开发中
 
 ## 快速开始
 
 ### 环境要求
 
-- Python 3.10+
-- JDK 21（推荐 Corretto）
+- JDK 21（推荐使用 Corretto）
 
 ### 安装与构建
 
 ```bash
-# 安装 Python 依赖
+# 安装依赖
 pip install -r scripts/requirements.txt
 
-# 环境检查
-just check-env
-
-# 构建全部（生成代码 + 缓存准备 + 构建所有 Mod）
+# 构建全部内容
 just full
 ```
 
 ### 运行
 
 ```bash
-# 启动控制服务器守护进程
+# 启动守护进程并启动 Minecraft
 just daemon
-
-# 启动一个 Minecraft 版本
 just launch 1.21.7 forge
 
-# 运行冒烟测试（构建 + 启动 + 截图）
+# 或者运行端到端冒烟测试
 just smoke 1.21.7
 ```
 
-## 架构
+## 工作原理
 
 ```
-┌─────────────────────────────────────┐
-│         Java Mod 插件                │
-│  (Forge / Fabric / NeoForge)        │
-│  ReflectionHelper, InputHandler     │
-└──────────────┬──────────────────────┘
-                │
-┌──────────────▼──────────────────────┐
-│         Minecraft 客户端              │
-│  (1.8.9 – 26.1.2, 24 个 Mod 变体)  │
-└─────────────────────────────────────┘
+┌────────────────────┐     HTTP/SSE      ┌─────────────────────┐
+│   AI 工具 (Claude)  │ ◄──────────────► │   Minecraft MCP      │
+│   .mcp.json 配置    │   port 9876      │   （游戏内模组）      │
+└────────────────────┘                   └──────────┬──────────┘
+                                                    │ 反射调用
+                                         ┌──────────▼──────────┐
+                                         │   Minecraft 客户端   │
+                                         │   (1.8.9 – 26.1.2)  │
+                                         └─────────────────────┘
 ```
 
-## 贡献
+该模组在 Minecraft 内部运行一个 HTTP 服务器（端口 9876）。你的 AI 工具通过标准 MCP 协议（SSE 传输）连接，每条命令 —— 点击、输入、截图等 —— 都通过 Java 反射机制实现，无需针对特定版本编写代码，跨所有 Minecraft 版本通用。
+
+## 参与贡献
 
 欢迎提交 Issue 和 Pull Request。
 
 ## 许可证
 
-本项目采用以下双重许可之一：
+根据你的选择，采用以下任一许可证：
 
 - Apache License, Version 2.0（[LICENSE-APACHE](../../LICENSE-APACHE) 或 http://www.apache.org/licenses/LICENSE-2.0）
 - MIT License（[LICENSE-MIT](../../LICENSE-MIT) 或 http://opensource.org/licenses/MIT）
-
-任选其一。

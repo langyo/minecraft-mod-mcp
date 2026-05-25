@@ -5,31 +5,33 @@
 
 # Minecraft MCP
 
-**멀티 버전, 멀티 모드로더 Minecraft MCP (모델 컨텍스트 프로토콜) 브릿지 모드**
+**AI가 마인크래프트를 플레이하게 하세요 — 모든 버전, 모든 모드로더를 지원합니다**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
-[![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
 
-**[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **한국어** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
+**[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **버전 0.1.0** — 활발히 개발 중입니다. Java 모드 플러그인과 HTTP 기반 제어 서버가 작동합니다. CI 빌드는 1.21.7 Forge 모드에서 통과됩니다. Fabric과 NeoForge 지원은 WIP입니다.
-
 ## Minecraft MCP란?
 
-Minecraft MCP(Master Control Program)는 멀티 버전, 멀티 모드로더 Minecraft UI 자동화 프레임워크입니다. 두 가지 계층으로 구성됩니다:
+Minecraft MCP는 AI 어시스턴트와 마인크래프트 사이의 다리 역할을 합니다. 게임 내에서 모드로 실행되며, **Claude Code, Cursor, Cline, GitHub Copilot 및 20개 이상의** AI 도구들이 표준 MCP 프로토콜을 통해 연결할 수 있는 HTTP 서버를 노출합니다. 이 다리를 통해 AI는 게임을 보고, 버튼을 클릭하고, 명령어를 입력하고, 세계와 상호작용할 수 있습니다.
 
-- **Java 모드 플러그인**(`packages/mods/`) — Forge, Fabric, NeoForge를 아우르는 24개의 모드 프로젝트로, MC 1.8.9부터 26.1.2까지 지원하며 공통 코드베이스(`packages/common/`)를 공유
-- **Python 자동화**(`scripts/`) — 빌드 자동화, 데몬 관리, 테스트 실행기 및 스모크 테스트
+> AI가 성을 짓게 하고 싶으신가요? 스모크 테스트를 실행하고 싶으신가요? 모드팩 메뉴를 탐색하고 싶으신가요? Minecraft MCP가 가능하게 합니다.
+
+- **보기** — 좌표 격자가 포함된 스크린샷 캡처
+- **행동하기** — 클릭, 타이핑, 스크롤, 드래그 및 모든 키 입력
+- **알기** — 플레이어 위치, 세계 정보, 화면 버튼, 디버그 필드 조회
+- **기록하기** — SSE를 통한 실시간 이벤트 스트리밍, 비디오 프레임 캡처
+
+[AI 도구 연동 가이드 →](./AI-TOOLS.md)
 
 ## 지원 버전
 
 | MC 버전 | Forge | Fabric | NeoForge |
-|---------|:-----:|:------:|:--------:|
+|------------|:-----:|:------:|:--------:|
 | 1.8.9 | ✓ | | |
 | 1.9.4 | ✓ | | |
 | 1.10.2 | ✓ | | |
@@ -46,65 +48,60 @@ Minecraft MCP(Master Control Program)는 멀티 버전, 멀티 모드로더 Mine
 | 1.21.7 | ✓ | | |
 | 26.1.2 | ✓ | | 🚧 |
 
-> 🚧 = WIP (개발 중)
+> 🚧 = 작업 진행 중
 
 ## 빠른 시작
 
 ### 사전 준비
 
-- Python 3.10+
 - JDK 21 (Corretto 권장)
 
-### 설치 및 빌드
+### 설정 및 빌드
 
 ```bash
-# Python 종속성 설치
+# 의존성 설치
 pip install -r scripts/requirements.txt
 
-# 환경 확인
-just check-env
-
-# 전체 빌드 (코드 생성 + 캐시 + 모든 모드 빌드)
+# 전체 빌드
 just full
 ```
 
 ### 실행
 
 ```bash
-# 제어 서버 데몬 시작
+# 데몬 시작 및 마인크래프트 실행
 just daemon
-
-# Minecraft 버전 실행
 just launch 1.21.7 forge
 
-# 스모크 테스트 실행 (빌드 + 실행 + 스크린샷)
+# 또는 엔드투엔드 스모크 테스트 실행
 just smoke 1.21.7
 ```
 
-## 아키텍처
+## 작동 원리
 
 ```
-┌─────────────────────────────────────┐
-│         Java 모드 플러그인            │
-│  (Forge / Fabric / NeoForge)        │
-│  ReflectionHelper, InputHandler     │
-└──────────────┬──────────────────────┘
-                │
-┌──────────────▼──────────────────────┐
-│         Minecraft 클라이언트           │
-│  (1.8.9 – 26.1.2, 24개 모드 변형)   │
-└─────────────────────────────────────┘
+┌────────────────────┐     HTTP/SSE      ┌─────────────────────┐
+│   AI 도구 (Claude)   │ ◄──────────────► │   Minecraft MCP      │
+│   .mcp.json 설정     │   포트 9876      │   (게임 내 모드)      │
+└────────────────────┘                   └──────────┬──────────┘
+                                                    │ 리플렉션
+                                         ┌──────────▼──────────┐
+                                         │   마인크래프트 클라이언트 │
+                                         │   (1.8.9 – 26.1.2)  │
+                                         └─────────────────────┘
 ```
 
-## 기여
+이 모드는 마인크래프트 내에서 포트 9876으로 HTTP 서버를 실행합니다. AI 도구는 표준 MCP 프로토콜(SSE 전송)을 통해 연결되며, 클릭, 타이핑, 스크린샷 등 모든 명령어는 Java 리플렉션을 사용하여 버전별 코드 없이 모든 마인크래프트 버전에서 작동합니다.
+
+## 기여하기
 
 이슈와 풀 리퀘스트를 환영합니다.
 
 ## 라이선스
 
-다음 중 하나의 라이선스로 제공됩니다:
+다음 중 하나의 라이선스에 따라 이용할 수 있습니다:
 
 - Apache License, Version 2.0 ([LICENSE-APACHE](../../LICENSE-APACHE) 또는 http://www.apache.org/licenses/LICENSE-2.0)
 - MIT License ([LICENSE-MIT](../../LICENSE-MIT) 또는 http://opensource.org/licenses/MIT)
 
-선택에 따릅니다.
+선택하여 적용할 수 있습니다.

@@ -5,28 +5,30 @@
 
 # Minecraft MCP
 
-**Mod Puente Minecraft MCP (Model Context Protocol) Multi-Versión y Multi-Modloader**
+**Deja que la IA juegue Minecraft — Controla cualquier versión, cualquier modloader**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
-[![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
 
 **[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **Español** &bull; **[Русский](../ru/README.md)**
 
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **Versión 0.1.0** — Desarrollo activo. Los plugins Java Mod y el servidor de control basado en HTTP están operativos. Las builds de CI están en verde para el mod Forge 1.21.7. El soporte para Fabric y NeoForge es WIP.
+## ¿Qué es Minecraft MCP
 
-## Qué es Minecraft MCP
+Minecraft MCP es un puente entre los asistentes de IA y Minecraft. Se ejecuta como un mod dentro del juego, exponiendo un servidor HTTP al que las herramientas de IA — **Claude Code, Cursor, Cline, GitHub Copilot, y más de 20 otras** — pueden conectarse mediante el protocolo estándar MCP. A través de este puente, la IA puede ver el juego, hacer clic en botones, escribir comandos e interactuar con el mundo.
 
-Minecraft MCP (Master Control Program) es un framework de automatización de UI de Minecraft multi-versión y multi-modloader. Consta de dos capas:
+> ¿Quieres que tu IA construya un castillo? ¿Ejecute una prueba de humo? ¿Navegue por el menú de un modpack? Minecraft MCP lo hace posible.
 
-- **Plugins Java Mod** (`packages/mods/`) — 24 proyectos de mod que abarcan Forge, Fabric y NeoForge, desde MC 1.8.9 hasta 26.1.2, compartiendo una base de código común (`packages/common/`)
-- **Automatización Python** (`scripts/`) — Automatización de builds, gestión de demonios, ejecutores de pruebas y pruebas de humo
+- **Ver** — captura capturas de pantalla con cuadrículas de coordenadas
+- **Actuar** — hacer clic, escribir, desplazar, arrastrar y presionar cualquier tecla
+- **Saber** — consultar la posición del jugador, información del mundo, botones de la pantalla y campos de depuración
+- **Grabar** — transmitir eventos en tiempo real mediante SSE, capturar fotogramas de video
 
-## Versiones soportadas
+[Guía de integración de herramientas de IA →](./AI-TOOLS.md)
+
+## Versiones compatibles
 
 | Versión MC | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
@@ -46,63 +48,58 @@ Minecraft MCP (Master Control Program) es un framework de automatización de UI 
 | 1.21.7 | ✓ | | |
 | 26.1.2 | ✓ | | 🚧 |
 
-> 🚧 = WIP (En desarrollo)
+> 🚧 = Trabajo en progreso
 
 ## Inicio rápido
 
 ### Requisitos previos
 
-- Python 3.10+
-- JDK 21 (Corretto recomendado)
+- JDK 21 (se recomienda Corretto)
 
-### Instalación y compilación
+### Configuración y compilación
 
 ```bash
-# Instalar dependencias de Python
+# Instalar dependencias
 pip install -r scripts/requirements.txt
 
-# Verificar el entorno
-just check-env
-
-# Compilar todo (generación + caché + compilar todos los mods)
+# Compilar todo
 just full
 ```
 
-### Ejecución
+### Ejecutar
 
 ```bash
-# Iniciar el demonio del servidor de control
+# Iniciar el daemon y lanzar Minecraft
 just daemon
-
-# Lanzar una versión de Minecraft
 just launch 1.21.7 forge
 
-# Ejecutar una prueba de humo (compilar + lanzar + captura de pantalla)
+# O ejecutar una prueba de humo de extremo a extremo
 just smoke 1.21.7
 ```
 
-## Arquitectura
+## Cómo funciona
 
 ```
-┌─────────────────────────────────────┐
-│         Plugin Java Mod              │
-│  (Forge / Fabric / NeoForge)        │
-│  ReflectionHelper, InputHandler     │
-└──────────────┬──────────────────────┘
-                │
-┌──────────────▼──────────────────────┐
-│         Cliente Minecraft            │
-│  (1.8.9 – 26.1.2, 24 variantes)    │
-└─────────────────────────────────────┘
+┌────────────────────┐     HTTP/SSE      ┌─────────────────────┐
+│  Herramienta IA    │ ◄──────────────► │   Minecraft MCP      │
+│  config .mcp.json  │   puerto 9876    │   (mod en el juego)  │
+└────────────────────┘                   └──────────┬──────────┘
+                                                    │ reflection
+                                         ┌──────────▼──────────┐
+                                         │   Cliente Minecraft  │
+                                         │   (1.8.9 – 26.1.2)  │
+                                         └─────────────────────┘
 ```
 
-## Contribuir
+El mod ejecuta un servidor HTTP en el puerto 9876 dentro de Minecraft. Tu herramienta de IA se conecta mediante el protocolo estándar MCP (transporte SSE), y cada comando — clic, escribir, captura de pantalla, etc. — utiliza Java reflection para funcionar en todas las versiones de Minecraft sin código específico para cada versión.
+
+## Contribuciones
 
 Se aceptan issues y pull requests.
 
 ## Licencia
 
-Bajo una de las siguientes licencias, a su elección:
+Licenciado bajo cualquiera de las siguientes:
 
 - Apache License, Version 2.0 ([LICENSE-APACHE](../../LICENSE-APACHE) o http://www.apache.org/licenses/LICENSE-2.0)
 - MIT License ([LICENSE-MIT](../../LICENSE-MIT) o http://opensource.org/licenses/MIT)

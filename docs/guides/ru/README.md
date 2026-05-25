@@ -1,30 +1,32 @@
 <!-- markdownlint-disable MD033 MD041 MD036 -->
 <div align="center">
 
-<img src="../../logo.webp" alt="Minecraft MCP logo" width="200"/>
+<img src="../../logo.webp" alt="Логотип Minecraft MCP" width="200"/>
 
 # Minecraft MCP
 
-**Мультиверсионный, мульти-загрузочный мост-мод Minecraft MCP (Model Context Protocol)**
+**Пусть ИИ играет в Minecraft — Управляйте любой версией, любым загрузчиком модов**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
-[![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
 
-**[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **Русский**
+**English** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **Версия 0.1.0** — Активная разработка. Java мод-плагины и HTTP-сервер управления работают. CI-сборки проходят успешно для мода Forge 1.21.7. Поддержка Fabric и NeoForge — WIP.
-
 ## Что такое Minecraft MCP
 
-Minecraft MCP (Master Control Program) — это мультиверсионный, мульти-загрузочный фреймворк автоматизации UI Minecraft. Он состоит из двух уровней:
+Minecraft MCP — это мост между ИИ-ассистентами и Minecraft. Он работает как мод внутри игры, предоставляя HTTP-сервер, к которому ИИ-инструменты — **Claude Code, Cursor, Cline, GitHub Copilot и ещё более 20** — могут подключаться через стандартный протокол MCP. Через этот мост ИИ может видеть игру, нажимать кнопки, вводить команды и взаимодействовать с миром.
 
-- **Java мод-плагины** (`packages/mods/`) — 24 мод-проекта для Forge, Fabric и NeoForge, охватывающих MC с 1.8.9 по 26.1.2, с общей кодовой базой (`packages/common/`)
-- **Автоматизация на Python** (`scripts/`) — Автоматизация сборки, управление демонами, запуск тестов и дымовое тестирование
+> Хотите, чтобы ИИ построил замок? Провёл smoke-тест? Разобрался в меню сборки модов? Minecraft MCP делает это возможным.
+
+- **Видеть** — делать скриншоты с координатной сеткой
+- **Действовать** — кликать, вводить текст, прокручивать, перетаскивать и нажимать любые клавиши
+- **Знать** — запрашивать позицию игрока, информацию о мире, кнопки на экране и отладочные поля
+- **Записывать** — транслировать события в реальном времени через SSE, захватывать видеокадры
+
+[Руководство по интеграции ИИ-инструментов →](./AI-TOOLS.md)
 
 ## Поддерживаемые версии
 
@@ -46,65 +48,60 @@ Minecraft MCP (Master Control Program) — это мультиверсионны
 | 1.21.7 | ✓ | | |
 | 26.1.2 | ✓ | | 🚧 |
 
-> 🚧 = WIP (В разработке)
+> 🚧 = В разработке
 
 ## Быстрый старт
 
 ### Необходимые условия
 
-- Python 3.10+
 - JDK 21 (рекомендуется Corretto)
 
 ### Установка и сборка
 
 ```bash
-# Установить зависимости Python
+# Установка зависимостей
 pip install -r scripts/requirements.txt
 
-# Проверить окружение
-just check-env
-
-# Собрать всё (генерация + кэш + сборка всех модов)
+# Полная сборка
 just full
 ```
 
 ### Запуск
 
 ```bash
-# Запустить демон управляющего сервера
+# Запуск демона и Minecraft
 just daemon
-
-# Запустить версию Minecraft
 just launch 1.21.7 forge
 
-# Запустить дымовой тест (сборка + запуск + скриншот)
+# Или запуск сквозного smoke-теста
 just smoke 1.21.7
 ```
 
-## Архитектура
+## Как это работает
 
 ```
-┌─────────────────────────────────────┐
-│         Java мод-плагин              │
-│  (Forge / Fabric / NeoForge)        │
-│  ReflectionHelper, InputHandler     │
-└──────────────┬──────────────────────┘
-                │
-┌──────────────▼──────────────────────┐
-│         Клиент Minecraft             │
-│  (1.8.9 – 26.1.2, 24 варианта)     │
-└─────────────────────────────────────┘
+┌────────────────────┐     HTTP/SSE      ┌─────────────────────┐
+│   AI Tool (Claude)  │ ◄──────────────► │   Minecraft MCP      │
+│   .mcp.json config  │   порт 9876      │   (внутриигровой мод) │
+└────────────────────┘                   └──────────┬──────────┘
+                                                    │ reflection
+                                         ┌──────────▼──────────┐
+                                         │   Minecraft Client   │
+                                         │   (1.8.9 – 26.1.2)  │
+                                         └─────────────────────┘
 ```
 
-## Участие в разработке
+Мод запускает HTTP-сервер на порту 9876 внутри Minecraft. Ваш ИИ-инструмент подключается через стандартный протокол MCP (транспорт SSE), и каждая команда — клик, ввод текста, скриншот и т.д. — использует Java reflection для работы во всех версиях Minecraft без версионно-зависимого кода.
 
-Приветствуются issues и pull requests.
+## Участие в проекте
+
+Мы рады Issues и pull request'ам.
 
 ## Лицензия
 
-Распространяется под одной из следующих лицензий на ваш выбор:
+Распространяется под одной из следующих лицензий:
 
 - Apache License, Version 2.0 ([LICENSE-APACHE](../../LICENSE-APACHE) или http://www.apache.org/licenses/LICENSE-2.0)
 - MIT License ([LICENSE-MIT](../../LICENSE-MIT) или http://opensource.org/licenses/MIT)
 
-на ваше усмотрение.
+на ваш выбор.
