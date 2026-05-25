@@ -119,13 +119,6 @@ public class ModDevMcpMod implements ClientModInitializer {
             ReflectionHelper.tickMouseRelease(mc);
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);
-            McpPlatformControl ctrl = McpControlFactory.get();
-            if (ctrl instanceof McpWin32Control w32ctrl) {
-                if (w32ctrl.getMcHwnd() == 0) {
-                    long glfwHandle = mc.getWindow().getHandle();
-                    w32ctrl.ensureHwndFromGlfw(glfwHandle);
-                }
-            }
         } catch (Exception ignored) {}
 
         handleOverlayMousePoll();

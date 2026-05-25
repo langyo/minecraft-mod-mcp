@@ -5,7 +5,7 @@
 
 # Minecraft MCP
 
-**AI가 마인크래프트를 플레이하게 하세요 — 모든 버전, 모든 모드로더를 지원합니다**
+**멀티 버전, 멀티 모드로더 Minecraft MCP (Model Context Protocol) 모드 — 모드 빌드를 위해**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)

@@ -5,7 +5,7 @@
 
 # Minecraft MCP
 
-**Пусть ИИ играет в Minecraft — Управляйте любой версией, любым загрузчиком модов**
+**Мультиверсионный, мультизагрузочный мод Minecraft MCP (Model Context Protocol) для создания модов**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)

@@ -5,7 +5,7 @@
 
 # Minecraft MCP
 
-**Deja que la IA juegue Minecraft — Controla cualquier versión, cualquier modloader**
+**Mod MCP (Model Context Protocol) de Minecraft multi-versión y multi-modloader para construir mods**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)

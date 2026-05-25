@@ -5,7 +5,7 @@
 
 # Minecraft MCP
 
-**Let AI Play Minecraft — Control Any Version, Any Modloader**
+**Multi-Version, Multi-Modloader Minecraft MCP (Model Context Protocol) Mod for building mods**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)

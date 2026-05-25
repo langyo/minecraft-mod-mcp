@@ -285,13 +285,6 @@ public class ModDevMcpMod {
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
-                McpPlatformControl ctrl = McpControlFactory.get();
-                if (ctrl instanceof McpWin32Control w32ctrl) {
-                    if (w32ctrl.getMcHwnd() == 0) {
-                        long glfwHandle = mc.getWindow().getWindow();
-                        w32ctrl.ensureHwndFromGlfw(glfwHandle);
-                    }
-                }
             } catch (Exception ignored) {}
             if (INSTANCE.chatSent) return;
             try {

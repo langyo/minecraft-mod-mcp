@@ -5,7 +5,7 @@
 
 # Minecraft MCP
 
-**让 AI 畅玩 Minecraft —— 支持任意版本、任意模组加载器**
+**多版本、多模组加载器 Minecraft MCP（模型上下文协议）模组，用于构建模组**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)

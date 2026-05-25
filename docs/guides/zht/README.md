@@ -5,7 +5,7 @@
 
 # Minecraft MCP
 
-**讓 AI 玩 Minecraft — 控制任何版本、任何模組載入器**
+**多版本、多模組載入器 Minecraft MCP（模型上下文協定）模組，用於構建模組**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
