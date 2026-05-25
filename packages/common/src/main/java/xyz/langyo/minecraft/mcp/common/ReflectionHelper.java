@@ -120,44 +120,61 @@ public final class ReflectionHelper {
 
     private static long cachedWindowHandle = 0;
 
+    public static void setCachedWindowHandle(long handle) {
+        if (handle != 0) cachedWindowHandle = handle;
+    }
+
     public static long getWindowHandle(Object mc) {
         if (cachedWindowHandle != 0) return cachedWindowHandle;
         try {
-            Object window = null;
-            try { window = mc.getClass().getMethod("getWindow").invoke(mc); }
-            catch (NoSuchMethodException e) {
-                try { window = mc.getClass().getMethod("getMainWindow").invoke(mc); }
-                catch (NoSuchMethodException e2) {
-                    for (Field f : mc.getClass().getDeclaredFields()) {
-                        if (f.getType().getSimpleName().contains("Window") || f.getType().getSimpleName().contains("MainWindow")) {
-                            f.setAccessible(true);
-                            window = f.get(mc);
-                            break;
-                        }
-                    }
-                }
-            }
+            Object window = findWindowObject(mc);
             if (window == null) return 0;
-            for (String methodName : new String[]{"handle", "getHandle", "getWindow"}) {
-                try {
-                    Object result = window.getClass().getMethod(methodName).invoke(window);
-                    if (result instanceof Number) {
-                        long val = ((Number) result).longValue();
-                        if (val != 0) { cachedWindowHandle = val; return val; }
-                    }
-                } catch (NoSuchMethodException ignored) {}
-            }
-            for (Field f : window.getClass().getDeclaredFields()) {
-                if (f.getType() == long.class) {
-                    f.setAccessible(true);
-                    long val = f.getLong(window);
-                    if (val != 0) { cachedWindowHandle = val; return val; }
-                }
-            }
-            return 0;
+            long handle = extractHandleFromWindow(window);
+            if (handle != 0) { cachedWindowHandle = handle; }
+            return handle;
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    private static Object findWindowObject(Object mc) throws Exception {
+        for (String name : new String[]{"getWindow", "getMainWindow"}) {
+            try { return mc.getClass().getMethod(name).invoke(mc); } catch (NoSuchMethodException ignored) {}
+        }
+        for (Field f : getAllFields(mc.getClass())) {
+            f.setAccessible(true);
+            Object val = f.get(mc);
+            if (val == null) continue;
+            if (hasLongField(val.getClass())) return val;
+        }
+        return null;
+    }
+
+    private static boolean hasLongField(Class<?> clazz) {
+        for (Field f : getAllFields(clazz)) {
+            if (f.getType() == long.class) return true;
+        }
+        return false;
+    }
+
+    private static long extractHandleFromWindow(Object window) throws Exception {
+        for (String methodName : new String[]{"handle", "getHandle", "getWindow"}) {
+            try {
+                Object result = window.getClass().getMethod(methodName).invoke(window);
+                if (result instanceof Number) {
+                    long val = ((Number) result).longValue();
+                    if (val != 0) return val;
+                }
+            } catch (NoSuchMethodException ignored) {}
+        }
+        for (Field f : getAllFields(window.getClass())) {
+            if (f.getType() == long.class) {
+                f.setAccessible(true);
+                long val = f.getLong(window);
+                if (val != 0) return val;
+            }
+        }
+        return 0;
     }
 
     public static boolean hasWindow(Object mc) {
@@ -2075,14 +2092,35 @@ public final class ReflectionHelper {
     }
 
     public static Object getMouseHandler(Object mc) {
-        try { return mc.getClass().getField("mouseHandler").get(mc); } catch (Exception e) {}
-        try { return mc.getClass().getDeclaredField("mouseHandler").get(mc); } catch (Exception e) {}
-        for (Field f : mc.getClass().getDeclaredFields()) {
+        for (String name : new String[]{"mouseHandler", "mouse"}) {
+            try { return mc.getClass().getField(name).get(mc); } catch (Exception ignored) {}
+            try { return mc.getClass().getDeclaredField(name).get(mc); } catch (Exception ignored) {}
+        }
+        for (Field f : getAllFields(mc.getClass())) {
             if (f.getType().getSimpleName().contains("MouseHandler") || f.getType().getSimpleName().contains("Mouse")) {
                 try { f.setAccessible(true); return f.get(mc); } catch (Exception ignored) {}
             }
         }
+        for (Field f : getAllFields(mc.getClass())) {
+            String tn = f.getType().getName();
+            if (tn.contains("Mouse") && !tn.contains("MouseEvent")) {
+                try { f.setAccessible(true); return f.get(mc); } catch (Exception ignored) {}
+            }
+        }
+        for (Field f : getAllFields(mc.getClass())) {
+            String tn = f.getType().getSimpleName();
+            if (tn.startsWith("class_") && hasDoubleField(f.getType()) && !tn.equals(mc.getClass().getSimpleName())) {
+                try { f.setAccessible(true); return f.get(mc); } catch (Exception ignored) {}
+            }
+        }
         return null;
+    }
+
+    private static boolean hasDoubleField(Class<?> clazz) {
+        for (Field f : getAllFields(clazz)) {
+            if (f.getType() == double.class) return true;
+        }
+        return false;
     }
 
     public static void sendMouseButton(long handle, int button, int action) {

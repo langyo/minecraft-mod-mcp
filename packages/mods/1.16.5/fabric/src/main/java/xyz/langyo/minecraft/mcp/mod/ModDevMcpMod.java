@@ -6,7 +6,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawableHelper;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.GameMenuScreen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.text.TranslatableText;
@@ -18,7 +17,6 @@ public class ModDevMcpMod implements ClientModInitializer {
     McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
-    private Screen lastPatchedScreen = null;
 
     private static McpRenderer wrapRenderer(MatrixStack ms, MinecraftClient mc) {
         return new McpRenderer() {
@@ -72,19 +70,6 @@ public class ModDevMcpMod implements ClientModInitializer {
     public void onScreenRender(MatrixStack ms, Screen screen, int mouseX, int mouseY, float tickDelta) {
         if (ReflectionHelper.isScreenshotInProgress()) return;
         try {
-            if (screen instanceof GameMenuScreen && screen != lastPatchedScreen) {
-                lastPatchedScreen = screen;
-                McpScreenHelper.patchPauseScreen(screen, new McpScreenHelper.ButtonFactory() {
-                    @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                        return new ButtonWidget(x, y, w, h, new TranslatableText(translationKey), btn -> onClick.run());
-                    }
-                });
-            }
-            if (!(screen instanceof GameMenuScreen)) {
-                lastPatchedScreen = null;
-            }
-        } catch (Exception ignored) {}
-        try {
             MinecraftClient mc = MinecraftClient.getInstance();
             int w = mc.getWindow().getScaledWidth();
             int h = mc.getWindow().getScaledHeight();
@@ -92,11 +77,13 @@ public class ModDevMcpMod implements ClientModInitializer {
             int my = (int) getMouseY(mc);
             if (ReflectionHelper.isMcpControlMode()) {
                 ReflectionHelper.cacheFrameFromRenderThread(mc);
-                McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.textRenderer,
-                        new TranslatableText("mcpmod.control.resume").getString(), w, h, mx, my);
-            } else if (mc.world != null && screen != null && !(screen instanceof GameMenuScreen)) {
-                McpOverlayLogic.renderTransferButton(wrapRenderer(ms, mc), mc.textRenderer,
-                        new TranslatableText("mcpmod.control.pause_button").getString(), w, h, mx, my);
+                String resumeLabel = new TranslatableText("mcpmod.control.resume").getString();
+                if (resumeLabel.equals("mcpmod.control.resume")) resumeLabel = "Resume Control";
+                McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.textRenderer, resumeLabel, w, h, mx, my);
+            } else if (mc.world != null && screen != null) {
+                String transferLabel = new TranslatableText("mcpmod.control.pause_button").getString();
+                if (transferLabel.equals("mcpmod.control.pause_button")) transferLabel = "Transfer to MCP";
+                McpOverlayLogic.renderTransferButton(wrapRenderer(ms, mc), mc.textRenderer, transferLabel, w, h, mx, my);
             }
         } catch (Exception ignored) {}
     }

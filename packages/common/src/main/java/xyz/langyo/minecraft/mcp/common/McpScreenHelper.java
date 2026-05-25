@@ -166,7 +166,19 @@ public class McpScreenHelper {
             }
             c = c.getSuperclass();
         }
-        return false;
+        return hasWidgetFields(obj);
+    }
+
+    private static boolean hasWidgetFields(Object obj) {
+        try {
+            int w = getIntField(obj, "width", "f_96515_", "field_146120_f", "field_230688_j_");
+            int h = getIntField(obj, "height", "f_96518_", "field_146121_g", "field_230689_k_");
+            int x = getIntField(obj, "x", "xPosition", "field_146128_h", "f_146128_h_", "field_230690_l_");
+            int y = getIntField(obj, "y", "yPosition", "field_146129_i", "f_146129_i_", "field_230691_m_");
+            return w > 0 && h > 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static void addRenderableWidget(Object screen, Object widget) throws Exception {
