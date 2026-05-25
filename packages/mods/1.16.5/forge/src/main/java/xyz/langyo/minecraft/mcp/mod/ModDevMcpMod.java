@@ -5,6 +5,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
@@ -22,6 +23,7 @@ import net.minecraft.util.text.TextFormatting;
 import net.minecraft.util.text.event.ClickEvent;
 import net.minecraft.util.text.Style;
 import com.mojang.blaze3d.matrix.MatrixStack;
+import org.lwjgl.glfw.GLFW;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
@@ -29,6 +31,65 @@ public class ModDevMcpMod {
     McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
+
+    private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
+    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
+    private static boolean cursorInterceptorInstalled = false;
+    private static java.lang.reflect.Field mousePosXField = null;
+    private static java.lang.reflect.Field mousePosYField = null;
+
+    private static void ensureCursorInterceptor(Minecraft mc) {
+        if (cursorInterceptorInstalled) return;
+        try {
+            long handle = mc.getMainWindow().getHandle();
+            originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    try {
+                        if (mousePosXField != null) mousePosXField.setDouble(mc.mouseHelper, xpos);
+                        if (mousePosYField != null) mousePosYField.setDouble(mc.mouseHelper, ypos);
+                    } catch (Exception ignored) {}
+                } else if (originalCursorCallback != null) {
+                    originalCursorCallback.invoke(window, xpos, ypos);
+                }
+            });
+            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    if (button == 0 && action == 1) {
+                        double mx = getMouseX(mc);
+                        double my = getMouseY(mc);
+                        ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                    }
+                    return;
+                }
+                if (originalMouseButtonCallback != null) {
+                    originalMouseButtonCallback.invoke(window, button, action, mods);
+                }
+            });
+            java.lang.reflect.Field[] fields = mc.mouseHelper.getClass().getDeclaredFields();
+            java.lang.reflect.Field firstDouble = null, secondDouble = null;
+            for (java.lang.reflect.Field f : fields) {
+                if (f.getType() == double.class) {
+                    if (firstDouble == null) firstDouble = f;
+                    else if (secondDouble == null) { secondDouble = f; break; }
+                }
+            }
+            if (firstDouble != null) { firstDouble.setAccessible(true); mousePosXField = firstDouble; }
+            if (secondDouble != null) { secondDouble.setAccessible(true); mousePosYField = secondDouble; }
+            cursorInterceptorInstalled = true;
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] Cursor interceptor failed: " + e.getMessage());
+        }
+    }
+
+    private static void forceGlfwMouseFree(Minecraft mc) {
+        ensureCursorInterceptor(mc);
+        try {
+            long hwnd = mc.getMainWindow().getHandle();
+            if (GLFW.glfwGetInputMode(hwnd, GLFW.GLFW_CURSOR) != GLFW.GLFW_CURSOR_NORMAL) {
+                GLFW.glfwSetInputMode(hwnd, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
+            }
+        } catch (Exception ignored) {}
+    }
 
     private static McpRenderer wrapRenderer(MatrixStack ms, Minecraft mc) {
         return new McpRenderer() {
@@ -90,16 +151,51 @@ public class ModDevMcpMod {
             }, "MCP-HTTP").start();
         }
 
+        MinecraftForge.EVENT_BUS.addListener((GuiOpenEvent event) -> {
+            if (ReflectionHelper.isMcpControlMode() && event.getGui() instanceof IngameMenuScreen) {
+                event.setCanceled(true);
+            }
+        });
+
         MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Post event) -> {
             try {
                 if (event.getGui() instanceof IngameMenuScreen) {
-                    McpScreenHelper.patchPauseScreen(event.getGui(), new McpScreenHelper.ButtonFactory() {
+                    Screen screen = event.getGui();
+                    McpScreenHelper.patchPauseScreen(screen, new McpScreenHelper.ButtonFactory() {
                         @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
                             return new Button(x, y, w, h, new TranslationTextComponent(translationKey), btn -> onClick.run());
                         }
                     });
                 }
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] InitGuiEvent.Post error: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseClickedEvent.Pre event) -> {
+            if (!ReflectionHelper.isMcpControlMode()) return;
+            try {
+                Minecraft mc = Minecraft.getInstance();
+                if (event.getButton() == 0) {
+                    double mx = getMouseX(mc);
+                    double my = getMouseY(mc);
+                    ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                }
             } catch (Exception ignored) {}
+            event.setCanceled(true);
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseDragEvent.Pre event) -> {
+            if (ReflectionHelper.isMcpControlMode()) event.setCanceled(true);
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseReleasedEvent.Pre event) -> {
+            if (ReflectionHelper.isMcpControlMode()) event.setCanceled(true);
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseScrollEvent.Pre event) -> {
+            if (ReflectionHelper.isMcpControlMode()) event.setCanceled(true);
         });
 
         MinecraftForge.EVENT_BUS.addListener((RenderGameOverlayEvent.Post event) -> {
@@ -110,6 +206,10 @@ public class ModDevMcpMod {
                 if (mc.currentScreen == null) {
                     ReflectionHelper.tickMouseRelease(mc);
                     ReflectionHelper.tickMcpControlMode(mc);
+
+                    if (ReflectionHelper.isMcpControlMode()) {
+                        forceGlfwMouseFree(mc);
+                    }
 
                     if (!ReflectionHelper.isScreenshotInProgress()) {
                         ReflectionHelper.cacheFrameFromRenderThread(mc);

@@ -19,10 +19,10 @@ public class McpScreenHelper {
             System.out.println("[MCP] patchPauseScreen: originalQuit=" + (originalQuit != null ? originalQuit.getClass().getName() : "null"));
             if (originalQuit == null) return;
 
-            int x = getIntField(originalQuit, "x", "xPosition", "field_146128_h", "f_146128_h_");
-            int y = getIntField(originalQuit, "y", "yPosition", "field_146129_i", "f_146129_i_");
-            int w = getIntField(originalQuit, "width", "f_96515_", "field_146120_f");
-            int h = getIntField(originalQuit, "height", "f_96518_", "field_146121_g");
+            int x = getIntField(originalQuit, "x", "xPosition", "field_146128_h", "f_146128_h_", "field_230690_l_", "getX", "func_230997_g_");
+            int y = getIntField(originalQuit, "y", "yPosition", "field_146129_i", "f_146129_i_", "field_230691_m_", "getY", "func_230990_k_");
+            int w = getIntField(originalQuit, "width", "f_96515_", "field_146120_f", "field_230688_j_", "getWidth", "func_230998_h_");
+            int h = getIntField(originalQuit, "height", "f_96518_", "field_146121_g", "field_230689_k_", "getHeight", "func_238483_d_");
             if (w == 0) w = getIntField(originalQuit, "f_96515_");
             if (h == 0) h = getIntField(originalQuit, "f_96518_");
             System.out.println("[MCP] patchPauseScreen: quitButton bounds: x=" + x + " y=" + y + " w=" + w + " h=" + h);
@@ -31,8 +31,8 @@ public class McpScreenHelper {
             int leftW = (w - gap) / 2;
             int rightW = w - gap - leftW;
 
-            setIntField(originalQuit, x + leftW + gap, "x", "xPosition", "field_146128_h");
-            setIntField(originalQuit, rightW, "width", "field_146120_f");
+            setIntField(originalQuit, x + leftW + gap, "x", "xPosition", "field_146128_h", "f_146128_h_", "field_230690_l_");
+            setIntField(originalQuit, rightW, "width", "field_146120_f", "f_96515_", "field_230688_j_");
 
             String transferKey = ReflectionHelper.getMcpControlPauseTransferTranslationKey();
             Object transfer = factory.createButton(transferKey, () -> {
@@ -126,8 +126,8 @@ public class McpScreenHelper {
         try {
             if (obj == null) return currentBest;
             if (!isButtonLike(obj)) return currentBest;
-            int w = getIntField(obj, "width", "f_96515_", "field_146120_f");
-            int y = getIntField(obj, "y", "yPosition", "field_146129_i", "f_146129_i_");
+            int w = getIntField(obj, "width", "f_96515_", "field_146120_f", "field_230688_j_", "getWidth", "func_230998_h_");
+            int y = getIntField(obj, "y", "yPosition", "field_146129_i", "f_146129_i_", "field_230691_m_", "getY", "func_230990_k_");
             System.out.println("[MCP] pickBottomWide: candidate " + obj.getClass().getName() + " w=" + w + " y=" + y + " currentBestY=" + currentBestY);
             if (w < 150) return currentBest;
             if (y > currentBestY) return obj;
@@ -215,6 +215,12 @@ public class McpScreenHelper {
                 }
             } catch (Exception ignored) {}
         }
+        for (String name : names) {
+            try {
+                java.lang.reflect.Method m = obj.getClass().getMethod(name);
+                return (int) m.invoke(obj);
+            } catch (Exception ignored) {}
+        }
         return 0;
     }
 
@@ -227,6 +233,14 @@ public class McpScreenHelper {
                     return;
                 }
             }
+        }
+        for (String name : names) {
+            try {
+                String setter = "set" + Character.toUpperCase(name.charAt(0)) + name.substring(1);
+                java.lang.reflect.Method m = obj.getClass().getMethod(setter, int.class);
+                m.invoke(obj, value);
+                return;
+            } catch (Exception ignored) {}
         }
     }
 }
