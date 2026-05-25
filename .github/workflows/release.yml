@@ -10,8 +10,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ─── Step 0: Version gate — ensure all mod versions match the tag ───
+  version-check:
+    name: Version Gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check version consistency
+        run: python scripts/check_versions.py ${{ github.ref_name }}
+
   # ─── Step 1: Build the shared common library ───
   build-common:
+    needs: version-check
     name: Build Common Library
     runs-on: windows-latest
     steps:
@@ -66,17 +81,17 @@ jobs:
               1.17.1/forge
               1.18.2/forge
               1.19.4/forge
-              1.20.6/forge
               1.14.4/fabric
               1.15.2/fabric
               1.16.5/fabric
               1.17.1/fabric
               1.18.2/fabric
               1.19.4/fabric
-              1.20.6/fabric
           - jdk: "21"
             mods: |
+              1.20.6/forge
               1.21.7/forge
+              1.20.6/fabric
               1.20.6/neoforge
           - jdk: "25"
             mods: |
