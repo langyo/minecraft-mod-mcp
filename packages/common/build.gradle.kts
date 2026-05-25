@@ -17,7 +17,6 @@ repositories {
 }
 
 dependencies {
-    implementation("org.java-websocket:Java-WebSocket:1.5.4")
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("net.java.dev.jna:jna:5.15.0")
     implementation("net.java.dev.jna:jna-platform:5.15.0")
