@@ -99,33 +99,21 @@ public class ModDevMcpMod {
 
     public ModDevMcpMod() {
         INSTANCE = this;
-        boolean depsOk = false;
-        try {
-            Class.forName("com.sun.jna.Library");
-            depsOk = true;
-        } catch (ClassNotFoundException e) {
-            System.err.println("[MCP-MOD] JNA not on classpath. Use launch_mc.py.");
-        } catch (Error e) {
-            System.err.println("[MCP-MOD] Dependency error: " + e.getMessage());
-        }
-
-        if (depsOk) {
-            new Thread(() -> {
-                try {
-                    Thread.sleep(5000);
-                    ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-                    int port = McpConfig.getServerPort();
-                    httpServer = new McpHttpServer(handler, port);
-                    httpServer.start();
-                    debugUrl = "http://127.0.0.1:" + port + "/debug";
-                    System.out.println("[MCP-MOD] Debug page: " + debugUrl);
-                } catch (Exception e) {
-                    System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
-                } catch (Error e) {
-                    System.err.println("[MCP-MOD] HTTP server error: " + e.getMessage());
-                }
-            }, "MCP-HTTP").start();
-        }
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+                int port = McpConfig.getServerPort();
+                httpServer = new McpHttpServer(handler, port);
+                httpServer.start();
+                debugUrl = "http://127.0.0.1:" + port + "/debug";
+                System.out.println("[MCP-MOD] Debug page: " + debugUrl);
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
+            } catch (Error e) {
+                System.err.println("[MCP-MOD] HTTP server error: " + e.getMessage());
+            }
+        }, "MCP-HTTP").start();
 
         ScreenEvent.Opening.BUS.addListener(event -> {
             if (ReflectionHelper.isMcpControlMode() && event.getNewScreen() instanceof PauseScreen) {
