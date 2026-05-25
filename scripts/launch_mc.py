@@ -4,6 +4,8 @@ Handles classpath construction, native extraction, and proper argument building.
 Usage:
   python scripts/launch_mc.py 1.21.7-forge-57.0.2
   python scripts/launch_mc.py 1.21.7-forge-57.0.2 --jvm-args "-Xmx4G -Xms2G"
+
+TODO: add Fabric loader profile installation support (was install_fabric.py)
 """
 
 import argparse
