@@ -165,6 +165,10 @@ public class ModDevMcpMod {
                         @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
                             return new Button(x, y, w, h, new TranslationTextComponent(translationKey), btn -> onClick.run());
                         }
+                    }, new McpScreenHelper.WidgetAdder() {
+                        @Override public void addWidget(Object scr, Object widget) throws Exception {
+                            event.addWidget((net.minecraft.client.gui.widget.Widget) widget);
+                        }
                     });
                 }
             } catch (Exception e) {

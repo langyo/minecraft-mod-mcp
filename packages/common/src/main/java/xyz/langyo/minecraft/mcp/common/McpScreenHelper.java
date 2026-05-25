@@ -11,7 +11,20 @@ public class McpScreenHelper {
         Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h);
     }
 
+    public interface WidgetAdder {
+        void addWidget(Object screen, Object widget) throws Exception;
+    }
+
+    private static Runnable pendingCloseScreen = null;
+
+    public static void setPendingCloseScreen(Runnable r) { pendingCloseScreen = r; }
+    public static Runnable consumePendingCloseScreen() { Runnable r = pendingCloseScreen; pendingCloseScreen = null; return r; }
+
     public static void patchPauseScreen(Object screen, ButtonFactory factory) {
+        patchPauseScreen(screen, factory, null);
+    }
+
+    public static void patchPauseScreen(Object screen, ButtonFactory factory, WidgetAdder adder) {
         try {
             System.out.println("[MCP] patchPauseScreen: screen=" + screen.getClass().getName());
             dumpAllFields(screen);
@@ -39,12 +52,17 @@ public class McpScreenHelper {
                 try {
                     Object mc = ReflectionHelper.getMinecraftInstance();
                     ReflectionHelper.enterMcpControlMode(mc);
-                    ReflectionHelper.closeScreen(mc);
+                    closeScreenDirect(mc);
                 } catch (Exception ignored) {}
             }, x, y, leftW, h);
             System.out.println("[MCP] patchPauseScreen: transfer button created: " + transfer.getClass().getName());
 
-            addRenderableWidget(screen, transfer);
+            if (adder != null) {
+                adder.addWidget(screen, transfer);
+                System.out.println("[MCP] patchPauseScreen: button added via WidgetAdder");
+            } else {
+                addRenderableWidget(screen, transfer);
+            }
             System.out.println("[MCP] patchPauseScreen: button added successfully");
         } catch (Exception e) {
             System.err.println("[MCP] patchPauseScreen ERROR: " + e.getMessage());
@@ -175,6 +193,8 @@ public class McpScreenHelper {
         addToNamedList(screen, "buttonList", widget);
         addToNamedList(screen, "field_146292_n", widget);
         addToNamedList(screen, "field_195124_j", widget);
+        addToNamedList(screen, "field_230705_e_", widget);
+        addToNamedList(screen, "field_230710_m_", widget);
         addToNamedList(screen, "renderables", widget);
         addToNamedList(screen, "children", widget);
         addToNamedList(screen, "narratables", widget);
@@ -241,6 +261,20 @@ public class McpScreenHelper {
                 m.invoke(obj, value);
                 return;
             } catch (Exception ignored) {}
+        }
+    }
+
+    private static void closeScreenDirect(Object mc) throws Exception {
+        for (Class<?> c = mc.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Method m : c.getDeclaredMethods()) {
+                String n = m.getName();
+                if (m.getParameterCount() != 1) continue;
+                if (n.equals("setScreen") || n.equals("displayGuiScreen") || n.equals("func_147108_a")) {
+                    m.setAccessible(true);
+                    m.invoke(mc, (Object) null);
+                    return;
+                }
+            }
         }
     }
 }
