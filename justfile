@@ -163,46 +163,6 @@ ws-shell:
     python scripts/ws_client.py
 
 # ============================================================
-# Rust Server
-# ============================================================
-
-# Build Rust server (debug)
-build-server:
-    cargo build -p mcp-server
-
-# Build Rust server (release)
-build-server-release:
-    cargo build -p mcp-server --release
-
-# Run Rust server daemon
-server *ARGS:
-    cargo run -p mcp-server {{ ARGS }}
-
-# Send command to running Rust server via TCP
-server-send cmd:
-    cargo run -p mcp-server -- send {{ cmd }}
-
-# Format all Rust code
-fmt:
-    cargo fmt --all
-
-# Check Rust formatting
-fmt-check:
-    cargo fmt --all -- --check
-
-# Run clippy
-clippy:
-    cargo clippy --workspace --all-targets -- -D warnings
-
-# Run Rust tests
-test-rust:
-    cargo test --workspace
-
-# Full CI check locally
-ci: fmt-check clippy build-server build-common
-    cargo test --workspace
-
-# ============================================================
 # Cleanup
 # ============================================================
 

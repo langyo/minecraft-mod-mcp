@@ -8,7 +8,6 @@
 **멀티 버전, 멀티 모드로더 Minecraft MCP (모델 컨텍스트 프로토콜) 브릿지 모드**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
@@ -18,13 +17,12 @@
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **버전 0.1.0** — 활발히 개발 중입니다. Rust 제어 서버, 24개의 모드 플러그인, YAML 워크플로 자동화 엔진이 작동합니다. CI 빌드는 Rust 검사와 1.21.7 Forge 모드에서 통과됩니다.
+> **버전 0.1.0** — 활발히 개발 중입니다. Java 모드 플러그인과 YAML 워크플로 자동화 엔진이 작동합니다. CI 빌드는 1.21.7 Forge 모드에서 통과됩니다. Fabric과 NeoForge 지원은 WIP입니다.
 
 ## Minecraft MCP란?
 
-Minecraft MCP(Master Control Program)는 멀티 버전, 멀티 모드로더 Minecraft UI 자동화 프레임워크입니다. 세 가지 계층으로 구성됩니다:
+Minecraft MCP(Master Control Program)는 멀티 버전, 멀티 모드로더 Minecraft UI 자동화 프레임워크입니다. 두 가지 계층으로 구성됩니다:
 
-- **Rust 제어 서버**(`packages/server/`) — WebSocket + TCP 서버로 스크린샷 캡처, 마우스/키보드 입력 주입, 비디오 스트리밍 제공
 - **Java 모드 플러그인**(`packages/mods/`) — Forge, Fabric, NeoForge를 아우르는 24개의 모드 프로젝트로, MC 1.8.9부터 26.1.2까지 지원하며 공통 코드베이스(`packages/common/`)를 공유
 - **Python 자동화**(`scripts/`) — "미리보기 클릭"(클릭 전 스크린샷에 좌표 시각적 확인) 기능이 있는 YAML 워크플로 엔진, 테스트 실행기, 빌드 자동화, 데몬 관리
 
@@ -38,22 +36,23 @@ Minecraft MCP(Master Control Program)는 멀티 버전, 멀티 모드로더 Mine
 | 1.11.2 | ✓ | | |
 | 1.12.2 | ✓ | | |
 | 1.13.2 | ✓ | | |
-| 1.14.4 | ✓ | ✓ | |
-| 1.15.2 | ✓ | ✓ | |
-| 1.16.5 | ✓ | ✓ | |
-| 1.17.1 | ✓ | ✓ | |
-| 1.18.2 | ✓ | ✓ | |
-| 1.19.4 | ✓ | ✓ | |
-| 1.20.6 | ✓ | ✓ | ✓ |
+| 1.14.4 | ✓ | 🚧 | |
+| 1.15.2 | ✓ | 🚧 | |
+| 1.16.5 | ✓ | 🚧 | |
+| 1.17.1 | ✓ | 🚧 | |
+| 1.18.2 | ✓ | 🚧 | |
+| 1.19.4 | ✓ | 🚧 | |
+| 1.20.6 | ✓ | 🚧 | 🚧 |
 | 1.21.7 | ✓ | | |
-| 26.1.2 | ✓ | | ✓ |
+| 26.1.2 | ✓ | | 🚧 |
+
+> 🚧 = WIP (개발 중)
 
 ## 빠른 시작
 
 ### 사전 준비
 
 - Python 3.10+
-- Rust 1.85+
 - JDK 21 (Corretto 권장)
 
 ### 설치 및 빌드
@@ -67,9 +66,6 @@ just check-env
 
 # 전체 빌드 (코드 생성 + 캐시 + 모든 모드 빌드)
 just full
-
-# Rust 서버만 빌드
-just build-server
 ```
 
 ### 실행
@@ -89,16 +85,11 @@ just smoke 1.21.7
 
 ```
 ┌─────────────────────────────────────┐
-│          Rust 제어 서버               │
-│  (axum WS/TCP, 스크린샷, 입력 주입)   │
-└──────────────┬──────────────────────┘
-               │ MCP 프로토콜 (WS/TCP)
-┌──────────────▼──────────────────────┐
 │         Java 모드 플러그인            │
 │  (Forge / Fabric / NeoForge)        │
 │  ReflectionHelper, InputHandler     │
 └──────────────┬──────────────────────┘
-               │
+                │
 ┌──────────────▼──────────────────────┐
 │         Minecraft 클라이언트           │
 │  (1.8.9 – 26.1.2, 24개 모드 변형)   │

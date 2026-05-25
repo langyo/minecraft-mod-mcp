@@ -8,7 +8,6 @@
 **多版本、多 Mod 載入器 Minecraft MCP（模型上下文協議）橋接 Mod**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
@@ -18,13 +17,12 @@
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **版本 0.1.0** — 活躍開發中。Rust 控制伺服器、24 個 Mod 插件以及 YAML 工作流自動化引擎均已可用。CI 已涵蓋 Rust 檢查和 1.21.7 Forge Mod 構建。
+> **版本 0.1.0** — 活躍開發中。Java Mod 插件以及 YAML 工作流自動化引擎均已可用。CI 已涵蓋 1.21.7 Forge Mod 構建。Fabric 和 NeoForge 支援為 WIP。
 
 ## 什麼是 Minecraft MCP
 
-Minecraft MCP（Master Control Program，主控程式）是一個多版本、多 Mod 載入器的 Minecraft UI 自動化框架，由三層組成：
+Minecraft MCP（Master Control Program，主控程式）是一個多版本、多 Mod 載入器的 Minecraft UI 自動化框架，由兩層組成：
 
-- **Rust 控制伺服器**（`packages/server/`）— 基於 WebSocket + TCP 協議，提供截圖擷取、滑鼠/鍵盤注入與影片串流功能
 - **Java Mod 插件**（`packages/mods/`）— 24 個 Mod 專案，涵蓋 Forge、Fabric 與 NeoForge 載入器，支援 MC 1.8.9 至 26.1.2，共享公共程式碼庫（`packages/common/`）
 - **Python 自動化**（`scripts/`）— YAML 工作流引擎，支援「預覽點擊」（點擊前先在截圖上標紅點驗證座標）、測試執行器、構建自動化與守護程序管理
 
@@ -38,22 +36,23 @@ Minecraft MCP（Master Control Program，主控程式）是一個多版本、多
 | 1.11.2 | ✓ | | |
 | 1.12.2 | ✓ | | |
 | 1.13.2 | ✓ | | |
-| 1.14.4 | ✓ | ✓ | |
-| 1.15.2 | ✓ | ✓ | |
-| 1.16.5 | ✓ | ✓ | |
-| 1.17.1 | ✓ | ✓ | |
-| 1.18.2 | ✓ | ✓ | |
-| 1.19.4 | ✓ | ✓ | |
-| 1.20.6 | ✓ | ✓ | ✓ |
+| 1.14.4 | ✓ | 🚧 | |
+| 1.15.2 | ✓ | 🚧 | |
+| 1.16.5 | ✓ | 🚧 | |
+| 1.17.1 | ✓ | 🚧 | |
+| 1.18.2 | ✓ | 🚧 | |
+| 1.19.4 | ✓ | 🚧 | |
+| 1.20.6 | ✓ | 🚧 | 🚧 |
 | 1.21.7 | ✓ | | |
-| 26.1.2 | ✓ | | ✓ |
+| 26.1.2 | ✓ | | 🚧 |
+
+> 🚧 = WIP（開發中）
 
 ## 快速開始
 
 ### 環境要求
 
 - Python 3.10+
-- Rust 1.85+
 - JDK 21（推薦 Corretto）
 
 ### 安裝與構建
@@ -67,9 +66,6 @@ just check-env
 
 # 構建全部（生成程式碼 + 快取準備 + 構建所有 Mod）
 just full
-
-# 或只構建 Rust 伺服器
-just build-server
 ```
 
 ### 執行
@@ -89,16 +85,11 @@ just smoke 1.21.7
 
 ```
 ┌─────────────────────────────────────┐
-│          Rust 控制伺服器              │
-│  (axum WS/TCP, 截圖, 輸入注入)       │
-└──────────────┬──────────────────────┘
-               │ MCP 協議 (WS/TCP)
-┌──────────────▼──────────────────────┐
 │         Java Mod 插件                │
 │  (Forge / Fabric / NeoForge)        │
 │  ReflectionHelper, InputHandler     │
 └──────────────┬──────────────────────┘
-               │
+                │
 ┌──────────────▼──────────────────────┐
 │         Minecraft 用戶端              │
 │  (1.8.9 – 26.1.2, 24 個 Mod 變體)  │

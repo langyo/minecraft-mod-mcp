@@ -8,7 +8,6 @@
 **Multi-Version, Multi-Modloader Minecraft MCP (Model Context Protocol) Bridge Mod**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
@@ -18,13 +17,12 @@
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **Version 0.1.0** — Active development. The Rust control server, 24 mod plugins, and YAML workflow automation engine are functional. CI builds are green for Rust checks and the 1.21.7 Forge mod.
+> **Version 0.1.0** — Active development. Java mod plugins and YAML workflow automation engine are functional. CI builds are green for the 1.21.7 Forge mod. Fabric and NeoForge support is WIP.
 
 ## What is Minecraft MCP
 
-Minecraft MCP (Master Control Program) is a multi-version, multi-modloader Minecraft UI automation framework. It consists of three layers:
+Minecraft MCP (Master Control Program) is a multi-version, multi-modloader Minecraft UI automation framework. It consists of two layers:
 
-- **Rust Control Server** (`packages/server/`) — WebSocket + TCP server providing screenshot capture, mouse/keyboard injection, and video streaming
 - **Java Mod Plugins** (`packages/mods/`) — 24 mod projects across Forge, Fabric, and NeoForge, spanning MC 1.8.9 through 26.1.2, all sharing a common codebase (`packages/common/`)
 - **Python Automation** (`scripts/`) — YAML workflow engine with "Preview Click" (visual coordinate verification before clicking), test runners, build automation, and daemon management
 
@@ -38,22 +36,23 @@ Minecraft MCP (Master Control Program) is a multi-version, multi-modloader Minec
 | 1.11.2 | ✓ | | |
 | 1.12.2 | ✓ | | |
 | 1.13.2 | ✓ | | |
-| 1.14.4 | ✓ | ✓ | |
-| 1.15.2 | ✓ | ✓ | |
-| 1.16.5 | ✓ | ✓ | |
-| 1.17.1 | ✓ | ✓ | |
-| 1.18.2 | ✓ | ✓ | |
-| 1.19.4 | ✓ | ✓ | |
-| 1.20.6 | ✓ | ✓ | ✓ |
+| 1.14.4 | ✓ | 🚧 | |
+| 1.15.2 | ✓ | 🚧 | |
+| 1.16.5 | ✓ | 🚧 | |
+| 1.17.1 | ✓ | 🚧 | |
+| 1.18.2 | ✓ | 🚧 | |
+| 1.19.4 | ✓ | 🚧 | |
+| 1.20.6 | ✓ | 🚧 | 🚧 |
 | 1.21.7 | ✓ | | |
-| 26.1.2 | ✓ | | ✓ |
+| 26.1.2 | ✓ | | 🚧 |
+
+> 🚧 = WIP (Work In Progress)
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.10+
-- Rust 1.85+
 - JDK 21 (Corretto recommended)
 
 ### Setup & Build
@@ -67,9 +66,6 @@ just check-env
 
 # Build everything (generate + cache + build all mods)
 just full
-
-# Or build just the Rust server
-just build-server
 ```
 
 ### Run
@@ -89,16 +85,11 @@ just smoke 1.21.7
 
 ```
 ┌─────────────────────────────────────┐
-│          Rust Control Server         │
-│  (axum WS/TCP, screenshot, input)   │
-└──────────────┬──────────────────────┘
-               │ MCP Protocol (WS/TCP)
-┌──────────────▼──────────────────────┐
 │         Java Mod Plugin              │
 │  (Forge / Fabric / NeoForge)        │
 │  ReflectionHelper, InputHandler     │
 └──────────────┬──────────────────────┘
-               │
+                │
 ┌──────────────▼──────────────────────┐
 │         Minecraft Client             │
 │  (1.8.9 – 26.1.2, 24 mod variants) │

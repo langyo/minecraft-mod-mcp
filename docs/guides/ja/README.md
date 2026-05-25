@@ -8,7 +8,6 @@
 **マルチバージョン・マルチ Mod ローダー対応 Minecraft MCP（モデルコンテキストプロトコル）ブリッジ Mod**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
@@ -18,13 +17,12 @@
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **バージョン 0.1.0** — 活発に開発中です。Rust 制御サーバー、24 個の Mod プラグイン、および YAML ワークフロー自動化エンジンが動作可能です。CI ビルドは Rust チェックと 1.21.7 Forge Mod でグリーンです。
+> **バージョン 0.1.0** — 活発に開発中です。Java Mod プラグインおよび YAML ワークフロー自動化エンジンが動作可能です。CI ビルドは 1.21.7 Forge Mod でグリーンです。Fabric と NeoForge のサポートは WIP です。
 
 ## Minecraft MCP とは
 
-Minecraft MCP（Master Control Program）は、マルチバージョン・マルチ Mod ローダー対応の Minecraft UI 自動化フレームワークです。以下の 3 層で構成されています：
+Minecraft MCP（Master Control Program）は、マルチバージョン・マルチ Mod ローダー対応の Minecraft UI 自動化フレームワークです。以下の 2 層で構成されています：
 
-- **Rust 制御サーバー**（`packages/server/`）— WebSocket + TCP サーバーで、スクリーンショット取得、マウス/キーボード注入、ビデオストリーミングを提供
 - **Java Mod プラグイン**（`packages/mods/`）— Forge、Fabric、NeoForge に対応する 24 の Mod プロジェクトで、MC 1.8.9 から 26.1.2 までをカバーし、共通コードベース（`packages/common/`）を共有
 - **Python 自動化**（`scripts/`）— 「プレビュークリック」（クリック前にスクリーンショット上で座標を視覚的に確認）機能を備えた YAML ワークフローエンジン、テストランナー、ビルド自動化、デーモン管理
 
@@ -38,22 +36,23 @@ Minecraft MCP（Master Control Program）は、マルチバージョン・マル
 | 1.11.2 | ✓ | | |
 | 1.12.2 | ✓ | | |
 | 1.13.2 | ✓ | | |
-| 1.14.4 | ✓ | ✓ | |
-| 1.15.2 | ✓ | ✓ | |
-| 1.16.5 | ✓ | ✓ | |
-| 1.17.1 | ✓ | ✓ | |
-| 1.18.2 | ✓ | ✓ | |
-| 1.19.4 | ✓ | ✓ | |
-| 1.20.6 | ✓ | ✓ | ✓ |
+| 1.14.4 | ✓ | 🚧 | |
+| 1.15.2 | ✓ | 🚧 | |
+| 1.16.5 | ✓ | 🚧 | |
+| 1.17.1 | ✓ | 🚧 | |
+| 1.18.2 | ✓ | 🚧 | |
+| 1.19.4 | ✓ | 🚧 | |
+| 1.20.6 | ✓ | 🚧 | 🚧 |
 | 1.21.7 | ✓ | | |
-| 26.1.2 | ✓ | | ✓ |
+| 26.1.2 | ✓ | | 🚧 |
+
+> 🚧 = WIP（開発中）
 
 ## クイックスタート
 
 ### 前提条件
 
 - Python 3.10+
-- Rust 1.85+
 - JDK 21（Corretto 推奨）
 
 ### セットアップとビルド
@@ -67,9 +66,6 @@ just check-env
 
 # すべてをビルド（コード生成 + キャッシュ + 全 Mod ビルド）
 just full
-
-# Rust サーバーのみビルド
-just build-server
 ```
 
 ### 実行
@@ -89,17 +85,11 @@ just smoke 1.21.7
 
 ```
 ┌─────────────────────────────────────┐
-│          Rust 制御サーバー             │
-│  (axum WS/TCP, スクリーンショット,    │
-│           入力注入)                   │
-└──────────────┬──────────────────────┘
-               │ MCP プロトコル (WS/TCP)
-┌──────────────▼──────────────────────┐
 │         Java Mod プラグイン           │
 │  (Forge / Fabric / NeoForge)        │
 │  ReflectionHelper, InputHandler     │
 └──────────────┬──────────────────────┘
-               │
+                │
 ┌──────────────▼──────────────────────┐
 │         Minecraft クライアント         │
 │  (1.8.9 – 26.1.2, 24 の Mod 派生)  │
