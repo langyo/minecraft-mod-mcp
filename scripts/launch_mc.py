@@ -740,6 +740,10 @@ def main():
     if not main_class:
         print("[ERROR] No mainClass found in version JSON")
         sys.exit(1)
+    if "fabricmc" in main_class:
+        jv = vj.get("javaVersion", {})
+        if not jv or jv.get("majorVersion", 8) < 17:
+            vj["javaVersion"] = {"majorVersion": 17}
     print(f"[LAUNCH] mainClass: {main_class}")
 
     cp = build_classpath(vj, mc_dir)
