@@ -5,26 +5,29 @@
 
 # Minecraft MCP
 
-**Multi-Version, Multi-Modloader Minecraft MCP (Model Context Protocol) Bridge Mod**
+**Let AI Play Minecraft — Control Any Version, Any Modloader**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
-[![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
+[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mcp)](https://github.com/langyo/minecraft-mcp/releases)
 
 **English** &bull; **[简体中文](docs/guides/zhs/README.md)** &bull; **[繁體中文](docs/guides/zht/README.md)** &bull; **[日本語](docs/guides/ja/README.md)** &bull; **[한국어](docs/guides/ko/README.md)** &bull; **[Français](docs/guides/fr/README.md)** &bull; **[Español](docs/guides/es/README.md)** &bull; **[Русский](docs/guides/ru/README.md)**
 
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **Version 0.1.0** — Active development. Java mod plugins and HTTP-based control server are functional. CI builds are green for the 1.21.7 Forge mod. Fabric and NeoForge support is WIP.
-
 ## What is Minecraft MCP
 
-Minecraft MCP (Master Control Program) is a multi-version, multi-modloader Minecraft UI automation framework. It consists of two layers:
+Minecraft MCP is a bridge between AI assistants and Minecraft. It runs as a mod inside the game, exposing an HTTP server that AI tools — **Claude Code, Cursor, Cline, GitHub Copilot, and 20+ others** — can connect to via the standard MCP protocol. Through this bridge, AI can see the game, click buttons, type commands, and interact with the world.
 
-- **Java Mod Plugins** (`packages/mods/`) — 24 mod projects across Forge, Fabric, and NeoForge, spanning MC 1.8.9 through 26.1.2, all sharing a common codebase (`packages/common/`)
-- **Python Automation** (`scripts/`) — Build automation, daemon management, test runners, and smoke testing
+> Want your AI to build a castle? Run a smoke test? Navigate a modpack menu? Minecraft MCP makes it possible.
+
+- **See** — capture screenshots with coordinate grids
+- **Act** — click, type, scroll, drag, and press any key
+- **Know** — query player position, world info, screen buttons, and debug fields
+- **Record** — stream events in real time via SSE, capture video frames
+
+[AI Tool Integration Guide →](docs/guides/en/AI-TOOLS.md)
 
 ## Supported Versions
 
@@ -46,55 +49,48 @@ Minecraft MCP (Master Control Program) is a multi-version, multi-modloader Minec
 | 1.21.7 | ✓ | | |
 | 26.1.2 | ✓ | | 🚧 |
 
-> 🚧 = WIP (Work In Progress)
+> 🚧 = Work In Progress
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.10+
 - JDK 21 (Corretto recommended)
 
 ### Setup & Build
 
 ```bash
-# Install Python dependencies
+# Install dependencies
 pip install -r scripts/requirements.txt
 
-# Check environment
-just check-env
-
-# Build everything (generate + cache + build all mods)
+# Build everything
 just full
 ```
 
 ### Run
 
 ```bash
-# Start the control server daemon
+# Start the daemon and launch Minecraft
 just daemon
-
-# Launch a Minecraft version
 just launch 1.21.7 forge
 
-# Run a smoke test (build + launch + screenshot)
+# Or run an end-to-end smoke test
 just smoke 1.21.7
 ```
 
-## Architecture
+## How It Works
 
+```mermaid
+flowchart LR
+    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
+    B["🔌 Minecraft MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
+
+    A <-- "HTTP / SSE" --> B
+    B -- "reflection" --> C
 ```
-┌─────────────────────────────────────┐
-│         Java Mod Plugin              │
-│  (Forge / Fabric / NeoForge)        │
-│  ReflectionHelper, InputHandler     │
-└──────────────┬──────────────────────┘
-                │
-┌──────────────▼──────────────────────┐
-│         Minecraft Client             │
-│  (1.8.9 – 26.1.2, 24 mod variants) │
-└─────────────────────────────────────┘
-```
+
+The mod runs an HTTP server on port 9876 inside Minecraft. Your AI tool connects via the standard MCP protocol (SSE transport), and every command — click, type, screenshot, etc. — uses Java reflection to work across all Minecraft versions without version-specific code.
 
 ## Contributing
 

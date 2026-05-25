@@ -9,6 +9,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
+[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mcp)](https://github.com/langyo/minecraft-mcp/releases)
 
 **[English](../en/README.md)** &bull; **简体中文** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
@@ -79,16 +80,14 @@ just smoke 1.21.7
 
 ## 工作原理
 
-```
-┌────────────────────┐     HTTP/SSE      ┌─────────────────────┐
-│   AI 工具 (Claude)  │ ◄──────────────► │   Minecraft MCP      │
-│   .mcp.json 配置    │   port 9876      │   （游戏内模组）      │
-└────────────────────┘                   └──────────┬──────────┘
-                                                    │ 反射调用
-                                         ┌──────────▼──────────┐
-                                         │   Minecraft 客户端   │
-                                         │   (1.8.9 – 26.1.2)  │
-                                         └─────────────────────┘
+```mermaid
+flowchart LR
+    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
+    B["🔌 Minecraft MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
+
+    A <-- "HTTP / SSE" --> B
+    B -- "reflection" --> C
 ```
 
 该模组在 Minecraft 内部运行一个 HTTP 服务器（端口 9876）。你的 AI 工具通过标准 MCP 协议（SSE 传输）连接，每条命令 —— 点击、输入、截图等 —— 都通过 Java 反射机制实现，无需针对特定版本编写代码，跨所有 Minecraft 版本通用。

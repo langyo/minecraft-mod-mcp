@@ -9,6 +9,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
+[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mcp)](https://github.com/langyo/minecraft-mcp/releases)
 
 **[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **日本語** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
@@ -79,16 +80,14 @@ just smoke 1.21.7
 
 ## 仕組み
 
-```
-┌────────────────────┐     HTTP/SSE      ┌─────────────────────┐
-│   AIツール (Claude) │ ◄──────────────► │   Minecraft MCP      │
-│   .mcp.json 設定    │   port 9876      │   (ゲーム内Mod)      │
-└────────────────────┘                   └──────────┬──────────┘
-                                                    │ リフレクション
-                                         ┌──────────▼──────────┐
-                                         │   Minecraft Client   │
-                                         │   (1.8.9 – 26.1.2)  │
-                                         └─────────────────────┘
+```mermaid
+flowchart LR
+    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
+    B["🔌 Minecraft MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
+
+    A <-- "HTTP / SSE" --> B
+    B -- "reflection" --> C
 ```
 
 このModはMinecraft内でポート9876のHTTPサーバーを実行します。お使いのAIツールは標準のMCPプロトコル（SSEトランスポート）で接続し、クリック、入力、スクリーンショットなどのすべてのコマンドはJavaリフレクションを使用して、バージョン固有のコードなしですべてのMinecraftバージョンで動作します。

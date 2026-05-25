@@ -9,6 +9,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
+[![Release](https://img.shields.io/github/v/release/langyo/minecraft-mcp)](https://github.com/langyo/minecraft-mcp/releases)
 
 **[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
@@ -79,16 +80,14 @@ just smoke 1.21.7
 
 ## 작동 원리
 
-```
-┌────────────────────┐     HTTP/SSE      ┌─────────────────────┐
-│   AI 도구 (Claude)   │ ◄──────────────► │   Minecraft MCP      │
-│   .mcp.json 설정     │   포트 9876      │   (게임 내 모드)      │
-└────────────────────┘                   └──────────┬──────────┘
-                                                    │ 리플렉션
-                                         ┌──────────▼──────────┐
-                                         │   마인크래프트 클라이언트 │
-                                         │   (1.8.9 – 26.1.2)  │
-                                         └─────────────────────┘
+```mermaid
+flowchart LR
+    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
+    B["🔌 Minecraft MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
+
+    A <-- "HTTP / SSE" --> B
+    B -- "reflection" --> C
 ```
 
 이 모드는 마인크래프트 내에서 포트 9876으로 HTTP 서버를 실행합니다. AI 도구는 표준 MCP 프로토콜(SSE 전송)을 통해 연결되며, 클릭, 타이핑, 스크린샷 등 모든 명령어는 Java 리플렉션을 사용하여 버전별 코드 없이 모든 마인크래프트 버전에서 작동합니다.
