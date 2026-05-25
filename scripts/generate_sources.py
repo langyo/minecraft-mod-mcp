@@ -35,8 +35,7 @@ import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 @Mod(modid = "mcpmod", name = "ModDev MCP", version = "1.0")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     @Mod.Instance("mcpmod")
     public static ModDevMcpMod instance;
@@ -44,18 +43,17 @@ public class ModDevMcpMod {
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         INSTANCE = this;
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
+        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        int port = McpConfig.getServerPort();
+        httpServer = new McpHttpServer(handler, port);
         new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(50);
-                    if (wsClient != null) wsClient.handleMessages();
-                } catch (Exception e) { break; }
+            try {
+                Thread.sleep(5000);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
             }
-        }).start();
+        }, "MCP-HTTP").start();
     }
 }
 """
@@ -70,23 +68,21 @@ import net.minecraftforge.fml.common.Mod;
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     public ModDevMcpMod() {
         INSTANCE = this;
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
+        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        int port = McpConfig.getServerPort();
+        httpServer = new McpHttpServer(handler, port);
         new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(50);
-                    if (wsClient != null) wsClient.handleMessages();
-                } catch (Exception e) { break; }
+            try {
+                Thread.sleep(5000);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
             }
-        }).start();
+        }, "MCP-HTTP").start();
     }
 }
 """
@@ -95,13 +91,11 @@ public class ModDevMcpMod {
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.event.TickEvent;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     public ModDevMcpMod() {
         INSTANCE = this;
@@ -109,15 +103,17 @@ public class ModDevMcpMod {
     }
 
     private void setup(final FMLCommonSetupEvent event) {
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
-    }
-
-    @net.minecraftforge.eventbus.api.SubscribeEvent
-    public void onTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        int port = McpConfig.getServerPort();
+        httpServer = new McpHttpServer(handler, port);
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
+            }
+        }, "MCP-HTTP").start();
     }
 }
 """
@@ -128,31 +124,29 @@ def forge_mod_fg4(mc):
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.common.MinecraftForge;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     public ModDevMcpMod() {
         INSTANCE = this;
         net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
-        MinecraftForge.EVENT_BUS.register(this);
     }
 
     private void setup(final FMLCommonSetupEvent event) {
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
-    }
-
-    @net.minecraftforge.eventbus.api.SubscribeEvent
-    public void onTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        int port = McpConfig.getServerPort();
+        httpServer = new McpHttpServer(handler, port);
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
+            }
+        }, "MCP-HTTP").start();
     }
 }
 """
@@ -170,31 +164,29 @@ import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.common.MinecraftForge;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     public ModDevMcpMod(FMLJavaModLoadingContext context) {
         INSTANCE = this;
         context.getModEventBus().addListener(this::commonSetup);
-        MinecraftForge.EVENT_BUS.addListener(this::onClientTickPost);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
-    }
-
-    @net.minecraftforge.eventbus.api.SubscribeEvent
-    public void onClientTickPost(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        int port = McpConfig.getServerPort();
+        httpServer = new McpHttpServer(handler, port);
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
+            }
+        }, "MCP-HTTP").start();
     }
 }
 """
@@ -208,22 +200,21 @@ import net.minecraftforge.fml.common.Mod;
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
+    private McpHttpServer httpServer;
 
     public ModDevMcpMod() {
         INSTANCE = this;
         new Thread(() -> {
-            String serverUrl = McpConfig.getServerUrl();
-            ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-            wsClient = new McpWebSocketClient(serverUrl, handler);
-            wsClient.connectAsync();
-            while (true) {
-                try {
-                    Thread.sleep(50);
-                    if (wsClient != null) wsClient.handleMessages();
-                } catch (Exception e) { break; }
+            try {
+                Thread.sleep(5000);
+                ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+                int port = McpConfig.getServerPort();
+                httpServer = new McpHttpServer(handler, port);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
             }
-        }).start();
+        }, "MCP-HTTP").start();
     }
 }
 """
@@ -238,32 +229,31 @@ def neoforge_mod_1201(mc):
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     public ModDevMcpMod(IEventBus modBus) {
         INSTANCE = this;
         modBus.addListener(this::commonSetup);
-        MinecraftForge.EVENT_BUS.addListener(this::onClientTick);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
-    }
-
-    private void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        int port = McpConfig.getServerPort();
+        httpServer = new McpHttpServer(handler, port);
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
+            }
+        }, "MCP-HTTP").start();
     }
 }
 """
@@ -275,31 +265,30 @@ def neoforge_mod_1204(mc):
 import xyz.langyo.minecraft.mcp.common.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     public ModDevMcpMod(IEventBus modBus) {
         INSTANCE = this;
         modBus.addListener(this::commonSetup);
-        NeoForge.EVENT_BUS.addListener(this::onClientTick);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
-    }
-
-    private void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && wsClient != null) wsClient.handleMessages();
+        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        int port = McpConfig.getServerPort();
+        httpServer = new McpHttpServer(handler, port);
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
+            }
+        }, "MCP-HTTP").start();
     }
 }
 """
@@ -314,31 +303,30 @@ def neoforge_mod(mc):
 import xyz.langyo.minecraft.mcp.common.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
-    private McpWebSocketClient wsClient;
-    private ReflectedInputHandler handler;
+    private McpHttpServer httpServer;
 
     public ModDevMcpMod(IEventBus modBus) {
         INSTANCE = this;
         modBus.addListener(this::commonSetup);
-        NeoForge.EVENT_BUS.addListener(this::onClientTickPost);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        String serverUrl = McpConfig.getServerUrl();
-        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
-    }
-
-    private void onClientTickPost(ClientTickEvent.Post event) {
-        if (wsClient != null) wsClient.handleMessages();
+        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        int port = McpConfig.getServerPort();
+        httpServer = new McpHttpServer(handler, port);
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
+            }
+        }, "MCP-HTTP").start();
     }
 }
 """
@@ -355,22 +343,21 @@ import xyz.langyo.minecraft.mcp.common.*;
 import net.fabricmc.api.ClientModInitializer;
 
 public class ModDevMcpMod implements ClientModInitializer {
-    private McpWebSocketClient wsClient;
+    private McpHttpServer httpServer;
 
     @Override
     public void onInitializeClient() {
-        String serverUrl = McpConfig.getServerUrl();
         ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        wsClient = new McpWebSocketClient(serverUrl, handler);
-        wsClient.connectAsync();
+        int port = McpConfig.getServerPort();
+        httpServer = new McpHttpServer(handler, port);
         new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(50);
-                    if (wsClient != null) wsClient.handleMessages();
-                } catch (Exception e) { break; }
+            try {
+                Thread.sleep(5000);
+                httpServer.start();
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
             }
-        }).start();
+        }, "MCP-HTTP").start();
     }
 }
 """
