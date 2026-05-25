@@ -89,7 +89,7 @@ FG_ERAS = {
     },
     "fg7": {
         "fg_version": "[7.0.23,8)",
-        "gradle": "9.3.1",
+        "gradle": "9.3.0",
         "plugin_id": "net.minecraftforge.gradle",
         "apply_method": "buildscript",
         "java": 21,
