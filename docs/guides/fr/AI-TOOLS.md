@@ -1,5 +1,9 @@
 # Guide d'intégration des outils d'IA
 
+**[English](../en/AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **Français** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
+
+> **Astuce** : Vous pouvez simplement demander à votre assistant IA de lire ce guide directement depuis l'URL de ce dépôt. Dans la plupart des cas, l'agent configurera automatiquement la connexion MCP — aucune configuration manuelle n'est nécessaire de votre part.
+
 Ce guide explique comment configurer les principaux outils de codage IA pour se connecter au serveur Minecraft MCP via HTTP.
 
 ## Points de terminaison HTTP de Minecraft MCP

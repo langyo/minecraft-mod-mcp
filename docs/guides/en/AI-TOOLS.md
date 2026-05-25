@@ -1,5 +1,9 @@
 # AI Tool Integration Guide
 
+**[English](./AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
+
+> **Tip**: You can simply ask your AI agent assistant to read this guide directly from this repository's URL. In most cases the agent will configure the MCP connection automatically — no manual setup is needed on your part.
+
 This guide explains how to configure mainstream AI coding tools to connect to the Minecraft MCP server via HTTP.
 
 ## Minecraft MCP HTTP Endpoints

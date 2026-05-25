@@ -1,5 +1,9 @@
 # AI 도구 통합 가이드
 
+**[English](../en/AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **한국어** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
+
+> **팁**: AI 에이전트 어시스턴트에게 이 저장소의 본 가이드 URL을 직접 읽도록 요청하면 됩니다. 대부분의 경우 에이전트가 자동으로 MCP 연결을 구성하므로 수동 설정이 필요하지 않습니다.
+
 이 가이드는 주요 AI 코딩 도구를 HTTP를 통해 Minecraft MCP 서버에 연결하는 방법을 설명합니다.
 
 ## Minecraft MCP HTTP 엔드포인트

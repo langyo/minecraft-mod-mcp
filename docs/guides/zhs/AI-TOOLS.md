@@ -1,5 +1,9 @@
 # AI 工具集成指南
 
+**[English](../en/AI-TOOLS.md)** &bull; **简体中文** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
+
+> **提示**：你可以直接让你的 AI Agent 助手阅读该仓库中的本指南 URL 进行对接，一般情况下无需你手动操作。
+
 本指南介绍如何将主流 AI 编程工具通过 HTTP 连接到 Minecraft MCP 服务器。
 
 ## Minecraft MCP HTTP 端点
