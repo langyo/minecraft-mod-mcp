@@ -137,14 +137,14 @@ steps:
 ## ファイル構造
 
 ```
-minecraft-neoforge-mcp/
+minecraft-mcp/
 ├── workflows/                        # YAML ワークフロー定義
 │   └── smoke_test.yaml               # スモークテスト：メインメニュー→ゲーム内→視点回転
 ├── scripts/
 │   ├── run_yaml.py                   # YAML ランナーエントリポイント
 │   ├── workflow_engine.py            # コアエンジン（アクション実行、状態管理、スクリーンショット注釈）
 │   └── run.py                       # 旧コマンドラインランナー（引き続き使用可能）
-├── mcp-common/                       # Mod 共通コード（リフレクション入力、スクリーンショット、制御モード）
+├── packages/common/                  # Mod 共通コード（リフレクション入力、スクリーンショット、制御モード）
 │   └── src/main/java/.../
 │       ├── ReflectionHelper.java     # guiClick, preview_click, lookDelta など
 │       ├── McpMessageHandler.java    # WebSocket メッセージ分散

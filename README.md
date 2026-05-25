@@ -13,7 +13,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
 
-**[English](README.md)** &bull; **[简体中文](docs/guides/zhs/README.md)** &bull; **[繁體中文](docs/guides/zht/README.md)** &bull; **[日本語](docs/guides/ja/README.md)** &bull; **[한국어](docs/guides/ko/README.md)** &bull; **[Français](docs/guides/fr/README.md)** &bull; **[Español](docs/guides/es/README.md)** &bull; **[Русский](docs/guides/ru/README.md)**
+**English** &bull; **[简体中文](docs/guides/zhs/README.md)** &bull; **[繁體中文](docs/guides/zht/README.md)** &bull; **[日本語](docs/guides/ja/README.md)** &bull; **[한국어](docs/guides/ko/README.md)** &bull; **[Français](docs/guides/fr/README.md)** &bull; **[Español](docs/guides/es/README.md)** &bull; **[Русский](docs/guides/ru/README.md)**
 
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
@@ -107,7 +107,7 @@ just smoke 1.21.7
 
 ## Docs
 
-- **[Workflow Automation](docs/guides/zhs/workflow.md)** — YAML-based UI automation with Preview Click
+- **[Workflow Automation](docs/guides/en/workflow.md)** — YAML-based UI automation with Preview Click
 - **[PLAN.md](PLAN.md)** — Completed test case: Redstone Ready world creation
 - **[Workflows](workflows/)** — Declarative YAML test definitions
 

@@ -13,7 +13,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-yellow.svg)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-0.1.0-lightgrey.svg)]()
 
-**[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
+**[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **Français** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->

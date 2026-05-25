@@ -137,14 +137,14 @@ steps:
 ## 檔案結構
 
 ```
-minecraft-neoforge-mcp/
+minecraft-mcp/
 ├── workflows/                        # YAML 工作流程定義
 │   └── smoke_test.yaml               # 冒煙測試：主選單→遊戲內→視角旋轉
 ├── scripts/
 │   ├── run_yaml.py                   # YAML 執行器入口
 │   ├── workflow_engine.py            # 核心引擎（動作執行、狀態管理、截圖標註）
 │   └── run.py                       # 舊版命令列 runner（仍可使用）
-├── mcp-common/                       # Mod 公共程式碼（反射輸入、截圖、控制模式）
+├── packages/common/                  # Mod 公共程式碼（反射輸入、截圖、控制模式）
 │   └── src/main/java/.../
 │       ├── ReflectionHelper.java     # guiClick, preview_click, lookDelta 等
 │       ├── McpMessageHandler.java    # WebSocket 訊息分發

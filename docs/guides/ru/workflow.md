@@ -137,14 +137,14 @@ steps:
 ## Структура файлов
 
 ```
-minecraft-neoforge-mcp/
+minecraft-mcp/
 ├── workflows/                        # Определения рабочих процессов YAML
 │   └── smoke_test.yaml               # Дымовой тест: главное меню → в игре → поворот обзора
 ├── scripts/
 │   ├── run_yaml.py                   # Точка входа исполнителя YAML
 │   ├── workflow_engine.py            # Основной движок (выполнение действий, управление состоянием, аннотация скриншотов)
 │   └── run.py                       # Старый исполнитель CLI (всё ещё пригоден)
-├── mcp-common/                       # Общий код мода (ввод через рефлексию, скриншот, режим управления)
+├── packages/common/                  # Общий код мода (ввод через рефлексию, скриншот, режим управления)
 │   └── src/main/java/.../
 │       ├── ReflectionHelper.java     # guiClick, preview_click, lookDelta и др.
 │       ├── McpMessageHandler.java    # Распределение сообщений WebSocket
