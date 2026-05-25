@@ -3275,7 +3275,6 @@ public final class ReflectionHelper {
             mcpControlMode = true;
             mcpControlModeEnterTime = System.currentTimeMillis();
             mouseReleaseActive = false;
-            forceCursorNormal = false;
             forceCursorAndReleaseMouse(mc);
             logModEvent("enter_control_mode", "MCP took control");
             dbg("enterMcpControlMode: cursor forced to NORMAL, no hook");
@@ -3290,7 +3289,6 @@ public final class ReflectionHelper {
             mcpControlModeExitTime = System.currentTimeMillis();
             logModEvent("exit_control_mode", "Manual control restored");
             mouseReleaseActive = false;
-            forceCursorNormal = false;
             if (LWJGL3) {
                 long glfwHandle = getWindowHandle(mc);
                 if (glfwHandle != 0 && glfwSetInputModeMethod != null) {
@@ -3379,9 +3377,6 @@ public final class ReflectionHelper {
 
     public static String getMcpControlPauseTransferTranslationKey() { return "mcpmod.control.transfer"; }
 
-    private static volatile boolean forceCursorNormal = false;
-    private static Method glfwHideWindowMethod;
-    private static Method glfwShowWindowMethod;
     private static int GLFW_CURSOR_VAL = -1;
     private static int GLFW_CURSOR_NORMAL_VAL = -1;
     private static boolean cursorCacheInit = false;
@@ -3389,10 +3384,6 @@ public final class ReflectionHelper {
     private static Field accumulatedDXField = null;
     private static Field accumulatedDYField = null;
     private static boolean mouseFieldsInit = false;
-    private static volatile boolean lastForceState = false;
-    private static volatile boolean windowHidden = false;
-    private static int savedWindowX = 0;
-    private static int savedWindowY = 0;
 
     private static void initCursorCache() throws Exception {
         if (cursorCacheInit) return;
@@ -3402,10 +3393,6 @@ public final class ReflectionHelper {
         }
         GLFW_CURSOR_VAL = GLFW_CURSOR;
         GLFW_CURSOR_NORMAL_VAL = GLFW_CURSOR_NORMAL;
-        if (glfwClass != null) {
-            try { glfwHideWindowMethod = glfwClass.getMethod("glfwHideWindow", long.class); } catch (Exception ignored) {}
-            try { glfwShowWindowMethod = glfwClass.getMethod("glfwShowWindow", long.class); } catch (Exception ignored) {}
-        }
         cursorCacheInit = true;
     }
 
@@ -3450,85 +3437,6 @@ public final class ReflectionHelper {
         if (mouseGrabbedField == null) {
             dbg("cursor: WARNING - mouseGrabbedField not found, camera rotation suppression will not work");
         }
-    }
-
-    public static void setForceCursorNormal(boolean v) { forceCursorNormal = v; }
-
-    public static void hideWindow(Object mc) {
-        if (windowHidden) return;
-        try {
-            long handle = getWindowHandle(mc);
-            dbg("cursor: hideWindow v2 called, handle=" + handle + " LWJGL3=" + LWJGL3);
-            if (handle == 0 || !LWJGL3) return;
-            McpPlatformControl ctrl = McpControlFactory.get();
-            dbg("cursor: ctrl type=" + ctrl.getClass().getSimpleName());
-            if (ctrl instanceof McpWin32Control) {
-                McpWin32Control w32 = (McpWin32Control) ctrl;
-                w32.ensureHwndFromGlfw(handle);
-                long hwnd = w32.getMcHwnd();
-                dbg("cursor: hwnd=" + hwnd);
-                if (hwnd != 0) {
-                    int[] rect = w32.getWindowRect(hwnd);
-                    if (rect != null) {
-                        savedWindowX = rect[0];
-                        savedWindowY = rect[1];
-                    }
-                    w32.moveWindowOffscreen(hwnd);
-                    windowHidden = true;
-                    dbg("cursor: window moved offscreen (saved " + savedWindowX + "," + savedWindowY + ")");
-                    return;
-                }
-            }
-            windowHidden = true;
-            dbg("cursor: hideWindow no-op (not Win32 or no hwnd)");
-        } catch (Exception e) {
-            dbg("cursor: hideWindow failed: " + e.getMessage());
-        }
-    }
-
-    public static void tickForceCursorNormal(Object mc) {
-        if (!forceCursorNormal) {
-            if (lastForceState) {
-                windowHidden = false;
-                lastForceState = false;
-                cursorApplied = false;
-            }
-            return;
-        }
-        try {
-            if (!isMcReady(mc)) return;
-            if (!windowHidden) hideWindow(mc);
-            if (!cursorApplied) {
-                forceCursorAndReleaseMouse(mc);
-                cursorApplied = true;
-                dbg("cursor: GLFW_CURSOR_NORMAL applied once");
-            } else {
-                Object mouseHandler = getMouseHandler(mc);
-                if (mouseHandler != null) {
-                    initMouseFields(mouseHandler);
-                    if (mouseGrabbedField != null) mouseGrabbedField.setBoolean(mouseHandler, false);
-                    if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
-                    if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
-                }
-            }
-            lastForceState = true;
-        } catch (Exception e) {
-            dbg("cursor: " + e.getMessage());
-        }
-    }
-
-    private static volatile boolean cursorApplied = false;
-    private static volatile long forceCursorNormalStartTime = 0;
-    private static final long READY_DELAY_MS = 10000;
-
-    private static boolean isMcReady(Object mc) {
-        if (forceCursorNormalStartTime == 0) {
-            forceCursorNormalStartTime = System.currentTimeMillis();
-        }
-        if (System.currentTimeMillis() - forceCursorNormalStartTime < READY_DELAY_MS) {
-            return false;
-        }
-        return getWindowHandle(mc) != 0;
     }
 
     public static String showMcpOverlay(String text, int port) {

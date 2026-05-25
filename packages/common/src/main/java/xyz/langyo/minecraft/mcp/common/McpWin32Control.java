@@ -833,22 +833,4 @@ public class McpWin32Control implements McpPlatformControl {
     }
 
     public long getMcHwnd() { return mcHwnd; }
-
-    public int[] getWindowRect(long hwnd) {
-        try {
-            RECT rect = new RECT();
-            if (U.GetWindowRect(hwnd, rect)) {
-                return new int[]{rect.left, rect.top, rect.right, rect.bottom};
-            }
-        } catch (Exception ignored) {}
-        return null;
-    }
-
-    public void moveWindowOffscreen(long hwnd) {
-        try {
-            int SWP_NOSIZE = 0x0001;
-            int SWP_NOZORDER = 0x0004;
-            U.SetWindowPos(hwnd, 0, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-        } catch (Exception ignored) {}
-    }
 }
