@@ -519,4 +519,4 @@ curl http://localhost:9876/api/events
 3. **포트 충돌**: 포트 9876이 사용 중인 경우, `MCP_PORT` 환경 변수 또는 시스템 속성 `mcp.server.port`를 통해 다른 포트를 설정하세요.
 4. **방화벽**: 방화벽이 `localhost:9876`에 대한 연결을 허용하는지 확인하세요.
 
-> 문제나 질문이 있으시면 [GitHub 저장소](https://github.com/langyo/minecraft-mcp)에 이슈를 등록해 주세요.
+> 문제나 질문이 있으시면 [GitHub 저장소](https://github.com/langyo/minecraft-mod-mcp)에 이슈를 등록해 주세요.

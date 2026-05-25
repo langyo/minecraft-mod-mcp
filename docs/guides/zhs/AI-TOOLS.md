@@ -519,4 +519,4 @@ curl http://localhost:9876/api/events
 3. **端口冲突**：如果端口 9876 被占用，请通过 `MCP_PORT` 环境变量或系统属性 `mcp.server.port` 配置其他端口。
 4. **防火墙**：确保防火墙允许连接到 `localhost:9876`。
 
-> 如有问题或疑问，请在 [GitHub 仓库](https://github.com/langyo/minecraft-mcp) 上提交 issue。
+> 如有问题或疑问，请在 [GitHub 仓库](https://github.com/langyo/minecraft-mod-mcp) 上提交 issue。

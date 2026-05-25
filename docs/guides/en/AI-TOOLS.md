@@ -519,4 +519,4 @@ curl http://localhost:9876/api/events
 3. **Port conflict**: If port 9876 is in use, configure a different port via the `MCP_PORT` environment variable or system property `mcp.server.port`.
 4. **Firewall**: Ensure your firewall allows connections to `localhost:9876`.
 
-> For issues or questions, please open an issue on the [GitHub repository](https://github.com/langyo/minecraft-mcp).
+> For issues or questions, please open an issue on the [GitHub repository](https://github.com/langyo/minecraft-mod-mcp).

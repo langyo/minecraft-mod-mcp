@@ -519,4 +519,4 @@ curl http://localhost:9876/api/events
 3. **Port conflict**: Если порт 9876 занят, настройте другой порт через переменную окружения `MCP_PORT` или системное свойство `mcp.server.port`.
 4. **Firewall**: Убедитесь, что ваш брандмауэр разрешает подключения к `localhost:9876`.
 
-> По вопросам и проблемам открывайте issue в [GitHub-репозитории](https://github.com/langyo/minecraft-mcp).
+> По вопросам и проблемам открывайте issue в [GitHub-репозитории](https://github.com/langyo/minecraft-mod-mcp).
