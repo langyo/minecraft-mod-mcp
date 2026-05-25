@@ -27,3 +27,7 @@ dependencies {
     implementation "net.java.dev.jna:jna:5.15.0"
     implementation "net.java.dev.jna:jna-platform:5.15.0"
 }
+
+tasks.withType(ProcessResources).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
