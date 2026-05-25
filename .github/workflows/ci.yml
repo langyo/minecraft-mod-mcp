@@ -35,11 +35,26 @@ jobs:
       - name: Build common
         run: .\gradlew.bat :packages:common:clean :packages:common:publish --no-daemon --console=plain
 
+      - name: Verify .maven-local
+        shell: pwsh
+        run: |
+          if (-not (Test-Path ".maven-local")) {
+            Write-Host "::error::.maven-local not found after publish"
+            exit 1
+          }
+          $count = (Get-ChildItem ".maven-local" -Recurse -File).Count
+          Write-Host "Files in .maven-local: $count"
+          if ($count -eq 0) {
+            Write-Host "::error::.maven-local is empty"
+            exit 1
+          }
+
       - name: Upload .maven-local
         uses: actions/upload-artifact@v4
         with:
           name: maven-local
           path: .maven-local/
+          if-no-files-found: error
           retention-days: 1
 
   build-mods:
