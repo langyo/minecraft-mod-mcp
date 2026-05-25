@@ -514,7 +514,7 @@ def _java_major_version(java_exe):
     return 0
 
 
-def build_jvm_args(vj, natives_dir, mc_dir=None, java_exe="java"):
+def build_jvm_args(vj, natives_dir, mc_dir=None, java_exe="java", version_name=""):
     mc_dir = mc_dir or MC_DIR
     java_ver = _java_major_version(java_exe)
     strip_jdk22_flags = java_ver < 22
@@ -541,7 +541,7 @@ def build_jvm_args(vj, natives_dir, mc_dir=None, java_exe="java"):
                 continue
             if arg in _EXPERIMENTAL_FLAGS:
                 needs_unlock = True
-            args.append(replace_vars(arg, natives_dir, mc_dir))
+            args.append(replace_vars(arg, natives_dir, mc_dir, version_name))
         elif isinstance(arg, dict):
             if should_include_arg(arg):
                 val = arg.get("value")
@@ -556,11 +556,11 @@ def build_jvm_args(vj, natives_dir, mc_dir=None, java_exe="java"):
                         continue
                     if v in _EXPERIMENTAL_FLAGS:
                         needs_unlock = True
-                    args.append(replace_vars(v, natives_dir, mc_dir))
+                    args.append(replace_vars(v, natives_dir, mc_dir, version_name))
     if needs_unlock:
         args.insert(0, "-XX:+UnlockExperimentalVMOptions")
     if not args and not jvm_raw:
-        args.append(replace_vars("-Djava.library.path=${natives_directory}", natives_dir, mc_dir))
+        args.append(replace_vars("-Djava.library.path=${natives_directory}", natives_dir, mc_dir, version_name))
     return args
 
 
@@ -668,7 +668,7 @@ def build_game_args(vj, version_name, mc_dir=None, username="Player", uuid="0000
     return clean
 
 
-def replace_vars(s, natives_dir, mc_dir):
+def replace_vars(s, natives_dir, mc_dir, version_name=""):
     cp_sep = ";" if platform.system() == "Windows" else ":"
     lib_dir = os.path.join(mc_dir, "libraries")
     return (
@@ -678,9 +678,9 @@ def replace_vars(s, natives_dir, mc_dir):
         .replace("${game_directory}", mc_dir)
         .replace("${library_directory}", lib_dir)
         .replace("${classpath_separator}", cp_sep)
-        .replace("${version_name}", "")
+        .replace("${version_name}", version_name)
         .replace("${auth_player_name}", "Player")
-        .replace("${auth_uuid}", "00000000-00000000-00000000-00000000")
+        .replace("${auth_uuid}", "00000000-0000-0000-0000-00000000000")
         .replace("${auth_access_token}", "0")
         .replace("${user_type}", "msa")
         .replace("${version_type}", "release")
@@ -757,7 +757,7 @@ def main():
     java_exe = args.java or find_java(java_ver)
     print(f"[LAUNCH] Java: {java_exe} (MC wants {java_ver})")
 
-    jvm_args = build_jvm_args(vj, natives_dir, mc_dir, java_exe)
+    jvm_args = build_jvm_args(vj, natives_dir, mc_dir, java_exe, version_name)
     game_args = build_game_args(vj, version_name, mc_dir, args.username)
 
     ws_jar = os.path.join(mc_dir, "libraries", "org", "java-websocket",
@@ -874,6 +874,15 @@ def main():
     if args.extra_jvm:
         cmd.extend(args.extra_jvm.split())
     cmd.extend(jvm_args)
+
+    parent = vj.get("_parent")
+    if parent and main_class and "bootstraplauncher" in main_class.lower():
+        parent_jar = parent + ".jar"
+        for i, a in enumerate(cmd):
+            if a.startswith("-DignoreList="):
+                if parent_jar not in a:
+                    cmd[i] = a.rstrip() + "," + parent_jar
+                break
     cmd.extend(["-cp", cp_str])
     cmd.append(main_class)
     cmd.extend(game_args)

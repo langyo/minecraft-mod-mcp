@@ -6,12 +6,14 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.client.event.ScreenOpenEvent;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiComponent;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.Font;
@@ -20,6 +22,7 @@ import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.network.chat.ClickEvent;
 import com.mojang.blaze3d.vertex.PoseStack;
+import org.lwjgl.glfw.GLFW;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
@@ -27,6 +30,26 @@ public class ModDevMcpMod {
     McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
+
+    private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
+    private static boolean cursorInterceptorInstalled = false;
+
+    private static void ensureCursorInterceptor(Minecraft mc) {
+        if (cursorInterceptorInstalled) return;
+        try {
+            long handle = mc.getWindow().getWindow();
+            originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    // swallow cursor events to prevent camera rotation
+                } else if (originalCursorCallback != null) {
+                    originalCursorCallback.invoke(window, xpos, ypos);
+                }
+            });
+            cursorInterceptorInstalled = true;
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] Cursor interceptor failed: " + e.getMessage());
+        }
+    }
 
     private static McpRenderer wrapRenderer(PoseStack ps, Minecraft mc) {
         return new McpRenderer() {
@@ -46,6 +69,14 @@ public class ModDevMcpMod {
                 return mc.font.width(text);
             }
         };
+    }
+
+    private static double getMouseX(Minecraft mc) {
+        return mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
+    }
+
+    private static double getMouseY(Minecraft mc) {
+        return mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
     }
 
     @SuppressWarnings("removal")
@@ -81,16 +112,75 @@ public class ModDevMcpMod {
             }, "MCP-HTTP").start();
         }
 
+        MinecraftForge.EVENT_BUS.addListener((ScreenOpenEvent event) -> {
+            if (ReflectionHelper.isMcpControlMode() && event.getScreen() instanceof PauseScreen) {
+                event.setCanceled(true);
+            }
+        });
+
         MinecraftForge.EVENT_BUS.addListener((ScreenEvent.InitScreenEvent.Post event) -> {
             try {
                 if (event.getScreen() instanceof PauseScreen) {
-                    McpScreenHelper.patchPauseScreen(event.getScreen(), new McpScreenHelper.ButtonFactory() {
-                        @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                            return new Button(x, y, w, h, new TranslatableComponent(translationKey), btn -> onClick.run());
+                    Screen screen = event.getScreen();
+                    AbstractWidget widest = null;
+                    int widestW = 0;
+                    for (Object w : event.getListenersList()) {
+                        if (w instanceof AbstractWidget) {
+                            AbstractWidget aw = (AbstractWidget) w;
+                            if (aw.getWidth() >= 150 && aw.getWidth() >= widestW) {
+                                widest = aw;
+                                widestW = aw.getWidth();
+                            }
                         }
+                    }
+                    if (widest == null) return;
+                    int x = widest.x;
+                    int y = widest.y;
+                    int w = widest.getWidth();
+                    int h = widest.getHeight();
+                    int gap = 8;
+                    int leftW = (w - gap) / 2;
+                    int rightW = w - gap - leftW;
+                    widest.x = x + leftW + gap;
+                    widest.setWidth(rightW);
+                    String transferKey = ReflectionHelper.getMcpControlPauseTransferTranslationKey();
+                    Button transferBtn = new Button(x, y, leftW, h, new TranslatableComponent(transferKey), btn -> {
+                        try {
+                            Minecraft mc = Minecraft.getInstance();
+                            ReflectionHelper.enterMcpControlMode(mc);
+                            mc.setScreen(null);
+                        } catch (Exception ignored) {}
                     });
+                    event.addListener(transferBtn);
+                    System.out.println("[MCP] Pause menu button added at x=" + x + " y=" + y + " w=" + leftW + " h=" + h);
                 }
+            } catch (Exception e) {
+                System.err.println("[MCP-MOD] InitScreenEvent.Post error: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.MouseClickedEvent.Pre event) -> {
+            if (!ReflectionHelper.isMcpControlMode()) return;
+            try {
+                Minecraft mc = Minecraft.getInstance();
+                double mx = getMouseX(mc);
+                double my = getMouseY(mc);
+                ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
             } catch (Exception ignored) {}
+            event.setCanceled(true);
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.MouseDragEvent.Pre event) -> {
+            if (ReflectionHelper.isMcpControlMode()) event.setCanceled(true);
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.MouseReleasedEvent.Pre event) -> {
+            if (ReflectionHelper.isMcpControlMode()) event.setCanceled(true);
+        });
+
+        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.MouseScrollEvent.Pre event) -> {
+            if (ReflectionHelper.isMcpControlMode()) event.setCanceled(true);
         });
 
         MinecraftForge.EVENT_BUS.addListener((RenderGameOverlayEvent.Post event) -> {
@@ -99,6 +189,7 @@ public class ModDevMcpMod {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.screen == null) {
+                    ensureCursorInterceptor(mc);
                     ReflectionHelper.tickMouseRelease(mc);
                     ReflectionHelper.tickMcpControlMode(mc);
 
@@ -109,8 +200,8 @@ public class ModDevMcpMod {
                     if (ReflectionHelper.isMcpControlMode() && !ReflectionHelper.isScreenshotInProgress()) {
                         int w = mc.getWindow().getGuiScaledWidth();
                         int h = mc.getWindow().getGuiScaledHeight();
-                        double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
-                        double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
+                        double mx = getMouseX(mc);
+                        double my = getMouseY(mc);
                         McpOverlayLogic.renderResumeButton(wrapRenderer(event.getMatrixStack(), mc), mc.font, new TranslatableComponent("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                     }
                 }
@@ -124,8 +215,8 @@ public class ModDevMcpMod {
                 Screen screen = event.getScreen();
                 int w = mc.getWindow().getGuiScaledWidth();
                 int h = mc.getWindow().getGuiScaledHeight();
-                double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
-                double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
+                double mx = getMouseX(mc);
+                double my = getMouseY(mc);
 
                 if (ReflectionHelper.isMcpControlMode()) {
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
@@ -142,8 +233,8 @@ public class ModDevMcpMod {
                 if (ReflectionHelper.shouldSuppressInput()) { event.setCanceled(true); return; }
                 if (ReflectionHelper.isMcpControlMode()) {
                     if (event.getButton() == 0) {
-                        double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
-                        double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
+                        double mx = getMouseX(mc);
+                        double my = getMouseY(mc);
                         String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                         if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                             event.setCanceled(true);
@@ -154,8 +245,8 @@ public class ModDevMcpMod {
                     return;
                 }
                 if (mc.level != null && mc.screen != null && !(mc.screen instanceof PauseScreen) && event.getButton() == 0) {
-                    double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
-                    double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
+                    double mx = getMouseX(mc);
+                    double my = getMouseY(mc);
                     if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {
                         event.setCanceled(true);
                     }
