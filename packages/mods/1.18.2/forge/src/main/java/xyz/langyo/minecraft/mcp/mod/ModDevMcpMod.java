@@ -155,12 +155,14 @@ public class ModDevMcpMod {
                     Screen screen = event.getScreen();
                     AbstractWidget widest = null;
                     int widestW = 0;
+                    int widestY = 0;
                     for (Object w : event.getListenersList()) {
                         if (w instanceof AbstractWidget) {
                             AbstractWidget aw = (AbstractWidget) w;
-                            if (aw.getWidth() >= 150 && aw.getWidth() >= widestW) {
+                            if (aw.getWidth() >= 150 && (aw.getWidth() > widestW || (aw.getWidth() == widestW && aw.y > widestY))) {
                                 widest = aw;
                                 widestW = aw.getWidth();
+                                widestY = aw.y;
                             }
                         }
                     }

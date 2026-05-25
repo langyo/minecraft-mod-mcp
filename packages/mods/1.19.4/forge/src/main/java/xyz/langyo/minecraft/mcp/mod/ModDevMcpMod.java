@@ -152,6 +152,7 @@ public class ModDevMcpMod {
                     Screen screen = event.getScreen();
                     AbstractWidget widest = null;
                     int widestW = 0;
+                    int widestY = 0;
                     Class<?> clazz = screen.getClass();
                     while (clazz != null) {
                         for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
@@ -162,9 +163,10 @@ public class ModDevMcpMod {
                                 for (Object item : (java.util.List<?>) val) {
                                     if (item instanceof AbstractWidget) {
                                         AbstractWidget aw = (AbstractWidget) item;
-                                        if (aw.getWidth() >= 150 && aw.getWidth() >= widestW) {
+                                        if (aw.getWidth() >= 150 && (aw.getWidth() > widestW || (aw.getWidth() == widestW && aw.getY() > widestY))) {
                                             widest = aw;
                                             widestW = aw.getWidth();
+                                            widestY = aw.getY();
                                         }
                                     }
                                 }
