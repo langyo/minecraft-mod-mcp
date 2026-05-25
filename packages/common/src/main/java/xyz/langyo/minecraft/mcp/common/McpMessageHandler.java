@@ -45,9 +45,8 @@ public class McpMessageHandler {
         java.util.Set<String> s = new java.util.HashSet<>();
         s.add("ping"); s.add("screenshot"); s.add("get_player_info"); s.add("get_world_info"); s.add("debug_fields");
         s.add("get_screen_buttons"); s.add("enumerate_widgets"); s.add("overlay_click");
-        s.add("enter_control_mode"); s.add("exit_control_mode"); s.add("platform_status");
+        s.add("enter_control_mode"); s.add("exit_control_mode");
         s.add("set_gamemode"); s.add("release_mouse"); s.add("pause_game"); s.add("close_screen"); s.add("open_chat");
-        s.add("win32_status"); s.add("mouse_hook_status"); s.add("overlay_show"); s.add("overlay_hide"); s.add("overlay_text");
         ALWAYS_ALLOWED = java.util.Collections.unmodifiableSet(s);
     }
 
@@ -95,18 +94,7 @@ public class McpMessageHandler {
         if (method.equals("release_mouse")) return handleReleaseMouse();
         if (method.equals("set_gamemode")) return handleSetGameMode(params);
         if (method.equals("switch_tab")) return handleSwitchTab(params);
-        if (method.equals("win32_borderless")) return handleWin32Borderless();
-        if (method.equals("win32_container")) return handleWin32Container();
-        if (method.equals("win32_status")) return handleWin32Status();
-        if (method.equals("overlay_show")) return handleOverlayShow(params);
-        if (method.equals("overlay_hide")) return handleOverlayHide();
-        if (method.equals("overlay_text")) return handleOverlayText(params);
-        if (method.equals("mouse_hook_status")) return handleMouseHookStatus();
-        if (method.equals("inject_click")) return handleInjectClick(params);
-        if (method.equals("inject_key")) return handleInjectKey(params);
-        if (method.equals("platform_status")) return handlePlatformStatus();
-        if (method.equals("video_start")) return handleVideoStart();
-        if (method.equals("video_stop")) return handleVideoStop();
+
         return "unknown: " + method;
     }
 
@@ -466,108 +454,6 @@ public class McpMessageHandler {
         return result[0];
     }
 
-    protected Object handleWin32Status() {
-        return ReflectionHelper.getHookStatus();
-    }
 
-    protected Object handleWin32Container() {
-        try {
-            McpPlatformControl ctrl = McpControlFactory.get();
-            Object mc = ReflectionHelper.getMinecraftInstance();
-            Object window = mc.getClass().getMethod("getWindow").invoke(mc);
-            final long glfwWin = (long) window.getClass().getMethod("getWindow").invoke(window);
-            final java.util.concurrent.CountDownLatch hwndLatch = new java.util.concurrent.CountDownLatch(1);
-            final Object[] hwndResult = {null};
-            java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
-            exec.invoke(mc, (Runnable) () -> {
-                try {
-                    hwndResult[0] = ctrl.resolveNativeWindowHandle(glfwWin);
-                } catch (Exception e) { hwndResult[0] = null; }
-                hwndLatch.countDown();
-            });
-            hwndLatch.await(5, java.util.concurrent.TimeUnit.SECONDS);
-            if (hwndResult[0] == null) return "error: native handle not found";
-            final long nativeHandle = (Long) hwndResult[0];
-            if (nativeHandle == 0) return "error: native handle is 0";
-            return ctrl.createContainer(nativeHandle);
-        } catch (Exception e) {
-            return "error: " + e.getMessage();
-        }
-    }
-
-    protected Object handleWin32Borderless() {
-        try {
-            McpPlatformControl ctrl = McpControlFactory.get();
-            Object mc = ReflectionHelper.getMinecraftInstance();
-            Object window = mc.getClass().getMethod("getWindow").invoke(mc);
-            final long glfwWin = (long) window.getClass().getMethod("getWindow").invoke(window);
-            final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-            final Object[] result = {null};
-            java.lang.reflect.Method exec = mc.getClass().getMethod("execute", Runnable.class);
-            exec.invoke(mc, (Runnable) () -> {
-                try {
-                    long nativeHandle = ctrl.resolveNativeWindowHandle(glfwWin);
-                    if (nativeHandle == 0) {
-                        result[0] = "error: native handle is 0 (glfw=" + glfwWin + ")";
-                    } else {
-                        long oldStyle = ctrl.makeBorderless(nativeHandle);
-                        result[0] = "borderless: hwnd=" + Long.toHexString(nativeHandle) + " oldStyle=" + Long.toHexString(oldStyle);
-                    }
-                } catch (Exception e) { result[0] = "error: " + e.getMessage(); }
-                latch.countDown();
-            });
-            latch.await(8, java.util.concurrent.TimeUnit.SECONDS);
-            return result[0] != null ? result[0] : "timeout on render thread";
-        } catch (Exception e) {
-            return "error: " + e.getMessage();
-        }
-    }
-
-    protected Object handleOverlayShow(java.util.Map<String, String> p) {
-        String text = p.getOrDefault("text", "");
-        int port = 9876;
-        try { port = Integer.parseInt(p.getOrDefault("port", "9876")); } catch (Exception ignored) {}
-        return ReflectionHelper.showMcpOverlay(text, port);
-    }
-
-    protected Object handleOverlayHide() {
-        return ReflectionHelper.hideMcpOverlay();
-    }
-
-    protected Object handleOverlayText(java.util.Map<String, String> p) {
-        String text = p.getOrDefault("text", "");
-        return ReflectionHelper.updateMcpOverlayText(text);
-    }
-
-    protected Object handleMouseHookStatus() {
-        return ReflectionHelper.getHookStatus();
-    }
-
-    protected Object handleInjectClick(java.util.Map<String, String> p) {
-        int x = 0, y = 0;
-        try { x = Integer.parseInt(p.getOrDefault("x", "0")); } catch (Exception ignored) {}
-        try { y = Integer.parseInt(p.getOrDefault("y", "0")); } catch (Exception ignored) {}
-        return ReflectionHelper.platformInjectClick(x, y);
-    }
-
-    protected Object handleInjectKey(java.util.Map<String, String> p) {
-        int vk = 0;
-        try { vk = Integer.parseInt(p.getOrDefault("vk", p.getOrDefault("key", "0"))); } catch (Exception ignored) {}
-        return ReflectionHelper.platformInjectKey(vk);
-    }
-
-    protected Object handlePlatformStatus() {
-        return ReflectionHelper.getHookStatus();
-    }
-
-    protected Object handleVideoStart() {
-        ReflectionHelper.setVideoCaptureActive(true);
-        return "{\"video_capture\":true}";
-    }
-
-    protected Object handleVideoStop() {
-        ReflectionHelper.setVideoCaptureActive(false);
-        return "{\"video_capture\":false}";
-    }
 
 }

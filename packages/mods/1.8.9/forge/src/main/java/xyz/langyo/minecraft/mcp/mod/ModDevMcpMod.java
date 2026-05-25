@@ -258,13 +258,6 @@ public class ModDevMcpMod {
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
                 forceLwjgl2MouseFree();
-                McpPlatformControl ctrl = McpControlFactory.get();
-                if (ctrl instanceof McpWin32Control) {
-                    McpWin32Control w32ctrl = (McpWin32Control) ctrl;
-                    if (w32ctrl.getMcHwnd() == 0) {
-                        w32ctrl.ensureHwndFromLwjgl2Display();
-                    }
-                }
                 if (Mouse.isButtonDown(0)) {
                     int mx = getMouseX(mc);
                     int my = getMouseY(mc);
@@ -288,13 +281,6 @@ public class ModDevMcpMod {
             ReflectionHelper.tickMouseRelease(mc);
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);
-            McpPlatformControl ctrl = McpControlFactory.get();
-            if (ctrl instanceof McpWin32Control) {
-                McpWin32Control w32ctrl = (McpWin32Control) ctrl;
-                if (w32ctrl.getMcHwnd() == 0) {
-                    w32ctrl.ensureHwndFromLwjgl2Display();
-                }
-            }
 
             if (mc.theWorld != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu) && Mouse.isButtonDown(0)) {
                 int mx = getMouseX(mc);

@@ -306,13 +306,6 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                         ReflectionHelper.tickMcpControlMode(mc);
                         ReflectionHelper.tickVideoCapture(mc);
                         forceGlfwMouseFree(mc);
-                        McpPlatformControl ctrl = McpControlFactory.get();
-                        if (ctrl instanceof McpWin32Control) {
-                            McpWin32Control w32ctrl = (McpWin32Control) ctrl;
-                            if (w32ctrl.getMcHwnd() == 0) {
-                                w32ctrl.ensureHwndFromGlfw(mc.mainWindow.getHandle());
-                            }
-                        }
                     } catch (Exception ignored) {}
                 }
                 return;
@@ -329,13 +322,6 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
-                McpPlatformControl ctrl = McpControlFactory.get();
-                if (ctrl instanceof McpWin32Control) {
-                    McpWin32Control w32ctrl = (McpWin32Control) ctrl;
-                    if (w32ctrl.getMcHwnd() == 0) {
-                        w32ctrl.ensureHwndFromGlfw(mc.mainWindow.getHandle());
-                    }
-                }
             } catch (Exception ignored) {}
             if (INSTANCE.chatSent) return;
             try {

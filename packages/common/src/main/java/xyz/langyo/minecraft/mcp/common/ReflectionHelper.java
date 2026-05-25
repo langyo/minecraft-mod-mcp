@@ -3439,61 +3439,7 @@ public final class ReflectionHelper {
         }
     }
 
-    public static String showMcpOverlay(String text, int port) {
-        McpPlatformControl ctrl = McpControlFactory.get();
-        boolean ok = ctrl.showOverlay(text, port);
-        mouseReleaseActive = true;
-        try {
-            Object mc = getMinecraftInstance();
-            if (mc != null) forceCursorAndReleaseMouse(mc);
-        } catch (Exception ignored) {}
-        return "{\"overlay_shown\":" + ok + ",\"text\":\"" + text + "\",\"port\":" + port + ",\"platform\":\"" + ctrl.getPlatformName() + "\"}";
-    }
 
-    public static String hideMcpOverlay() {
-        McpControlFactory.get().hideOverlay();
-        return "{\"overlay_hidden\":true}";
-    }
-
-    public static String updateMcpOverlayText(String text) {
-        McpControlFactory.get().updateOverlayText(text);
-        return "{\"overlay_text_updated\":true}";
-    }
-
-    public static String platformInjectClick(int x, int y) {
-        McpPlatformControl ctrl = McpControlFactory.get();
-        if (ctrl instanceof McpWin32Control) {
-            McpWin32Control w32 = (McpWin32Control) ctrl;
-            try {
-                Object mc = getMinecraftInstance();
-                long glfwHandle = getWindowHandle(mc);
-                dbg("platformInjectClick: glfwHandle=" + glfwHandle);
-                if (glfwHandle != 0) {
-                    boolean ensured = w32.ensureHwndFromGlfw(glfwHandle);
-                    dbg("platformInjectClick: ensureHwnd=" + ensured);
-                }
-            } catch (Exception e) {
-                dbg("platformInjectClick: mc resolve failed: " + e.getMessage());
-            }
-            boolean ok = w32.injectClickClient(x, y);
-            return "{\"inject_click\":" + ok + ",\"x\":" + x + ",\"y\":" + y + "}";
-        }
-        boolean ok = ctrl.injectClick(x, y);
-        return "{\"inject_click\":" + ok + ",\"x\":" + x + ",\"y\":" + y + "}";
-    }
-
-    public static String platformInjectKey(int vk) {
-        McpPlatformControl ctrl = McpControlFactory.get();
-        boolean ok = ctrl.injectKey(vk);
-        return "{\"inject_key\":" + ok + ",\"vk\":" + vk + "}";
-    }
-
-    public static String getHookStatus() {
-        McpPlatformControl ctrl = McpControlFactory.get();
-        return "{\"platform\":\"" + ctrl.getPlatformName() +
-                "\",\"hook_installed\":" + ctrl.isHookInstalled() +
-                ",\"control_mode\":" + ctrl.isControlMode() + "}";
-    }
 
     private static volatile boolean mouseReleaseActive = false;
     private static volatile boolean screenshotInProgress = false;
@@ -3556,12 +3502,7 @@ public final class ReflectionHelper {
     }
 
     public static void tickMouseRelease(Object mc) {
-        if (!mouseReleaseActive || screenshotInProgress) return;
-        try {
-            Object screen = getCurrentScreen(mc);
-            if (screen != null) return;
-            forceCursorAndReleaseMouse(mc);
-        } catch (Exception ignored) {}
+        return;
     }
 
     public static void tickMcpControlMode(Object mc) {
