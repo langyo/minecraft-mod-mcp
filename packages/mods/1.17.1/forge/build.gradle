@@ -16,8 +16,11 @@ archivesBaseName = "minecraft-moddev-mcp-mod"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
-sourceCompatibility = JavaVersion.VERSION_16
-targetCompatibility = JavaVersion.VERSION_16
+afterEvaluate {
+    tasks.withType(JavaCompile).configureEach {
+        options.release.set(16)
+    }
+}
 
 minecraft {
     mappings channel: "official", version: "1.17.1"
@@ -38,6 +41,10 @@ repositories {
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
 sourceSets.main.resources.srcDir '../../../common/src/main/resources'
+
+tasks.withType(ProcessResources).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
 
 dependencies {
     minecraft "net.minecraftforge:forge:1.17.1-37.1.1"

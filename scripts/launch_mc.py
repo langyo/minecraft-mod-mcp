@@ -689,7 +689,8 @@ def replace_vars(s, natives_dir, mc_dir):
 
 _JDK_LOOKUP = {
     8:  r"C:\Program Files\Amazon Corretto\jdk1.8.0_452",
-    17: r"C:\Program Files\Amazon Corretto\jdk21.0.8_9",
+    16: r"C:\Program Files\Amazon Corretto\jdk17.0.19_10",
+    17: r"C:\Program Files\Amazon Corretto\jdk17.0.19_10",
     21: r"C:\Program Files\Amazon Corretto\jdk21.0.8_9",
     24: r"C:\Users\langy\.jdks\openjdk-24.0.2+12-54",
     25: r"C:\Program Files\Amazon Corretto\jdk25.0.3_9",
