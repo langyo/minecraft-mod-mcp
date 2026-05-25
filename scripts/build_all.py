@@ -26,6 +26,7 @@ from version_config import (
     ALL_VERSIONS, FG_ERAS, MODS_DIR,
     get_loaders, get_fg_era, get_jdk_home, find_jdk17, is_legacy, JDK_PATHS,
 )
+from mirrors import probe_all as probe_mirrors, patch_all_wrappers, generate_init_gradle
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS_DIR_ACTUAL = MODS_DIR
@@ -173,6 +174,14 @@ def main():
     parser.add_argument("--no-cache", action="store_true", help="Skip prepare_cache step")
     parser.add_argument("-j", "--jobs", type=int, default=4, help="Parallel workers (default: 4)")
     args = parser.parse_args()
+
+    probe_mirrors()
+
+    patched = patch_all_wrappers(BASE)
+    if patched > 0:
+        print(f"  Patched {patched} gradle-wrapper.properties with working mirror\n")
+
+    generate_init_gradle()
 
     if not args.no_cache:
         print("Running prepare_cache.py first...")

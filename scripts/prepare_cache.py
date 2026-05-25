@@ -31,6 +31,7 @@ from version_config import (
     ALL_VERSIONS, FG_ERAS, LEGACY_ERAS,
     is_legacy, get_loaders, get_fabric_loom,
 )
+from mirrors import probe_all as probe_mirrors, get_url, download as mirror_download, get_all_urls
 
 TEMP_DIR = os.path.join(os.environ.get("TEMP", "/tmp"), "opencode")
 DL_CLASS = os.path.join(TEMP_DIR, "Dl.class")
@@ -43,10 +44,6 @@ FG_CACHE = os.path.join(GRADLE_USER_HOME, "caches", "forge_gradle")
 
 PROXY_HOST = "127.0.0.1"
 PROXY_PORT = 7890
-MAVEN_FORGE = "https://maven.minecraftforge.net"
-MAVEN_FABRIC = "https://maven.fabricmc.net"
-MAVEN_NEOFORGE = "https://maven.neoforged.net/releases"
-MAVEN_CENTRAL = "https://repo1.maven.org/maven2"
 
 
 def ensure_dl_class():
@@ -146,14 +143,22 @@ def place_in_gradle_cache(group, artifact, version, filename, src_file):
     return True
 
 
-def download_and_cache(url, group, artifact, version, filename, use_proxy=False):
+def download_and_cache(rel_path, group, artifact, version, filename, mirror_group, use_proxy=False):
     staging = os.path.join(TEMP_DIR, "forge_staging", artifact, version)
     os.makedirs(staging, exist_ok=True)
     tmp_file = os.path.join(staging, filename)
-    success = download_files([(url, tmp_file)], use_proxy=use_proxy)
-    if success and os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
+
+    if os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
         place_in_gradle_cache(group, artifact, version, filename, tmp_file)
         return True
+
+    for base_url in get_all_urls(mirror_group):
+        url = f"{base_url.rstrip('/')}/{rel_path.lstrip('/')}"
+        success = download_files([(url, tmp_file)], use_proxy=use_proxy)
+        if success and os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
+            place_in_gradle_cache(group, artifact, version, filename, tmp_file)
+            return True
+
     return False
 
 
@@ -208,6 +213,8 @@ def place_in_fg_mcp_repo(channel, full_ver, src_file):
 
 
 def main():
+    probe_mirrors()
+
     ensure_dl_class()
     os.makedirs(TEMP_DIR, exist_ok=True)
 
@@ -233,13 +240,21 @@ def main():
         full_ver = f"{datever}-{mc}"
         artifact_name = f"mcp_{channel}"
         filename = f"{artifact_name}-{full_ver}.zip"
-        url = f"{MAVEN_FORGE}/de/oceanlabs/mcp/{artifact_name}/{full_ver}/{filename}"
+        rel_path = f"de/oceanlabs/mcp/{artifact_name}/{full_ver}/{filename}"
         print(f"  [{mc}] {artifact_name}/{full_ver}")
         staging = os.path.join(TEMP_DIR, "mcp_staging", artifact_name, full_ver)
         os.makedirs(staging, exist_ok=True)
         tmp_file = os.path.join(staging, filename)
-        success = download_files([(url, tmp_file)])
-        if success and os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
+        downloaded = False
+        for base_url in get_all_urls("maven_forge"):
+            url = f"{base_url.rstrip('/')}/{rel_path}"
+            success = download_files([(url, tmp_file)])
+            if success and os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
+                downloaded = True
+                break
+            if os.path.isfile(tmp_file):
+                os.remove(tmp_file)
+        if downloaded:
             place_in_gradle_cache("de.oceanlabs.mcp", artifact_name, full_ver, filename, tmp_file)
             place_in_fg_mcp_repo(channel, full_ver, tmp_file)
             ok += 1
@@ -263,9 +278,9 @@ def main():
     for group, artifact, version in fg_plugins:
         for ext in ("jar", "pom"):
             filename = f"{artifact}-{version}.{ext}"
-            url = f"{MAVEN_FORGE}/{group.replace('.', '/')}/{artifact}/{version}/{filename}"
+            rel_path = f"{group.replace('.', '/')}/{artifact}/{version}/{filename}"
             print(f"  FG {version}: {ext}")
-            if download_and_cache(url, group, artifact, version, filename):
+            if download_and_cache(rel_path, group, artifact, version, filename, "maven_forge"):
                 ok += 1
             else:
                 fail += 1
@@ -284,13 +299,21 @@ def main():
         channel, datever = mappings.split("_", 1)
         full_ver = f"{datever}-{mc}"
         filename = f"{channel}-{full_ver}.zip"
-        url = f"{MAVEN_FORGE}/de/oceanlabs/mcp/mcp_{channel}/{full_ver}/{channel}-{full_ver}.zip"
+        rel_path = f"de/oceanlabs/mcp/mcp_{channel}/{full_ver}/{channel}-{full_ver}.zip"
         print(f"  [{mc}] mcp_{channel}/{full_ver}")
         staging = os.path.join(TEMP_DIR, "mcp_staging", f"mcp_{channel}", full_ver)
         os.makedirs(staging, exist_ok=True)
         tmp_file = os.path.join(staging, filename)
-        success = download_files([(url, tmp_file)])
-        if success and os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
+        downloaded = False
+        for base_url in get_all_urls("maven_forge"):
+            url = f"{base_url.rstrip('/')}/{rel_path}"
+            success = download_files([(url, tmp_file)])
+            if success and os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
+                downloaded = True
+                break
+            if os.path.isfile(tmp_file):
+                os.remove(tmp_file)
+        if downloaded:
             place_in_gradle_cache("de.oceanlabs.mcp", f"mcp_{channel}", full_ver, filename, tmp_file)
             place_in_fg_mcp_repo(channel, full_ver, tmp_file)
             ok += 1
@@ -306,17 +329,13 @@ def main():
         if not yarn:
             continue
         for classifier in ("v2", ""):
-            suffix = f":{classifier}" if classifier else ""
             filename = f"yarn-{yarn}{'' if not classifier else f'-{classifier}'}.jar"
-            url = f"{MAVEN_FABRIC}/net/fabricmc/yarn/{yarn}/{filename}"
-            version_key = f"{yarn}{suffix}"
+            rel_path = f"net/fabricmc/yarn/{yarn}/{filename}"
             print(f"  [{mc}] yarn {yarn} ({classifier or 'default'})")
-            if download_and_cache(url, "net.fabricmc", "yarn", yarn, filename):
+            if download_and_cache(rel_path, "net.fabricmc", "yarn", yarn, filename, "maven_fabric"):
                 ok += 1
             else:
-                if classifier:
-                    pass
-                else:
+                if not classifier:
                     fail += 1
 
     # ================================================================
@@ -333,9 +352,9 @@ def main():
     for lv in sorted(loader_versions):
         for ext in ("jar", "pom"):
             filename = f"fabric-loader-{lv}.{ext}"
-            url = f"{MAVEN_FABRIC}/net/fabricmc/fabric-loader/{lv}/{filename}"
+            rel_path = f"net/fabricmc/fabric-loader/{lv}/{filename}"
             print(f"  loader {lv}: {ext}")
-            if download_and_cache(url, "net.fabricmc", "fabric-loader", lv, filename):
+            if download_and_cache(rel_path, "net.fabricmc", "fabric-loader", lv, filename, "maven_fabric"):
                 ok += 1
             else:
                 fail += 1
@@ -352,9 +371,9 @@ def main():
     for lv in sorted(loom_versions):
         for ext in ("jar", "pom"):
             filename = f"fabric-loom-{lv}.{ext}"
-            url = f"{MAVEN_FABRIC}/net/fabricmc/fabric-loom/{lv}/{filename}"
+            rel_path = f"net/fabricmc/fabric-loom/{lv}/{filename}"
             print(f"  loom {lv}: {ext}")
-            if download_and_cache(url, "net.fabricmc", "fabric-loom", lv, filename):
+            if download_and_cache(rel_path, "net.fabricmc", "fabric-loom", lv, filename, "maven_fabric"):
                 ok += 1
             else:
                 fail += 1
@@ -372,9 +391,9 @@ def main():
         if style == "fg6":
             for ext in ("jar", "pom"):
                 filename = f"forge-{nf_ver}.{ext}"
-                url = f"{MAVEN_FORGE}/net/neoforged/forge/{nf_ver}/{filename}"
+                rel_path = f"net/neoforged/forge/{nf_ver}/{filename}"
                 print(f"  [{mc}] NF FG6 {filename[:50]}")
-                if download_and_cache(url, "net.neoforged", "forge", nf_ver, filename):
+                if download_and_cache(rel_path, "net.neoforged", "forge", nf_ver, filename, "maven_forge"):
                     ok += 1
                 else:
                     fail += 1
@@ -382,17 +401,17 @@ def main():
             bundle_ver = info.get("mdg", "")
             if bundle_ver:
                 filename = f"neoforge-moddev-bundle-{bundle_ver}.jar"
-                url = f"{MAVEN_NEOFORGE}/net/neoforged/moddev/{bundle_ver}/{filename}"
+                rel_path = f"net/neoforged/moddev/{bundle_ver}/{filename}"
                 print(f"  [{mc}] MDG bundle {bundle_ver}")
-                if download_and_cache(url, "net.neoforged", "moddev", bundle_ver, filename):
+                if download_and_cache(rel_path, "net.neoforged", "moddev", bundle_ver, filename, "maven_neoforge"):
                     ok += 1
                 else:
                     fail += 1
             for ext in ("jar", "pom"):
                 filename = f"neoforge-{nf_ver}.{ext}"
-                url = f"{MAVEN_NEOFORGE}/net/neoforged/neoforge/{nf_ver}/{filename}"
+                rel_path = f"net/neoforged/neoforge/{nf_ver}/{filename}"
                 print(f"  [{mc}] NF {filename[:50]}")
-                if download_and_cache(url, "net.neoforged", "neoforge", nf_ver, filename):
+                if download_and_cache(rel_path, "net.neoforged", "neoforge", nf_ver, filename, "maven_neoforge"):
                     ok += 1
                 else:
                     fail += 1
