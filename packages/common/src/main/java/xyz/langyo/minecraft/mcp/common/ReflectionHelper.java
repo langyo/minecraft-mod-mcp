@@ -1,8 +1,5 @@
 package xyz.langyo.minecraft.mcp.common;
 
-import java.awt.GraphicsDevice;
-import java.awt.GraphicsEnvironment;
-import java.awt.Rectangle;
 import java.awt.Robot;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
@@ -22,7 +19,6 @@ import javax.imageio.ImageIO;
 public final class ReflectionHelper {
 
     private static final boolean LWJGL3;
-    private static final boolean HAS_VULKAN;
     private static Robot awtRobot;
 
     private static Class<?> glfwClass, gl11Class, gl30Class, displayClass, mcClass;
@@ -67,9 +63,6 @@ public final class ReflectionHelper {
         boolean v = false;
         try { Class.forName("org.lwjgl.glfw.GLFW"); v = true; } catch (ClassNotFoundException e) {}
         LWJGL3 = v;
-        boolean vk = false;
-        try { Class.forName("org.lwjgl.vulkan.VK"); vk = true; } catch (ClassNotFoundException e) {}
-        HAS_VULKAN = vk;
         try { awtRobot = new Robot(); awtRobot.setAutoDelay(10); } catch (Exception e) {}
     }
 
@@ -982,39 +975,6 @@ public final class ReflectionHelper {
         }
         try { return mc.getClass().getMethod("screen").invoke(mc); } catch (Exception ignored) {}
         return null;
-    }
-
-    public static double getGuiScale(Object mc) {
-        try {
-            Object gs = null;
-            for (Field f : getAllFields(mc.getClass())) {
-                String n = f.getName();
-                if (n.contains("guiScale") || n.equals("field_85159_q") || n.equals("field_82502_R")) {
-                    try { f.setAccessible(true); gs = f.get(mc); break; } catch (Exception ignored) {}
-                }
-            }
-            if (gs instanceof Number) return ((Number) gs).doubleValue();
-            // Try GameSettings
-            for (Field f : getAllFields(mc.getClass())) {
-                String tn = f.getType().getSimpleName();
-                if (tn.contains("GameSettings") || tn.contains("Settings") || tn.equals("field_71450_a")) {
-                    try {
-                        f.setAccessible(true);
-                        Object settings = f.get(mc);
-                        if (settings != null) {
-                            for (Field sf : getAllFields(settings.getClass())) {
-                                if (sf.getName().contains("guiScale") || sf.getName().equals("field_85159_q")) {
-                                    sf.setAccessible(true);
-                                    Object v = sf.get(settings);
-                                    if (v instanceof Number) return ((Number) v).doubleValue();
-                                }
-                            }
-                        }
-                    } catch (Exception ignored) {}
-                }
-            }
-        } catch (Exception e) { dbg("getGuiScale err: " + e.getMessage()); }
-        return 2.0; // default Normal scale
     }
 
     private static final Map<Class<?>, List<Method>> methodCache = new ConcurrentHashMap<>();
@@ -2552,83 +2512,6 @@ public final class ReflectionHelper {
         }
     }
 
-    public static byte[] takeWindowScreenshot() {
-        try {
-            Robot r = awtRobot;
-            if (r == null) return null;
-            int wx = 0, wy = 0, ww = 800, wh = 600;
-            if (!LWJGL3) {
-                try {
-                    Class<?> displayClass = Class.forName("org.lwjgl.opengl.Display");
-                    wx = (Integer) displayClass.getMethod("getX").invoke(null);
-                    wy = (Integer) displayClass.getMethod("getY").invoke(null);
-                    ww = (Integer) displayClass.getMethod("getWidth").invoke(null);
-                    wh = (Integer) displayClass.getMethod("getHeight").invoke(null);
-                } catch (Exception e) {
-                    return null;
-                }
-            } else {
-                Object mc = getMinecraftInstance();
-                if (!hasWindow(mc)) return null;
-                long handle = getWindowHandle(mc);
-                if (handle == 0) return null;
-                try {
-                    Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                    Thread.sleep(100);
-                    wx = ((Number) glfwClass.getMethod("glfwGetWindowPosX", long.class).invoke(null, handle)).intValue();
-                    wy = ((Number) glfwClass.getMethod("glfwGetWindowPosY", long.class).invoke(null, handle)).intValue();
-                    int[] wArr = {0}, hArr = {0};
-                    try {
-                        Class<?> intBufClass = Class.forName("java.nio.IntBuffer");
-                        Object wBuf = java.nio.IntBuffer.allocate(1);
-                        Object hBuf = java.nio.IntBuffer.allocate(1);
-                        glfwClass.getMethod("glfwGetWindowSize", long.class, intBufClass, intBufClass)
-                                .invoke(null, handle, wBuf, hBuf);
-                        ww = ((java.nio.IntBuffer) wBuf).get(0);
-                        wh = ((java.nio.IntBuffer) hBuf).get(0);
-                    } catch (Exception e2) {
-                        Object window2 = null;
-                        try { window2 = mc.getClass().getMethod("getWindow").invoke(mc); }
-                        catch (NoSuchMethodException nsme) {
-                            try { window2 = mc.getClass().getMethod("getMainWindow").invoke(mc); }
-                            catch (Exception ignored) {}
-                        }
-                        if (window2 != null) {
-                            for (String fn : new String[]{"width", "cachedWidth"}) {
-                                try { Field wf = window2.getClass().getDeclaredField(fn); wf.setAccessible(true); ww = wf.getInt(window2); break; } catch (Exception ignored) {}
-                            }
-                            for (String fn : new String[]{"height", "cachedHeight"}) {
-                                try { Field hf = window2.getClass().getDeclaredField(fn); hf.setAccessible(true); wh = hf.getInt(window2); break; } catch (Exception ignored) {}
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    return null;
-                }
-            }
-            if (ww <= 0 || wh <= 0) return null;
-            Rectangle rect = new Rectangle(wx, wy, ww, wh);
-            BufferedImage img = r.createScreenCapture(rect);
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(img, "png", baos);
-            return baos.toByteArray();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    public static byte[] takePlatformScreenshot() {
-        return McpControlFactory.get().takePlatformScreenshot();
-    }
-
-    public static void lwjgl2PressKey(int keyCode) {}
-
-    public static void lwjgl2ReleaseKey(int keyCode) {}
-
-    public static void lwjgl2MouseNext() {}
-
-    public static void lwjgl2SetMouseButton(int button, boolean pressed) {}
-
     private static Object getPlayer(Object mc) throws Exception {
         try { return mc.getClass().getMethod("player").invoke(mc); } catch (NoSuchMethodException ignored) {}
         for (Field f : getAllFields(mc.getClass())) {
@@ -3494,25 +3377,7 @@ public final class ReflectionHelper {
 
     public static boolean isScreenshotInProgress() { return screenshotInProgress; }
 
-    public static String getMcpControlOverlayTranslationKey() { return "mcpmod.control.overlay"; }
-
     public static String getMcpControlPauseTransferTranslationKey() { return "mcpmod.control.transfer"; }
-
-    public static boolean shouldRenderMcpControlOverlay(Object mc) {
-        return mcpControlMode;
-    }
-
-    public static boolean shouldBlockUserMouseInput(Object mc) {
-        return mcpControlMode;
-    }
-
-    public static boolean shouldBlockUserKeyboardInput(Object mc) {
-        return mcpControlMode;
-    }
-
-    public static void handleMcpOverlayClicked(Object mc) {
-        exitMcpControlMode(mc);
-    }
 
     private static volatile boolean forceCursorNormal = false;
     private static Method glfwHideWindowMethod;
@@ -3589,10 +3454,6 @@ public final class ReflectionHelper {
 
     public static void setForceCursorNormal(boolean v) { forceCursorNormal = v; }
 
-    public static boolean isForceCursorNormal() { return forceCursorNormal; }
-
-    public static boolean isWindowHidden() { return windowHidden; }
-
     public static void hideWindow(Object mc) {
         if (windowHidden) return;
         try {
@@ -3625,16 +3486,10 @@ public final class ReflectionHelper {
         }
     }
 
-    public static void showWindow(Object mc) {
-        if (!windowHidden) return;
-        windowHidden = false;
-        dbg("cursor: showWindow skipped (no-op for testing)");
-    }
-
     public static void tickForceCursorNormal(Object mc) {
         if (!forceCursorNormal) {
             if (lastForceState) {
-                showWindow(mc);
+                windowHidden = false;
                 lastForceState = false;
                 cursorApplied = false;
             }
@@ -3732,14 +3587,10 @@ public final class ReflectionHelper {
                 ",\"control_mode\":" + ctrl.isControlMode() + "}";
     }
 
-    public static boolean isLWJGL3() { return LWJGL3; }
-
     private static volatile boolean mouseReleaseActive = false;
     private static volatile boolean screenshotInProgress = false;
     private static volatile byte[] cachedScreenshot = null;
     private static volatile long cachedScreenshotTime = 0;
-
-    public static void setMouseReleaseActive(boolean v) { mouseReleaseActive = v; }
 
     private static long lastCacheFrameLog = 0;
     public static void cacheFrameFromRenderThread(Object mc) {
@@ -3767,10 +3618,6 @@ public final class ReflectionHelper {
                 if (System.currentTimeMillis() - lastCacheFrameLog > 30000) { dbg("cacheFrame: cached " + result.length + " bytes via takeGl"); lastCacheFrameLog = System.currentTimeMillis(); }
             }
         } catch (Exception e) { if (System.currentTimeMillis() - lastCacheFrameLog > 5000) { dbg("cacheFrame: " + e.getMessage()); lastCacheFrameLog = System.currentTimeMillis(); } }
-    }
-
-    public static byte[] getCachedScreenshot() {
-        return cachedScreenshot;
     }
     public static boolean isMouseReleaseActive() { return mouseReleaseActive; }
 
@@ -4016,7 +3863,7 @@ public final class ReflectionHelper {
         try {
             byte[] jpeg = captureFrameJpeg(mc);
             if (jpeg != null && jpeg.length > 0) {
-                McpWebSocketClient.sendVideoFrame(jpeg);
+                dbg("video: captured frame " + jpeg.length + " bytes (no WS client to send)");
             }
         } catch (Exception e) {
             dbg("video: " + e.getMessage());

@@ -1,12 +1,9 @@
 package xyz.langyo.minecraft.mcp.common;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import javax.imageio.ImageIO;
 
 public class ReflectedInputHandler extends McpMessageHandler implements McpProtocol.MinecraftInput {
 
@@ -335,27 +332,6 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         catch (Exception e) { throw new RuntimeException(e.getMessage(), e); }
     }
 
-    private static byte[] createDummyScreenshot(String msg) throws Exception {
-        BufferedImage img = new BufferedImage(1600, 200, BufferedImage.TYPE_INT_RGB);
-        java.awt.Graphics g = img.getGraphics();
-        g.setColor(java.awt.Color.RED);
-        g.fillRect(0, 0, 1600, 200);
-        g.setColor(java.awt.Color.WHITE);
-        g.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 11));
-        int y = 15;
-        int maxLen = Math.min(msg.length(), 1600);
-        for (int i = 0; i < maxLen; i += 140) {
-            String line = msg.substring(i, Math.min(i + 140, msg.length()));
-            g.drawString(line, 5, y);
-            y += 14;
-            if (y > 195) break;
-        }
-        g.dispose();
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(img, "png", baos);
-        return baos.toByteArray();
-    }
-
     @Override
     public String executeCommand(String command) {
         return ReflectionHelper.sendCommand(mc(), command);
@@ -368,8 +344,4 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     public String getWorldInfo() { return ReflectionHelper.getWorldInfo(mc()); }
 
     public String debugFields() { return ReflectionHelper.debugFields(mc()); }
-
-    private static final String SHIFT_CHARS = "!@#$%^&*()_+{}|:<>?~";
-
-    private static boolean isShiftChar(char ch) { return SHIFT_CHARS.indexOf(ch) >= 0; }
 }

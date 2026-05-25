@@ -16,15 +16,6 @@ public class McpMessageHandler {
 
 
     public void sendInit(Object wsClient) {
-        McpWebSocketClient ws = castClient(wsClient);
-        if (ws != null && ws.isOpen()) {
-            JsonObject init = new JsonObject();
-            init.addProperty("jsonrpc", "2.0");
-            init.addProperty("method", "initialize");
-            init.add("params", new JsonObject());
-            init.addProperty("id", 1);
-            ws.send(GSON.toJson(init));
-        }
     }
 
     public void handleMessage(String raw, Object wsClient) {
@@ -120,13 +111,6 @@ public class McpMessageHandler {
     }
 
     private void sendResponse(String method, Object result, Object wsClient, String requestId) {
-        McpWebSocketClient ws = castClient(wsClient);
-        if (ws == null || !ws.isOpen()) return;
-        JsonObject resp = new JsonObject();
-        resp.addProperty("jsonrpc", "2.0");
-        resp.add("result", GSON.toJsonTree(result));
-        resp.addProperty("id", requestId != null ? requestId : String.valueOf(reqId++));
-        ws.send(GSON.toJson(resp));
     }
 
     protected Object handleOverlayClick(java.util.Map<String, String> params) {
@@ -586,8 +570,4 @@ public class McpMessageHandler {
         return "{\"video_capture\":false}";
     }
 
-    private static McpWebSocketClient castClient(Object wsClient) {
-        if (wsClient instanceof McpWebSocketClient) return (McpWebSocketClient) wsClient;
-        return null;
-    }
 }

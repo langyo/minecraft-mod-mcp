@@ -851,12 +851,4 @@ public class McpWin32Control implements McpPlatformControl {
             U.SetWindowPos(hwnd, 0, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         } catch (Exception ignored) {}
     }
-
-    public void moveWindowBack(long hwnd, int x, int y) {
-        try {
-            int SWP_NOSIZE = 0x0001;
-            int SWP_NOZORDER = 0x0004;
-            U.SetWindowPos(hwnd, 0, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-        } catch (Exception ignored) {}
-    }
 }

@@ -17,14 +17,14 @@
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **Version 0.1.0** — Active development. Java mod plugins and YAML workflow automation engine are functional. CI builds are green for the 1.21.7 Forge mod. Fabric and NeoForge support is WIP.
+> **Version 0.1.0** — Active development. Java mod plugins and HTTP-based control server are functional. CI builds are green for the 1.21.7 Forge mod. Fabric and NeoForge support is WIP.
 
 ## What is Minecraft MCP
 
 Minecraft MCP (Master Control Program) is a multi-version, multi-modloader Minecraft UI automation framework. It consists of two layers:
 
 - **Java Mod Plugins** (`packages/mods/`) — 24 mod projects across Forge, Fabric, and NeoForge, spanning MC 1.8.9 through 26.1.2, all sharing a common codebase (`packages/common/`)
-- **Python Automation** (`scripts/`) — YAML workflow engine with "Preview Click" (visual coordinate verification before clicking), test runners, build automation, and daemon management
+- **Python Automation** (`scripts/`) — Build automation, daemon management, test runners, and smoke testing
 
 ## Supported Versions
 
@@ -95,12 +95,6 @@ just smoke 1.21.7
 │  (1.8.9 – 26.1.2, 24 mod variants) │
 └─────────────────────────────────────┘
 ```
-
-## Docs
-
-- **[Workflow Automation](workflow.md)** — YAML-based UI automation with Preview Click
-- **[PLAN.md](../../PLAN.md)** — Completed test case: Redstone Ready world creation
-- **[Workflows](../../workflows/)** — Declarative YAML test definitions
 
 ## Contributing
 

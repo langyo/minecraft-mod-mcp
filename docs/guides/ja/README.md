@@ -17,14 +17,14 @@
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **バージョン 0.1.0** — 活発に開発中です。Java Mod プラグインおよび YAML ワークフロー自動化エンジンが動作可能です。CI ビルドは 1.21.7 Forge Mod でグリーンです。Fabric と NeoForge のサポートは WIP です。
+> **バージョン 0.1.0** — 活発に開発中です。Java Mod プラグインおよび HTTP ベースの制御サーバーが動作可能です。CI ビルドは 1.21.7 Forge Mod でグリーンです。Fabric と NeoForge のサポートは WIP です。
 
 ## Minecraft MCP とは
 
 Minecraft MCP（Master Control Program）は、マルチバージョン・マルチ Mod ローダー対応の Minecraft UI 自動化フレームワークです。以下の 2 層で構成されています：
 
 - **Java Mod プラグイン**（`packages/mods/`）— Forge、Fabric、NeoForge に対応する 24 の Mod プロジェクトで、MC 1.8.9 から 26.1.2 までをカバーし、共通コードベース（`packages/common/`）を共有
-- **Python 自動化**（`scripts/`）— 「プレビュークリック」（クリック前にスクリーンショット上で座標を視覚的に確認）機能を備えた YAML ワークフローエンジン、テストランナー、ビルド自動化、デーモン管理
+- **Python 自動化**（`scripts/`）— ビルド自動化、デーモン管理、テストランナー、スモークテスト
 
 ## サポートバージョン
 
@@ -95,12 +95,6 @@ just smoke 1.21.7
 │  (1.8.9 – 26.1.2, 24 の Mod 派生)  │
 └─────────────────────────────────────┘
 ```
-
-## ドキュメント
-
-- **[ワークフロー自動化](workflow.md)** — プレビュークリック機能付き YAML ベース UI 自動化
-- **[PLAN.md](../../PLAN.md)** — 完了したテストケース：Redstone Ready ワールド作成
-- **[Workflows](../../workflows/)** — 宣言型 YAML テスト定義
 
 ## コントリビューション
 

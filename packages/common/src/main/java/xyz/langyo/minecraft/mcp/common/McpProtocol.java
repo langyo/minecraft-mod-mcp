@@ -26,10 +26,4 @@ public final class McpProtocol {
         String getWorldInfo();
         String debugFields();
     }
-
-    public interface ModLifecycle {
-        void onInit(MinecraftInput input, Object wsClient);
-        void onTick();
-        void onShutdown();
-    }
 }

@@ -17,14 +17,14 @@
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **버전 0.1.0** — 활발히 개발 중입니다. Java 모드 플러그인과 YAML 워크플로 자동화 엔진이 작동합니다. CI 빌드는 1.21.7 Forge 모드에서 통과됩니다. Fabric과 NeoForge 지원은 WIP입니다.
+> **버전 0.1.0** — 활발히 개발 중입니다. Java 모드 플러그인과 HTTP 기반 제어 서버가 작동합니다. CI 빌드는 1.21.7 Forge 모드에서 통과됩니다. Fabric과 NeoForge 지원은 WIP입니다.
 
 ## Minecraft MCP란?
 
 Minecraft MCP(Master Control Program)는 멀티 버전, 멀티 모드로더 Minecraft UI 자동화 프레임워크입니다. 두 가지 계층으로 구성됩니다:
 
 - **Java 모드 플러그인**(`packages/mods/`) — Forge, Fabric, NeoForge를 아우르는 24개의 모드 프로젝트로, MC 1.8.9부터 26.1.2까지 지원하며 공통 코드베이스(`packages/common/`)를 공유
-- **Python 자동화**(`scripts/`) — "미리보기 클릭"(클릭 전 스크린샷에 좌표 시각적 확인) 기능이 있는 YAML 워크플로 엔진, 테스트 실행기, 빌드 자동화, 데몬 관리
+- **Python 자동화**(`scripts/`) — 빌드 자동화, 데몬 관리, 테스트 실행기 및 스모크 테스트
 
 ## 지원 버전
 
@@ -95,12 +95,6 @@ just smoke 1.21.7
 │  (1.8.9 – 26.1.2, 24개 모드 변형)   │
 └─────────────────────────────────────┘
 ```
-
-## 문서
-
-- **[워크플로 자동화](workflow.md)** — 미리보기 클릭 기능이 있는 YAML 기반 UI 자동화
-- **[PLAN.md](../../PLAN.md)** — 완료된 테스트 케이스: Redstone Ready 세계 생성
-- **[Workflows](../../workflows/)** — 선언적 YAML 테스트 정의
 
 ## 기여
 

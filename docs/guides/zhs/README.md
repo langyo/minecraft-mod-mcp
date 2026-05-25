@@ -17,14 +17,14 @@
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
 
-> **版本 0.1.0** — 活跃开发中。Java Mod 插件以及 YAML 工作流自动化引擎均已可用。CI 已覆盖 1.21.7 Forge Mod 构建。Fabric 和 NeoForge 支持为 WIP。
+> **版本 0.1.0** — 活跃开发中。Java Mod 插件以及 HTTP 控制服务器均已可用。CI 已覆盖 1.21.7 Forge Mod 构建。Fabric 和 NeoForge 支持为 WIP。
 
 ## 什么是 Minecraft MCP
 
 Minecraft MCP（Master Control Program，主控程序）是一个多版本、多 Mod 加载器的 Minecraft UI 自动化框架，由两层组成：
 
 - **Java Mod 插件**（`packages/mods/`）— 24 个 Mod 项目，覆盖 Forge、Fabric 和 NeoForge 加载器，支持 MC 1.8.9 至 26.1.2，共享公共代码库（`packages/common/`）
-- **Python 自动化**（`scripts/`）— YAML 工作流引擎，支持"预选点击"（点击前先在截图上标红点验证坐标）、测试运行器、构建自动化和守护进程管理
+- **Python 自动化**（`scripts/`）— 构建自动化、守护进程管理、测试运行器和冒烟测试
 
 ## 支持的版本
 
@@ -95,12 +95,6 @@ just smoke 1.21.7
 │  (1.8.9 – 26.1.2, 24 个 Mod 变体)  │
 └─────────────────────────────────────┘
 ```
-
-## 文档
-
-- **[工作流自动化](workflow.md)** — 基于 YAML 的 UI 自动化，支持预选点击
-- **[PLAN.md](../../PLAN.md)** — 已完成的测试案例：Redstone Ready 世界创建
-- **[Workflows](../../workflows/)** — 声明式 YAML 测试定义
 
 ## 贡献
 
