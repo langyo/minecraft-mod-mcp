@@ -45,6 +45,10 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.withType(ProcessResources).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 jar {
     manifest {
         attributes 'Automatic-Module-Name': 'mcpmod'
