@@ -502,6 +502,7 @@ curl http://localhost:9876/api/events
 | Commande | Description |
 |---------|-------------|
 | `screenshot` | Prendre une capture d'écran de la fenêtre Minecraft |
+| `screenshot_to_file` | Prendre une capture d'écran et l'enregistrer dans un fichier local (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
 | `click` | Cliquer aux coordonnées (x, y) |
 | `press_key` | Appuyer sur une touche du clavier |
 | `type_text` | Saisir une chaîne de texte |
@@ -509,6 +510,64 @@ curl http://localhost:9876/api/events
 | `execute_command` | Exécuter une commande slash Minecraft |
 | `get_player_info` | Obtenir la position et l'état du joueur |
 | `get_world_info` | Obtenir les informations du monde |
+
+---
+
+## Intégration de la reconnaissance visuelle
+
+Vous pouvez associer Minecraft MCP à des **serveurs MCP compatibles vision** pour permettre aux agents IA de *voir et comprendre* ce qui se passe dans le jeu — lire le texte de l'IU, diagnostiquer les erreurs, analyser les dispositions, et plus encore.
+
+### Comment ça fonctionne
+
+1. Minecraft MCP prend une capture d'écran et l'enregistre dans un fichier local via `screenshot_to_file`
+2. Un serveur MCP vision lit ce fichier et l'analyse
+3. L'agent IA coordonne les deux — capture → analyser → agir
+
+```
+AI Agent
+  │
+  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
+  │
+  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "Main menu, 3 buttons visible"
+  │
+  └──► Minecraft MCP:  click x=400,y=300 → enters game
+```
+
+### Serveur MCP GLM Vision
+
+[GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) est un serveur MCP local propulsé par GLM-4.6V, offrant :
+
+| Tool | Use Case |
+|------|----------|
+| `ui_to_artifact` | Convertir des captures d'écran d'IU en code, invites ou spécifications de conception |
+| `extract_text_from_screenshot` | OCR du texte de l'IU du jeu (chat, panneaux, menus) |
+| `diagnose_error_screenshot` | Analyser les boîtes de dialogue d'erreur et les traces d'appels dans le jeu |
+| `understand_technical_diagram` | Lire les circuits de redstone, les schémas |
+| `analyze_data_visualization` | Lire les statistiques et tableaux de bord du jeu |
+| `image_analysis` | Compréhension visuelle générale des scènes de jeu |
+| `ui_diff_check` | Comparer des captures d'écran avant/après |
+
+**Installation** (nécessite Node.js >= 18) :
+
+```bash
+# Claude Code
+claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> -- npx -y "@z_ai/mcp-server"
+
+# Manual config (Cline, Roo Code, Kilo Code, etc.)
+{
+  "mcpServers": {
+    "zai-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@z_ai/mcp-server"],
+      "env": {
+        "Z_AI_API_KEY": "<your_zhipu_api_key>",
+        "Z_AI_MODE": "ZHIPU"
+      }
+    }
+  }
+}
+```
 
 ---
 

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "minecraft-mcp": {
+      "type": "sse",
+      "url": "http://localhost:9876/api/events"
+    }
+  }
+}

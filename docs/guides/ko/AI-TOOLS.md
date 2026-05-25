@@ -502,6 +502,7 @@ curl http://localhost:9876/api/events
 | 명령어 | 설명 |
 |---------|-------------|
 | `screenshot` | Minecraft 창의 스크린샷 촬영 |
+| `screenshot_to_file` | 스크린샷을 촬영하여 로컬 파일로 저장 (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
 | `click` | (x, y) 좌표 클릭 |
 | `press_key` | 키보드 키 입력 |
 | `type_text` | 텍스트 문자열 입력 |
@@ -509,6 +510,64 @@ curl http://localhost:9876/api/events
 | `execute_command` | Minecraft 슬래시 명령어 실행 |
 | `get_player_info` | 플레이어 위치 및 상태 정보 조회 |
 | `get_world_info` | 월드 정보 조회 |
+
+---
+
+## 시각 인식 통합
+
+Minecraft MCP를 **비전 지원 MCP 서버**와 함께 사용하면 AI 에이전트가 게임에서 일어나는 일을 *보고 이해*할 수 있습니다 — UI 텍스트 읽기, 오류 진단, 레이아웃 분석 등 다양한 작업이 가능합니다.
+
+### 작동 방식
+
+1. Minecraft MCP가 `screenshot_to_file`을 통해 스크린샷을 로컬 파일로 저장합니다
+2. 비전 MCP 서버가 해당 파일을 읽고 분석합니다
+3. AI 에이전트가 두 서버를 조율합니다 — 스크린샷 → 분석 → 동작
+
+```
+AI Agent
+  │
+  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
+  │
+  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "Main menu, 3 buttons visible"
+  │
+  └──► Minecraft MCP:  click x=400,y=300 → enters game
+```
+
+### GLM Vision MCP 서버
+
+[GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`)는 GLM-4.6V로 구동되는 로컬 MCP 서버로, 다음 기능을 제공합니다:
+
+| Tool | Use Case |
+|------|----------|
+| `ui_to_artifact` | UI 스크린샷을 코드, 프롬프트 또는 디자인 명세로 변환 |
+| `extract_text_from_screenshot` | 게임 UI에서 텍스트 OCR (채팅, 표지판, 메뉴) |
+| `diagnose_error_screenshot` | 게임 내 오류 대화상자 및 스택 트레이스 분석 |
+| `understand_technical_diagram` | 레드스톤 회로, 회로도 읽기 |
+| `analyze_data_visualization` | 게임 내 통계, 대시보드 읽기 |
+| `image_analysis` | 게임 장면에 대한 일반적인 시각적 이해 |
+| `ui_diff_check` | 스크린샷 전후 비교 |
+
+**설치** (Node.js >= 18 필요):
+
+```bash
+# Claude Code
+claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> -- npx -y "@z_ai/mcp-server"
+
+# Manual config (Cline, Roo Code, Kilo Code, etc.)
+{
+  "mcpServers": {
+    "zai-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@z_ai/mcp-server"],
+      "env": {
+        "Z_AI_API_KEY": "<your_zhipu_api_key>",
+        "Z_AI_MODE": "ZHIPU"
+      }
+    }
+  }
+}
+```
 
 ---
 

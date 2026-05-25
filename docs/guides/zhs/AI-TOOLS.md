@@ -501,7 +501,8 @@ curl http://localhost:9876/api/events
 
 | 命令 | 说明 |
 |---------|-------------|
-| `screenshot` | 截取 Minecraft 窗口的屏幕截图 |
+| `screenshot` | 截取屏幕截图，返回 base64 数据 URI |
+| `screenshot_to_file` | 截取屏幕截图并保存到本地文件（`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`） |
 | `click` | 在 (x, y) 坐标处点击 |
 | `press_key` | 按下键盘按键 |
 | `type_text` | 输入文本字符串 |
@@ -509,6 +510,64 @@ curl http://localhost:9876/api/events
 | `execute_command` | 执行 Minecraft 斜杠命令 |
 | `get_player_info` | 获取玩家位置和状态 |
 | `get_world_info` | 获取世界信息 |
+
+---
+
+## 视觉识别集成
+
+你可以将 Minecraft MCP 与**支持视觉能力的 MCP 服务器**配合使用，让 AI 代理能够*查看并理解*游戏中正在发生的事情——读取 UI 文本、诊断错误、分析布局等。
+
+### 工作原理
+
+1. Minecraft MCP 通过 `screenshot_to_file` 截取屏幕截图并保存到本地文件
+2. 视觉 MCP 服务器读取该文件并进行分析
+3. AI 代理协调两者——截图 → 分析 → 行动
+
+```
+AI Agent
+  │
+  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
+  │
+  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "主菜单，3 个按钮可见"
+  │
+  └──► Minecraft MCP:  click x=400,y=300 → 进入游戏
+```
+
+### GLM 视觉 MCP 服务器
+
+[GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server)（`@z_ai/mcp-server`）是一个由 GLM-4.6V 驱动的本地 MCP 服务器，提供以下功能：
+
+| 工具 | 用途 |
+|------|----------|
+| `ui_to_artifact` | 将 UI 截图转换为代码、提示词或设计规格 |
+| `extract_text_from_screenshot` | 从游戏 UI（聊天、告示牌、菜单）中 OCR 提取文字 |
+| `diagnose_error_screenshot` | 解析游戏中的错误对话框和堆栈跟踪 |
+| `understand_technical_diagram` | 解读红石电路、原理图 |
+| `analyze_data_visualization` | 读取游戏内统计数据、仪表盘 |
+| `image_analysis` | 对游戏场景进行通用视觉理解 |
+| `ui_diff_check` | 对比前后截图差异 |
+
+**安装**（需要 Node.js >= 18）：
+
+```bash
+# Claude Code
+claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> -- npx -y "@z_ai/mcp-server"
+
+# 手动配置（Cline、Roo Code、Kilo Code 等）
+{
+  "mcpServers": {
+    "zai-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@z_ai/mcp-server"],
+      "env": {
+        "Z_AI_API_KEY": "<your_zhipu_api_key>",
+        "Z_AI_MODE": "ZHIPU"
+      }
+    }
+  }
+}
+```
 
 ---
 

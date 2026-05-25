@@ -502,6 +502,7 @@ curl http://localhost:9876/api/events
 | Comando | Descripción |
 |---------|-------------|
 | `screenshot` | Toma una captura de pantalla de la ventana de Minecraft |
+| `screenshot_to_file` | Toma una captura de pantalla y la guarda en un archivo local (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
 | `click` | Hace clic en las coordenadas (x, y) |
 | `press_key` | Presiona una tecla del teclado |
 | `type_text` | Escribe una cadena de texto |
@@ -509,6 +510,64 @@ curl http://localhost:9876/api/events
 | `execute_command` | Ejecuta un comando slash de Minecraft |
 | `get_player_info` | Obtiene la posición y el estado del jugador |
 | `get_world_info` | Obtiene información del mundo |
+
+---
+
+## Integración de Reconocimiento Visual
+
+Puedes combinar Minecraft MCP con **servidores MCP con capacidad de visión** para que los agentes de IA puedan *ver y entender* lo que sucede en el juego — leer texto de la IU, diagnosticar errores, analizar diseños y más.
+
+### Cómo Funciona
+
+1. Minecraft MCP toma una captura de pantalla y la guarda en un archivo local mediante `screenshot_to_file`
+2. Un servidor MCP de visión lee ese archivo y lo analiza
+3. El agente de IA coordina ambos — captura → analizar → actuar
+
+```
+AI Agent
+  │
+  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
+  │
+  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "Main menu, 3 buttons visible"
+  │
+  └──► Minecraft MCP:  click x=400,y=300 → enters game
+```
+
+### Servidor MCP GLM Vision
+
+[GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) es un servidor MCP local impulsado por GLM-4.6V que proporciona:
+
+| Tool | Use Case |
+|------|----------|
+| `ui_to_artifact` | Convertir capturas de pantalla de IU en código, prompts o especificaciones de diseño |
+| `extract_text_from_screenshot` | OCR de texto de la IU del juego (chat, carteles, menús) |
+| `diagnose_error_screenshot` | Analizar diálogos de error y trazas de pila en el juego |
+| `understand_technical_diagram` | Leer circuitos de redstone, esquemas |
+| `analyze_data_visualization` | Leer estadísticas y paneles del juego |
+| `image_analysis` | Comprensión visual general de escenas del juego |
+| `ui_diff_check` | Comparar capturas de pantalla antes/después |
+
+**Instalación** (requiere Node.js >= 18):
+
+```bash
+# Claude Code
+claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> -- npx -y "@z_ai/mcp-server"
+
+# Manual config (Cline, Roo Code, Kilo Code, etc.)
+{
+  "mcpServers": {
+    "zai-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@z_ai/mcp-server"],
+      "env": {
+        "Z_AI_API_KEY": "<your_zhipu_api_key>",
+        "Z_AI_MODE": "ZHIPU"
+      }
+    }
+  }
+}
+```
 
 ---
 

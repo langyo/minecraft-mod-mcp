@@ -57,6 +57,7 @@ public class McpMessageHandler {
         }
         if (method.equals("ping")) return "pong";
         if (method.equals("screenshot")) return handleScreenshot();
+        if (method.equals("screenshot_to_file")) return handleScreenshotToFile(params);
         if (method.equals("overlay_click")) return handleOverlayClick(params);
         if (method.equals("enter_control_mode") || method.equals("exit_control_mode")) return handleControlMode(params, method);
 
@@ -146,6 +147,21 @@ public class McpMessageHandler {
             return "error: screenshot returned null";
         } catch (Exception e) {
             return "error: " + e.getMessage();
+        }
+    }
+
+    protected Object handleScreenshotToFile(java.util.Map<String, String> p) {
+        String filePath = p.get("path");
+        if (filePath == null || filePath.isEmpty()) return "{\"error\":\"missing path\"}";
+        try {
+            byte[] bytes = minecraftInput != null ? minecraftInput.screenshot() : null;
+            if (bytes == null) return "{\"error\":\"screenshot returned null\"}";
+            java.nio.file.Path fp = java.nio.file.Paths.get(filePath);
+            java.nio.file.Files.createDirectories(fp.getParent());
+            java.nio.file.Files.write(fp, bytes);
+            return "{\"file\":\"" + fp.toAbsolutePath().toString().replace("\\", "\\\\") + "\",\"size\":" + bytes.length + "}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage().replace("\\", "\\\\").replace("\"", "\\\"") + "\"}";
         }
     }
 

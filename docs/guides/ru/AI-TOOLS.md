@@ -502,6 +502,7 @@ curl http://localhost:9876/api/events
 | Команда | Описание |
 |---------|-------------|
 | `screenshot` | Сделать скриншот окна Minecraft |
+| `screenshot_to_file` | Сделать скриншот и сохранить в локальный файл (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
 | `click` | Кликнуть по координатам (x, y) |
 | `press_key` | Нажать клавишу клавиатуры |
 | `type_text` | Ввести текстовую строку |
@@ -509,6 +510,64 @@ curl http://localhost:9876/api/events
 | `execute_command` | Выполнить команду Minecraft через слэш |
 | `get_player_info` | Получить позицию и состояние игрока |
 | `get_world_info` | Получить информацию о мире |
+
+---
+
+## Интеграция визуального распознавания
+
+Вы можете использовать Minecraft MCP вместе с **MCP-серверами с поддержкой компьютерного зрения**, чтобы AI-агенты могли *видеть и понимать*, что происходит в игре — читать текст интерфейса, диагностировать ошибки, анализировать расположение элементов и многое другое.
+
+### Как это работает
+
+1. Minecraft MCP делает скриншот и сохраняет его в локальный файл через `screenshot_to_file`
+2. Vision MCP-сервер читает этот файл и анализирует его
+3. AI-агент координирует оба сервера — скриншот → анализ → действие
+
+```
+AI Agent
+  │
+  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
+  │
+  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "Main menu, 3 buttons visible"
+  │
+  └──► Minecraft MCP:  click x=400,y=300 → enters game
+```
+
+### GLM Vision MCP Server
+
+[GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) — это локальный MCP-сервер на базе GLM-4.6V, предоставляющий:
+
+| Tool | Use Case |
+|------|----------|
+| `ui_to_artifact` | Преобразование скриншотов интерфейса в код, промпты или спецификации дизайна |
+| `extract_text_from_screenshot` | OCR текста из игрового интерфейса (чат, таблички, меню) |
+| `diagnose_error_screenshot` | Анализ диалогов ошибок и стек-трейсов в игре |
+| `understand_technical_diagram` | Чтение редстоун-схем и чертежей |
+| `analyze_data_visualization` | Чтение игровой статистики и панелей показателей |
+| `image_analysis` | Общее визуальное понимание игровых сцен |
+| `ui_diff_check` | Сравнение скриншотов до/после |
+
+**Установка** (требуется Node.js >= 18):
+
+```bash
+# Claude Code
+claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> -- npx -y "@z_ai/mcp-server"
+
+# Manual config (Cline, Roo Code, Kilo Code, etc.)
+{
+  "mcpServers": {
+    "zai-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@z_ai/mcp-server"],
+      "env": {
+        "Z_AI_API_KEY": "<your_zhipu_api_key>",
+        "Z_AI_MODE": "ZHIPU"
+      }
+    }
+  }
+}
+```
 
 ---
 

@@ -501,7 +501,8 @@ curl http://localhost:9876/api/events
 
 | 指令 | 說明 |
 |---------|-------------|
-| `screenshot` | 截取 Minecraft 視窗的螢幕截圖 |
+| `screenshot` | 截取 Minecraft 視窗的螢幕截圖，回傳 base64 資料 URI |
+| `screenshot_to_file` | 截取螢幕截圖並儲存為本地檔案 (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
 | `click` | 在 (x, y) 座標點擊 |
 | `press_key` | 按下鍵盤按鍵 |
 | `type_text` | 輸入文字字串 |
@@ -509,6 +510,84 @@ curl http://localhost:9876/api/events
 | `execute_command` | 執行 Minecraft 斜線指令 |
 | `get_player_info` | 取得玩家位置與狀態 |
 | `get_world_info` | 取得世界資訊 |
+
+---
+
+## 視覺辨識整合
+
+你可以將 Minecraft MCP 與**具備視覺能力的 MCP 伺服器**搭配使用，讓 AI 代理能夠*看見並理解*遊戲中發生的事情 — 讀取 UI 文字、診斷錯誤、分析版面配置等。
+
+### 運作原理
+
+1. Minecraft MCP 擷取螢幕截圖，並透過 `screenshot_to_file` 儲存為本地檔案
+2. 視覺 MCP 伺服器讀取該檔案並進行分析
+3. AI 代理協調兩者 — 截圖 → 分析 → 行動
+
+```
+AI Agent
+  │
+  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
+  │
+  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "主選單，可見 3 個按鈕"
+  │
+  └──► Minecraft MCP:  click x=400,y=300 → 進入遊戲
+```
+
+### GLM Vision MCP 伺服器
+
+[GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) 是一個由 GLM-4.6V 驅動的本地 MCP 伺服器，提供以下功能：
+
+| Tool | Use Case |
+|------|----------|
+| `ui_to_artifact` | 將 UI 截圖轉換為程式碼、提示詞或設計規格 |
+| `extract_text_from_screenshot` | 從遊戲 UI 中 OCR 文字（聊天、告示牌、選單） |
+| `diagnose_error_screenshot` | 解析遊戲中的錯誤對話框和堆疊追蹤 |
+| `understand_technical_diagram` | 讀取紅石電路、結構示意圖 |
+| `analyze_data_visualization` | 讀取遊戲內統計資料、儀表板 |
+| `image_analysis` | 遊戲場景的通用視覺理解 |
+| `ui_diff_check` | 比較前後截圖差異 |
+
+**安裝**（需要 Node.js >= 18）：
+
+```bash
+# Claude Code
+claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> -- npx -y "@z_ai/mcp-server"
+
+# 手動設定（Cline、Roo Code、Kilo Code 等）
+{
+  "mcpServers": {
+    "zai-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@z_ai/mcp-server"],
+      "env": {
+        "Z_AI_API_KEY": "<your_zhipu_api_key>",
+        "Z_AI_MODE": "ZHIPU"
+      }
+    }
+  }
+}
+```
+
+> **注意**：視覺 MCP 會從磁碟讀取檔案，因此在呼叫視覺工具之前，請務必先使用 `screenshot_to_file`（而非 `screenshot`）。你的 AI 代理可以在呼叫 `screenshot_to_file` 時指定檔案路徑。
+
+### 操作範例
+
+1. 向你的 AI 代理提問：*"擷取 Minecraft 的螢幕截圖，儲存到 `/tmp/mc.png`，然後分析螢幕上的內容，告訴我該按哪個按鈕來開始新遊戲。"*
+2. 代理呼叫 `minecraft-mcp` → `screenshot_to_file` → 檔案已儲存
+3. 代理呼叫 `zai-mcp-server` → `extract_text_from_screenshot` → 讀取 UI 文字
+4. 代理告訴你它看到了什麼，以及下一步該做什麼
+
+### 其他視覺工具
+
+| Tool | Description |
+|------|-------------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude 原生理解圖片 — 直接貼上或引用截圖檔案 |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAI 視覺模型，可透過任何 OpenAI 相容客戶端使用 |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | Google 的視覺 API，可在 Gemini 相容工具中使用 |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | 開源視覺語言模型，適用於自託管環境 |
+
+> 任何具備視覺能力的 LLM 或 MCP 伺服器都可以用於相同流程 — 關鍵是使用 `screenshot_to_file` 先將截圖儲存到磁碟。
 
 ---
 

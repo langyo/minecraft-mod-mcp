@@ -501,7 +501,8 @@ curl http://localhost:9876/api/events
 
 | Command | Description |
 |---------|-------------|
-| `screenshot` | Take a screenshot of the Minecraft window |
+| `screenshot` | Take a screenshot, returns base64 data URI |
+| `screenshot_to_file` | Take a screenshot and save to a local file (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
 | `click` | Click at (x, y) coordinates |
 | `press_key` | Press a keyboard key |
 | `type_text` | Type a text string |
@@ -509,6 +510,84 @@ curl http://localhost:9876/api/events
 | `execute_command` | Execute a Minecraft slash command |
 | `get_player_info` | Get player position and status |
 | `get_world_info` | Get world information |
+
+---
+
+## Visual Recognition Integration
+
+You can pair Minecraft MCP with **vision-capable MCP servers** to let AI agents *see and understand* what's happening in the game — reading UI text, diagnosing errors, analyzing layouts, and more.
+
+### How It Works
+
+1. Minecraft MCP takes a screenshot and saves it to a local file via `screenshot_to_file`
+2. A vision MCP server reads that file and analyzes it
+3. The AI agent coordinates both — screenshot → analyze → act
+
+```
+AI Agent
+  │
+  ├──► Minecraft MCP:  screenshot_to_file → /tmp/mc_screen.png
+  │
+  ├──► Vision MCP:     analyze /tmp/mc_screen.png → "Main menu, 3 buttons visible"
+  │
+  └──► Minecraft MCP:  click x=400,y=300 → enters game
+```
+
+### GLM Vision MCP Server
+
+[GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) is a local MCP server powered by GLM-4.6V, providing:
+
+| Tool | Use Case |
+|------|----------|
+| `ui_to_artifact` | Convert UI screenshots into code, prompts, or design specs |
+| `extract_text_from_screenshot` | OCR text from game UI (chat, signs, menus) |
+| `diagnose_error_screenshot` | Parse error dialogs and stack traces in-game |
+| `understand_technical_diagram` | Read redstone circuits, schematics |
+| `analyze_data_visualization` | Read in-game stats, dashboards |
+| `image_analysis` | General visual understanding of game scenes |
+| `ui_diff_check` | Compare before/after screenshots |
+
+**Installation** (requires Node.js >= 18):
+
+```bash
+# Claude Code
+claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> -- npx -y "@z_ai/mcp-server"
+
+# Manual config (Cline, Roo Code, Kilo Code, etc.)
+{
+  "mcpServers": {
+    "zai-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@z_ai/mcp-server"],
+      "env": {
+        "Z_AI_API_KEY": "<your_zhipu_api_key>",
+        "Z_AI_MODE": "ZHIPU"
+      }
+    }
+  }
+}
+```
+
+> **Note**: The vision MCP reads files from disk, so always use `screenshot_to_file` (not `screenshot`) before calling vision tools. Your AI agent can request a specific file path when calling `screenshot_to_file`.
+
+### Example Workflow
+
+1. Ask your AI agent: *"Take a screenshot of Minecraft, save it to `/tmp/mc.png`, then analyze what's on screen and tell me what button to click to start a new game."*
+2. The agent calls `minecraft-mcp` → `screenshot_to_file` → file saved
+3. The agent calls `zai-mcp-server` → `extract_text_from_screenshot` → reads UI text
+4. The agent tells you what it sees and what to do next
+
+### Other Vision Tools
+
+| Tool | Description |
+|------|-------------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude natively understands images — simply paste or reference a screenshot file |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAI vision models accessible via any OpenAI-compatible client |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | Google's vision API, usable in Gemini-compatible tools |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | Open-source vision-language model for self-hosted setups |
+
+> Any vision-capable LLM or MCP server can be used in the same pipeline — the key is using `screenshot_to_file` to persist the screenshot to disk first.
 
 ---
 
