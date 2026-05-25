@@ -10,7 +10,6 @@ import xyz.langyo.minecraft.mcp.mod.ModDevMcpMod;
 
 @Mixin(Screen.class)
 public abstract class ScreenMixin {
-
     @Inject(method = "render", at = @At("TAIL"))
     private void onRender(MatrixStack matrices, int mouseX, int mouseY, float tickDelta, CallbackInfo ci) {
         ModDevMcpMod mod = ModDevMcpMod.INSTANCE;

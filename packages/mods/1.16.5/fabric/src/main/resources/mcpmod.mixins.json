@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "xyz.langyo.minecraft.mcp.mod.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "client": [
+    "InGameHudMixin",
+    "ScreenMixin",
+    "MinecraftClientMixin",
+    "MouseMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

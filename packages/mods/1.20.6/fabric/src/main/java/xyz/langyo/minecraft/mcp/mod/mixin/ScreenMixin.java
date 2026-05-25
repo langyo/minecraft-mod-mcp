@@ -18,12 +18,4 @@ public abstract class ScreenMixin {
             mod.onScreenRender(ctx, (Screen) (Object) this, mouseX, mouseY, tickDelta);
         }
     }
-
-    @Inject(method = "init(Lnet/minecraft/client/MinecraftClient;II)V", at = @At("TAIL"))
-    private void onInit(net.minecraft.client.MinecraftClient client, int width, int height, CallbackInfo ci) {
-        ModDevMcpMod mod = ModDevMcpMod.INSTANCE;
-        if (mod != null) {
-            mod.onScreenInit((Screen) (Object) this);
-        }
-    }
 }

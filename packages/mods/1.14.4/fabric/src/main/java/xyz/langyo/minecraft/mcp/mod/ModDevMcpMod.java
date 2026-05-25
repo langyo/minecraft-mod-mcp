@@ -19,6 +19,7 @@ public class ModDevMcpMod implements ClientModInitializer {
     McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
+    private Screen lastPatchedScreen = null;
 
     private static McpRenderer wrapRenderer(MinecraftClient mc) {
         return new McpRenderer() {
@@ -78,6 +79,22 @@ public class ModDevMcpMod implements ClientModInitializer {
     public void onScreenRender(Screen screen, int mouseX, int mouseY, float tickDelta) {
         if (ReflectionHelper.isScreenshotInProgress()) return;
         try {
+            if (screen instanceof GameMenuScreen && screen != lastPatchedScreen) {
+                lastPatchedScreen = screen;
+                McpScreenHelper.patchPauseScreen(screen, new McpScreenHelper.ButtonFactory() {
+                    @Override
+                    public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
+                        return new ButtonWidget(x, y, w, h,
+                                new TranslatableText(translationKey).asString(),
+                                btn -> onClick.run());
+                    }
+                });
+            }
+            if (!(screen instanceof GameMenuScreen)) {
+                lastPatchedScreen = null;
+            }
+        } catch (Exception ignored) {}
+        try {
             MinecraftClient mc = MinecraftClient.getInstance();
             int w = mc.window.getScaledWidth();
             int h = mc.window.getScaledHeight();
@@ -93,21 +110,6 @@ public class ModDevMcpMod implements ClientModInitializer {
                 McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.textRenderer,
                         new TranslatableText("mcpmod.control.pause_button").asString(),
                         w, h, mx, my);
-            }
-        } catch (Exception ignored) {}
-    }
-
-    public void onScreenInit(Screen screen) {
-        try {
-            if (screen instanceof GameMenuScreen) {
-                McpScreenHelper.patchPauseScreen(screen, new McpScreenHelper.ButtonFactory() {
-                    @Override
-                    public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                        return new ButtonWidget(x, y, w, h,
-                                new TranslatableText(translationKey).asString(),
-                                btn -> onClick.run());
-                    }
-                });
             }
         } catch (Exception ignored) {}
     }

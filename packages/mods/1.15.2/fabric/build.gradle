@@ -22,7 +22,6 @@ dependencies {
     minecraft "com.mojang:minecraft:1.15.2"
     mappings "net.fabricmc:yarn:1.15.2+build.17:v2"
     modImplementation "net.fabricmc:fabric-loader:0.11.3"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:0.28.5+1.15"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
     implementation "net.java.dev.jna:jna:5.15.0"
     implementation "net.java.dev.jna:jna-platform:5.15.0"
