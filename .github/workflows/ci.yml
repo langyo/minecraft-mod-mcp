@@ -125,6 +125,8 @@ jobs:
 
       - name: Build mods
         shell: pwsh
+        env:
+          GRADLE_OPTS: "-Xmx2G"
         run: |
           $ErrorActionPreference = "Stop"
           $failedMods = @()
@@ -140,7 +142,10 @@ jobs:
 
             Push-Location $modPath
             try {
-              $result = .\gradlew.bat clean jar --no-daemon --console=plain --warning-mode=summary 2>&1
+              $gradleVer = if (Test-Path "gradle/wrapper/gradle-wrapper.properties") { (Get-Content "gradle/wrapper/gradle-wrapper.properties" | Select-String "distributionUrl" | Select-Object -First 1) -replace '.*gradle-', '' -replace '-bin.*', '' } else { "8.0" }
+              $majorVer = $gradleVer.Split('.')[0]
+              $extraArgs = if ([int]$majorVer -ge 5) { "--warning-mode=summary" } else { "" }
+              $result = .\gradlew.bat clean jar --no-daemon --console=plain $extraArgs 2>&1
               if ($LASTEXITCODE -ne 0) {
                 $errFile = "build-error.log"
                 $result | Out-File -FilePath $errFile -Encoding UTF8

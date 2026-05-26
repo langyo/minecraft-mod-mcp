@@ -14,11 +14,7 @@ version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
-afterEvaluate {
-    tasks.withType(JavaCompile).configureEach {
-        options.release.set(8)
-    }
-}
+sourceCompatibility = targetCompatibility = "1.8"
 
 minecraft {
     mappings channel: "snapshot", version: "20200224-1.15.1"
