@@ -380,8 +380,18 @@ public class McpMessageHandler {
     }
 
     protected Object handleRightClick() {
-        if (minecraftInput != null) minecraftInput.rightClick();
-        return "right_clicked";
+        if (minecraftInput != null) {
+            final CountDownLatch latch = new CountDownLatch(1);
+            final String[] result = {""};
+            ReflectedInputHandler.executeOnRenderThread(() -> {
+                try { result[0] = ReflectionHelper.doRightClick(ReflectionHelper.getMinecraftInstance()); }
+                catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+                latch.countDown();
+            });
+            try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+            return result[0];
+        }
+        return "no input handler";
     }
 
     protected Object handleUseItem() {
@@ -390,8 +400,15 @@ public class McpMessageHandler {
     }
 
     protected Object handlePlaceBlock() {
-        if (minecraftInput != null) return ReflectionHelper.doPlaceBlock(ReflectionHelper.getMinecraftInstance());
-        return "no input handler";
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {""};
+        ReflectedInputHandler.executeOnRenderThread(() -> {
+            try { result[0] = ReflectionHelper.doPlaceBlock(ReflectionHelper.getMinecraftInstance()); }
+            catch (Exception e) { result[0] = "{\"error\":\"" + e.getMessage() + "\"}"; }
+            latch.countDown();
+        });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
     }
 
     protected Object handlePauseGame() {

@@ -2806,28 +2806,61 @@ public final class ReflectionHelper {
 
     public static String doRightClick(Object mc) {
         try {
-            long handle = getWindowHandle(mc);
-            Object mouseHandler = getMouseHandler(mc);
-            dbg("doRightClick: handle=" + handle + " mouseHandler=" + (mouseHandler != null ? mouseHandler.getClass().getSimpleName() : "null"));
-            if (mouseHandler != null && handle != 0) {
-                Method target = findMouseButtonMethod(mouseHandler.getClass());
-                dbg("doRightClick: target=" + (target != null ? target.getName() : "null"));
-                if (target != null) {
-                    target.setAccessible(true);
-                    Object r1 = target.invoke(mouseHandler, handle, 1, 1, 0);
-                    dbg("doRightClick: press result=" + r1);
-                    Thread.sleep(50);
-                    Object r2 = target.invoke(mouseHandler, handle, 1, 0, 0);
-                    dbg("doRightClick: release result=" + r2);
-                    return "{\"right_click\":true,\"via\":\"mouseHandler\",\"method\":\"" + target.getName() + "\"}";
+            Object screen = null;
+            for (Method m : getAllMethods(mc.getClass())) {
+                String mn = m.getName();
+                if ((mn.equals("screen") || mn.equals("currentScreen")) && m.getParameterCount() == 0) {
+                    try { m.setAccessible(true); screen = m.invoke(mc); break; } catch (Exception ignored) {}
                 }
             }
-            sendMouseButton(handle, 1, 1);
-            Thread.sleep(100);
-            sendMouseButton(handle, 1, 0);
-            return "{\"right_click\":true,\"via\":\"sendMouseButton\"}";
+            if (screen == null) {
+                for (Field f : getAllFields(mc.getClass())) {
+                    if (f.getType().getSimpleName().contains("Screen") || f.getType().getSimpleName().contains("GuiScreen")) {
+                        try { f.setAccessible(true); screen = f.get(mc); break; } catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (screen != null) {
+                long handle = getWindowHandle(mc);
+                Object mouseHandler = getMouseHandler(mc);
+                if (mouseHandler != null && handle != 0) {
+                    Method target = findMouseButtonMethod(mouseHandler.getClass());
+                    if (target != null) {
+                        target.setAccessible(true);
+                        target.invoke(mouseHandler, handle, 1, 1, 0);
+                        Thread.sleep(50);
+                        target.invoke(mouseHandler, handle, 1, 0, 0);
+                        return "{\"right_click\":true,\"via\":\"screen_mouseHandler\"}";
+                    }
+                }
+                sendMouseButton(handle, 1, 1);
+                Thread.sleep(100);
+                sendMouseButton(handle, 1, 0);
+                return "{\"right_click\":true,\"via\":\"screen_sendMouseButton\"}";
+            }
+            for (Method m : getAllMethods(mc.getClass())) {
+                String mn = m.getName();
+                if ((mn.equals("startUseItem") || mn.equals("rightClickMouse") || mn.equals("func_147121_ag") || mn.equals("func_147118_ci"))
+                        && m.getParameterCount() == 0) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(mc);
+                        return "{\"right_click\":true,\"via\":\"startUseItem\",\"method\":\"" + mn + "\"}";
+                    } catch (Exception ignored) {}
+                }
+            }
+            for (Method m : getAllMethods(mc.getClass())) {
+                String mn = m.getName().toLowerCase();
+                if (m.getParameterCount() == 0 && mn.contains("useitem") && !mn.contains("tick") && !mn.contains("render")) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(mc);
+                        return "{\"right_click\":true,\"via\":\"useItem_generic\",\"method\":\"" + m.getName() + "\"}";
+                    } catch (Exception ignored) {}
+                }
+            }
+            return "{\"error\":\"no useItem method found for 3D rightClick\"}";
         } catch (Exception e) {
-            dbg("doRightClick error: " + e.getMessage());
             return "{\"error\":\"" + e.getMessage() + "\"}";
         }
     }
@@ -2884,33 +2917,57 @@ public final class ReflectionHelper {
             }
             int bx = (int)Math.floor(px), by = (int)Math.floor(py) - 1, bz = (int)Math.floor(pz);
             dbg("doPlaceBlock: player at " + px + "," + py + "," + pz + " placing at " + bx + "," + by + "," + bz);
-            Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
+            dbg("doPlaceBlock: gameMode class=" + gameMode.getClass().getName());
+            Class<?> vec3Class = null;
+            try { vec3Class = Class.forName("net.minecraft.world.phys.Vec3"); } catch (ClassNotFoundException e) {
+                vec3Class = Class.forName("net.minecraft.util.math.Vec3d");
+            }
             Object hitVec = vec3Class.getConstructor(double.class, double.class, double.class).newInstance(px, by + 1.0, pz);
-            Class<?> dirClass = Class.forName("net.minecraft.core.Direction");
+            Class<?> dirClass = null;
             Object dirUp = null;
+            try { dirClass = Class.forName("net.minecraft.core.Direction"); } catch (ClassNotFoundException e) {
+                dirClass = Class.forName("net.minecraft.util.math.Direction");
+            }
             for (Object d : (Enum[])dirClass.getMethod("values").invoke(null)) { if (((Enum)d).name().equals("UP")) { dirUp = d; break; } }
-            Class<?> bpClass = Class.forName("net.minecraft.core.BlockPos");
+            Class<?> bpClass = null;
+            try { bpClass = Class.forName("net.minecraft.core.BlockPos"); } catch (ClassNotFoundException e) {
+                bpClass = Class.forName("net.minecraft.util.math.BlockPos");
+            }
             Object blockPos = bpClass.getConstructor(int.class, int.class, int.class).newInstance(bx, by, bz);
-            Class<?> bhrClass = Class.forName("net.minecraft.world.phys.BlockHitResult");
+            Class<?> bhrClass = null;
+            try { bhrClass = Class.forName("net.minecraft.world.phys.BlockHitResult"); } catch (ClassNotFoundException e) {
+                bhrClass = Class.forName("net.minecraft.util.hit.BlockHitResult");
+            }
             Object hitResult = bhrClass.getConstructor(vec3Class, dirClass, bpClass, boolean.class).newInstance(hitVec, dirUp, blockPos, false);
-            Class<?> handClass = Class.forName("net.minecraft.world.InteractionHand");
+            Class<?> handClass = null;
+            try { handClass = Class.forName("net.minecraft.world.InteractionHand"); } catch (ClassNotFoundException e) {
+                handClass = Class.forName("net.minecraft.util.Hand");
+            }
             Object mainHand = null;
             for (Object h : (Enum[])handClass.getMethod("values").invoke(null)) { if (((Enum)h).name().equals("MAIN_HAND")) { mainHand = h; break; } }
             boolean placed = false;
+            StringBuilder methodsInfo = new StringBuilder();
             for (Method m : getAllMethods(gameMode.getClass())) {
                 String mn = m.getName();
-                if ((mn.equals("useItemOn") || mn.equals("func_180517_b") || mn.contains("useItemOn"))
-                        && m.getParameterCount() >= 3) {
-                    Class<?>[] pts = m.getParameterTypes();
-                    if (pts.length == 3 && pts[0].isInstance(player) && pts[1] == handClass) {
-                        try { m.setAccessible(true); m.invoke(gameMode, player, mainHand, hitResult); placed = true; dbg("doPlaceBlock: OK via " + mn + "(3)"); break; }
-                        catch (Exception ignored) {}
+                Class<?>[] pts = m.getParameterTypes();
+                methodsInfo.append(mn).append("(").append(pts.length).append(") ");
+                if (mn.equals("useItemOn") || mn.equals("func_180517_b") || mn.contains("useItemOn")
+                        || mn.startsWith("m_") || mn.startsWith("func_")) {
+                    if (pts.length >= 3) {
+                        try {
+                            m.setAccessible(true);
+                            if (pts.length == 4) {
+                                m.invoke(gameMode, player, mainHand, hitResult);
+                            } else if (pts.length == 3) {
+                                m.invoke(gameMode, player, mainHand, hitResult);
+                            }
+                            placed = true;
+                            dbg("doPlaceBlock: OK via " + mn + "(" + pts.length + ")");
+                            break;
+                        } catch (Exception ex) {
+                            dbg("doPlaceBlock: " + mn + " failed: " + ex.getMessage());
+                        }
                     }
-                }
-                if (!placed && (mn.equals("useItemOn") || mn.equals("func_180517_b") || mn.contains("useItemOn"))
-                        && m.getParameterCount() >= 4) {
-                    try { m.setAccessible(true); m.invoke(gameMode, player, mainHand, hitResult); placed = true; dbg("doPlaceBlock: OK via " + mn); break; }
-                    catch (Exception ignored) {}
                 }
             }
             if (!placed) {
@@ -2918,11 +2975,28 @@ public final class ReflectionHelper {
                     String mn = m.getName().toLowerCase();
                     if (mn.contains("useitem") && !mn.contains("continue") && m.getParameterCount() >= 2) {
                         try { m.setAccessible(true); m.invoke(gameMode, player, mainHand, hitResult); placed = true; dbg("doPlaceBlock: OK via " + m.getName()); break; }
-                        catch (Exception ignored) {}
+                        catch (Exception ex) { dbg("doPlaceBlock: " + m.getName() + " failed: " + ex.getMessage()); }
                     }
                 }
             }
-            if (!placed) return "{\"error\":\"no useItemOn method found on gameMode\"}";
+            if (!placed) {
+                for (Method m : getAllMethods(gameMode.getClass())) {
+                    Class<?>[] pts = m.getParameterTypes();
+                    if (m.getParameterCount() >= 3 && pts.length >= 3) {
+                        boolean hasPlayer = false, hasHand = false, hasHit = false;
+                        for (Class<?> pt : pts) {
+                            if (pt.getSimpleName().contains("Player")) hasPlayer = true;
+                            if (pt.getSimpleName().contains("Hand") || pt.getSimpleName().contains("InteractionHand")) hasHand = true;
+                            if (pt.getSimpleName().contains("Hit") || pt.getSimpleName().contains("BlockHit")) hasHit = true;
+                        }
+                        if (hasPlayer && hasHand && hasHit) {
+                            try { m.setAccessible(true); m.invoke(gameMode, player, mainHand, hitResult); placed = true; dbg("doPlaceBlock: OK via sig-match " + m.getName()); break; }
+                            catch (Exception ex) { dbg("doPlaceBlock: sig-match " + m.getName() + " failed: " + ex.getMessage()); }
+                        }
+                    }
+                }
+            }
+            if (!placed) return "{\"error\":\"no useItemOn method found on gameMode\",\"methods\":\"" + methodsInfo + "\"}";
             return "{\"placed\":true,\"at\":[" + bx + "," + by + "," + bz + "]}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
