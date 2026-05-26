@@ -87,13 +87,13 @@ jobs:
               1.16.5/fabric
               1.17.1/fabric
               1.18.2/fabric
-              1.19.4/fabric
           - jdk: "21"
             mods: |
               1.20.6/forge
               1.21.7/forge
               1.20.6/fabric
               1.20.6/neoforge
+              1.19.4/fabric
           - jdk: "25"
             mods: |
               26.1.2/forge
@@ -126,7 +126,7 @@ jobs:
       - name: Build mods
         shell: pwsh
         env:
-          GRADLE_OPTS: "-Xmx6G"
+          GRADLE_OPTS: "-Xmx8G"
         run: |
           $ErrorActionPreference = "Stop"
           $failedMods = @()
