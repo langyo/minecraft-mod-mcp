@@ -169,7 +169,9 @@ public class ModDevMcpMod {
                     }
                     if (!ReflectionHelper.isScreenshotInProgress()) {
                         GuiGraphicsExtractor g = event.getGuiGraphics();
-                        renderHudButton(g, mc);
+                        int sw = mc.getWindow().getGuiScaledWidth();
+                        int sh = mc.getWindow().getGuiScaledHeight();
+                        withFullScissor(g, sw, sh, () -> renderHudButton(g, mc));
                     }
                 } else if (ReflectionHelper.isMcpControlMode()) {
                     tick(mc);
