@@ -1,7 +1,0 @@
-{
-  "mcpmod.control.overlay": "MCP 正在操纵游戏",
-  "mcpmod.control.transfer": "转交控制权给 MCP",
-  "mcpmod.control.resume": "恢复手动控制",
-  "mcpmod.control.menu": "系统菜单",
-  "mcpmod.control.pause_button": "MCP 接管"
-}

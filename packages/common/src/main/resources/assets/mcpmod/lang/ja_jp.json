@@ -3,5 +3,6 @@
   "mcpmod.control.transfer": "MCPに制御を移行",
   "mcpmod.control.overlay": "MCPがゲームを制御中",
   "mcpmod.control.menu": "システムメニュー",
-  "mcpmod.description": "AIエージェント連携のためのMinecraft WebSocketブリッジMOD"
+  "mcpmod.description": "AIエージェント連携のためのMinecraft WebSocketブリッジMOD",
+  "mcpmod.control.pause_button": "MCP Take Over"
 }

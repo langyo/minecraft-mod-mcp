@@ -1,6 +1,6 @@
 {
   "mcpmod.control.resume": "Resume Manual Control",
-  "mcpmod.control.pause_button": "Transfer to MCP",
+  "mcpmod.control.pause_button": "MCP Take Over",
   "mcpmod.control.transfer": "Transfer control to MCP",
   "mcpmod.control.overlay": "MCP is controlling the game",
   "mcpmod.control.menu": "System Menu",

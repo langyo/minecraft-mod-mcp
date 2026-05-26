@@ -3,5 +3,6 @@
   "mcpmod.control.transfer": "MCP로 제어 전환",
   "mcpmod.control.overlay": "MCP가 게임을 제어 중",
   "mcpmod.control.menu": "시스템 메뉴",
-  "mcpmod.description": "AI 에이전트 상호작용을 위한 Minecraft WebSocket 브리지 모드"
+  "mcpmod.description": "AI 에이전트 상호작용을 위한 Minecraft WebSocket 브리지 모드",
+  "mcpmod.control.pause_button": "MCP Take Over"
 }
