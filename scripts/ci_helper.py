@@ -153,15 +153,19 @@ def _find_xvfb():
 
 def kill_minecraft():
     """Kill all running Minecraft Java processes."""
+    import signal
     try:
-        subprocess.run(["pkill", "-f", "minecraft"], timeout=5)
+        result = subprocess.run(["pgrep", "-f", "minecraft"], capture_output=True, text=True, timeout=5)
+        for pid in result.stdout.strip().split("\n"):
+            pid = pid.strip()
+            if pid:
+                try:
+                    os.kill(int(pid), signal.SIGKILL)
+                except (ProcessLookupError, ValueError, PermissionError):
+                    pass
     except Exception:
         pass
-    try:
-        subprocess.run(["pkill", "-f", "java.*minecraft"], timeout=5)
-    except Exception:
-        pass
-    time.sleep(2)
+    time.sleep(1)
 
 
 def install_mod_jar(jar_path, mc_dir=None):
