@@ -929,8 +929,6 @@ def main():
     if args.headless:
         cmd.extend([
             "-Djava.awt.headless=true",
-            "-Dorg.lwjgl.opengl.libname=egl-headless",
-            "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true",
         ])
         print(f"[LAUNCH] Headless mode: width={args.width}, height={args.height}")
 
@@ -955,8 +953,14 @@ def main():
 
     cmd.extend(["--width", args.width, "--height", args.height])
     if args.world:
-        cmd.extend(["--quickPlaySingleplayer", args.world])
-        print(f"[LAUNCH] Quick-play world: {args.world}")
+        mc_num = mc_ver.split(".")
+        major = int(mc_num[0]) if len(mc_num) > 0 and mc_num[0].isdigit() else 0
+        minor = int(mc_num[1]) if len(mc_num) > 1 and mc_num[1].isdigit() else 0
+        if major > 1 or (major == 1 and minor >= 20):
+            cmd.extend(["--quickPlaySingleplayer", args.world])
+            print(f"[LAUNCH] Quick-play world: {args.world}")
+        else:
+            print(f"[LAUNCH] World specified but --quickPlaySingleplayer not supported on {mc_ver}")
     cmd.extend(game_args)
 
     if args.dry_run:

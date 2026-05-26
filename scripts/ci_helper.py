@@ -34,6 +34,77 @@ TEST_WORLD_DIR = ROOT / "tests" / "reference-screenshots"
 SCREENSHOT_DIR = ROOT / "screenshots" / "ci"
 REF_SCREENSHOT_DIR = ROOT / "tests" / "reference-screenshots"
 
+
+def setup_mc_version(mc_ver, loader, mc_dir=None):
+    """Ensure a MC version is installed in .minecraft before launching.
+
+    Downloads vanilla JSON+JAR if needed, installs Forge/NeoForge/Fabric.
+    Returns the version name (e.g. '1.21.7-forge-57.0.2').
+    """
+    mc = mc_dir or str(MC_DIR)
+
+    launcher_profiles = Path(mc) / "launcher_profiles.json"
+    if not launcher_profiles.exists():
+        launcher_profiles.write_text('{"profiles":{}}')
+
+    if loader in ("forge", "neoforge"):
+        install_script = str(SCRIPTS / "install_forge.py")
+        _log(f"Running {install_script} --mc {mc_ver} ...")
+        result = subprocess.run(
+            [sys.executable, install_script, "--mc", mc_ver],
+            env={**os.environ, "HOME": str(Path(mc).parent)},
+            capture_output=True, text=True, timeout=600,
+        )
+        if result.returncode != 0:
+            _log(f"install_forge stderr: {result.stderr[-500:]}")
+        for line in result.stdout.splitlines():
+            if "OK:" in line:
+                name = line.split("OK:")[-1].strip()
+                _log(f"Forge installed: {name}")
+                return name
+
+        from install_forge import _find_installed
+        installed = _find_installed(mc_ver, loader)
+        if installed:
+            _log(f"Found installed: {installed}")
+            return installed
+        _log(f"Forge install failed for {mc_ver}/{loader}")
+        return None
+
+    elif loader == "fabric":
+        return _install_fabric_json(mc_ver, mc)
+
+    return None
+
+
+def _install_fabric_json(mc_ver, mc):
+    """Create Fabric loader version JSON via Fabric meta API."""
+    import urllib.request, json
+
+    meta_url = f"https://meta.fabricmc.net/v2/versions/loader/{mc_ver}"
+    req = urllib.request.Request(meta_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        versions = json.loads(resp.read())
+    if not versions:
+        _log(f"No Fabric loader for {mc_ver}")
+        return None
+    loader_info = versions[0]
+    loader_ver = loader_info["loader"]["version"]
+    version_name = f"fabric-loader-{loader_ver}-{mc_ver}"
+
+    profile_url = (f"https://meta.fabricmc.net/v2/versions/loader/{mc_ver}"
+                   f"/{loader_ver}/profile/json")
+    req2 = urllib.request.Request(profile_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req2, timeout=30) as resp2:
+        profile = json.loads(resp2.read())
+
+    ver_dir = Path(mc) / "versions" / version_name
+    ver_dir.mkdir(parents=True, exist_ok=True)
+    (ver_dir / f"{version_name}.json").write_text(json.dumps(profile, indent=2))
+
+    _log(f"Fabric version JSON: {version_name}")
+    return version_name
+
 sys.path.insert(0, str(SCRIPTS))
 
 
@@ -463,7 +534,12 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     if world_name:
         install_test_world(world_name)
 
-    _log(f"Launching MC {mc_ver}-{loader} (JDK {jdk_ver})")
+    version_name = setup_mc_version(mc_ver, loader)
+    if not version_name:
+        _log("ERROR: Failed to setup MC version")
+        return {"setup": {"passed": False, "detail": "Version setup failed"}}
+
+    _log(f"Launching MC {version_name} (JDK {jdk_ver})")
 
     env = os.environ.copy()
     env["JAVA_HOME"] = os.environ.get(f"JAVA_HOME_{jdk_ver}_X64", os.environ.get("JAVA_HOME", ""))
@@ -477,7 +553,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     launcher = str(SCRIPTS / "launch_mc.py")
     try:
         mc_proc = subprocess.Popen(
-            [sys.executable, launcher, f"{mc_ver}-{loader}", "--headless",
+            [sys.executable, launcher, version_name, "--headless",
              "--width", "854", "--height", "480",
              "--extra-jvm", extra_jvm,
              "--no-assets-download", "--no-mod-sync"],
@@ -580,11 +656,15 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
     install_mod_jar(mod_jar)
     install_test_world(world_name)
 
+    version_name = setup_mc_version(mc_ver, loader)
+    if not version_name:
+        return {"setup": {"passed": False, "detail": "Version setup failed"}}
+
     env = os.environ.copy()
     launcher = str(SCRIPTS / "launch_mc.py")
 
     mc_proc = subprocess.Popen(
-        [sys.executable, launcher, f"{mc_ver}-{loader}",
+        [sys.executable, launcher, version_name,
          "--width", "1280", "--height", "720",
          "--world", world_name,
          "--no-assets-download", "--no-mod-sync"],
@@ -724,9 +804,14 @@ def main():
         install_mod_jar(mod_jar)
         install_test_world(args.world)
 
+        version_name = setup_mc_version(args.mc_ver, args.loader)
+        if not version_name:
+            _log("ERROR: Failed to setup MC version")
+            sys.exit(1)
+
         launcher = str(SCRIPTS / "launch_mc.py")
         mc_proc = subprocess.Popen(
-            [sys.executable, launcher, f"{args.mc_ver}-{args.loader}",
+            [sys.executable, launcher, version_name,
              "--width", "1280", "--height", "720",
              "--world", args.world,
              "--no-assets-download", "--no-mod-sync"],
