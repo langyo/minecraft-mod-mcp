@@ -238,3 +238,228 @@ jobs:
             Branch: `${{ github.ref_name }}`
           prerelease: true
           files: dist/*.jar
+
+  # ============================================================
+  # HEADLESS SMOKE TESTS — 24 versions, API only, fast
+  # ============================================================
+  headless-smoke:
+    name: "Smoke ${{ matrix.mc_ver }}-${{ matrix.loader }} (JDK ${{ matrix.jdk }})"
+    needs: build-mods
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { mc_ver: "1.8.9",   loader: "forge",    jdk: "8"  }
+          - { mc_ver: "1.9.4",   loader: "forge",    jdk: "8"  }
+          - { mc_ver: "1.10.2",  loader: "forge",    jdk: "8"  }
+          - { mc_ver: "1.11.2",  loader: "forge",    jdk: "8"  }
+          - { mc_ver: "1.12.2",  loader: "forge",    jdk: "8"  }
+          - { mc_ver: "1.13.2",  loader: "forge",    jdk: "8"  }
+          - { mc_ver: "1.14.4",  loader: "forge",    jdk: "8"  }
+          - { mc_ver: "1.15.2",  loader: "forge",    jdk: "8"  }
+          - { mc_ver: "1.16.5",  loader: "forge",    jdk: "17" }
+          - { mc_ver: "1.17.1",  loader: "forge",    jdk: "17" }
+          - { mc_ver: "1.18.2",  loader: "forge",    jdk: "17" }
+          - { mc_ver: "1.19.4",  loader: "forge",    jdk: "17" }
+          - { mc_ver: "1.14.4",  loader: "fabric",   jdk: "17" }
+          - { mc_ver: "1.15.2",  loader: "fabric",   jdk: "17" }
+          - { mc_ver: "1.16.5",  loader: "fabric",   jdk: "17" }
+          - { mc_ver: "1.17.1",  loader: "fabric",   jdk: "17" }
+          - { mc_ver: "1.18.2",  loader: "fabric",   jdk: "17" }
+          - { mc_ver: "1.19.4",  loader: "fabric",   jdk: "17" }
+          - { mc_ver: "1.20.6",  loader: "forge",    jdk: "21" }
+          - { mc_ver: "1.21.7",  loader: "forge",    jdk: "21" }
+          - { mc_ver: "1.20.6",  loader: "fabric",   jdk: "21" }
+          - { mc_ver: "1.20.6",  loader: "neoforge", jdk: "21" }
+          - { mc_ver: "26.1.2",  loader: "forge",    jdk: "25" }
+          - { mc_ver: "26.1.2",  loader: "neoforge", jdk: "25" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all mod JARs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mods-jdk*
+          path: release-jars/
+      - name: Flatten JARs
+        run: |
+          mkdir -p dist
+          find release-jars -name "*.jar" -exec cp {} dist/ \;
+          echo "Available JARs:"
+          ls -la dist/
+      - name: Find mod JAR
+        id: find-jar
+        run: |
+          MOD_JAR=$(find dist -name "minecraft-mcp-${{ matrix.mc_ver }}-${{ matrix.loader }}-*.jar" 2>/dev/null | head -1)
+          if [ -z "$MOD_JAR" ]; then
+            echo "::error::No JAR found for ${{ matrix.mc_ver }}-${{ matrix.loader }}"
+            ls dist/ || true
+            exit 1
+          fi
+          echo "mod_jar=$MOD_JAR" >> $GITHUB_OUTPUT
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "${{ matrix.jdk }}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri libx11-dev 2>/dev/null || true
+      - name: Start Xvfb
+        run: |
+          Xvfb :99 -screen 0 1024x768x24 -ac -nolisten tcp &
+          sleep 2
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+          echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
+          echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
+      - name: Run smoke test
+        id: smoke
+        run: |
+          python scripts/ci_helper.py smoke \
+            --mc-ver "${{ matrix.mc_ver }}" \
+            --loader "${{ matrix.loader }}" \
+            --jdk-ver "${{ matrix.jdk }}" \
+            --mod-jar "${{ steps.find-jar.outputs.mod_jar }}" \
+            --world "CI_TestWorld" \
+            --output-json "report_${{ matrix.mc_ver }}_${{ matrix.loader }}.json"
+      - name: Kill MC
+        if: always()
+        run: pkill -f "java.*minecraft" 2>/dev/null || true
+
+  # ============================================================
+  # SCREENSHOT TEST — 4 versions with llvmpipe rendering
+  # ============================================================
+  screenshot-test:
+    name: "Screenshot ${{ matrix.mc_ver }}-${{ matrix.loader }}"
+    needs: build-mods
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { mc_ver: "1.12.2",  loader: "forge",    jdk: "8"  }
+          - { mc_ver: "1.16.5",  loader: "forge",    jdk: "17" }
+          - { mc_ver: "1.21.7",  loader: "forge",    jdk: "21" }
+          - { mc_ver: "26.1.2",  loader: "forge",    jdk: "25" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all mod JARs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mods-jdk*
+          path: release-jars/
+      - name: Flatten JARs
+        run: |
+          mkdir -p dist
+          find release-jars -name "*.jar" -exec cp {} dist/ \;
+      - name: Find mod JAR
+        id: find-jar
+        run: |
+          MOD_JAR=$(find dist -name "minecraft-mcp-${{ matrix.mc_ver }}-${{ matrix.loader }}-*.jar" 2>/dev/null | head -1)
+          echo "mod_jar=$MOD_JAR" >> $GITHUB_OUTPUT
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "${{ matrix.jdk }}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install Pillow
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri 2>/dev/null || true
+      - name: Start Xvfb
+        run: |
+          Xvfb :99 -screen 0 1280x720x24 -ac -nolisten tcp &
+          sleep 2
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+          echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
+          echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
+      - name: Run screenshot test
+        run: |
+          python scripts/ci_helper.py screenshot-test \
+            --mc-ver "${{ matrix.mc_ver }}" \
+            --loader "${{ matrix.loader }}" \
+            --mod-jar "${{ steps.find-jar.outputs.mod_jar }}" \
+            --world "CI_TestWorld" \
+            --ref-screenshot "test-world/ref_${{ matrix.mc_ver }}_${{ matrix.loader }}.png" || true
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.mc_ver }}-${{ matrix.loader }}
+          path: screenshots/ci/
+          retention-days: 7
+      - name: Kill MC
+        if: always()
+        run: pkill -f "java.*minecraft" 2>/dev/null || true
+
+  # ============================================================
+  # E2E SMOKE TEST — Full workflow with superflat world
+  # ============================================================
+  e2e-smoke:
+    name: "E2E 1.21.7-forge"
+    needs: build-mods
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all mod JARs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mods-jdk*
+          path: release-jars/
+      - name: Flatten JARs
+        run: |
+          mkdir -p dist
+          find release-jars -name "*.jar" -exec cp {} dist/ \;
+      - name: Find mod JAR
+        id: find-jar
+        run: |
+          MOD_JAR=$(find dist -name "minecraft-mcp-1.21.7-forge-*.jar" 2>/dev/null | head -1)
+          echo "mod_jar=$MOD_JAR" >> $GITHUB_OUTPUT
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install Pillow
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri 2>/dev/null || true
+      - name: Start Xvfb
+        run: |
+          Xvfb :99 -screen 0 1280x720x24 -ac -nolisten tcp &
+          sleep 2
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+          echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
+          echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
+      - name: Run E2E test
+        id: e2e
+        run: |
+          python scripts/ci_helper.py e2e \
+            --mc-ver "1.21.7" \
+            --loader "forge" \
+            --jdk-ver "21" \
+            --mod-jar "${{ steps.find-jar.outputs.mod_jar }}" \
+            --world "CI_TestWorld" \
+            --output-json "e2e_report.json"
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: screenshots/ci/
+          retention-days: 7
+      - name: Kill MC
+        if: always()
+        run: pkill -f "java.*minecraft" 2>/dev/null || true

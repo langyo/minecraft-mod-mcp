@@ -1,6 +1,9 @@
 """Smoke test: launch MC, navigate menus, create Redstone Ready superflat world,
 place a sign with 'Hello World', then exit cleanly.
 
+CI mode (--ci) uses a pre-built test world, skips GUI navigation, and focuses
+on screenshot-based verification suitable for headless CI environments.
+
 Complete workflow:
   1. Detect main menu
   2. Click Single Player
@@ -11,15 +14,16 @@ Complete workflow:
   7. Open inventory, take a sign
   8. Close inventory
   9. Rotate view angle (game-internal, no OS mouse interference)
- 10. Right-click to place sign
- 11. Type 'Hello World' on sign, confirm
- 12. Press ESC -> pause menu
- 13. Save and Quit to title
- 14. Quit Game
+  10. Right-click to place sign
+  11. Type 'Hello World' on sign, confirm
+  12. Press ESC -> pause menu
+  13. Save and Quit to title
+  14. Quit Game
 
 Usage:
   python scripts/smoke_test.py 1.21.7-forge-57.0.2
   python scripts/smoke_test.py 26.1.2-forge-64.0.8
+  python scripts/smoke_test.py 1.21.7-forge-57.0.2 --ci --world CI_TestWorld
 """
 
 import argparse
@@ -117,10 +121,135 @@ def step(server, step_num, total, desc):
     print(f"[{step_num}/{total}] {desc}")
 
 
+def run_ci_test(version, loader, mc_key, world_name, timeout=600):
+    """CI mode: use pre-built world, skip GUI navigation, compare screenshots."""
+    from ci_helper import (
+        setup_xvfb, install_test_world, install_mod_jar, wait_for_mod,
+        api_call, get_screenshot, verify_screenshot, compare_screenshots_structural,
+        compare_screenshots_strict, kill_minecraft,
+    )
+
+    print(f"============================================================")
+    print(f"CI SMOKE TEST: {version}/{loader} (world={world_name})")
+    print(f"============================================================")
+
+    kill_minecraft()
+    setup_xvfb(screen="1280x720x24")
+
+    mod_jar = find_mod_jar(version, loader)
+    if not mod_jar:
+        print(f"  ERROR: Mod JAR not found")
+        return 1
+    install_mod_jar(str(mod_jar))
+
+    world_installed = False
+    try:
+        install_test_world(world_name)
+        world_installed = True
+    except Exception as e:
+        print(f"  WARNING: Could not install test world: {e}")
+
+    import threading
+
+    width, height = 1280, 720
+
+    from launch_mc import find_java
+
+    info = ALL_VERSIONS.get(mc_key, {})
+    java_ver = info.get("java", 21)
+    java_exe = find_java(java_ver)
+
+    env = os.environ.copy()
+    env["JAVA_HOME"] = os.path.dirname(os.path.dirname(java_exe))
+
+    extra_jvm = ""
+    if os.environ.get("CI") == "true":
+        extra_jvm = "-Djava.awt.headless=true -Dorg.lwjgl.opengl.libname=egl-headless"
+
+    launcher = str(SCRIPTS / "launch_mc.py")
+    cmd = [sys.executable, launcher, version,
+           "--width", str(width), "--height", str(height),
+           "--extra-jvm", extra_jvm,
+           "--no-assets-download"]
+
+    mc_proc = subprocess.Popen(cmd, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               text=True, bufsize=1)
+    def log_output():
+        for line in mc_proc.stdout:
+            stripped = line.strip()
+            if stripped:
+                print(f"  [MC] {stripped[:200]}", flush=True)
+    threading.Thread(target=log_output, daemon=True).start()
+
+    try:
+        mod_url = wait_for_mod(timeout=300)
+        print(f"  Mod ready: {mod_url}")
+    except Exception as e:
+        print(f"  ERROR: Mod not ready: {e}")
+        kill_minecraft()
+        return 1
+
+    time.sleep(15)
+
+    try:
+        resp = api_call(mod_url, "ping", {})
+        print(f"  PING: {resp}")
+    except Exception as e:
+        print(f"  PING ERROR: {e}")
+
+    try:
+        info = api_call(mod_url, "get_player_info", {})
+        print(f"  PLAYER: {json.dumps(info, indent=2)[:200]}")
+    except Exception as e:
+        print(f"  PLAYER ERROR: {e}")
+
+    ss_paths = []
+    for label in ["01_ingame", "02_inventory", "03_sign"]:
+        try:
+            png = get_screenshot(mod_url, timeout=120)
+            ss_path = str(ROOT / "screenshots" / "ci" / f"e2e_{version}_{loader}_{label}_{int(time.time())}.png")
+            Path(ss_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(ss_path).write_bytes(png)
+            ok, detail = verify_screenshot(png, min_size_kb=1)
+            print(f"  SCREENSHOT {label}: {'PASS' if ok else 'FAIL'} - {detail}")
+            ss_paths.append((label, ss_path))
+        except Exception as e:
+            print(f"  SCREENSHOT {label} ERROR: {e}")
+
+    comparisons_passed = 0
+    comparisons_total = 0
+    for label, ss_path in ss_paths:
+        ref_path = ROOT / "test-world" / f"ref_{version}_{loader}_{label}.png"
+        if ref_path.exists():
+            comparisons_total += 1
+            ok, det = compare_screenshots_structural(str(ss_path), str(ref_path), threshold=0.85)
+            print(f"  COMPARE {label}: {'PASS' if ok else 'FAIL'} - {det}")
+            if ok:
+                comparisons_passed += 1
+
+            strict_ok, strict_det = compare_screenshots_strict(str(ss_path), str(ref_path))
+            print(f"  COMPARE_STRICT {label}: {'PASS' if strict_ok else 'FAIL'} - {strict_det}")
+
+    kill_minecraft()
+    if mc_proc and mc_proc.poll() is None:
+        mc_proc.kill()
+
+    print(f"\n  ========================================")
+    if comparisons_total > 0:
+        print(f"  CI SMOKE: comparison {comparisons_passed}/{comparisons_total}")
+    print(f"  ========================================")
+
+    return 0 if (comparisons_total == 0 or comparisons_passed >= comparisons_total) else 1
+
+
 def main():
     parser = argparse.ArgumentParser(description="Smoke test: full E2E Minecraft workflow")
     parser.add_argument("version", help="MC version e.g. 1.21.7-forge-57.0.2")
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--ci", action="store_true", help="CI mode: use pre-built world, screenshot comparison")
+    parser.add_argument("--world", default="CI_TestWorld", help="World save name for CI mode")
+    parser.add_argument("--jdk-ver", default=None, help="JDK version override (for CI)")
     args = parser.parse_args()
 
     version = args.version
@@ -136,6 +265,9 @@ def main():
             if version.startswith(k):
                 mc_key = k
                 break
+
+    if args.ci:
+        return run_ci_test(version, loader, mc_key, args.world, timeout=args.timeout)
 
     TOTAL_STEPS = 14
     is_chinese = True

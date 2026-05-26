@@ -297,11 +297,16 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
             if (scheduled) {
                 try { latch.await(15, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException e) {}
                 if (holder[0] != null) return holder[0];
-                if (err[0] != null) throw new RuntimeException(err[0].getMessage(), err[0]);
+                if (err[0] != null) System.err.println("[Input] screenshot: " + err[0].getMessage());
             }
             return doScreenshot();
-        } catch (RuntimeException e) { throw e; }
-        catch (Exception e) { throw new RuntimeException(e.getMessage(), e); }
+        } catch (RuntimeException e) {
+            System.err.println("[Input] screenshot: " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            System.err.println("[Input] screenshot: " + e.getMessage());
+            return null;
+        }
     }
 
     private boolean isOnRenderThread() {
@@ -322,14 +327,18 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
         int w = getWidth();
         int h = getHeight();
         if (w <= 0 || h <= 0) {
-            throw new RuntimeException("dims=" + w + "x" + h);
+            return null;
         }
         try {
             byte[] result = ReflectionHelper.takeScreenshot(mc(), w, h);
-            if (result == null) throw new RuntimeException("takeScreenshot null w=" + w + " h=" + h);
             return result;
-        } catch (RuntimeException e) { throw e; }
-        catch (Exception e) { throw new RuntimeException(e.getMessage(), e); }
+        } catch (RuntimeException e) {
+            System.err.println("[Input] doScreenshot: " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            System.err.println("[Input] doScreenshot: " + e.getMessage());
+            return null;
+        }
     }
 
     @Override

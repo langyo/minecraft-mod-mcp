@@ -480,7 +480,10 @@ def extract_natives(vj, mc_dir=None):
                         if fn.endswith((".dll", ".so", ".dylib", ".jnilib")):
                             if "META-INF" in fn:
                                 continue
-                            zf.extract(info, natives_dir)
+                            base = os.path.basename(fn)
+                            target = os.path.join(natives_dir, base)
+                            if not os.path.isfile(target):
+                                zf.extract(info, natives_dir)
             except Exception:
                 pass
     return natives_dir
@@ -689,27 +692,28 @@ def replace_vars(s, natives_dir, mc_dir, version_name=""):
     )
 
 
-_JDK_LOOKUP = {
-    8:  r"C:\Program Files\Amazon Corretto\jdk1.8.0_452",
-    16: r"C:\Program Files\Amazon Corretto\jdk17.0.19_10",
-    17: r"C:\Program Files\Amazon Corretto\jdk17.0.19_10",
-    21: r"C:\Program Files\Amazon Corretto\jdk21.0.8_9",
-    24: r"C:\Users\langy\.jdks\openjdk-24.0.2+12-54",
-    25: r"C:\Program Files\Amazon Corretto\jdk25.0.3_9",
-}
+_IS_WINDOWS = platform.system() == "Windows"
+_EXE_SUFFIX = ".exe" if _IS_WINDOWS else ""
+
+
+_JAVA_HOME_ENV_KEYS = ["JAVA_HOME_8_X64", "JAVA_HOME_17_X64", "JAVA_HOME_21_X64",
+                       "JAVA_HOME_25_X64", "JAVA_HOME", "JDK_21"]
 
 
 def find_java(version_java=None):
     ver = int(version_java) if version_java else None
-    if ver and ver in _JDK_LOOKUP:
-        home = _JDK_LOOKUP[ver]
-        exe = os.path.join(home, "bin", "java.exe" if platform.system() == "Windows" else "java")
-        if os.path.isfile(exe):
-            return exe
-    for env_key in ("JAVA_HOME", "JDK_21"):
+    if ver:
+        ver_keys = [f"JAVA_HOME_{ver}_X64", f"JAVA_HOME_{ver}"]
+        for ek in ver_keys:
+            home = os.environ.get(ek)
+            if home:
+                exe = os.path.join(home, "bin", f"java{_EXE_SUFFIX}")
+                if os.path.isfile(exe):
+                    return exe
+    for env_key in _JAVA_HOME_ENV_KEYS:
         home = os.environ.get(env_key)
         if home:
-            exe = os.path.join(home, "bin", "java.exe" if platform.system() == "Windows" else "java")
+            exe = os.path.join(home, "bin", f"java{_EXE_SUFFIX}")
             if os.path.isfile(exe):
                 return exe
     return "java"
@@ -725,6 +729,16 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Print command but don't launch")
     parser.add_argument("--extra-jvm", default="", help="Extra JVM system properties")
     parser.add_argument("--loader", default=None, help="Loader type filter (forge/neoforge/fabric)")
+    parser.add_argument("--headless", action="store_true", help="Launch in headless mode (Xvfb+llvmpipe)")
+    parser.add_argument("--width", default="854", help="Window width (default 854)")
+    parser.add_argument("--height", default="480", help="Window height (default 480)")
+    parser.add_argument("--world", default=None, help="World save name to load directly")
+    parser.add_argument("--no-assets-download", action="store_true",
+                        help="Skip asset downloading (CI pre-cache)")
+    parser.add_argument("--no-mod-sync", action="store_true",
+                        help="Skip mod JAR syncing from packages/mods (CI pre-installed)")
+    parser.add_argument("--fixed-framerate", type=int, default=0,
+                        help="Fixed framerate cap (0=uncapped)")
     args = parser.parse_args()
 
     mc_dir = args.mc_dir or MC_DIR
@@ -737,7 +751,10 @@ def main():
 
     vj = merge_version_json(version_name, mc_dir)
     ensure_asset_index(vj, mc_dir)
-    download_missing_assets(vj, mc_dir)
+    if not args.no_assets_download:
+        download_missing_assets(vj, mc_dir)
+    else:
+        print("[LAUNCH] Skipping asset download (--no-assets-download)")
     main_class = vj.get("mainClass")
     if not main_class:
         print("[ERROR] No mainClass found in version JSON")
@@ -851,20 +868,27 @@ def main():
                 if os.path.isdir(ld_path):
                     mod_jar_dirs.append(ld_path)
 
-    for existing in glob.glob(os.path.join(mods_dir, "*.jar")):
-        try:
-            os.remove(existing)
-            print(f"[LAUNCH] Removed old jar: {os.path.basename(existing)}")
-        except Exception:
-            pass
+    if not args.no_mod_sync:
+        for existing in glob.glob(os.path.join(mods_dir, "*.jar")):
+            try:
+                os.remove(existing)
+                print(f"[LAUNCH] Removed old jar: {os.path.basename(existing)}")
+            except Exception:
+                pass
 
-    for lib_dir in mod_jar_dirs:
-        for jar in glob.glob(os.path.join(lib_dir, "*.jar")):
-            if "sources" in os.path.basename(jar):
-                continue
-            dest = os.path.join(mods_dir, os.path.basename(jar))
-            shutil.copy2(jar, dest)
-            print(f"[LAUNCH] Synced mod jar: {os.path.basename(jar)} ({os.path.getsize(dest)} bytes)")
+    if not args.no_mod_sync:
+        for lib_dir in mod_jar_dirs:
+            for jar in glob.glob(os.path.join(lib_dir, "*.jar")):
+                if "sources" in os.path.basename(jar):
+                    continue
+                dest = os.path.join(mods_dir, os.path.basename(jar))
+                shutil.copy2(jar, dest)
+                print(f"[LAUNCH] Synced mod jar: {os.path.basename(jar)} ({os.path.getsize(dest)} bytes)")
+    else:
+        print("[LAUNCH] Skipping mod sync (--no-mod-sync)")
+        existing_mods = glob.glob(os.path.join(mods_dir, "*.jar"))
+        if existing_mods:
+            print(f"[LAUNCH] Pre-installed mods: {len(existing_mods)}")
 
     common_jars = sorted(glob.glob(os.path.join(project_root, "packages", "common", "build", "libs", "*.jar")))
     for jar in common_jars:
@@ -878,6 +902,15 @@ def main():
     cmd.extend(args.jvm_args.split())
     mc_ver = args.version.split("-")[0] if args.version else "unknown"
     loader = args.loader if hasattr(args, "loader") and args.loader else "forge"
+
+    if args.headless:
+        cmd.extend([
+            "-Djava.awt.headless=true",
+            "-Dorg.lwjgl.opengl.libname=egl-headless",
+            "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true",
+        ])
+        print(f"[LAUNCH] Headless mode: width={args.width}, height={args.height}")
+
     cmd.extend([
         f"-Dmcp.mod.version={mc_ver}",
         f"-Dmcp.mod.loader={loader}",
@@ -896,6 +929,11 @@ def main():
                 break
     cmd.extend(["-cp", cp_str])
     cmd.append(main_class)
+
+    cmd.extend(["--width", args.width, "--height", args.height])
+    if args.world:
+        cmd.extend(["--quickPlaySingleplayer", args.world])
+        print(f"[LAUNCH] Quick-play world: {args.world}")
     cmd.extend(game_args)
 
     if args.dry_run:
@@ -915,6 +953,12 @@ def main():
     print(f"  CP: {len(cp)} libs")
     print(f"  Natives: {natives_dir}")
     print(f"  Extra JVM: -Dmcp.mod.version={mc_ver} -Dmcp.mod.loader={loader}")
+    if args.headless:
+        print(f"  Headless: true  Window: {args.width}x{args.height}")
+    if args.world:
+        print(f"  World: {args.world}")
+    if args.no_mod_sync:
+        print(f"  Mod sync: skipped")
 
     log_out = os.path.join(mc_dir, "mcp-launch-stdout.log")
     log_err = os.path.join(mc_dir, "mcp-launch-stderr.log")
