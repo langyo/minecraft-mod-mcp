@@ -1056,7 +1056,7 @@ public final class ReflectionHelper {
         }
         try {
             Object dim = level.getClass().getMethod("dimension").invoke(level);
-            try { return (String) dim.getClass().getMethod("identifier").invoke(dim); } catch (NoSuchMethodException ignored) {}
+            try { return dim.getClass().getMethod("identifier").invoke(dim).toString(); } catch (NoSuchMethodException ignored) {}
             try { return dim.getClass().getMethod("location").invoke(dim).toString(); } catch (NoSuchMethodException ignored) {}
             try { return dim.getClass().getMethod("getRegistryName").invoke(dim).toString(); } catch (NoSuchMethodException ignored) {}
         } catch (NoSuchMethodException ignored) {}
@@ -2027,21 +2027,21 @@ public final class ReflectionHelper {
     }
 
     private static Method findMouseButtonMethod(Class<?> mouseHandlerClass) {
+        Method exactMatch = null;
+        Method namedMatch = null;
         Method fallback = null;
         for (Method m : mouseHandlerClass.getDeclaredMethods()) {
             Class<?>[] pt = m.getParameterTypes();
             if (pt.length != 4 || pt[0] != long.class || pt[1] != int.class || pt[2] != int.class || pt[3] != int.class) continue;
             if (java.lang.reflect.Modifier.isStatic(m.getModifiers())) continue;
             String name = m.getName();
-            if (name.equals("onPress")) return m;
-            if (name.startsWith("lambda$setup$")) {
-                if (fallback == null) fallback = m;
-                continue;
-            }
-            if (name.contains("mouseButton") || name.contains("onMouse") || name.contains("button")) {
-                if (fallback == null) fallback = m;
-            }
+            if (name.equals("mouseButton")) return m;
+            if (name.equals("onPress") && exactMatch == null) exactMatch = m;
+            if (!name.startsWith("lambda$") && (name.contains("mouseButton") || name.contains("onMouse")) && namedMatch == null) namedMatch = m;
+            if (fallback == null) fallback = m;
         }
+        if (exactMatch != null) return exactMatch;
+        if (namedMatch != null) return namedMatch;
         return fallback;
     }
 
@@ -2808,14 +2808,18 @@ public final class ReflectionHelper {
         try {
             long handle = getWindowHandle(mc);
             Object mouseHandler = getMouseHandler(mc);
+            dbg("doRightClick: handle=" + handle + " mouseHandler=" + (mouseHandler != null ? mouseHandler.getClass().getSimpleName() : "null"));
             if (mouseHandler != null && handle != 0) {
                 Method target = findMouseButtonMethod(mouseHandler.getClass());
+                dbg("doRightClick: target=" + (target != null ? target.getName() : "null"));
                 if (target != null) {
                     target.setAccessible(true);
-                    target.invoke(mouseHandler, handle, 1, 1, 0);
+                    Object r1 = target.invoke(mouseHandler, handle, 1, 1, 0);
+                    dbg("doRightClick: press result=" + r1);
                     Thread.sleep(50);
-                    target.invoke(mouseHandler, handle, 1, 0, 0);
-                    return "{\"right_click\":true,\"via\":\"mouseHandler\"}";
+                    Object r2 = target.invoke(mouseHandler, handle, 1, 0, 0);
+                    dbg("doRightClick: release result=" + r2);
+                    return "{\"right_click\":true,\"via\":\"mouseHandler\",\"method\":\"" + target.getName() + "\"}";
                 }
             }
             sendMouseButton(handle, 1, 1);
@@ -2823,6 +2827,7 @@ public final class ReflectionHelper {
             sendMouseButton(handle, 1, 0);
             return "{\"right_click\":true,\"via\":\"sendMouseButton\"}";
         } catch (Exception e) {
+            dbg("doRightClick error: " + e.getMessage());
             return "{\"error\":\"" + e.getMessage() + "\"}";
         }
     }

@@ -42,26 +42,48 @@ export class ModClient {
     return s !== null;
   }
 
+  private disconnect(): void {
+    this.modPort = null;
+    this.baseUrl = "";
+  }
+
   async sendCommand(method: string, params?: Record<string, unknown>): Promise<unknown> {
-    if (!this.baseUrl) throw new Error("Mod not connected");
-    const body: Record<string, unknown> = { cmd: method, ...(params || {}) };
-    const resp = await fetch(`${this.baseUrl}/api/cmd`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      throw new Error(`Mod returned ${resp.status}: ${text}`);
+    if (!this.baseUrl) {
+      await this.discover();
+      if (!this.baseUrl) throw new Error("Mod not connected");
     }
-    return resp.json();
+    const body: Record<string, unknown> = { cmd: method, ...(params || {}) };
+    try {
+      const resp = await fetch(`${this.baseUrl}/api/cmd`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        if (resp.status === 502 || resp.status === 503) this.disconnect();
+        throw new Error(`Mod returned ${resp.status}: ${text}`);
+      }
+      return resp.json();
+    } catch (err: any) {
+      if (err.cause?.code === "ECONNREFUSED") this.disconnect();
+      throw err;
+    }
   }
 
   async screenshot(): Promise<unknown> {
-    if (!this.baseUrl) throw new Error("Mod not connected");
-    const resp = await fetch(`${this.baseUrl}/api/screenshot`);
-    if (!resp.ok) throw new Error(`Screenshot failed: ${resp.status}`);
-    return resp.json();
+    if (!this.baseUrl) {
+      await this.discover();
+      if (!this.baseUrl) throw new Error("Mod not connected");
+    }
+    try {
+      const resp = await fetch(`${this.baseUrl}/api/screenshot`);
+      if (!resp.ok) throw new Error(`Screenshot failed: ${resp.status}`);
+      return resp.json();
+    } catch (err: any) {
+      if (err.cause?.code === "ECONNREFUSED") this.disconnect();
+      throw err;
+    }
   }
 
   setMcProcess(proc: ReturnType<typeof import("node:child_process").spawn>) {

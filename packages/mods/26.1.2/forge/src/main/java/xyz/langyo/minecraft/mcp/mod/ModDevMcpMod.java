@@ -58,15 +58,12 @@ public class ModDevMcpMod {
     }
 
     private static void renderHudButton(GuiGraphicsExtractor g, Minecraft mc) {
+        if (!ReflectionHelper.isMcpControlMode()) return;
         int w = mc.getWindow().getGuiScaledWidth();
         int h = mc.getWindow().getGuiScaledHeight();
         double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
         double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-        if (ReflectionHelper.isMcpControlMode()) {
-            McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
-        } else if (INSTANCE.debugUrl != null || ReflectionHelper.isMouseReleaseActive()) {
-            McpOverlayLogic.renderTransferButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
-        }
+        McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
     }
 
     private static void renderScreenButton(GuiGraphicsExtractor g, Minecraft mc, Screen screen) {
@@ -157,7 +154,6 @@ public class ModDevMcpMod {
         }, "MCP-HTTP").start();
 
         CustomizeGuiOverlayEvent.Chat.BUS.addListener(event -> {
-            if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive() && !ReflectionHelper.isMcpControlMode()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
 
@@ -165,21 +161,15 @@ public class ModDevMcpMod {
                     mc.screen = null;
                 }
 
-                if (ReflectionHelper.isMcpControlMode() && !tickLogSuppress) {
-                    tickLogSuppress = true;
-                    System.err.println("[MCP-DEBUG] Chat event: mcpControlMode=true, screen=" + (mc.screen != null ? mc.screen.getClass().getSimpleName() : "null") + ", debugUrl=" + (debugUrl != null ? "set" : "null"));
-                }
-
                 if (mc.screen == null) {
+                    if (!ReflectionHelper.isMcpControlMode()) return;
                     tick(mc);
                     if (!ReflectionHelper.isScreenshotInProgress()) {
                         ReflectionHelper.cacheFrameFromRenderThread(mc);
                     }
                     if (!ReflectionHelper.isScreenshotInProgress()) {
                         GuiGraphicsExtractor g = event.getGuiGraphics();
-                        int w = mc.getWindow().getGuiScaledWidth();
-                        int h = mc.getWindow().getGuiScaledHeight();
-                        withFullScissor(g, w, h, () -> renderHudButton(g, mc));
+                        renderHudButton(g, mc);
                     }
                 } else if (ReflectionHelper.isMcpControlMode()) {
                     tick(mc);
@@ -281,7 +271,10 @@ public class ModDevMcpMod {
                     return;
                 }
                 if (mc.level != null) {
-                    renderScreenButton(event.getGuiGraphics(), mc, screen);
+                    GuiGraphicsExtractor sg = event.getGuiGraphics();
+                    int sw = mc.getWindow().getGuiScaledWidth();
+                    int sh = mc.getWindow().getGuiScaledHeight();
+                    withFullScissor(sg, sw, sh, () -> renderScreenButton(sg, mc, screen));
                 }
             } catch (Exception e) { e.printStackTrace(); }
         });

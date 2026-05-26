@@ -122,6 +122,15 @@ public final class GlfwKeys {
             if (c >= 'a' && c <= 'z') return GLFW_KEY_A_R + (c - 'a');
             if (c >= '0' && c <= '9') return GLFW_KEY_0_R + (c - '0');
         }
+        if (n.startsWith("key.keyboard.")) {
+            String suffix = n.substring("key.keyboard.".length());
+            if (suffix.length() == 1) {
+                char c = suffix.charAt(0);
+                if (c >= '0' && c <= '9') return GLFW_KEY_0_R + (c - '0');
+                if (c >= 'a' && c <= 'z') return GLFW_KEY_A_R + (c - 'a');
+                if (c >= 'A' && c <= 'Z') return GLFW_KEY_A_R + (c - 'A');
+            }
+        }
         return -1;
     }
 
@@ -148,6 +157,15 @@ public final class GlfwKeys {
         if (n.length() == 1) {
             char c = n.charAt(0);
             if (c >= 'a' && c <= 'z') return KEY_A + (c - 'a');
+        }
+        if (n.startsWith("key.keyboard.")) {
+            String suffix = n.substring("key.keyboard.".length());
+            if (suffix.length() == 1) {
+                char c = suffix.charAt(0);
+                if (c >= '0' && c <= '9') return KEY_0 + (c - '0');
+                if (c >= 'a' && c <= 'z') return KEY_A + (c - 'a');
+                if (c >= 'A' && c <= 'Z') return KEY_A + (c - 'A');
+            }
         }
         return -1;
     }

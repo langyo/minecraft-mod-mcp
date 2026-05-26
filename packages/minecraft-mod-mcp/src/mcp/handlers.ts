@@ -13,6 +13,9 @@ export function registerHandlers(server: McpServer, mod: ModClient) {
       inputSchema: tool.inputSchema as any,
     }, async (params: any) => {
       try {
+        if (!mod.connected && tool.name !== "launch_minecraft") {
+          await mod.discover();
+        }
         const result = await handleTool(tool.name, params, mod);
         return { content: [{ type: "text" as const, text: formatResult(result) }] };
       } catch (err: any) {
