@@ -34,6 +34,11 @@ TEST_WORLD_DIR = ROOT / "tests" / "reference-screenshots"
 SCREENSHOT_DIR = ROOT / "screenshots" / "ci"
 REF_SCREENSHOT_DIR = ROOT / "tests" / "reference-screenshots"
 
+# Strip proxy env vars to prevent CI network hangs
+for k in list(os.environ.keys()):
+    if k.lower().endswith("proxy") or k.lower() == "all_proxy":
+        del os.environ[k]
+
 
 def setup_mc_version(mc_ver, loader, mc_dir=None):
     """Ensure a MC version is installed in .minecraft before launching.
@@ -50,9 +55,13 @@ def setup_mc_version(mc_ver, loader, mc_dir=None):
     if loader in ("forge", "neoforge"):
         install_script = str(SCRIPTS / "install_forge.py")
         _log(f"Running {install_script} --mc {mc_ver} ...")
+        env_clean = {k: v for k, v in os.environ.items()
+                      if not k.lower().endswith("proxy") and k.lower() != "all_proxy"}
+        env_clean["HOME"] = str(Path(mc).parent)
+        env_clean["JAVA_HOME"] = os.environ.get("JAVA_HOME", "")
         result = subprocess.run(
             [sys.executable, install_script, "--mc", mc_ver],
-            env={**os.environ, "HOME": str(Path(mc).parent)},
+            env=env_clean,
             capture_output=True, text=True, timeout=600,
         )
         if result.returncode != 0:
