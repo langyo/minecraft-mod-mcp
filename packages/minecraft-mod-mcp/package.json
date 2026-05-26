@@ -1,0 +1,65 @@
+{
+  "name": "minecraft-mod-mcp",
+  "version": "0.1.0",
+  "description": "MCP server bridge for Minecraft — connect AI tools to Minecraft via Model Context Protocol",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "minecraft-mod-mcp": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "minecraft",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "automation",
+    "forge",
+    "fabric",
+    "neoforge"
+  ],
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langyo/minecraft-mod-mcp.git",
+    "directory": "packages/minecraft-mod-mcp"
+  },
+  "homepage": "https://github.com/langyo/minecraft-mod-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/langyo/minecraft-mod-mcp/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.4",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "hono": "^4.7.10",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.50",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.4"
+  }
+}

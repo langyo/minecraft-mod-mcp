@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -14,14 +15,16 @@ import java.util.concurrent.*;
 
 public class McpHttpServer {
 
-    private static final int DEFAULT_PORT = 9876;
+    private static final int PORT_START = McpConfig.PORT_START;
+    private static final int PORT_END = McpConfig.PORT_END;
     private HttpServer server;
     private final McpMessageHandler handler;
-    private final int port;
+    private int port;
     private final List<CallEvent> callHistory = new CopyOnWriteArrayList<>();
     private final List<SseClient> sseClients = new CopyOnWriteArrayList<>();
     private static final int MAX_HISTORY = 200;
     private static final Map<String, String> MIME_TYPES = new HashMap<>();
+    private final long startTimeMs = System.currentTimeMillis();
     static {
         MIME_TYPES.put(".html", "text/html; charset=utf-8");
         MIME_TYPES.put(".css", "text/css; charset=utf-8");
@@ -46,13 +49,13 @@ public class McpHttpServer {
         volatile boolean active = true;
     }
 
-    public McpHttpServer(McpMessageHandler handler, int port) {
+    public McpHttpServer(McpMessageHandler handler, int configuredPort) {
         this.handler = handler;
-        this.port = port > 0 ? port : DEFAULT_PORT;
+        this.port = configuredPort > 0 ? configuredPort : PORT_START;
     }
 
     public McpHttpServer(McpMessageHandler handler) {
-        this(handler, DEFAULT_PORT);
+        this(handler, 0);
     }
 
     public int getPort() { return port; }
@@ -69,19 +72,60 @@ public class McpHttpServer {
     }
 
     public void start() throws IOException {
-        server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
+        int configuredPort = this.port;
+        if (configuredPort > 0) {
+            server = HttpServer.create(new InetSocketAddress("0.0.0.0", configuredPort), 0);
+            port = configuredPort;
+        } else {
+            IOException lastErr = null;
+            for (int p = PORT_START; p >= PORT_END; p--) {
+                try {
+                    server = HttpServer.create(new InetSocketAddress("0.0.0.0", p), 0);
+                    port = p;
+                    lastErr = null;
+                    break;
+                } catch (IOException e) {
+                    lastErr = e;
+                }
+            }
+            if (lastErr != null) throw lastErr;
+        }
         server.setExecutor(Executors.newFixedThreadPool(8));
         server.createContext("/api/screenshot", new ScreenshotHandler());
         server.createContext("/api/cmd", new CmdHandler());
         server.createContext("/api/events", new EventHandler());
         server.createContext("/api/calls", new CallsHandler());
         server.createContext("/api/status", exchange -> {
-            sendJson(exchange, 200, "{\"ok\":true,\"port\":" + port + "}");
+            sendJson(exchange, 200, buildStatusJson());
         });
         server.createContext("/debug", new StaticHandler());
         server.createContext("/", new RootHandler());
         server.start();
         ReflectionHelper.dbg("McpHttpServer: started on port " + port);
+    }
+
+    private String buildStatusJson() {
+        long pid = getPid();
+        double uptime = (System.currentTimeMillis() - startTimeMs) / 1000.0;
+        StringBuilder sb = new StringBuilder("{");
+        sb.append("\"ok\":true");
+        sb.append(",\"type\":\"minecraft-mod\"");
+        sb.append(",\"version\":\"").append(esc(McpConfig.getModVersion())).append("\"");
+        sb.append(",\"loader\":\"").append(esc(McpConfig.getModLoader())).append("\"");
+        String forgeVer = McpConfig.getForgeVersion();
+        if (forgeVer != null) sb.append(",\"forgeVersion\":\"").append(esc(forgeVer)).append("\"");
+        sb.append(",\"pid\":").append(pid);
+        sb.append(",\"port\":").append(port);
+        sb.append(",\"uptime\":").append(String.format(java.util.Locale.ROOT, "%.1f", uptime));
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private static long getPid() {
+        try {
+            String rtName = ManagementFactory.getRuntimeMXBean().getName();
+            return Long.parseLong(rtName.split("@")[0]);
+        } catch (Exception e) { return -1; }
     }
 
     public void stop() {

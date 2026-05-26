@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
+      "type": "streamable-http",
       "url": "http://localhost:9876/mcp"
     }
   }

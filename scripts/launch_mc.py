@@ -876,7 +876,12 @@ def main():
 
     cmd = [java_exe]
     cmd.extend(args.jvm_args.split())
-    cmd.extend(["-Dmcp.server=ws://127.0.0.1:9876"])
+    mc_ver = args.version.split("-")[0] if args.version else "unknown"
+    loader = args.loader if hasattr(args, "loader") and args.loader else "forge"
+    cmd.extend([
+        f"-Dmcp.mod.version={mc_ver}",
+        f"-Dmcp.mod.loader={loader}",
+    ])
     if args.extra_jvm:
         cmd.extend(args.extra_jvm.split())
     cmd.extend(jvm_args)
@@ -903,14 +908,13 @@ def main():
         return
 
     env = os.environ.copy()
-    env["MC_MCP_SERVER"] = "ws://127.0.0.1:9876"
 
     print(f"\n[LAUNCH] Starting Minecraft...")
     print(f"  Version: {version_name}")
     print(f"  Main: {main_class}")
     print(f"  CP: {len(cp)} libs")
     print(f"  Natives: {natives_dir}")
-    print(f"  Extra JVM: -Dmcp.server=ws://127.0.0.1:9876")
+    print(f"  Extra JVM: -Dmcp.mod.version={mc_ver} -Dmcp.mod.loader={loader}")
 
     log_out = os.path.join(mc_dir, "mcp-launch-stdout.log")
     log_err = os.path.join(mc_dir, "mcp-launch-stderr.log")
