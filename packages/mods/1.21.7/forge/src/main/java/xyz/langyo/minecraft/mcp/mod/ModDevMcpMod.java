@@ -244,11 +244,12 @@ public class ModDevMcpMod {
                     }
 
                     if (ReflectionHelper.isMcpControlMode() && !ReflectionHelper.isScreenshotInProgress()) {
+                        GuiGraphics g = event.getGuiGraphics();
                         int w = mc.getWindow().getGuiScaledWidth();
                         int h = mc.getWindow().getGuiScaledHeight();
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
-                        McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
+                        withFullScissor(g, w, h, () -> McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my));
                     }
                 }
             } catch (Exception ignored) {}

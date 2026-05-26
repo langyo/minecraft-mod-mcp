@@ -177,11 +177,12 @@ public class ModDevMcpMod {
                     }
 
                     if (ReflectionHelper.isMcpControlMode() && !ReflectionHelper.isScreenshotInProgress()) {
+                        GuiGraphicsExtractor g = event.getGuiGraphics();
                         int w = mc.getWindow().getGuiScaledWidth();
                         int h = mc.getWindow().getGuiScaledHeight();
                         double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
                         double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-                        McpOverlayLogic.renderResumeButton(wrapRenderer(event.getGuiGraphics(), mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
+                        withFullScissor(g, w, h, () -> McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my));
                     }
 
                     if (!INSTANCE.chatSent && INSTANCE.debugUrl != null) {
