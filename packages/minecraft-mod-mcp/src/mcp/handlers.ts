@@ -8,7 +8,10 @@ import { PORT_START, PORT_END } from "../consts.js";
 
 export function registerHandlers(server: McpServer, mod: ModClient) {
   for (const tool of TOOLS) {
-    server.tool(tool.name, tool.description, tool.inputSchema as any, async (params: any) => {
+    server.registerTool(tool.name, {
+      description: tool.description,
+      inputSchema: tool.inputSchema as any,
+    }, async (params: any) => {
       try {
         const result = await handleTool(tool.name, params, mod);
         return { content: [{ type: "text" as const, text: formatResult(result) }] };
