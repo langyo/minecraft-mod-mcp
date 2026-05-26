@@ -14,7 +14,7 @@ version = "1.0.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 afterEvaluate {
     tasks.withType(JavaCompile).configureEach {

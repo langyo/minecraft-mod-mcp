@@ -126,7 +126,7 @@ jobs:
       - name: Build mods
         shell: pwsh
         env:
-          GRADLE_OPTS: "-Xmx4G"
+          GRADLE_OPTS: "-Xmx6G"
         run: |
           $ErrorActionPreference = "Stop"
           $failedMods = @()
