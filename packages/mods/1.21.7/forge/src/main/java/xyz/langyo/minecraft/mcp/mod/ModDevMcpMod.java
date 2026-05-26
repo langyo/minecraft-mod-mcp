@@ -91,7 +91,7 @@ public class ModDevMcpMod {
 
     private static void withFullScissor(GuiGraphics g, int w, int h, Runnable action) {
         try {
-            Object stack = g.getScissorStack();
+            Object stack = g.getClass().getMethod("getScissorStack").invoke(g);
             java.lang.reflect.Method peekM = null, pushM = null, popM = null;
             for (java.lang.reflect.Method m : stack.getClass().getDeclaredMethods()) {
                 if (m.getName().equals("peek")) peekM = m;
