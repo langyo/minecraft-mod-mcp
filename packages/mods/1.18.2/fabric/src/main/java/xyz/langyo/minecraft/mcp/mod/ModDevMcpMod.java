@@ -84,7 +84,7 @@ public class ModDevMcpMod implements ClientModInitializer {
                 String resumeLabel = new TranslatableText("mcpmod.control.resume").getString();
                 if (resumeLabel.equals("mcpmod.control.resume")) resumeLabel = "Resume Control";
                 McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.textRenderer, resumeLabel, w, h, mx, my);
-            } else if (mc.world != null && screen != null) {
+            } else if (mc.world != null && screen != null && !(screen instanceof GameMenuScreen)) {
                 String transferLabel = new TranslatableText("mcpmod.control.pause_button").getString();
                 if (transferLabel.equals("mcpmod.control.pause_button")) transferLabel = "Transfer to MCP";
                 McpOverlayLogic.renderTransferButton(wrapRenderer(ms, mc), mc.textRenderer, transferLabel, w, h, mx, my);

@@ -99,6 +99,30 @@ public class ModDevMcpMod {
         };
     }
 
+    private static void withFullScissor(Runnable action) {
+        try {
+            boolean wasEnabled = org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
+            if (wasEnabled) org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
+            action.run();
+            if (wasEnabled) org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
+        } catch (Exception e) {
+            action.run();
+        }
+    }
+
+    private static void renderScreenButton(PoseStack ps, Minecraft mc, Screen screen) {
+        int w = mc.getWindow().getGuiScaledWidth();
+        int h = mc.getWindow().getGuiScaledHeight();
+        double mx = getMouseX(mc);
+        double my = getMouseY(mc);
+        if (ReflectionHelper.isMcpControlMode()) {
+            ReflectionHelper.cacheFrameFromRenderThread(mc);
+            McpOverlayLogic.renderResumeButton(wrapRenderer(ps, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
+        } else if (!(screen instanceof PauseScreen)) {
+            McpOverlayLogic.renderTransferButton(wrapRenderer(ps, mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
+        }
+    }
+
     private static double getMouseX(Minecraft mc) {
         return mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
     }
@@ -237,18 +261,16 @@ public class ModDevMcpMod {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 Screen screen = event.getScreen();
-                int w = mc.getWindow().getGuiScaledWidth();
-                int h = mc.getWindow().getGuiScaledHeight();
-                double mx = getMouseX(mc);
-                double my = getMouseY(mc);
-
-                if (ReflectionHelper.isMcpControlMode()) {
-                    ReflectionHelper.cacheFrameFromRenderThread(mc);
-                    McpOverlayLogic.renderResumeButton(wrapRenderer(event.getPoseStack(), mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
-                } else if (mc.level != null && screen != null && !(screen instanceof PauseScreen)) {
-                    McpOverlayLogic.renderTransferButton(wrapRenderer(event.getPoseStack(), mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
+                if (screen == null) return;
+                if (ReflectionHelper.isMcpControlMode() && screen instanceof PauseScreen) {
+                    mc.screen = null;
+                    return;
                 }
-            } catch (Exception ignored) {}
+                if (mc.level != null) {
+                    PoseStack ps = event.getPoseStack();
+                    withFullScissor(() -> renderScreenButton(ps, mc, screen));
+                }
+            } catch (Exception e) { e.printStackTrace(); }
         });
 
         MinecraftForge.EVENT_BUS.addListener((InputEvent.MouseButton.Pre event) -> {

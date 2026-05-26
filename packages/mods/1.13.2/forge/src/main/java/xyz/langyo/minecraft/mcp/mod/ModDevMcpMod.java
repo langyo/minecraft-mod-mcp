@@ -44,6 +44,33 @@ public class ModDevMcpMod {
         };
     }
 
+    private static void withFullScissor(Runnable action) {
+        try {
+            boolean wasEnabled = org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
+            if (wasEnabled) org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
+            action.run();
+            if (wasEnabled) org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
+        } catch (Exception e) {
+            action.run();
+        }
+    }
+
+    private static void renderScreenButton(Minecraft mc, GuiScreen screen) {
+        int w = mc.mainWindow.getScaledWidth();
+        int h = mc.mainWindow.getScaledHeight();
+        double mx = getMouseX(mc);
+        double my = getMouseY(mc);
+        if (ReflectionHelper.isMcpControlMode()) {
+            forceGlfwMouseFree(mc);
+            ReflectionHelper.cacheFrameFromRenderThread(mc);
+            String label = translate("mcpmod.control.resume");
+            McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
+        } else if (!(screen instanceof GuiIngameMenu)) {
+            String label = translate("mcpmod.control.pause_button");
+            McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
+        }
+    }
+
     private static double getMouseX(Minecraft mc) {
         return mc.mouseHelper.getMouseX() * mc.mainWindow.getScaledWidth() / mc.mainWindow.getWidth();
     }
@@ -221,21 +248,15 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 GuiScreen screen = event.getGui();
-                int w = mc.mainWindow.getScaledWidth();
-                int h = mc.mainWindow.getScaledHeight();
-                double mx = getMouseX(mc);
-                double my = getMouseY(mc);
-
-                if (ReflectionHelper.isMcpControlMode()) {
-                    forceGlfwMouseFree(mc);
-                    ReflectionHelper.cacheFrameFromRenderThread(mc);
-                    String label = translate("mcpmod.control.resume");
-                    McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
-                } else if (mc.world != null && screen != null && !(screen instanceof GuiIngameMenu)) {
-                    String label = translate("mcpmod.control.pause_button");
-                    McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
+                if (screen == null) return;
+                if (ReflectionHelper.isMcpControlMode() && screen instanceof GuiIngameMenu) {
+                    mc.currentScreen = null;
+                    return;
                 }
-            } catch (Exception ignored) {}
+                if (mc.world != null) {
+                    withFullScissor(() -> renderScreenButton(mc, screen));
+                }
+            } catch (Exception e) { e.printStackTrace(); }
         });
 
         MinecraftForge.EVENT_BUS.addListener((InputEvent.MouseInputEvent event) -> {
