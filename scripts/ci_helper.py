@@ -557,7 +557,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
              "--jvm-args", "-Xmx512M -Xms256M",
              "--width", "640", "--height", "360",
              "--extra-jvm", extra_jvm,
-             "--no-assets-download", "--no-mod-sync"],
+             "--no-mod-sync"],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
         )
@@ -669,7 +669,7 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
          "--jvm-args", "-Xmx512M -Xms256M",
          "--width", "1280", "--height", "720",
          "--world", world_name,
-         "--no-assets-download", "--no-mod-sync"],
+         "--no-mod-sync"],
         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1,
     )
@@ -817,7 +817,7 @@ def main():
              "--jvm-args", "-Xmx512M -Xms256M",
              "--width", "1280", "--height", "720",
              "--world", args.world,
-             "--no-assets-download", "--no-mod-sync"],
+             "--no-mod-sync"],
             env=os.environ.copy(),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,

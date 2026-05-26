@@ -306,6 +306,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.minecraft/assets
+          key: mc-assets-${{ matrix.mc_ver }}-${{ hashFiles('scripts/launch_mc.py') }}
+          restore-keys: |
+            mc-assets-${{ matrix.mc_ver }}-
+
       - name: Install system deps
         run: |
           sudo apt-get update -qq
@@ -372,6 +380,14 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install Pillow
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.minecraft/assets
+          key: mc-assets-ss-${{ matrix.mc_ver }}-${{ hashFiles('scripts/launch_mc.py') }}
+          restore-keys: |
+            mc-assets-ss-${{ matrix.mc_ver }}-
+
       - name: Install system deps
         run: |
           sudo apt-get update -qq
@@ -434,6 +450,14 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install Pillow
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.minecraft/assets
+          key: mc-assets-e2e-1.21.7-${{ hashFiles('scripts/launch_mc.py') }}
+          restore-keys: |
+            mc-assets-e2e-1.21.7-
+
       - name: Install system deps
         run: |
           sudo apt-get update -qq
