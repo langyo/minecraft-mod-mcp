@@ -28,7 +28,7 @@ publishing {
     }
     repositories {
         maven {
-            url = uri(layout.projectDirectory.dir("../../.maven-local"))
+            url = uri(rootProject.file(".maven-local"))
         }
     }
 }
