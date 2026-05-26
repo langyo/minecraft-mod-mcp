@@ -254,7 +254,7 @@ public class ModDevMcpMod {
                         int h = mc.getWindow().getGuiScaledHeight();
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
-                        withFullScissor(g, w, h, () -> McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my));
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                     }
                 }
             } catch (Exception ignored) {}
@@ -274,7 +274,7 @@ public class ModDevMcpMod {
                     GuiGraphics sg = event.getGuiGraphics();
                     int sw = mc.getWindow().getGuiScaledWidth();
                     int sh = mc.getWindow().getGuiScaledHeight();
-                    withFullScissor(sg, sw, sh, () -> renderScreenButton(sg, mc, screen));
+                    renderScreenButton(sg, mc, screen);
                 }
             } catch (Exception e) { e.printStackTrace(); }
         });

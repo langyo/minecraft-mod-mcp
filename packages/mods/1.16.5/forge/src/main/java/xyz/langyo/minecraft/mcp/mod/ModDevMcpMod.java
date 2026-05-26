@@ -236,7 +236,7 @@ public class ModDevMcpMod {
                         int h = mc.getMainWindow().getScaledHeight();
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
-                        withFullScissor(() -> McpOverlayLogic.renderResumeButton(wrapRenderer(event.getMatrixStack(), mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my));
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(event.getMatrixStack(), mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                     }
                 }
             } catch (Exception ignored) {}
@@ -254,7 +254,7 @@ public class ModDevMcpMod {
                 }
                 if (mc.world != null) {
                     MatrixStack ms = event.getMatrixStack();
-                    withFullScissor(() -> renderScreenButton(ms, mc, screen));
+                    renderScreenButton(ms, mc, screen);
                 }
             } catch (Exception e) { e.printStackTrace(); }
         });

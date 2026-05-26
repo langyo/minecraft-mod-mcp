@@ -199,7 +199,7 @@ public class ModDevMcpMod {
                         int h = mc.getMainWindow().getScaledHeight();
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
-                        withFullScissor(() -> McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getFormattedText(), w, h, (int) mx, (int) my));
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getFormattedText(), w, h, (int) mx, (int) my);
                     }
                 }
             } catch (Exception ignored) {}
@@ -216,7 +216,7 @@ public class ModDevMcpMod {
                     return;
                 }
                 if (mc.world != null) {
-                    withFullScissor(() -> renderScreenButton(mc, screen));
+                    renderScreenButton(mc, screen);
                 }
             } catch (Exception e) { e.printStackTrace(); }
         });

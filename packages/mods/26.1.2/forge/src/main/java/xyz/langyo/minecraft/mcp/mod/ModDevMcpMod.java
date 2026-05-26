@@ -171,7 +171,7 @@ public class ModDevMcpMod {
                         GuiGraphicsExtractor g = event.getGuiGraphics();
                         int sw = mc.getWindow().getGuiScaledWidth();
                         int sh = mc.getWindow().getGuiScaledHeight();
-                        withFullScissor(g, sw, sh, () -> renderHudButton(g, mc));
+                        renderHudButton(g, mc);
                     }
                 } else if (ReflectionHelper.isMcpControlMode()) {
                     tick(mc);
@@ -276,7 +276,7 @@ public class ModDevMcpMod {
                     GuiGraphicsExtractor sg = event.getGuiGraphics();
                     int sw = mc.getWindow().getGuiScaledWidth();
                     int sh = mc.getWindow().getGuiScaledHeight();
-                    withFullScissor(sg, sw, sh, () -> renderScreenButton(sg, mc, screen));
+                    renderScreenButton(sg, mc, screen);
                 }
             } catch (Exception e) { e.printStackTrace(); }
         });

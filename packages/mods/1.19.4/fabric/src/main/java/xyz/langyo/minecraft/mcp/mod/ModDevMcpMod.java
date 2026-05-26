@@ -65,11 +65,8 @@ public class ModDevMcpMod implements ClientModInitializer {
                     int h = mc.getWindow().getScaledHeight();
                     int mx = (int) getMouseX(mc);
                     int my = (int) getMouseY(mc);
-                    boolean wasScissor = org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
-                    if (wasScissor) org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
                     McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.textRenderer,
                             Text.translatable("mcpmod.control.resume").getString(), w, h, mx, my);
-                    if (wasScissor) org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
                 }
             }
         } catch (Exception ignored) {}

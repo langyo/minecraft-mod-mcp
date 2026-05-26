@@ -182,7 +182,7 @@ public class ModDevMcpMod {
                         int h = mc.getWindow().getGuiScaledHeight();
                         double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
                         double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
-                        withFullScissor(g, w, h, () -> McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my));
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                     }
 
                     if (!INSTANCE.chatSent && INSTANCE.debugUrl != null) {
@@ -222,7 +222,7 @@ public class ModDevMcpMod {
                     GuiGraphicsExtractor sg = event.getGuiGraphics();
                     int sw = mc.getWindow().getGuiScaledWidth();
                     int sh = mc.getWindow().getGuiScaledHeight();
-                    withFullScissor(sg, sw, sh, () -> renderScreenButton(sg, mc, screen));
+                    renderScreenButton(sg, mc, screen);
                 }
             } catch (Exception e) { e.printStackTrace(); }
         });

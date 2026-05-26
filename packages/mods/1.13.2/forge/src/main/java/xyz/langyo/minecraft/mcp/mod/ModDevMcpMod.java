@@ -237,7 +237,7 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
                         String label = translate("mcpmod.control.resume");
-                        withFullScissor(() -> McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my));
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
                     }
                 }
             } catch (Exception ignored) {}
@@ -254,7 +254,7 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                     return;
                 }
                 if (mc.world != null) {
-                    withFullScissor(() -> renderScreenButton(mc, screen));
+                    renderScreenButton(mc, screen);
                 }
             } catch (Exception e) { e.printStackTrace(); }
         });
