@@ -128,7 +128,8 @@ def download_libraries(vj, mc_dir=None):
                     downloaded += 1
                 except Exception:
                     pass
-        for classifier_key in ("natives-windows", "natives-windows-arm64"):
+        for classifier_key in ("natives-windows", "natives-windows-arm64",
+                                "natives-linux", "natives-osx"):
             native = dl.get("classifiers", {}).get(classifier_key, {})
             npath = native.get("path")
             nurl = native.get("url", "")

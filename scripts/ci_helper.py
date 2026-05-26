@@ -116,88 +116,85 @@ def _generate_level_dat(save_dir, world_name):
     """Generate a minimal superflat Redstone Ready level.dat using gzip+NBT."""
     import gzip
     import struct
+    import io
 
-    def write_tag(f, tag_type, name, write_value):
-        f.write(struct.pack(">b", tag_type))
+    buf = io.BytesIO()
+
+    def write_tag(tag_type, name, write_value):
+        buf.write(struct.pack(">b", tag_type))
         if name is not None:
             name_bytes = name.encode("utf-8")
-            f.write(struct.pack(">H", len(name_bytes)))
-            f.write(name_bytes)
+            buf.write(struct.pack(">H", len(name_bytes)))
+            buf.write(name_bytes)
         if write_value:
-            write_value(f)
+            write_value()
 
-    def write_byte(f, val):
-        f.write(struct.pack(">b", val))
+    def write_byte(val):
+        buf.write(struct.pack(">b", val))
 
-    def write_int(f, val):
-        f.write(struct.pack(">i", val))
+    def write_int(val):
+        buf.write(struct.pack(">i", val))
 
-    def write_long(f, val):
-        f.write(struct.pack(">q", val))
+    def write_long(val):
+        buf.write(struct.pack(">q", val))
 
-    def write_string(f, val):
+    def write_string(val):
         data = val.encode("utf-8")
-        f.write(struct.pack(">H", len(data)))
-        f.write(data)
+        buf.write(struct.pack(">H", len(data)))
+        buf.write(data)
 
-    def write_compound(f, entries):
+    def write_compound(entries):
         for tag_type, name, write_fn in entries:
-            write_tag(f, tag_type, name, write_fn)
-        f.write(b"\x00")  # TAG_End
-
-    buf = bytearray()
+            write_tag(tag_type, name, write_fn)
+        buf.write(b"\x00")  # TAG_End
 
     def _gen():
-        write_compound(buf, [
+        write_compound([
             # Data compound
-            (10, "Data", lambda f: write_compound(f, [
-                (4, "DataVersion", lambda b: write_int(b, 3953)),
-                (4, "version", lambda b: write_int(b, 19133)),
-                (8, "LevelName", lambda b: write_string(b, world_name)),
-                (4, "GameType", lambda b: write_int(b, 1)),
-                (1, "MapFeatures", lambda b: write_byte(b, 1)),
-                (1, "allowCommands", lambda b: write_byte(b, 1)),
-                (1, "hardcore", lambda b: write_byte(b, 0)),
-                (1, "Difficulty", lambda b: write_byte(b, 2)),
-                (1, "DifficultyLocked", lambda b: write_byte(b, 0)),
-                (3, "SpawnX", lambda b: write_int(b, 0)),
-                (3, "SpawnY", lambda b: write_int(b, 5)),
-                (3, "SpawnZ", lambda b: write_int(b, 0)),
-                (4, "RandomSeed", lambda b: write_long(b, 42)),
-                (8, "generatorName", lambda b: write_string(b, "flat")),
-                (8, "generatorOptions", lambda b: write_string(
-                    b,
-                    "3;minecraft:bedrock,2*minecraft:dirt,minecraft:grass;1;village"
-                )),
-                (1, "initialized", lambda b: write_byte(b, 1)),
-                (4, "LastPlayed", lambda b: write_long(b, int(time.time() * 1000))),
-                (4, "Time", lambda b: write_long(b, 0)),
-                (4, "DayTime", lambda b: write_long(b, 1000)),
-                (4, "ClearWeatherTime", lambda b: write_int(b, 0)),
-                (4, "rainTime", lambda b: write_int(b, 0)),
-                (4, "thunderTime", lambda b: write_int(b, 0)),
-                (1, "raining", lambda b: write_byte(b, 0)),
-                (1, "thundering", lambda b: write_byte(b, 0)),
-                (10, "GameRules", lambda f: write_compound(f, [
-                    (8, "doDaylightCycle", lambda b: write_string(b, "true")),
-                    (8, "doWeatherCycle", lambda b: write_string(b, "true")),
-                    (8, "doFireTick", lambda b: write_string(b, "false")),
-                    (8, "doMobSpawning", lambda b: write_string(b, "false")),
-                    (8, "keepInventory", lambda b: write_string(b, "true")),
+            (10, "Data", lambda: write_compound([
+                (4, "DataVersion", lambda: write_int(3953)),
+                (4, "version", lambda: write_int(19133)),
+                (8, "LevelName", lambda: write_string(world_name)),
+                (4, "GameType", lambda: write_int(1)),
+                (1, "MapFeatures", lambda: write_byte(1)),
+                (1, "allowCommands", lambda: write_byte(1)),
+                (1, "hardcore", lambda: write_byte(0)),
+                (1, "Difficulty", lambda: write_byte(2)),
+                (1, "DifficultyLocked", lambda: write_byte(0)),
+                (3, "SpawnX", lambda: write_int(0)),
+                (3, "SpawnY", lambda: write_int(5)),
+                (3, "SpawnZ", lambda: write_int(0)),
+                (4, "RandomSeed", lambda: write_long(42)),
+                (8, "generatorName", lambda: write_string("flat")),
+                (8, "generatorOptions", lambda: write_string(
+                    "3;minecraft:bedrock,2*minecraft:dirt,minecraft:grass;1;village")),
+                (1, "initialized", lambda: write_byte(1)),
+                (4, "LastPlayed", lambda: write_long(int(time.time() * 1000))),
+                (4, "Time", lambda: write_long(0)),
+                (4, "DayTime", lambda: write_long(1000)),
+                (4, "ClearWeatherTime", lambda: write_int(0)),
+                (4, "rainTime", lambda: write_int(0)),
+                (4, "thunderTime", lambda: write_int(0)),
+                (1, "raining", lambda: write_byte(0)),
+                (1, "thundering", lambda: write_byte(0)),
+                (10, "GameRules", lambda: write_compound([
+                    (8, "doDaylightCycle", lambda: write_string("true")),
+                    (8, "doWeatherCycle", lambda: write_string("true")),
+                    (8, "doFireTick", lambda: write_string("false")),
+                    (8, "doMobSpawning", lambda: write_string("false")),
+                    (8, "keepInventory", lambda: write_string("true")),
                 ])),
-                (10, "WorldGenSettings", lambda f: write_compound(f, [
-                    (1, "bonus_chest", lambda b: write_byte(b, 0)),
-                    (1, "generate_features", lambda b: write_byte(b, 1)),
-                    (10, "dimensions", lambda f: write_compound(f, [
-                        (10, "minecraft:overworld", lambda b: write_compound(b, [
-                            (8, "type", lambda c: write_string(c, "minecraft:overworld")),
-                            (10, "generator", lambda c: write_compound(c, [
-                                (8, "type", lambda d: write_string(d, "minecraft:flat")),
-                                (10, "settings", lambda d: write_compound(d, [
-                                    (10, "layers", lambda e: write_compound(e, [
-                                        (0, "", None),
-                                    ])),
-                                    (8, "biome", lambda e: write_string(e, "minecraft:plains")),
+                (10, "WorldGenSettings", lambda: write_compound([
+                    (1, "bonus_chest", lambda: write_byte(0)),
+                    (1, "generate_features", lambda: write_byte(1)),
+                    (10, "dimensions", lambda: write_compound([
+                        (10, "minecraft:overworld", lambda: write_compound([
+                            (8, "type", lambda: write_string("minecraft:overworld")),
+                            (10, "generator", lambda: write_compound([
+                                (8, "type", lambda: write_string("minecraft:flat")),
+                                (10, "settings", lambda: write_compound([
+                                    (10, "layers", lambda: write_compound([])),
+                                    (8, "biome", lambda: write_string("minecraft:plains")),
                                 ])),
                             ])),
                         ])),
@@ -211,7 +208,7 @@ def _generate_level_dat(save_dir, world_name):
     level_dat = os.path.join(save_dir, "level.dat")
     os.makedirs(save_dir, exist_ok=True)
     with gzip.open(level_dat, "wb") as f:
-        f.write(bytes(buf))
+        f.write(buf.getvalue())
 
     session_lock = os.path.join(save_dir, "session.lock")
     with open(session_lock, "wb") as f:
