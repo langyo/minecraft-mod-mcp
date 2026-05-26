@@ -16,10 +16,8 @@ archivesBaseName = "minecraft-moddev-mcp-mod"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
-afterEvaluate {
-    tasks.withType(JavaCompile).configureEach {
-        options.release.set(8)
-    }
+compileJava {
+    options.release.set(8)
 }
 
 minecraft {
