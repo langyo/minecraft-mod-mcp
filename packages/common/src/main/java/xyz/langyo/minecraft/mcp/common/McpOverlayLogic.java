@@ -2,9 +2,9 @@ package xyz.langyo.minecraft.mcp.common;
 
 public class McpOverlayLogic {
 
-    private static final int PAD = 5;
-    private static final int BTN_H = 13;
     private static final int MARGIN = 10;
+    private static final int BTN_SIZE = 16;
+    private static final int ICON_PAD = 4;
 
     public static class ButtonBounds {
         public int x, y, w, h;
@@ -16,37 +16,58 @@ public class McpOverlayLogic {
         }
     }
 
-    public static ButtonBounds calcResumeButtonBounds(int fontWidth, int screenW) {
-        int btnW = fontWidth + PAD * 2;
-        return new ButtonBounds(screenW - btnW - MARGIN, MARGIN, btnW, BTN_H);
-    }
-
-    public static ButtonBounds calcTransferButtonBounds(int fontWidth, int screenW) {
-        int btnW = fontWidth + PAD * 2;
-        return new ButtonBounds(screenW - btnW - MARGIN, MARGIN, btnW, BTN_H);
+    private static ButtonBounds calcIconBounds(int screenW) {
+        return new ButtonBounds(screenW - BTN_SIZE - MARGIN, MARGIN, BTN_SIZE, BTN_SIZE);
     }
 
     public static void renderResumeButton(McpRenderer r, Object font, String label, int screenW, int screenH, int mouseX, int mouseY) {
-        int fontW = r.getStringWidth(font, label);
-        ButtonBounds b = calcResumeButtonBounds(fontW, screenW);
-
+        ButtonBounds b = calcIconBounds(screenW);
         boolean hover = b.hit(mouseX, mouseY);
-        int bg = hover ? 0xDD666666 : 0xBB444444;
+        int bg = hover ? 0xEE666666 : 0xCC444444;
+        int fg = hover ? 0xFFCCCCCC : 0xFFAAAAAA;
         r.fill(b.x, b.y, b.x + b.w, b.y + b.h, bg);
-        r.drawString(font, label, b.x + PAD, b.y + (b.h - 8) / 2, 0xFFFFFFFF, false);
-
+        drawResumeIcon(r, b.x, b.y, b.w, b.h, fg);
         ReflectionHelper.setOverlayButtonBounds(b.x, b.y, b.w, b.h, 0, 0, 0, 0);
     }
 
     public static void renderTransferButton(McpRenderer r, Object font, String label, int screenW, int screenH, int mouseX, int mouseY) {
-        int fontW = r.getStringWidth(font, label);
-        ButtonBounds b = calcTransferButtonBounds(fontW, screenW);
-
+        ButtonBounds b = calcIconBounds(screenW);
         boolean hover = b.hit(mouseX, mouseY);
-        int bg = hover ? 0xDD446644 : 0xBB335533;
+        int bg = hover ? 0xEE446644 : 0xCC335533;
+        int fg = hover ? 0xFFCCCCCC : 0xFFAAAAAA;
         r.fill(b.x, b.y, b.x + b.w, b.y + b.h, bg);
-        r.drawString(font, label, b.x + PAD, b.y + (b.h - 8) / 2, 0xFFFFFFFF, false);
-
+        drawTransferIcon(r, b.x, b.y, b.w, b.h, fg);
         ReflectionHelper.setTransferButtonBounds(b.x, b.y, b.w, b.h);
+    }
+
+    private static void drawResumeIcon(McpRenderer r, int bx, int by, int bw, int bh, int color) {
+        int p = ICON_PAD;
+        int cx = bx + bw / 2;
+        int cy = by + bh / 2;
+        int hw = (bw - p * 2) / 2;
+        int hh = (bh - p * 2) / 2;
+        int steps = hh;
+        for (int i = 0; i < steps; i++) {
+            int rowY = cy - hh + i;
+            int halfW = (i * hw) / steps;
+            r.fill(cx - halfW, rowY, cx + halfW + 1, rowY + 1, color);
+        }
+    }
+
+    private static void drawTransferIcon(McpRenderer r, int bx, int by, int bw, int bh, int color) {
+        int p = ICON_PAD;
+        int x1 = bx + p;
+        int y1 = by + p;
+        int x2 = bx + bw - p;
+        int y2 = by + bh - p;
+        int midX = (x1 + x2) / 2;
+        int midY = (y1 + y2) / 2;
+        r.fill(x1, midY - 1, x2, midY + 1, color);
+        r.fill(midX - 1, y1, midX + 1, y2, color);
+        int aw = 3;
+        r.fill(x1, y1, x1 + aw, y1 + aw, color);
+        r.fill(x2 - aw, y1, x2, y1 + aw, color);
+        r.fill(x1, y2 - aw, x1 + aw, y2, color);
+        r.fill(x2 - aw, y2 - aw, x2, y2, color);
     }
 }
