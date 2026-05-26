@@ -554,7 +554,8 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     try:
         mc_proc = subprocess.Popen(
             [sys.executable, launcher, version_name, "--headless",
-             "--width", "854", "--height", "480",
+             "--jvm-args", "-Xmx512M -Xms256M",
+             "--width", "640", "--height", "360",
              "--extra-jvm", extra_jvm,
              "--no-assets-download", "--no-mod-sync"],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -665,6 +666,7 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
 
     mc_proc = subprocess.Popen(
         [sys.executable, launcher, version_name,
+         "--jvm-args", "-Xmx512M -Xms256M",
          "--width", "1280", "--height", "720",
          "--world", world_name,
          "--no-assets-download", "--no-mod-sync"],
@@ -812,6 +814,7 @@ def main():
         launcher = str(SCRIPTS / "launch_mc.py")
         mc_proc = subprocess.Popen(
             [sys.executable, launcher, version_name,
+             "--jvm-args", "-Xmx512M -Xms256M",
              "--width", "1280", "--height", "720",
              "--world", args.world,
              "--no-assets-download", "--no-mod-sync"],

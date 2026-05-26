@@ -249,6 +249,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
         include:
           - { mc_ver: "1.8.9",   loader: "forge",    jdk: "8"  }
@@ -340,6 +341,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - { mc_ver: "1.12.2",  loader: "forge",    jdk: "8"  }

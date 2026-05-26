@@ -267,13 +267,13 @@ def main():
     img = Image.open(args.input)
     print(f"[1/4] Loaded: {args.input} ({img.size[0]}x{img.size[1]})")
 
-    cleaned = remove_background(img, strategy=args.bg, threshold=args.threshold)
-    print(f"[2/4] Background removed ({args.bg}), content: {cleaned.size[0]}x{cleaned.size[1]}")
+    pix = pixelate(img.convert("RGBA"), args.size)
+    print(f"[2/4] Pixelated to {args.size}x{args.size}")
 
-    pix = pixelate(cleaned, args.size)
-    print(f"[3/4] Pixelated to {args.size}x{args.size}")
+    cleaned = remove_background(pix, strategy=args.bg, threshold=args.threshold)
+    print(f"[3/4] Background removed ({args.bg}), content: {cleaned.size[0]}x{cleaned.size[1]}")
 
-    pixels, w, h = extract_pixels(pix, min_alpha=args.min_alpha)
+    pixels, w, h = extract_pixels(cleaned, min_alpha=args.min_alpha)
     print(f"[4/4] Extracted {len(pixels)} non-transparent pixels")
 
     if args.no_optimize:
