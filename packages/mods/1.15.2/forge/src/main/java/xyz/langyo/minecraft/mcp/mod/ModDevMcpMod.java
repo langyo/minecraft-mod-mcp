@@ -199,7 +199,7 @@ public class ModDevMcpMod {
                         int h = mc.getMainWindow().getScaledHeight();
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
-                        McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getFormattedText(), w, h, (int) mx, (int) my);
+                        withFullScissor(() -> McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getFormattedText(), w, h, (int) mx, (int) my));
                     }
                 }
             } catch (Exception ignored) {}

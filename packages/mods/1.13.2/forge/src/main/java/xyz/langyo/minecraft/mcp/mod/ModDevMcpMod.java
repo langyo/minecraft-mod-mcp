@@ -237,7 +237,7 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
                         String label = translate("mcpmod.control.resume");
-                        McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
+                        withFullScissor(() -> McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my));
                     }
                 }
             } catch (Exception ignored) {}
