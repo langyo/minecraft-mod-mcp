@@ -450,8 +450,6 @@ def extract_natives(vj, mc_dir=None):
     mc_dir = mc_dir or MC_DIR
     version_id = vj.get("id") or vj.get("inheritsFrom", "unknown")
     natives_dir = os.path.join(mc_dir, "versions-natives", version_id)
-    if os.path.isdir(natives_dir) and os.listdir(natives_dir):
-        return natives_dir
     os.makedirs(natives_dir, exist_ok=True)
     current_os = get_os_name()
     for lib in vj.get("libraries", []):
@@ -487,6 +485,25 @@ def extract_natives(vj, mc_dir=None):
                                 zf.extract(info, natives_dir)
             except Exception:
                 pass
+        if "natives-" in name and not native_jar:
+            art = dl.get("artifact", {})
+            path = art.get("path", "")
+            if path:
+                native_jar = os.path.join(mc_dir, "libraries", path)
+                if os.path.isfile(native_jar):
+                    try:
+                        with zipfile.ZipFile(native_jar, "r") as zf:
+                            for info in zf.infolist():
+                                fn = info.filename
+                                if fn.endswith((".dll", ".so", ".dylib", ".jnilib")):
+                                    if "META-INF" in fn:
+                                        continue
+                                    base = os.path.basename(fn)
+                                    target = os.path.join(natives_dir, base)
+                                    if not os.path.isfile(target):
+                                        zf.extract(info, natives_dir)
+                    except Exception:
+                        pass
     return natives_dir
 
 
@@ -765,6 +782,11 @@ def main():
         if not jv or jv.get("majorVersion", 8) < 17:
             vj["javaVersion"] = {"majorVersion": 17}
     print(f"[LAUNCH] mainClass: {main_class}")
+
+    if not args.no_assets_download:
+        download_missing_assets(vj, mc_dir)
+
+    download_libraries(vj, mc_dir)
 
     cp = build_classpath(vj, mc_dir)
     print(f"[LAUNCH] Classpath: {len(cp)} entries")

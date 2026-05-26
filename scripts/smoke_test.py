@@ -220,7 +220,7 @@ def run_ci_test(version, loader, mc_key, world_name, timeout=600):
     comparisons_passed = 0
     comparisons_total = 0
     for label, ss_path in ss_paths:
-        ref_path = ROOT / "test-world" / f"ref_{version}_{loader}_{label}.png"
+        ref_path = ROOT / "tests" / "reference-screenshots" / f"ref_{version}_{loader}_{label}.png"
         if ref_path.exists():
             comparisons_total += 1
             ok, det = compare_screenshots_structural(str(ss_path), str(ref_path), threshold=0.85)

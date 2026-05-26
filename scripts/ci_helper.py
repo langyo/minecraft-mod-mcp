@@ -30,9 +30,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 MC_DIR = Path(os.environ.get("HOME", os.path.expanduser("~"))) / ".minecraft"
 
-TEST_WORLD_DIR = ROOT / "test-world"
+TEST_WORLD_DIR = ROOT / "tests" / "reference-screenshots"
 SCREENSHOT_DIR = ROOT / "screenshots" / "ci"
-REF_SCREENSHOT_DIR = ROOT / "test-world"
+REF_SCREENSHOT_DIR = ROOT / "tests" / "reference-screenshots"
 
 sys.path.insert(0, str(SCRIPTS))
 

@@ -388,7 +388,7 @@ jobs:
             --loader "${{ matrix.loader }}" \
             --mod-jar "${{ steps.find-jar.outputs.mod_jar }}" \
             --world "CI_TestWorld" \
-            --ref-screenshot "test-world/ref_${{ matrix.mc_ver }}_${{ matrix.loader }}.png" || true
+            --ref-screenshot "tests/reference-screenshots/ref_${{ matrix.mc_ver }}_${{ matrix.loader }}.png" || true
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
