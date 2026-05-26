@@ -1510,6 +1510,25 @@ public final class ReflectionHelper {
     }
 
     private static byte[] takeGlScreenshot0(Object mc, int width, int height) throws Exception {
+        try {
+            return _takeGlScreenshot0Inner(mc, width, height);
+        } catch (UnsatisfiedLinkError e) {
+            dbg("takeGlScreenshot0: GL libraries unavailable (UnsatisfiedLinkError): " + e.getMessage());
+            return null;
+        } catch (NoClassDefFoundError e) {
+            dbg("takeGlScreenshot0: GL class not found (headless): " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            String msg = e.getMessage();
+            if (msg != null && (msg.contains("glReadPixels") || msg.contains("GL") || msg.contains("render"))) {
+                dbg("takeGlScreenshot0: GL error (headless): " + msg);
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    private static byte[] _takeGlScreenshot0Inner(Object mc, int width, int height) throws Exception {
         updateSkyColor(mc);
         if (width <= 0 || height <= 0) throw new RuntimeException("bad dims " + width + "x" + height);
         Object fb = null;
