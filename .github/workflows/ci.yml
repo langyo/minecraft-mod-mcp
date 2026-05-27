@@ -145,7 +145,8 @@ jobs:
               $gradleVer = if (Test-Path "gradle/wrapper/gradle-wrapper.properties") { (Get-Content "gradle/wrapper/gradle-wrapper.properties" | Select-String "distributionUrl" | Select-Object -First 1) -replace '.*gradle-', '' -replace '-bin.*', '' } else { "8.0" }
               $majorVer = $gradleVer.Split('.')[0]
               $extraArgs = if ([int]$majorVer -ge 5) { "--warning-mode=summary" } else { "" }
-              $result = .\gradlew.bat clean jar --no-daemon --console=plain $extraArgs 2>&1
+              $gradleTask = if ($mod -match "/fabric$") { "clean build -x test" } else { "clean jar" }
+              $result = .\gradlew.bat $gradleTask --no-daemon --console=plain $extraArgs 2>&1
               if ($LASTEXITCODE -ne 0) {
                 $errFile = "build-error.log"
                 $result | Out-File -FilePath $errFile -Encoding UTF8

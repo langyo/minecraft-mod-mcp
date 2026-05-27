@@ -105,6 +105,7 @@ def download_libraries(vj, mc_dir=None):
     lib_dir = os.path.join(mc_dir, "libraries")
     missing = 0
     downloaded = 0
+    failed = 0
     for lib in vj.get("libraries", []):
         if not should_include_lib(lib):
             continue
@@ -127,7 +128,7 @@ def download_libraries(vj, mc_dir=None):
                         f.write(data)
                     downloaded += 1
                 except Exception:
-                    pass
+                    failed += 1
         for classifier_key in ("natives-windows", "natives-windows-arm64",
                                 "natives-linux", "natives-osx"):
             native = dl.get("classifiers", {}).get(classifier_key, {})
@@ -194,7 +195,7 @@ def download_libraries(vj, mc_dir=None):
                     except Exception:
                         continue
     if missing or downloaded:
-        print(f"  Libraries: {downloaded} downloaded, {missing - downloaded} failed")
+        print(f"  Libraries: {downloaded} downloaded, {failed} failed")
     return downloaded
 
 
@@ -714,8 +715,8 @@ _IS_WINDOWS = platform.system() == "Windows"
 _EXE_SUFFIX = ".exe" if _IS_WINDOWS else ""
 
 
-_JAVA_HOME_ENV_KEYS = ["JAVA_HOME_8_X64", "JAVA_HOME_17_X64", "JAVA_HOME_21_X64",
-                       "JAVA_HOME_25_X64", "JAVA_HOME", "JDK_21"]
+_JAVA_HOME_ENV_KEYS = ["JAVA_HOME", "JAVA_HOME_8_X64", "JAVA_HOME_17_X64", "JAVA_HOME_21_X64",
+                       "JAVA_HOME_25_X64", "JDK_21"]
 
 
 def find_java(version_java=None):
@@ -787,6 +788,7 @@ def main():
         download_missing_assets(vj, mc_dir)
 
     download_libraries(vj, mc_dir)
+    ensure_version_jar(vj, mc_dir)
 
     cp = build_classpath(vj, mc_dir)
     print(f"[LAUNCH] Classpath: {len(cp)} entries")
