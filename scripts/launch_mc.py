@@ -132,6 +132,7 @@ def _patch_lwjgl2_headless_impl(cp):
 
     utf8s, classes, nats, methodrefs = _parse_cp(data)
     if utf8s is None:
+        print(f"[LAUNCH] LWJGL patch: constant pool parse failed", flush=True)
         return
 
     dm_class_idx = None
@@ -158,8 +159,9 @@ def _patch_lwjgl2_headless_impl(cp):
             dm_init_desc_str = mdesc
             break
     if not dm_init_ref:
-        print(f"[LAUNCH] LWJGL patch: DisplayMode.<init> not found in methodrefs", flush=True)
+        print(f"[LAUNCH] LWJGL patch: DisplayMode.<init> not found in methodrefs (checked {len(methodrefs)})", flush=True)
         return
+    print(f"[LAUNCH] LWJGL patch: found dm_class={dm_class_idx} dm_arr={dm_arr_idx} init_ref={dm_init_ref} desc={dm_init_desc_str}", flush=True)
 
     new_bytecode = bytearray()
     new_bytecode.append(0x04)  # iconst_1
@@ -255,6 +257,7 @@ def _patch_lwjgl2_headless_impl(cp):
     if not result:
         print(f"[LAUNCH] LWJGL patch: failed to find/replace Code attribute", flush=True)
         return
+    print(f"[LAUNCH] LWJGL patch: code replaced, new class size={len(result)}, rebuilding jar...", flush=True)
 
     try:
         tmp_jar = lwjgl_jar + ".tmp"
