@@ -30,7 +30,7 @@ def patch_lwjgl2_headless(cp):
     lwjgl_jar = None
     for p in cp:
         bn = os.path.basename(p).lower()
-        if "lwjgl" in bn and bn.endswith(".jar") and "platform" not in bn and "natives" not in bn and "source" not in bn:
+        if bn.startswith("lwjgl-") and bn.endswith(".jar") and "platform" not in bn and "natives" not in bn and "source" not in bn and "util" not in bn:
             lwjgl_jar = p
             break
     if not lwjgl_jar:
