@@ -34,6 +34,12 @@ def merge_version_json(version_name, mc_dir=None):
     parent = vj.get("inheritsFrom")
     if parent:
         parent_json_path = os.path.join(mc_dir, "versions", parent, f"{parent}.json")
+        if not os.path.isfile(parent_json_path):
+            try:
+                from install_forge import download_vanilla
+                download_vanilla(parent)
+            except Exception:
+                pass
         if os.path.isfile(parent_json_path):
             with open(parent_json_path, "r", encoding="utf-8") as f:
                 pj = json.load(f)
