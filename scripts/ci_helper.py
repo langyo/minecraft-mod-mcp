@@ -617,6 +617,13 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         results["mod_ready"] = {"passed": True, "detail": mod_url}
     except TimeoutError:
         results["mod_ready"] = {"passed": False, "detail": "HTTP server not found"}
+        crash_dir = MC_DIR / "crash-reports"
+        if crash_dir.is_dir():
+            for f in sorted(crash_dir.glob("*.txt"))[-1:]:
+                _log(f"  CRASH REPORT ({f.name}):")
+                with open(f, "r", errors="replace") as fh:
+                    for line in fh.readlines()[:40]:
+                        _log(f"    {line.rstrip()[:200]}")
         kill_minecraft()
         return results
 

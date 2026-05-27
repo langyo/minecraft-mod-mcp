@@ -25,6 +25,219 @@ MC_DIR = os.path.join(
 )
 
 
+def patch_lwjgl2_headless(cp):
+    """Patch LWJGL 2.x LinuxDisplay to return a fallback display mode on headless."""
+    lwjgl_jar = None
+    for p in cp:
+        bn = os.path.basename(p).lower()
+        if "lwjgl" in bn and bn.endswith(".jar") and "platform" not in bn and "natives" not in bn and "source" not in bn:
+            lwjgl_jar = p
+            break
+    if not lwjgl_jar:
+        return
+    patched_marker = lwjgl_jar + ".headless-patched"
+    if os.path.isfile(patched_marker):
+        return
+    import struct as _struct
+
+    CLASS_NAME = "org/lwjgl/opengl/LinuxDisplay"
+    METHOD_NAME = "getAvailableDisplayModes"
+    METHOD_DESC = "()[Lorg/lwjgl/opengl/DisplayMode;"
+    DM_CLASS = "org/lwjgl/opengl/DisplayMode"
+    DM_ARR_CLASS = "[Lorg/lwjgl/opengl/DisplayMode;"
+    DM_INIT = "<init>"
+    DM_INIT_DESC = "(IIII)V"
+    try:
+        with zipfile.ZipFile(lwjgl_jar, "r") as zf:
+            if CLASS_NAME + ".class" not in zf.namelist():
+                return
+            data = zf.read(CLASS_NAME + ".class")
+    except Exception:
+        return
+
+    def _u2(d, o):
+        return _struct.unpack_from(">H", d, o)[0]
+
+    def _u4(d, o):
+        return _struct.unpack_from(">I", d, o)[0]
+
+    def _skip_cp_entry(d, o):
+        tag = d[o]
+        o += 1
+        sizes = {1: 2, 3: 4, 4: 4, 5: 8, 6: 8, 7: 2, 8: 2, 9: 4, 10: 4,
+                 11: 4, 12: 4, 15: 3, 16: 2, 17: 4, 18: 4}
+        if tag not in sizes:
+            return -1
+        extra = sizes[tag]
+        o += extra
+        if tag == 1:
+            length = _u2(d, o - 2)
+            o += length
+        elif tag == 5 or tag == 6:
+            return o + 1
+        return o
+
+    def _parse_cp(d):
+        cp_count = _u2(d, 8)
+        off = 10
+        utf8s = {}
+        classes = {}
+        nats = {}
+        methodrefs = {}
+        idx = 1
+        while idx < cp_count:
+            tag = d[off]
+            off += 1
+            if tag == 1:
+                length = _u2(d, off)
+                off += 2
+                utf8s[idx] = bytes(d[off:off + length]).decode("utf-8", errors="replace")
+                off += length
+            elif tag == 7:
+                classes[idx] = _u2(d, off)
+                off += 2
+            elif tag == 12:
+                nats[idx] = (_u2(d, off), _u2(d, off + 2))
+                off += 4
+            elif tag == 10:
+                methodrefs[idx] = (_u2(d, off), _u2(d, off + 2))
+                off += 4
+            else:
+                noff = _skip_cp_entry(d, off - 1)
+                if noff < 0:
+                    return None, None, None, None
+                off = noff
+            idx += 1
+        return utf8s, classes, nats, methodrefs
+
+    utf8s, classes, nats, methodrefs = _parse_cp(data)
+    if utf8s is None:
+        return
+
+    dm_class_idx = None
+    dm_arr_idx = None
+    for ci, ni in classes.items():
+        name = utf8s.get(ni, "")
+        if name == DM_CLASS:
+            dm_class_idx = ci
+        elif name == DM_ARR_CLASS:
+            dm_arr_idx = ci
+    if not dm_class_idx or not dm_arr_idx:
+        return
+
+    dm_init_ref = None
+    for mi, (ci, ni) in methodrefs.items():
+        cls_name = utf8s.get(classes.get(ci, 0), "")
+        n, d = nats.get(ni, (0, 0))
+        mname = utf8s.get(n, "")
+        mdesc = utf8s.get(d, "")
+        if cls_name == DM_CLASS and mname == DM_INIT and mdesc == DM_INIT_DESC:
+            dm_init_ref = mi
+    if not dm_init_ref:
+        return
+
+    new_bytecode = bytearray()
+    new_bytecode.append(0x04)  # iconst_1
+    new_bytecode.extend(b"\xbd" + dm_arr_idx.to_bytes(2, "big"))  # anewarray DisplayMode[]
+    new_bytecode.append(0x59)  # dup
+    new_bytecode.append(0x03)  # iconst_0
+    new_bytecode.extend(b"\xbb" + dm_class_idx.to_bytes(2, "big"))  # new DisplayMode
+    new_bytecode.append(0x59)  # dup
+    new_bytecode.extend(b"\x11\x04\x00")  # sipush 1024
+    new_bytecode.extend(b"\x11\x03\x00")  # sipush 768
+    new_bytecode.extend(b"\x10\x18")  # bipush 24
+    new_bytecode.extend(b"\x10\x3c")  # bipush 60
+    new_bytecode.extend(b"\xb7" + dm_init_ref.to_bytes(2, "big"))  # invokespecial <init>
+    new_bytecode.append(0x53)  # aastore
+    new_bytecode.append(0xb0)  # areturn
+    code_len = len(new_bytecode)
+
+    code_attr_body = bytearray()
+    code_attr_body.extend(_struct.pack(">H", 9))   # max_stack
+    code_attr_body.extend(_struct.pack(">H", 0))   # max_locals
+    code_attr_body.extend(_struct.pack(">I", code_len))
+    code_attr_body.extend(new_bytecode)
+    code_attr_body.extend(_struct.pack(">H", 0))   # exception_table_length
+    code_attr_body.extend(_struct.pack(">H", 0))   # attributes_count
+
+    def _find_and_replace_code(d):
+        off = 10
+        cp_count = _u2(d, 8)
+        idx = 1
+        while idx < cp_count:
+            tag = d[off]
+            off += 1
+            sz = {1: 2, 3: 4, 4: 4, 5: 8, 6: 8, 7: 2, 8: 2, 9: 4, 10: 4,
+                  11: 4, 12: 4, 15: 3, 16: 2, 17: 4, 18: 4}
+            if tag not in sz:
+                return None
+            off += sz[tag]
+            if tag == 1:
+                length = _u2(d, off - 2)
+                off += length
+            elif tag in (5, 6):
+                idx += 1
+            idx += 1
+        off += 6
+        iface_count = _u2(d, off)
+        off += 2 + iface_count * 2
+        field_count = _u2(d, off)
+        off += 2
+        for _ in range(field_count):
+            off += 6
+            ac = _u2(d, off)
+            off += 2
+            for _ in range(ac):
+                off += 2
+                alen = _u4(d, off)
+                off += 4 + alen
+        method_count = _u2(d, off)
+        off += 2
+        for _ in range(method_count):
+            m_access = _u2(d, off)
+            m_name = _u2(d, off + 2)
+            m_desc = _u2(d, off + 4)
+            mn = utf8s.get(m_name, "")
+            md = utf8s.get(m_desc, "")
+            off += 6
+            ac = _u2(d, off)
+            off += 2
+            for _ in range(ac):
+                attr_start = off
+                attr_name_idx = _u2(d, off)
+                off += 2
+                alen = _u4(d, off)
+                off += 4
+                if mn == METHOD_NAME and md == METHOD_DESC and utf8s.get(attr_name_idx) == "Code":
+                    old_total = 2 + 4 + alen
+                    new_body = _struct.pack(">H", attr_name_idx) + _struct.pack(">I", len(code_attr_body)) + bytes(code_attr_body)
+                    pre = d[:attr_start]
+                    post = d[attr_start + old_total:]
+                    return pre + new_body + post
+                off += alen
+        return None
+
+    result = _find_and_replace_code(data)
+    if not result:
+        return
+
+    try:
+        tmp_jar = lwjgl_jar + ".tmp"
+        with zipfile.ZipFile(lwjgl_jar, "r") as zin:
+            with zipfile.ZipFile(tmp_jar, "w", zipfile.ZIP_DEFLATED) as zout:
+                for item in zin.infolist():
+                    if item.filename == CLASS_NAME + ".class":
+                        zout.writestr(item, bytes(result))
+                    else:
+                        zout.writestr(item, zin.read(item.filename))
+        shutil.move(tmp_jar, lwjgl_jar)
+        with open(patched_marker, "w") as f:
+            f.write("patched")
+        print(f"[LAUNCH] Patched LWJGL 2.x LinuxDisplay for headless mode")
+    except Exception as e:
+        print(f"[LAUNCH] WARNING: Failed to patch LWJGL: {e}")
+
+
 def merge_version_json(version_name, mc_dir=None):
     mc_dir = mc_dir or MC_DIR
     version_dir = os.path.join(mc_dir, "versions", version_name)
@@ -947,6 +1160,7 @@ def main():
                 "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true",
                 "-Dorg.lwjgl.opengl.Display.noinput=true",
             ])
+            patch_lwjgl2_headless(cp)
         print(f"[LAUNCH] Headless mode: width={args.width}, height={args.height}")
 
     cmd.extend([
