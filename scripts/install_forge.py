@@ -155,7 +155,7 @@ def download_vanilla(mc_ver: str) -> bool:
         vj_dir = VERSIONS_DIR / mc_ver
         vj_dir.mkdir(parents=True, exist_ok=True)
         vj_path.write_text(json.dumps(vj, indent=2), encoding="utf-8")
-        print(f"  OK: {vj_path}")
+        print(f"  VANILLA: {vj_path}")
         return True
     except Exception as e:
         print(f"  ERROR downloading vanilla: {e}")

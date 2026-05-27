@@ -66,11 +66,15 @@ def setup_mc_version(mc_ver, loader, mc_dir=None):
         )
         if result.returncode != 0:
             _log(f"install_forge stderr: {result.stderr[-500:]}")
+        name = None
         for line in result.stdout.splitlines():
-            if "OK:" in line:
-                name = line.split("OK:")[-1].strip()
-                _log(f"Forge installed: {name}")
-                return name
+            if "OK:" in line and "OK (new):" not in line:
+                candidate = line.split("OK:")[-1].strip()
+                if "/" not in candidate and not candidate.endswith(".json"):
+                    name = candidate
+        if name:
+            _log(f"Forge installed: {name}")
+            return name
 
         from install_forge import _find_installed
         installed = _find_installed(mc_ver, loader)
