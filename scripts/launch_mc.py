@@ -938,6 +938,15 @@ def main():
         cmd.extend([
             "-Djava.awt.headless=true",
         ])
+        try:
+            major = int(mc_ver.split(".")[1]) if "." in mc_ver else 0
+        except ValueError:
+            major = 99
+        if major <= 13:
+            cmd.extend([
+                "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true",
+                "-Dorg.lwjgl.opengl.Display.noinput=true",
+            ])
         print(f"[LAUNCH] Headless mode: width={args.width}, height={args.height}")
 
     cmd.extend([

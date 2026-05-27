@@ -136,10 +136,12 @@ def setup_xvfb(display=":99", screen="1024x768x24"):
     else:
         _log("Starting Xvfb...")
         subprocess.Popen(
-            ["Xvfb", display, "-screen", "0", screen, "-ac", "-nolisten", "tcp"],
+            ["Xvfb", display, "-screen", "0", screen, "-ac",
+             "+extension", "RANDR", "+extension", "GLX", "-nolisten", "tcp"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         time.sleep(2)
+        _configure_xrandr(display, screen)
     os.environ["DISPLAY"] = display
     os.environ["LIBGL_ALWAYS_SOFTWARE"] = "true"
     os.environ["GALLIUM_DRIVER"] = "llvmpipe"
@@ -156,6 +158,33 @@ def _find_xvfb():
         return result.stdout.strip().split("\n") if result.stdout.strip() else []
     except Exception:
         return []
+
+
+def _configure_xrandr(display, screen):
+    """Add display modes via xrandr for LWJGL 2.x compatibility."""
+    try:
+        w, h = screen.split("x")[0], screen.split("x")[1]
+        mode_name = f"{w}x{h}_60"
+        subprocess.run(
+            ["xrandr", "--newmode", mode_name,
+             str(int(w) * 0.062), w,
+             str(int(w) + int(int(w) * 0.05)),
+             str(int(w) + int(int(w) * 0.15)),
+             str(int(w) + int(int(w) * 0.30)),
+             h,
+             str(int(h) + 3),
+             str(int(h) + 6),
+             str(int(h) + int(int(h) * 0.04)),
+             "-hsync", "+vsync"],
+            capture_output=True, timeout=5,
+        )
+        subprocess.run(
+            ["xrandr", "--addmode", "default", mode_name],
+            capture_output=True, timeout=5,
+        )
+        _log(f"xrandr: added mode {mode_name}")
+    except Exception as e:
+        _log(f"xrandr: {e} (non-fatal)")
 
 
 def kill_minecraft():

@@ -327,11 +327,13 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri libx11-dev 2>/dev/null || true
+          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri libx11-dev x11-xserver-utils 2>/dev/null || true
       - name: Start Xvfb
         run: |
-          Xvfb :99 -screen 0 1024x768x24 -ac -nolisten tcp &
+          Xvfb :99 -screen 0 1024x768x24 -ac +extension RANDR +extension GLX -nolisten tcp &
           sleep 2
+          xrandr --newmode "1024x768_60" 63.50 1024 1072 1176 1328 768 771 775 798 -hsync +vsync 2>/dev/null || true
+          xrandr --addmode default 1024x768_60 2>/dev/null || true
           echo "DISPLAY=:99" >> $GITHUB_ENV
           echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
           echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
@@ -401,11 +403,13 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri 2>/dev/null || true
+          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri x11-xserver-utils 2>/dev/null || true
       - name: Start Xvfb
         run: |
-          Xvfb :99 -screen 0 1280x720x24 -ac -nolisten tcp &
+          Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &
           sleep 2
+          xrandr --newmode "1280x720_60" 74.50 1280 1344 1472 1664 720 723 728 748 -hsync +vsync 2>/dev/null || true
+          xrandr --addmode default 1280x720_60 2>/dev/null || true
           echo "DISPLAY=:99" >> $GITHUB_ENV
           echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
           echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
@@ -471,11 +475,13 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri 2>/dev/null || true
+          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri x11-xserver-utils 2>/dev/null || true
       - name: Start Xvfb
         run: |
-          Xvfb :99 -screen 0 1280x720x24 -ac -nolisten tcp &
+          Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &
           sleep 2
+          xrandr --newmode "1280x720_60" 74.50 1280 1344 1472 1664 720 723 728 748 -hsync +vsync 2>/dev/null || true
+          xrandr --addmode default 1280x720_60 2>/dev/null || true
           echo "DISPLAY=:99" >> $GITHUB_ENV
           echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
           echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
