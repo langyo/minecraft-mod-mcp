@@ -84,17 +84,17 @@ def _patch_lwjgl2_headless_impl(cp):
     def _skip_cp_entry(d, o):
         tag = d[o]
         o += 1
-        sizes = {1: 2, 3: 4, 4: 4, 5: 8, 6: 8, 7: 2, 8: 2, 9: 4, 10: 4,
-                 11: 4, 12: 4, 15: 3, 16: 2, 17: 4, 18: 4}
-        if tag not in sizes:
-            return -1
-        extra = sizes[tag]
-        o += extra
+        FIXED = {3: 4, 4: 4, 5: 8, 6: 8, 7: 2, 8: 2, 9: 4, 10: 4,
+                 11: 4, 12: 4, 15: 3, 16: 2, 17: 4, 18: 4, 19: 2, 20: 2}
         if tag == 1:
-            length = _u2(d, o - 2)
-            o += length
-        elif tag == 5 or tag == 6:
-            return o + 1
+            length = _u2(d, o)
+            o += 2 + length
+        elif tag in FIXED:
+            o += FIXED[tag]
+            if tag in (5, 6):
+                o += 0  # takes 2 slots handled by caller
+        else:
+            return -1
         return o
 
     def _parse_cp(d):
@@ -116,17 +116,37 @@ def _patch_lwjgl2_headless_impl(cp):
             elif tag == 7:
                 classes[idx] = _u2(d, off)
                 off += 2
+            elif tag == 8:
+                off += 2
+            elif tag == 9:
+                off += 4
             elif tag == 12:
                 nats[idx] = (_u2(d, off), _u2(d, off + 2))
                 off += 4
             elif tag == 10:
                 methodrefs[idx] = (_u2(d, off), _u2(d, off + 2))
                 off += 4
+            elif tag == 11:
+                off += 4
+            elif tag == 3 or tag == 4:
+                off += 4
+            elif tag == 5:
+                off += 8
+                idx += 1
+            elif tag == 6:
+                off += 8
+            elif tag == 15:
+                off += 3
+            elif tag == 16:
+                off += 2
+            elif tag == 17:
+                off += 4
+            elif tag == 18:
+                off += 4
+            elif tag == 19 or tag == 20:
+                off += 2
             else:
-                noff = _skip_cp_entry(d, off - 1)
-                if noff < 0:
-                    return None, None, None, None
-                off = noff
+                return None, None, None, None
             idx += 1
         return utf8s, classes, nats, methodrefs
 
