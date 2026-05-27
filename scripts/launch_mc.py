@@ -46,13 +46,14 @@ def patch_lwjgl2_headless(cp):
     DM_CLASS = "org/lwjgl/opengl/DisplayMode"
     DM_ARR_CLASS = "[Lorg/lwjgl/opengl/DisplayMode;"
     DM_INIT = "<init>"
-    DM_INIT_DESC = "(IIII)V"
     try:
         with zipfile.ZipFile(lwjgl_jar, "r") as zf:
             if CLASS_NAME + ".class" not in zf.namelist():
+                print(f"[LAUNCH] LWJGL patch: {CLASS_NAME}.class not found in {os.path.basename(lwjgl_jar)}")
                 return
             data = zf.read(CLASS_NAME + ".class")
-    except Exception:
+    except Exception as e:
+        print(f"[LAUNCH] LWJGL patch: failed to read jar: {e}")
         return
 
     def _u2(d, o):
@@ -123,17 +124,22 @@ def patch_lwjgl2_headless(cp):
         elif name == DM_ARR_CLASS:
             dm_arr_idx = ci
     if not dm_class_idx or not dm_arr_idx:
+        print(f"[LAUNCH] LWJGL patch: dm_class={dm_class_idx} dm_arr={dm_arr_idx} - not found")
         return
 
     dm_init_ref = None
+    dm_init_desc_str = None
     for mi, (ci, ni) in methodrefs.items():
         cls_name = utf8s.get(classes.get(ci, 0), "")
         n, d = nats.get(ni, (0, 0))
         mname = utf8s.get(n, "")
         mdesc = utf8s.get(d, "")
-        if cls_name == DM_CLASS and mname == DM_INIT and mdesc == DM_INIT_DESC:
+        if cls_name == DM_CLASS and mname == DM_INIT:
             dm_init_ref = mi
+            dm_init_desc_str = mdesc
+            break
     if not dm_init_ref:
+        print(f"[LAUNCH] LWJGL patch: DisplayMode.<init> not found in methodrefs")
         return
 
     new_bytecode = bytearray()
@@ -145,15 +151,24 @@ def patch_lwjgl2_headless(cp):
     new_bytecode.append(0x59)  # dup
     new_bytecode.extend(b"\x11\x04\x00")  # sipush 1024
     new_bytecode.extend(b"\x11\x03\x00")  # sipush 768
-    new_bytecode.extend(b"\x10\x18")  # bipush 24
-    new_bytecode.extend(b"\x10\x3c")  # bipush 60
+    if dm_init_desc_str and dm_init_desc_str.startswith("(IIII"):
+        new_bytecode.extend(b"\x10\x18")  # bipush 24
+        new_bytecode.extend(b"\x10\x3c")  # bipush 60
+        if dm_init_desc_str == "(IIIZ)V":
+            new_bytecode.append(0x04)  # iconst_1 (fullscreen=true)
     new_bytecode.extend(b"\xb7" + dm_init_ref.to_bytes(2, "big"))  # invokespecial <init>
     new_bytecode.append(0x53)  # aastore
     new_bytecode.append(0xb0)  # areturn
     code_len = len(new_bytecode)
 
+    max_stack = 5  # array, array, 0, DM, DM
+    max_stack += 2  # 1024, 768
+    if dm_init_desc_str and dm_init_desc_str.startswith("(IIII"):
+        max_stack += 2  # bpp, freq
+        if dm_init_desc_str == "(IIIZ)V":
+            max_stack += 1  # fullscreen
     code_attr_body = bytearray()
-    code_attr_body.extend(_struct.pack(">H", 9))   # max_stack
+    code_attr_body.extend(_struct.pack(">H", max_stack))   # max_stack
     code_attr_body.extend(_struct.pack(">H", 0))   # max_locals
     code_attr_body.extend(_struct.pack(">I", code_len))
     code_attr_body.extend(new_bytecode)
@@ -219,6 +234,7 @@ def patch_lwjgl2_headless(cp):
 
     result = _find_and_replace_code(data)
     if not result:
+        print(f"[LAUNCH] LWJGL patch: failed to find/replace Code attribute")
         return
 
     try:
