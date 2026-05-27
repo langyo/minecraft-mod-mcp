@@ -27,6 +27,16 @@ MC_DIR = os.path.join(
 
 def patch_lwjgl2_headless(cp):
     """Patch LWJGL 2.x LinuxDisplay to return a fallback display mode on headless."""
+    try:
+        _patch_lwjgl2_headless_impl(cp)
+    except Exception as e:
+        import traceback
+        print(f"[LAUNCH] LWJGL patch ERROR: {e}", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        sys.stdout.flush()
+
+
+def _patch_lwjgl2_headless_impl(cp):
     lwjgl_jar = None
     lwjgl_candidates = []
     for p in cp:
@@ -1185,6 +1195,7 @@ def main():
                 "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true",
                 "-Dorg.lwjgl.opengl.Display.noinput=true",
             ])
+            print(f"[LAUNCH] LWJGL 2.x detected (mc_ver={mc_ver}, major={major}), patching...", flush=True)
             patch_lwjgl2_headless(cp)
         print(f"[LAUNCH] Headless mode: width={args.width}, height={args.height}")
 
