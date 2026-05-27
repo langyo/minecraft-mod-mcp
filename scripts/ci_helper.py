@@ -59,8 +59,11 @@ def setup_mc_version(mc_ver, loader, mc_dir=None):
                       if not k.lower().endswith("proxy") and k.lower() != "all_proxy"}
         env_clean["HOME"] = str(Path(mc).parent)
         env_clean["JAVA_HOME"] = os.environ.get("JAVA_HOME", "")
+        cmd = [sys.executable, install_script, "--mc", mc_ver]
+        if loader in ("forge", "neoforge"):
+            cmd += ["--loader", loader]
         result = subprocess.run(
-            [sys.executable, install_script, "--mc", mc_ver],
+            cmd,
             env=env_clean,
             capture_output=True, text=True, timeout=600,
         )

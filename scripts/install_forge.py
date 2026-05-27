@@ -258,10 +258,16 @@ def install_one(mc_ver: str, loader: str, force: bool = False):
 
         if ok or new_dirs:
             for d in sorted(new_dirs):
-                if loader in d or mc_ver in d:
+                if loader in d:
                     print(f"  OK: {d}")
                     _ensure_parents(d)
                     return "ok"
+            for d in sorted(new_dirs):
+                if mc_ver in d and loader not in d:
+                    continue
+                print(f"  OK: {d}")
+                _ensure_parents(d)
+                return "ok"
             if new_dirs:
                 print(f"  OK (new): {', '.join(sorted(new_dirs))}")
                 return "ok"
