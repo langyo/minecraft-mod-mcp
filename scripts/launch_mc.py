@@ -41,10 +41,11 @@ def patch_lwjgl2_headless(cp):
         if not lwjgl_jar:
             lwjgl_jar = lwjgl_candidates[0]
     if not lwjgl_jar:
-        print(f"[LAUNCH] LWJGL patch: no lwjgl jar found in classpath ({len(cp)} entries)")
+        print(f"[LAUNCH] LWJGL patch: no lwjgl jar found in classpath ({len(cp)} entries)", flush=True)
         return
     patched_marker = lwjgl_jar + ".headless-patched"
     if os.path.isfile(patched_marker):
+        print(f"[LAUNCH] LWJGL patch: already patched ({os.path.basename(lwjgl_jar)})", flush=True)
         return
     import struct as _struct
 
@@ -57,7 +58,7 @@ def patch_lwjgl2_headless(cp):
     try:
         with zipfile.ZipFile(lwjgl_jar, "r") as zf:
             if CLASS_NAME + ".class" not in zf.namelist():
-                print(f"[LAUNCH] LWJGL patch: {CLASS_NAME}.class not found in {os.path.basename(lwjgl_jar)}")
+                print(f"[LAUNCH] LWJGL patch: {CLASS_NAME}.class not found in {os.path.basename(lwjgl_jar)}", flush=True)
                 return
             data = zf.read(CLASS_NAME + ".class")
     except Exception as e:
@@ -132,7 +133,7 @@ def patch_lwjgl2_headless(cp):
         elif name == DM_ARR_CLASS:
             dm_arr_idx = ci
     if not dm_class_idx or not dm_arr_idx:
-        print(f"[LAUNCH] LWJGL patch: dm_class={dm_class_idx} dm_arr={dm_arr_idx} - not found")
+        print(f"[LAUNCH] LWJGL patch: dm_class={dm_class_idx} dm_arr={dm_arr_idx} - not found", flush=True)
         return
 
     dm_init_ref = None
@@ -147,7 +148,7 @@ def patch_lwjgl2_headless(cp):
             dm_init_desc_str = mdesc
             break
     if not dm_init_ref:
-        print(f"[LAUNCH] LWJGL patch: DisplayMode.<init> not found in methodrefs")
+        print(f"[LAUNCH] LWJGL patch: DisplayMode.<init> not found in methodrefs", flush=True)
         return
 
     new_bytecode = bytearray()
@@ -242,7 +243,7 @@ def patch_lwjgl2_headless(cp):
 
     result = _find_and_replace_code(data)
     if not result:
-        print(f"[LAUNCH] LWJGL patch: failed to find/replace Code attribute")
+        print(f"[LAUNCH] LWJGL patch: failed to find/replace Code attribute", flush=True)
         return
 
     try:
@@ -257,9 +258,9 @@ def patch_lwjgl2_headless(cp):
         shutil.move(tmp_jar, lwjgl_jar)
         with open(patched_marker, "w") as f:
             f.write("patched")
-        print(f"[LAUNCH] Patched LWJGL 2.x LinuxDisplay for headless mode")
+        print(f"[LAUNCH] Patched LWJGL 2.x LinuxDisplay for headless mode", flush=True)
     except Exception as e:
-        print(f"[LAUNCH] WARNING: Failed to patch LWJGL: {e}")
+        print(f"[LAUNCH] WARNING: Failed to patch LWJGL: {e}", flush=True)
 
 
 def merge_version_json(version_name, mc_dir=None):
