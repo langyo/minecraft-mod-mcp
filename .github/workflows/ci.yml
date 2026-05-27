@@ -146,7 +146,7 @@ jobs:
               $majorVer = $gradleVer.Split('.')[0]
               $extraArgs = if ([int]$majorVer -ge 5) { "--warning-mode=summary" } else { "" }
               if ($mod -match "/fabric$") {
-                $result = .\gradlew.bat clean build -x test --no-daemon --console=plain $extraArgs 2>&1
+                $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
               } else {
                 $result = .\gradlew.bat clean jar --no-daemon --console=plain $extraArgs 2>&1
               }
