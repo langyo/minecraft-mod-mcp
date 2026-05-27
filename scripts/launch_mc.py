@@ -238,7 +238,7 @@ def _patch_lwjgl2_headless_impl(cp):
             max_stack += 1  # fullscreen
     code_attr_body = bytearray()
     code_attr_body.extend(_struct.pack(">H", max_stack))   # max_stack
-    code_attr_body.extend(_struct.pack(">H", 0))   # max_locals
+    code_attr_body.extend(_struct.pack(">H", 1))   # max_locals (JVM requires >=1)
     code_attr_body.extend(_struct.pack(">I", code_len))
     code_attr_body.extend(new_bytecode)
     code_attr_body.extend(_struct.pack(">H", 0))   # exception_table_length
