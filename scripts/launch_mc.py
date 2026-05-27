@@ -163,9 +163,37 @@ def _patch_lwjgl2_headless_impl(cp):
             dm_class_idx = ci
         elif name == DM_ARR_CLASS:
             dm_arr_idx = ci
-    if not dm_class_idx or not dm_arr_idx:
-        print(f"[LAUNCH] LWJGL patch: dm_class={dm_class_idx} dm_arr={dm_arr_idx} - not found", flush=True)
+    if not dm_class_idx:
+        print(f"[LAUNCH] LWJGL patch: DisplayMode class not found in CP", flush=True)
         return
+    if not dm_arr_idx:
+        utf8_name_idx = max(utf8s.keys()) + 1
+        dm_arr_idx = max(classes.keys()) + 1
+        utf8_name_bytes = b"\x01" + _struct.pack(">H", len(DM_ARR_CLASS)) + DM_ARR_CLASS.encode("utf-8")
+        class_bytes = b"\x07" + _struct.pack(">H", utf8_name_idx)
+        data = bytearray(data)
+        cp_count_pos = 8
+        old_cp_count = _u2(data, cp_count_pos)
+        new_cp_count = old_cp_count + 2
+        _struct.pack_into(">H", data, cp_count_pos, new_cp_count)
+        cp_end = 10
+        tmp_idx = 1
+        while tmp_idx < old_cp_count:
+            tag = data[cp_end]
+            cp_end += 1
+            if tag == 1:
+                l = _u2(data, cp_end); cp_end += 2 + l
+            elif tag in (3, 4): cp_end += 4
+            elif tag == 5: cp_end += 8; tmp_idx += 1
+            elif tag == 6: cp_end += 8
+            elif tag in (7, 8, 16, 19, 20): cp_end += 2
+            elif tag in (9, 10, 11, 12, 17, 18): cp_end += 4
+            elif tag == 15: cp_end += 3
+            tmp_idx += 1
+        data = bytes(data[:cp_end]) + utf8_name_bytes + class_bytes + bytes(data[cp_end:])
+        utf8s[utf8_name_idx] = DM_ARR_CLASS
+        classes[dm_arr_idx] = utf8_name_idx
+        print(f"[LAUNCH] LWJGL patch: injected DM[] CP entries utf8={utf8_name_idx} class={dm_arr_idx}", flush=True)
 
     dm_init_ref = None
     dm_init_desc_str = None
