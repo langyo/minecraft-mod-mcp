@@ -28,12 +28,20 @@ MC_DIR = os.path.join(
 def patch_lwjgl2_headless(cp):
     """Patch LWJGL 2.x LinuxDisplay to return a fallback display mode on headless."""
     lwjgl_jar = None
+    lwjgl_candidates = []
     for p in cp:
         bn = os.path.basename(p).lower()
-        if bn.startswith("lwjgl-") and bn.endswith(".jar") and "platform" not in bn and "natives" not in bn and "source" not in bn and "util" not in bn:
-            lwjgl_jar = p
-            break
+        if "lwjgl" in bn and bn.endswith(".jar") and "platform" not in bn and "natives" not in bn and "source" not in bn and "util" not in bn:
+            lwjgl_candidates.append(p)
+    if lwjgl_candidates:
+        for c in lwjgl_candidates:
+            if os.path.basename(c).lower().startswith("lwjgl-"):
+                lwjgl_jar = c
+                break
+        if not lwjgl_jar:
+            lwjgl_jar = lwjgl_candidates[0]
     if not lwjgl_jar:
+        print(f"[LAUNCH] LWJGL patch: no lwjgl jar found in classpath ({len(cp)} entries)")
         return
     patched_marker = lwjgl_jar + ".headless-patched"
     if os.path.isfile(patched_marker):
