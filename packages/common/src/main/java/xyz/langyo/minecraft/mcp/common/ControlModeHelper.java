@@ -142,6 +142,7 @@ public final class ControlModeHelper {
         }
         if (hitMenu) {
             exitMcpControlMode(mc);
+            ReflectionHelper.openPauseMenu(mc);
             return "system_menu";
         }
         return "blocked";
