@@ -27,6 +27,7 @@ public class ModDevMcpMod {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
     private static boolean prevMouseButton0 = false;
+    private static boolean waitingForRelease = false;
 
     @Mod.Instance("mcpmod")
     public static ModDevMcpMod instance;
@@ -100,11 +101,8 @@ public class ModDevMcpMod {
                 originalMouseHelper = null;
             }
             noGrabInstalled = false;
-            if (mc.currentScreen == null) {
-                mc.mouseHelper.grabMouseCursor();
-                while (org.lwjgl.input.Mouse.next()) {}
-            }
             prevMouseButton0 = true;
+            waitingForRelease = true;
         } catch (Exception e) {
             System.err.println("[MCP-MOD] restoreMouse error: " + e.getMessage());
         }
@@ -151,8 +149,6 @@ public class ModDevMcpMod {
         String t = translations.get(key);
         return t != null ? t : key;
     }
-
-    private static int transferCooldown = 0;
 
     private static boolean isPauseMenu(GuiScreen screen) {
         return screen instanceof GuiIngameMenu;
@@ -209,6 +205,11 @@ public class ModDevMcpMod {
                     int h = sr.getScaledHeight();
                     int mx = getMouseX(mc);
                     int my = getMouseY(mc);
+                    boolean mouse0 = Mouse.isButtonDown(0);
+                    if (mouse0 && !prevMouseButton0) {
+                        ReflectionHelper.handleOverlayClick(mx, my, mc);
+                    }
+                    prevMouseButton0 = mouse0;
                     String label = translate("mcpmod.control.resume");
                     McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, mx, my);
                 }
@@ -246,36 +247,27 @@ public class ModDevMcpMod {
     @SubscribeEvent
     public void onMouseInput(MouseEvent event) {
         try {
-            Minecraft mc = Minecraft.getMinecraft();
-            if (ReflectionHelper.isMcpControlMode()) {
-                if (event.getButton() == 0 && event.isButtonstate()) {
-                    int mx = getMouseX(mc);
-                    int my = getMouseY(mc);
-                    String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
-                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                        event.setCanceled(true);
-                    }
-                }
-                return;
-            }
             if (ReflectionHelper.shouldSuppressInput()) {
                 event.setCanceled(true);
-                return;
             }
         } catch (Exception ignored) {}
     }
 
     @SubscribeEvent
     public void onGuiMouseInputPre(GuiScreenEvent.MouseInputEvent.Pre event) {
+        if (org.lwjgl.input.Mouse.getEventButton() != 0 || !org.lwjgl.input.Mouse.getEventButtonState()) return;
+        Minecraft mc = Minecraft.getMinecraft();
+        int mx = getMouseX(mc);
+        int my = getMouseY(mc);
         if (ReflectionHelper.isMcpControlMode()) {
-            if (org.lwjgl.input.Mouse.getEventButton() == 0 && org.lwjgl.input.Mouse.getEventButtonState()) {
-                Minecraft mc = Minecraft.getMinecraft();
-                int mx = getMouseX(mc);
-                int my = getMouseY(mc);
-                String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
-                if (!"blocked".equals(result) && !"cooldown".equals(result) && !"not_in_control_mode".equals(result)) {
-                    event.setCanceled(true);
-                }
+            String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
+            if (!"blocked".equals(result) && !"cooldown".equals(result) && !"not_in_control_mode".equals(result)) {
+                event.setCanceled(true);
+            }
+        } else if (mc.world != null) {
+            String result = ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
+            if ("transfer_to_mcp".equals(result)) {
+                event.setCanceled(true);
             }
         }
     }
@@ -285,7 +277,6 @@ public class ModDevMcpMod {
         if (INSTANCE == null || INSTANCE.debugUrl == null) return;
 
         if (ReflectionHelper.isMcpControlMode()) {
-            transferCooldown = 10;
             if (event.phase == TickEvent.Phase.START) {
                 installNoGrabMouseHelper();
             } else {
@@ -293,39 +284,32 @@ public class ModDevMcpMod {
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
-                if (mc.currentScreen == null) {
-                    boolean mouse0 = Mouse.isButtonDown(0);
-                    if (mouse0 && !prevMouseButton0) {
-                        int mx = getMouseX(mc);
-                        int my = getMouseY(mc);
-                        ReflectionHelper.handleOverlayClick(mx, my, mc);
-                    }
-                    prevMouseButton0 = mouse0;
-                }
             }
             return;
         }
 
         if (event.phase == TickEvent.Phase.START) {
             restoreOriginalMouseHelper();
-            prevMouseButton0 = Mouse.isButtonDown(0);
+            if (waitingForRelease) {
+                while (org.lwjgl.input.Mouse.next()) {}
+                org.lwjgl.input.Mouse.setGrabbed(false);
+                if (!org.lwjgl.input.Mouse.isButtonDown(0)) {
+                    waitingForRelease = false;
+                    Minecraft mc = Minecraft.getMinecraft();
+                    if (mc.currentScreen == null) {
+                        mc.mouseHelper.grabMouseCursor();
+                    }
+                }
+                return;
+            }
         }
 
         if (event.phase != TickEvent.Phase.END) return;
-        if (transferCooldown > 0) transferCooldown--;
         try {
             Minecraft mc = Minecraft.getMinecraft();
             ReflectionHelper.tickMouseRelease(mc);
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);
-
-            boolean mouse0 = Mouse.isButtonDown(0);
-            if (transferCooldown == 0 && mc.world != null && mc.currentScreen != null && mouse0 && !prevMouseButton0) {
-                int mx = getMouseX(mc);
-                int my = getMouseY(mc);
-                ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
-            }
-            prevMouseButton0 = mouse0;
         } catch (Exception ignored) {}
         if (INSTANCE.chatSent) return;
         try {

@@ -138,10 +138,6 @@ public class ModDevMcpMod {
                 originalMouseHelper = null;
             }
             noGrabInstalled = false;
-            if (mc.currentScreen == null) {
-                mc.mouseHelper.grabMouseCursor();
-                while (Mouse.next()) {}
-            }
             prevMouseButton0 = true;
             waitingForRelease = true;
         } catch (Exception e) {
@@ -244,10 +240,18 @@ public class ModDevMcpMod {
 
         if (event.phase == TickEvent.Phase.START) {
             restoreOriginalMouseHelper();
-            if (waitingForRelease && !Mouse.isButtonDown(0)) {
-                waitingForRelease = false;
+            if (waitingForRelease) {
+                while (Mouse.next()) {}
+                Mouse.setGrabbed(false);
+                if (!Mouse.isButtonDown(0)) {
+                    waitingForRelease = false;
+                    Minecraft mc = Minecraft.getMinecraft();
+                    if (mc.currentScreen == null) {
+                        mc.mouseHelper.grabMouseCursor();
+                    }
+                }
+                return;
             }
-            if (waitingForRelease) return;
         }
 
         if (event.phase != TickEvent.Phase.END) return;
