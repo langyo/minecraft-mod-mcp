@@ -73,7 +73,7 @@ public class ModDevMcpMod {
         double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
         if (ReflectionHelper.isMcpControlMode()) {
             McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
-        } else if (!(screen instanceof PauseScreen)) {
+        } else if (screen != null) {
             McpOverlayLogic.renderTransferButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
         }
     }
@@ -95,7 +95,7 @@ public class ModDevMcpMod {
                     }
                     return true;
                 }
-                if (mc.level != null && mc.screen != null && !(mc.screen instanceof PauseScreen) && event.getButton() == 0) {
+                if (mc.level != null && mc.screen != null && event.getButton() == 0) {
                     double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
                     double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
                     if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {

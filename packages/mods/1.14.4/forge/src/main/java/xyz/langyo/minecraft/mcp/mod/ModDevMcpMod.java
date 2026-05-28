@@ -126,7 +126,7 @@ public class ModDevMcpMod {
             forceGlfwMouseFree(mc);
             ReflectionHelper.cacheFrameFromRenderThread(mc);
             McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getFormattedText(), w, h, (int) mx, (int) my);
-        } else if (!(screen instanceof IngameMenuScreen)) {
+        } else if (screen != null) {
             McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.pause_button").getFormattedText(), w, h, (int) mx, (int) my);
         }
     }
@@ -164,18 +164,6 @@ public class ModDevMcpMod {
             if (ReflectionHelper.isMcpControlMode() && event.getGui() instanceof IngameMenuScreen) {
                 event.setCanceled(true);
             }
-        });
-
-        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Post event) -> {
-            try {
-                if (event.getGui() instanceof IngameMenuScreen) {
-                    McpScreenHelper.patchPauseScreen(event.getGui(), new McpScreenHelper.ButtonFactory() {
-                        @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                            return new net.minecraft.client.gui.widget.button.Button(x, y, w, h, new TranslationTextComponent(translationKey).getFormattedText(), btn -> onClick.run());
-                        }
-                    });
-                }
-            } catch (Exception ignored) {}
         });
 
         MinecraftForge.EVENT_BUS.addListener((RenderGameOverlayEvent.Post event) -> {
@@ -239,7 +227,7 @@ public class ModDevMcpMod {
                     event.setCanceled(true);
                     return;
                 }
-                if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof IngameMenuScreen) && event.getButton() == 0) {
+                if (mc.world != null && mc.currentScreen != null && event.getButton() == 0) {
                     double mx = getMouseX(mc);
                     double my = getMouseY(mc);
                     if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {

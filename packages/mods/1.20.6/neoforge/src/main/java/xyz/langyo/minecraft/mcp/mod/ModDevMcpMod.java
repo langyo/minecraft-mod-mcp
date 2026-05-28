@@ -68,7 +68,7 @@ public class ModDevMcpMod {
         if (ReflectionHelper.isMcpControlMode()) {
             ReflectionHelper.cacheFrameFromRenderThread(mc);
             McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
-        } else if (!(screen instanceof PauseScreen)) {
+        } else if (screen != null) {
             McpOverlayLogic.renderTransferButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
         }
     }
@@ -92,18 +92,6 @@ public class ModDevMcpMod {
                 System.err.println("[MCP-MOD] HTTP server error: " + e.getMessage());
             }
         }, "MCP-HTTP").start();
-
-        NeoForge.EVENT_BUS.addListener((ScreenEvent.Init.Post event) -> {
-            try {
-                if (event.getScreen() instanceof PauseScreen pauseScreen) {
-                    McpScreenHelper.patchPauseScreen(pauseScreen, new McpScreenHelper.ButtonFactory() {
-                        @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                            return Button.builder(Component.translatable(translationKey), btn -> onClick.run()).bounds(x, y, w, h).build();
-                        }
-                    });
-                }
-            } catch (Exception ignored) {}
-        });
 
         NeoForge.EVENT_BUS.addListener((CustomizeGuiOverlayEvent.Chat event) -> {
             if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
@@ -165,7 +153,7 @@ public class ModDevMcpMod {
                     event.setCanceled(true);
                     return;
                 }
-                if (mc.level != null && mc.screen != null && !(mc.screen instanceof PauseScreen) && event.getButton() == 0) {
+                if (mc.level != null && mc.screen != null && event.getButton() == 0) {
                     double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
                     double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
                     if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {

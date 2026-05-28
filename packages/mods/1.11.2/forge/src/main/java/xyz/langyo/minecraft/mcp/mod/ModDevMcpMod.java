@@ -181,33 +181,6 @@ public class ModDevMcpMod {
     }
 
     @SubscribeEvent
-    public void onGuiInit(GuiScreenEvent.InitGuiEvent.Post event) {
-        try {
-            if (isPauseMenu(event.getGui())) {
-                McpScreenHelper.patchPauseScreen(event.getGui(), new McpScreenHelper.ButtonFactory() {
-                    @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                        String displayText = translate(translationKey);
-                        GuiButton btn = new GuiButton(-999, x, y, w, h, displayText) {
-                            @Override public boolean mousePressed(Minecraft mc2, int mx, int my) {
-                                if (super.mousePressed(mc2, mx, my)) {
-                                    try {
-                                        Minecraft mc = Minecraft.getMinecraft();
-                                        ReflectionHelper.enterMcpControlMode(mc);
-                                        mc.displayGuiScreen(null);
-                                    } catch (Exception ignored) {}
-                                    return true;
-                                }
-                                return false;
-                            }
-                        };
-                        return btn;
-                    }
-                });
-            }
-        } catch (Exception ignored) {}
-    }
-
-    @SubscribeEvent
     public void onRenderOverlay(RenderGameOverlayEvent.Post event) {
         if (event.getType() != RenderGameOverlayEvent.ElementType.CHAT) return;
         if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive() && !ReflectionHelper.isMcpControlMode()) return;
@@ -257,7 +230,7 @@ public class ModDevMcpMod {
                 ReflectionHelper.cacheFrameFromRenderThread(mc);
                 String label = translate("mcpmod.control.resume");
                 McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, label, w, h, mx, my);
-            } else if (mc.world != null && screen != null && !isPauseMenu(screen)) {
+            } else if (mc.world != null && screen != null) {
                 GL11.glScissor(0, 0, mc.displayWidth, mc.displayHeight);
                 GL11.glEnable(GL11.GL_SCISSOR_TEST);
                 String label = translate("mcpmod.control.pause_button");
@@ -325,7 +298,7 @@ public class ModDevMcpMod {
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);
 
-            if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu) && Mouse.isButtonDown(0)) {
+            if (mc.world != null && mc.currentScreen != null && Mouse.isButtonDown(0)) {
                 int mx = getMouseX(mc);
                 int my = getMouseY(mc);
                 ReflectionHelper.handleTransferOverlayClick(mx, my, mc);

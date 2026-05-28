@@ -65,7 +65,7 @@ public class ModDevMcpMod {
             ReflectionHelper.cacheFrameFromRenderThread(mc);
             String label = translate("mcpmod.control.resume");
             McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
-        } else if (!(screen instanceof GuiIngameMenu)) {
+        } else if (screen != null) {
             String label = translate("mcpmod.control.pause_button");
             McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRenderer, label, w, h, (int) mx, (int) my);
         }
@@ -161,7 +161,7 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
         if (ReflectionHelper.isMcpControlMode()) {
             String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
             System.out.println("[MCP-MOD] Overlay click result: " + result);
-        } else if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu)) {
+        } else if (mc.world != null && mc.currentScreen != null) {
             String result = ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc);
             System.out.println("[MCP-MOD] Transfer click result: " + result);
         }
@@ -187,32 +187,6 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                 System.err.println("[MCP-MOD] HTTP server error: " + e.getMessage());
             }
         }, "MCP-HTTP").start();
-
-        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Post event) -> {
-            try {
-                if (event.getGui() instanceof GuiIngameMenu) {
-                    System.out.println("[MCP-MOD] GuiIngameMenu detected, attempting patch...");
-                    McpScreenHelper.patchPauseScreen(event.getGui(), new McpScreenHelper.ButtonFactory() {
-                        @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                            String displayText = translate(translationKey);
-                            System.out.println("[MCP-MOD] Creating transfer button: " + displayText + " at (" + x + "," + y + ") " + w + "x" + h);
-                            return new GuiButton(-999, x, y, w, h, displayText) {
-                                @Override public void onClick(double mouseX, double mouseY) {
-                                    try {
-                                        onClick.run();
-                                    } catch (Exception e) {
-                                        System.err.println("[MCP-MOD] Transfer button error: " + e.getMessage());
-                                    }
-                                }
-                            };
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                System.err.println("[MCP-MOD] Pause screen patch error: " + e.getMessage());
-                e.printStackTrace();
-            }
-        });
 
         MinecraftForge.EVENT_BUS.addListener((RenderGameOverlayEvent.Post event) -> {
             if (event.getType() != RenderGameOverlayEvent.ElementType.CHAT) return;
@@ -269,7 +243,7 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                 if (ReflectionHelper.shouldSuppressInput()) {
                     return;
                 }
-                if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GuiIngameMenu)) {
+                if (mc.world != null && mc.currentScreen != null) {
                     if (event.getButton() == 0 && event.getAction() == 1) {
                         handleClick(mc, event.getButton(), event.getAction());
                     }

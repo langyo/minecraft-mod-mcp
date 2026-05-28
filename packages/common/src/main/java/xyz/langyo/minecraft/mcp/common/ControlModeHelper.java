@@ -124,6 +124,25 @@ public final class ControlModeHelper {
                    && guiY >= overlayTransferY && guiY <= overlayTransferY + overlayTransferH;
         if (hit) {
             enterMcpControlMode(mc);
+            try {
+                Object screen = ReflectionCache.getCurrentScreen(mc);
+                if (screen != null) {
+                    String cn = screen.getClass().getName().toLowerCase();
+                    if (cn.contains("ingamemenu") || cn.contains("pausemenu") || cn.contains("pausescreen")
+                            || cn.contains("gamemenu") || cn.contains("options")) {
+                        for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
+                            String n = m.getName();
+                            if ((n.equals("displayGuiScreen") || n.equals("setScreen") || n.equals("func_147108_a"))
+                                    && m.getParameterCount() == 1) {
+                                m.invoke(mc, (Object) null);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[MCP] handleTransferOverlayClick closeScreen failed: " + e.getMessage());
+            }
             return "transfer_to_mcp";
         }
         return "missed";

@@ -129,7 +129,7 @@ public class ModDevMcpMod {
         if (ReflectionHelper.isMcpControlMode()) {
             ReflectionHelper.cacheFrameFromRenderThread(mc);
             McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
-        } else if (!(screen instanceof IngameMenuScreen)) {
+        } else if (screen != null) {
             McpOverlayLogic.renderTransferButton(wrapRenderer(ms, mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.pause_button").getString(), w, h, (int) mx, (int) my);
         }
     }
@@ -166,26 +166,6 @@ public class ModDevMcpMod {
         MinecraftForge.EVENT_BUS.addListener((GuiOpenEvent event) -> {
             if (ReflectionHelper.isMcpControlMode() && event.getGui() instanceof IngameMenuScreen) {
                 event.setCanceled(true);
-            }
-        });
-
-        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Post event) -> {
-            try {
-                if (event.getGui() instanceof IngameMenuScreen) {
-                    Screen screen = event.getGui();
-                    McpScreenHelper.patchPauseScreen(screen, new McpScreenHelper.ButtonFactory() {
-                        @Override public Object createButton(String translationKey, Runnable onClick, int x, int y, int w, int h) {
-                            return new Button(x, y, w, h, new TranslationTextComponent(translationKey), btn -> onClick.run());
-                        }
-                    }, new McpScreenHelper.WidgetAdder() {
-                        @Override public void addWidget(Object scr, Object widget) throws Exception {
-                            event.addWidget((net.minecraft.client.gui.widget.Widget) widget);
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                System.err.println("[MCP-MOD] InitGuiEvent.Post error: " + e.getMessage());
-                e.printStackTrace();
             }
         });
 
@@ -276,7 +256,7 @@ public class ModDevMcpMod {
                     event.setCanceled(true);
                     return;
                 }
-                if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof IngameMenuScreen) && event.getButton() == 0) {
+                if (mc.world != null && mc.currentScreen != null && event.getButton() == 0) {
                     double mx = getMouseX(mc);
                     double my = getMouseY(mc);
                     if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {
