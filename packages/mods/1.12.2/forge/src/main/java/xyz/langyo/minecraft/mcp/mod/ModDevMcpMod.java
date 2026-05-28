@@ -247,7 +247,7 @@ public class ModDevMcpMod {
     @SubscribeEvent
     public void onMouseInput(MouseEvent event) {
         try {
-            if (ReflectionHelper.shouldSuppressInput()) {
+            if (waitingForRelease || ReflectionHelper.shouldSuppressInput()) {
                 event.setCanceled(true);
             }
         } catch (Exception ignored) {}
