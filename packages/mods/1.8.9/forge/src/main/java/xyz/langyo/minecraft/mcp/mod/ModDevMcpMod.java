@@ -27,6 +27,7 @@ public class ModDevMcpMod {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
     private static boolean prevMouseButton0 = false;
+    private static boolean waitingForRelease = false;
 
     @Mod.Instance("mcpmod")
     public static ModDevMcpMod instance;
@@ -139,7 +140,10 @@ public class ModDevMcpMod {
             noGrabInstalled = false;
             if (mc.currentScreen == null) {
                 mc.mouseHelper.grabMouseCursor();
+                while (Mouse.next()) {}
             }
+            prevMouseButton0 = true;
+            waitingForRelease = true;
         } catch (Exception e) {
             System.err.println("[MCP-MOD] restoreMouse error: " + e.getMessage());
         }
@@ -167,8 +171,7 @@ public class ModDevMcpMod {
                     int my = getMouseY(mc);
                     boolean mouse0 = Mouse.isButtonDown(0);
                     if (mouse0 && !prevMouseButton0) {
-                        String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
-                        System.out.println("[MCP-DBG] renderClick mx=" + mx + " my=" + my + " result=" + result);
+                        ReflectionHelper.handleOverlayClick(mx, my, mc);
                     }
                     prevMouseButton0 = mouse0;
                     McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, net.minecraft.client.resources.I18n.format("mcpmod.control.resume"), w, h, mx, my);
@@ -241,7 +244,10 @@ public class ModDevMcpMod {
 
         if (event.phase == TickEvent.Phase.START) {
             restoreOriginalMouseHelper();
-            prevMouseButton0 = Mouse.isButtonDown(0);
+            if (waitingForRelease && !Mouse.isButtonDown(0)) {
+                waitingForRelease = false;
+            }
+            if (waitingForRelease) return;
         }
 
         if (event.phase != TickEvent.Phase.END) return;

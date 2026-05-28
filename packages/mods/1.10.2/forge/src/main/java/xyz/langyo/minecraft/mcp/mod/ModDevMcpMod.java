@@ -102,7 +102,9 @@ public class ModDevMcpMod {
             noGrabInstalled = false;
             if (mc.currentScreen == null) {
                 mc.mouseHelper.grabMouseCursor();
+                while (org.lwjgl.input.Mouse.next()) {}
             }
+            prevMouseButton0 = true;
         } catch (Exception e) {
             System.err.println("[MCP-MOD] restoreMouse error: " + e.getMessage());
         }
