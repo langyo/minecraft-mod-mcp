@@ -61,14 +61,13 @@ public class ModDevMcpMod {
 
     private static MouseHelper originalMouseHelper;
     private static NoGrabMouseHelper noGrabMouseHelper;
+    private static boolean noGrabInstalled = false;
 
     private static class NoGrabMouseHelper extends net.minecraft.util.MouseHelper {
         @Override
         public void grabMouseCursor() {}
         @Override
-        public void ungrabMouseCursor() {
-            try { Mouse.setGrabbed(false); } catch (Exception ignored) {}
-        }
+        public void ungrabMouseCursor() {}
         @Override
         public void mouseXYChange() {
             deltaX = 0;
@@ -76,31 +75,37 @@ public class ModDevMcpMod {
         }
     }
 
-    private static void forceLwjgl2MouseFree() {
+    private static void installNoGrabMouseHelper() {
+        if (noGrabInstalled) return;
         try {
             Minecraft mc = Minecraft.getMinecraft();
-            if (!ReflectionHelper.isMcpControlMode()) {
-                if (originalMouseHelper != null && !(mc.mouseHelper instanceof NoGrabMouseHelper)) {
-                    // already restored
-                } else if (originalMouseHelper != null) {
-                    mc.mouseHelper = originalMouseHelper;
-                    originalMouseHelper = null;
-                }
-                return;
-            }
-            if (originalMouseHelper == null && mc.mouseHelper != null && !(mc.mouseHelper instanceof NoGrabMouseHelper)) {
+            if (mc.mouseHelper != null && !(mc.mouseHelper instanceof NoGrabMouseHelper)) {
                 originalMouseHelper = mc.mouseHelper;
-            }
-            if (mc.mouseHelper instanceof NoGrabMouseHelper) {
-                // already installed
-            } else if (originalMouseHelper != null) {
                 if (noGrabMouseHelper == null) noGrabMouseHelper = new NoGrabMouseHelper();
                 mc.mouseHelper = noGrabMouseHelper;
             }
-            if (Mouse.isGrabbed()) {
-                Mouse.setGrabbed(false);
+            org.lwjgl.input.Mouse.setGrabbed(false);
+            noGrabInstalled = true;
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] installNoGrab error: " + e.getMessage());
+        }
+    }
+
+    private static void restoreOriginalMouseHelper() {
+        if (!noGrabInstalled) return;
+        try {
+            Minecraft mc = Minecraft.getMinecraft();
+            if (originalMouseHelper != null) {
+                mc.mouseHelper = originalMouseHelper;
+                originalMouseHelper = null;
             }
-        } catch (Exception ignored) {}
+            noGrabInstalled = false;
+            if (mc.currentScreen == null) {
+                mc.mouseHelper.grabMouseCursor();
+            }
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] restoreMouse error: " + e.getMessage());
+        }
     }
 
     private static boolean isPauseMenu(GuiScreen screen) {
@@ -147,10 +152,6 @@ public class ModDevMcpMod {
             ReflectionHelper.tickMouseRelease(mc);
             ReflectionHelper.tickMcpControlMode(mc);
 
-            if (ReflectionHelper.isMcpControlMode()) {
-                forceLwjgl2MouseFree();
-            }
-
             if (mc.currentScreen == null) {
                 if (!ReflectionHelper.isScreenshotInProgress()) {
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
@@ -184,7 +185,6 @@ public class ModDevMcpMod {
             if (ReflectionHelper.isMcpControlMode()) {
                 GL11.glScissor(0, 0, mc.displayWidth, mc.displayHeight);
                 GL11.glEnable(GL11.GL_SCISSOR_TEST);
-                forceLwjgl2MouseFree();
                 ReflectionHelper.cacheFrameFromRenderThread(mc);
                 String label = net.minecraft.client.resources.I18n.format("mcpmod.control.resume");
                 McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, label, w, h, mx, my);
@@ -240,13 +240,12 @@ public class ModDevMcpMod {
 
         if (ReflectionHelper.isMcpControlMode()) {
             if (event.phase == TickEvent.Phase.START) {
-                forceLwjgl2MouseFree();
+                installNoGrabMouseHelper();
             } else {
                 Minecraft mc = Minecraft.getMinecraft();
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
-                forceLwjgl2MouseFree();
                 if (mc.currentScreen == null) {
                     boolean mouse0 = Mouse.isButtonDown(0);
                     if (mouse0 && !prevMouseButton0) {
@@ -260,15 +259,8 @@ public class ModDevMcpMod {
             return;
         }
 
-        if (!ReflectionHelper.isMcpControlMode() && event.phase == TickEvent.Phase.END) {
-            Minecraft mc = Minecraft.getMinecraft();
-            if (originalMouseHelper != null) {
-                mc.mouseHelper = originalMouseHelper;
-                originalMouseHelper = null;
-                if (mc.currentScreen == null) {
-                    try { mc.mouseHelper.grabMouseCursor(); } catch (Exception ignored) {}
-                }
-            }
+        if (event.phase == TickEvent.Phase.START) {
+            restoreOriginalMouseHelper();
         }
 
         if (event.phase != TickEvent.Phase.END) return;

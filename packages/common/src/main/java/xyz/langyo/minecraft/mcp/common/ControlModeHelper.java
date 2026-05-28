@@ -189,7 +189,9 @@ public final class ControlModeHelper {
     public static void tickMcpControlMode(Object mc) {
         if (!mcpControlMode) return;
         try {
-            forceCursorAndReleaseMouse(mc);
+            if (ReflectionCache.LWJGL3) {
+                forceCursorAndReleaseMouse(mc);
+            }
             Object mouseHandler = ReflectionCache.getMouseHandler(mc);
             if (mouseHandler != null) {
                 initMouseFields(mouseHandler);
