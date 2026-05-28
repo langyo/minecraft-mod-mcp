@@ -26,6 +26,7 @@ public class ModDevMcpMod {
     private McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
+    private static boolean prevMouseButton0 = false;
 
     @Mod.Instance("mcpmod")
     public static ModDevMcpMod instance;
@@ -279,15 +280,17 @@ public class ModDevMcpMod {
                 forceLwjgl2MouseFree();
             } else {
                 Minecraft mc = Minecraft.getMinecraft();
+                boolean mouse0 = Mouse.isButtonDown(0);
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
                 forceLwjgl2MouseFree();
-                if (Mouse.isButtonDown(0)) {
+                if (mouse0 && !prevMouseButton0) {
                     int mx = getMouseX(mc);
                     int my = getMouseY(mc);
                     ReflectionHelper.handleOverlayClick(mx, my, mc);
                 }
+                prevMouseButton0 = mouse0;
             }
             return;
         }
@@ -307,11 +310,13 @@ public class ModDevMcpMod {
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);
 
-            if (mc.world != null && mc.currentScreen != null && Mouse.isButtonDown(0)) {
+            boolean mouse0 = Mouse.isButtonDown(0);
+            if (mc.world != null && mc.currentScreen != null && mouse0 && !prevMouseButton0) {
                 int mx = getMouseX(mc);
                 int my = getMouseY(mc);
                 ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
             }
+            prevMouseButton0 = mouse0;
         } catch (Exception ignored) {}
         if (INSTANCE.chatSent) return;
         try {

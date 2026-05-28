@@ -150,7 +150,7 @@ public final class ControlModeHelper {
 
     public static String handleOverlayClick(int guiX, int guiY, Object mc) {
         if (!mcpControlMode) return "not_in_control_mode";
-        if (System.currentTimeMillis() - mcpControlModeEnterTime < 1000) return "cooldown";
+        if (System.currentTimeMillis() - mcpControlModeEnterTime < 300) return "cooldown";
         boolean hitResume = guiX >= overlayResumeX && guiX <= overlayResumeX + overlayResumeW
                          && guiY >= overlayResumeY && guiY <= overlayResumeY + overlayResumeH;
         boolean hitMenu = guiX >= overlayMenuX && guiX <= overlayMenuX + overlayMenuW

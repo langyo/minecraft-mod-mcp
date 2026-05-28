@@ -26,6 +26,7 @@ public class ModDevMcpMod {
     private McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
+    private static boolean prevMouseButton0 = false;
 
     @Mod.Instance("mcpmod")
     public static ModDevMcpMod instance;
@@ -146,10 +147,12 @@ public class ModDevMcpMod {
         if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive() && !ReflectionHelper.isMcpControlMode()) return;
         try {
             Minecraft mc = Minecraft.getMinecraft();
+            boolean overlayMouse0 = false;
             ReflectionHelper.tickMouseRelease(mc);
             ReflectionHelper.tickMcpControlMode(mc);
 
             if (ReflectionHelper.isMcpControlMode()) {
+                overlayMouse0 = Mouse.isButtonDown(0);
                 forceLwjgl2MouseFree();
             }
 
@@ -164,7 +167,7 @@ public class ModDevMcpMod {
                     int h = sr.getScaledHeight();
                     int mx = getMouseX(mc);
                     int my = getMouseY(mc);
-                    if (Mouse.isButtonDown(0)) {
+                    if (overlayMouse0 && !prevMouseButton0) {
                         ReflectionHelper.handleOverlayClick(mx, my, mc);
                     }
                     McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, net.minecraft.client.resources.I18n.format("mcpmod.control.resume"), w, h, mx, my);
@@ -224,15 +227,17 @@ public class ModDevMcpMod {
                 forceLwjgl2MouseFree();
             } else {
                 Minecraft mc = Minecraft.getMinecraft();
+                boolean mouse0 = Mouse.isButtonDown(0);
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
                 forceLwjgl2MouseFree();
-                if (Mouse.isButtonDown(0)) {
+                if (mouse0 && !prevMouseButton0) {
                     int mx = getMouseX(mc);
                     int my = getMouseY(mc);
                     ReflectionHelper.handleOverlayClick(mx, my, mc);
                 }
+                prevMouseButton0 = mouse0;
             }
             return;
         }
@@ -252,11 +257,13 @@ public class ModDevMcpMod {
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);
 
-            if (mc.theWorld != null && mc.currentScreen != null && Mouse.isButtonDown(0)) {
+            boolean mouse0 = Mouse.isButtonDown(0);
+            if (mc.theWorld != null && mc.currentScreen != null && mouse0 && !prevMouseButton0) {
                 int mx = getMouseX(mc);
                 int my = getMouseY(mc);
                 ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
             }
+            prevMouseButton0 = mouse0;
         } catch (Exception ignored) {}
         if (INSTANCE.chatSent) return;
         try {
