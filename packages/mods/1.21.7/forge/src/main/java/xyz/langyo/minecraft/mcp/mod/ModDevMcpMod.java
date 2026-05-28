@@ -23,7 +23,6 @@ public class ModDevMcpMod {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
 
-    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
     private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
     private static boolean mouseInterceptorInstalled = false;
     private static java.lang.reflect.Field mousePosXField = null;
@@ -33,19 +32,6 @@ public class ModDevMcpMod {
         if (mouseInterceptorInstalled) return;
         try {
             long handle = mc.getWindow().getWindow();
-            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
-                if (ReflectionHelper.isMcpControlMode()) {
-                    if (button == 0 && action == 1) {
-                        double mx = getMouseX(mc);
-                        double my = getMouseY(mc);
-                        ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
-                    }
-                    return;
-                }
-                if (originalMouseButtonCallback != null) {
-                    originalMouseButtonCallback.invoke(window, button, action, mods);
-                }
-            });
             originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
                 if (ReflectionHelper.isMcpControlMode()) {
                     try {
@@ -163,23 +149,12 @@ public class ModDevMcpMod {
                 double my = getMouseY(mc);
                 String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                 if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                    return false;
+                    return true;
                 }
             } catch (Exception ignored) {}
-            return true;
+            return false;
         });
 
-        ScreenEvent.MouseDragged.Pre.BUS.addListener(event -> {
-            return ReflectionHelper.isMcpControlMode();
-        });
-
-        ScreenEvent.MouseButtonReleased.Pre.BUS.addListener(event -> {
-            return ReflectionHelper.isMcpControlMode();
-        });
-
-        ScreenEvent.MouseScrolled.Pre.BUS.addListener(event -> {
-            return ReflectionHelper.isMcpControlMode();
-        });
 
         CustomizeGuiOverlayEvent.Chat.BUS.addListener(event -> {
             if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
@@ -238,7 +213,7 @@ public class ModDevMcpMod {
                             return true;
                         }
                     }
-                    return true;
+                    return false;
                 }
                 if (mc.level != null && mc.screen != null && event.getButton() == 0) {
                     double mx = getMouseX(mc);

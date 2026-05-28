@@ -150,7 +150,6 @@ public class ModDevMcpMod {
                             return;
                         }
                     }
-                    event.setCanceled(true);
                     return;
                 }
                 if (mc.level != null && mc.screen != null && event.getButton() == 0) {

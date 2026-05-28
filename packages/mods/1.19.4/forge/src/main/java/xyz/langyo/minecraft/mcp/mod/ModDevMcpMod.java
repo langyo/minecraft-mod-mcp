@@ -28,7 +28,6 @@ public class ModDevMcpMod {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
 
-    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
     private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
     private static boolean mouseInterceptorInstalled = false;
     private static java.lang.reflect.Field mousePosXField = null;
@@ -38,19 +37,6 @@ public class ModDevMcpMod {
         if (mouseInterceptorInstalled) return;
         try {
             long handle = mc.getWindow().getWindow();
-            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
-                if (ReflectionHelper.isMcpControlMode()) {
-                    if (button == 0 && action == 1) {
-                        double mx = getMouseX(mc);
-                        double my = getMouseY(mc);
-                        ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
-                    }
-                    return;
-                }
-                if (originalMouseButtonCallback != null) {
-                    originalMouseButtonCallback.invoke(window, button, action, mods);
-                }
-            });
             originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
                 if (ReflectionHelper.isMcpControlMode()) {
                     try {
@@ -166,22 +152,9 @@ public class ModDevMcpMod {
                 double my = getMouseY(mc);
                 String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                 if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                    return;
+                    event.setCanceled(true);
                 }
             } catch (Exception ignored) {}
-            event.setCanceled(true);
-        });
-
-        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.MouseDragged.Pre event) -> {
-            if (ReflectionHelper.isMcpControlMode()) event.setCanceled(true);
-        });
-
-        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.MouseButtonReleased.Pre event) -> {
-            if (ReflectionHelper.isMcpControlMode()) event.setCanceled(true);
-        });
-
-        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.MouseScrolled.Pre event) -> {
-            if (ReflectionHelper.isMcpControlMode()) event.setCanceled(true);
         });
 
         MinecraftForge.EVENT_BUS.addListener((CustomizeGuiOverlayEvent.Chat event) -> {
@@ -236,10 +209,8 @@ public class ModDevMcpMod {
                         String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                         if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                             event.setCanceled(true);
-                            return;
                         }
                     }
-                    event.setCanceled(true);
                     return;
                 }
                 if (mc.level != null && mc.screen != null && event.getButton() == 0) {

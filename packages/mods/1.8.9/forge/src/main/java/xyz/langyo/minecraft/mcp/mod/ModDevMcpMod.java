@@ -211,10 +211,9 @@ public class ModDevMcpMod {
                 int my = getMouseY(mc);
                 String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
                 if (!"blocked".equals(result) && !"cooldown".equals(result) && !"not_in_control_mode".equals(result)) {
-                    return;
+                    event.setCanceled(true);
                 }
             }
-            event.setCanceled(true);
         }
     }
 

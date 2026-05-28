@@ -110,7 +110,7 @@ public class ModDevMcpMod implements ClientModInitializer {
                         return true;
                     }
                 }
-                return true;
+                return false;
             }
 
             if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GameMenuScreen) && button == 0) {

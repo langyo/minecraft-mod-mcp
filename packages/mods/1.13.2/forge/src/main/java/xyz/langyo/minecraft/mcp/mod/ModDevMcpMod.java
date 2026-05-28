@@ -84,7 +84,6 @@ public class ModDevMcpMod {
     }
 
     private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
-    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
     private static boolean cursorInterceptorInstalled = false;
     private static java.lang.reflect.Field mousePosXField = null;
     private static java.lang.reflect.Field mousePosYField = null;
@@ -101,17 +100,6 @@ public class ModDevMcpMod {
                     } catch (Exception ignored) {}
                 } else if (originalCursorCallback != null) {
                     originalCursorCallback.invoke(window, xpos, ypos);
-                }
-            });
-            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
-                if (ReflectionHelper.isMcpControlMode()) {
-                    if (button == 0 && action == 1) {
-                        handleClick(mc, button, action);
-                    }
-                    return;
-                }
-                if (originalMouseButtonCallback != null) {
-                    originalMouseButtonCallback.invoke(window, button, action, mods);
                 }
             });
             java.lang.reflect.Field[] fields = mc.mouseHelper.getClass().getDeclaredFields();
@@ -237,7 +225,14 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 if (ReflectionHelper.isMcpControlMode()) {
-                    handleClick(mc, event.getButton(), event.getAction());
+                    if (event.getButton() == 0 && event.getAction() == 1) {
+                        double mx = getMouseX(mc);
+                        double my = getMouseY(mc);
+                        String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                        if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                            event.setCanceled(true);
+                        }
+                    }
                     return;
                 }
                 if (ReflectionHelper.shouldSuppressInput()) {
@@ -260,11 +255,10 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                         double my = getMouseY(mc);
                         String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                         if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                            return;
+                            try { event.setCanceled(true); } catch (Exception ignored) {}
                         }
                     }
                 } catch (Exception ignored) {}
-                try { event.setCanceled(true); } catch (Exception ignored) {}
             }
         });
 

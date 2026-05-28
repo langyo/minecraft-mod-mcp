@@ -245,7 +245,14 @@ public class ModDevMcpMod {
         try {
             Minecraft mc = Minecraft.getMinecraft();
             if (ReflectionHelper.isMcpControlMode()) {
-                event.setCanceled(true);
+                if (event.getButton() == 0 && event.isButtonstate()) {
+                    int mx = getMouseX(mc);
+                    int my = getMouseY(mc);
+                    String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
+                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                        event.setCanceled(true);
+                    }
+                }
                 return;
             }
             if (ReflectionHelper.shouldSuppressInput()) {
@@ -264,10 +271,9 @@ public class ModDevMcpMod {
                 int my = getMouseY(mc);
                 String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
                 if (!"blocked".equals(result) && !"cooldown".equals(result) && !"not_in_control_mode".equals(result)) {
-                    return;
+                    event.setCanceled(true);
                 }
             }
-            event.setCanceled(true);
         }
     }
 

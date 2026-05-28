@@ -93,7 +93,7 @@ public class ModDevMcpMod {
                             return true;
                         }
                     }
-                    return true;
+                    return false;
                 }
                 if (mc.level != null && mc.screen != null && event.getButton() == 0) {
                     double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
