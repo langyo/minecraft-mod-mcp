@@ -114,15 +114,9 @@ public final class ControlModeHelper {
                 }
             } else {
                 try {
-                    Object screen = ReflectionCache.getCurrentScreen(mc);
                     Class<?> mouseClass = Class.forName("org.lwjgl.input.Mouse");
-                    if (screen != null) {
-                        mouseClass.getMethod("setGrabbed", boolean.class).invoke(null, false);
-                        ReflectionHelper.dbg("exitMcpControlMode LWJGL2: screen open, cursor ungrabbed");
-                    } else {
-                        mouseClass.getMethod("setGrabbed", boolean.class).invoke(null, true);
-                        ReflectionHelper.dbg("exitMcpControlMode LWJGL2: no screen, mouse grabbed");
-                    }
+                    mouseClass.getMethod("setGrabbed", boolean.class).invoke(null, false);
+                    ReflectionHelper.dbg("exitMcpControlMode LWJGL2: cursor ungrabbed, MC will re-grab if needed");
                 } catch (Exception e) {
                     ReflectionHelper.dbg("exitMcpControlMode LWJGL2: " + e.getMessage());
                 }

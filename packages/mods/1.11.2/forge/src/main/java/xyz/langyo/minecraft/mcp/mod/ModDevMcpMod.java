@@ -100,7 +100,6 @@ public class ModDevMcpMod {
             if (Mouse.isGrabbed()) {
                 Mouse.setGrabbed(false);
             }
-            while (Mouse.next()) {}
         } catch (Exception ignored) {}
     }
 
@@ -286,26 +285,31 @@ public class ModDevMcpMod {
                 forceLwjgl2MouseFree();
             } else {
                 Minecraft mc = Minecraft.getMinecraft();
-                boolean mouse0 = Mouse.isButtonDown(0);
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
                 forceLwjgl2MouseFree();
-                if (mouse0 && !prevMouseButton0) {
-                    int mx = getMouseX(mc);
-                    int my = getMouseY(mc);
-                    ReflectionHelper.handleOverlayClick(mx, my, mc);
+                if (mc.currentScreen == null) {
+                    boolean mouse0 = Mouse.isButtonDown(0);
+                    if (mouse0 && !prevMouseButton0) {
+                        int mx = getMouseX(mc);
+                        int my = getMouseY(mc);
+                        ReflectionHelper.handleOverlayClick(mx, my, mc);
+                    }
+                    prevMouseButton0 = mouse0;
                 }
-                prevMouseButton0 = mouse0;
             }
             return;
         }
 
         if (!ReflectionHelper.isMcpControlMode() && event.phase == TickEvent.Phase.END) {
             Minecraft mc = Minecraft.getMinecraft();
-            if (mc.currentScreen == null && originalMouseHelper != null) {
+            if (originalMouseHelper != null) {
                 mc.mouseHelper = originalMouseHelper;
                 originalMouseHelper = null;
+                if (mc.currentScreen == null) {
+                    try { mc.mouseHelper.grabMouseCursor(); } catch (Exception ignored) {}
+                }
             }
         }
 
