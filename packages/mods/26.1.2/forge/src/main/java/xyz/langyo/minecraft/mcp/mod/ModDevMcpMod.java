@@ -208,60 +208,6 @@ public class ModDevMcpMod {
             }
         });
 
-        ScreenEvent.Init.Post.BUS.addListener(event -> {
-            try {
-                if (event.getScreen() instanceof PauseScreen) {
-                    Screen screen = event.getScreen();
-                    AbstractWidget widest = null;
-                    int maxBottomY = -1;
-                    Class<?> clazz = screen.getClass();
-                    while (clazz != null) {
-                        for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
-                            f.setAccessible(true);
-                            Object val;
-                            try { val = f.get(screen); } catch (Exception ex) { continue; }
-                            if (val instanceof java.util.List) {
-                                for (Object item : (java.util.List<?>) val) {
-                                    if (item instanceof AbstractWidget) {
-                                        AbstractWidget aw = (AbstractWidget) item;
-                                        int bottomY = aw.getY() + aw.getHeight();
-                                        if (aw.getWidth() >= 150 && bottomY > maxBottomY) {
-                                            widest = aw;
-                                            maxBottomY = bottomY;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        clazz = clazz.getSuperclass();
-                    }
-                    if (widest == null) return;
-                    int x = widest.getX();
-                    int y = widest.getY();
-                    int w = widest.getWidth();
-                    int h = widest.getHeight();
-                    int gap = 8;
-                    int leftW = (w - gap) / 2;
-                    int rightW = w - gap - leftW;
-                    widest.setX(x + leftW + gap);
-                    widest.setWidth(rightW);
-                    String transferKey = ReflectionHelper.getMcpControlPauseTransferTranslationKey();
-                    Button transferBtn = Button.builder(Component.translatable(transferKey), btn -> {
-                        try {
-                            Minecraft mc = Minecraft.getInstance();
-                            System.err.println("[MCP-DEBUG] PauseScreen button clicked, calling enterMcpControlMode...");
-                            String result = ReflectionHelper.enterMcpControlMode(mc);
-                            System.err.println("[MCP-DEBUG] enterMcpControlMode result: " + result);
-                            System.err.println("[MCP-DEBUG] isMcpControlMode: " + ReflectionHelper.isMcpControlMode());
-                            mc.setScreen(null);
-                            System.err.println("[MCP-DEBUG] setScreen(null) done");
-                        } catch (Exception e) { System.err.println("[MCP-DEBUG] button exception: " + e.getMessage()); e.printStackTrace(); }
-                    }).bounds(x, y, leftW, h).build();
-                    event.addListener(transferBtn);
-                }
-            } catch (Exception ignored) {}
-        });
-
         ScreenEvent.Render.Post.BUS.addListener(event -> {
             if (ReflectionHelper.isScreenshotInProgress()) return;
             try {

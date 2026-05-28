@@ -161,50 +161,6 @@ public class ModDevMcpMod {
             }
         });
 
-        MinecraftForge.EVENT_BUS.addListener((ScreenEvent.InitScreenEvent.Post event) -> {
-            try {
-                if (event.getScreen() instanceof PauseScreen) {
-                    Screen screen = event.getScreen();
-                    AbstractWidget widest = null;
-                    int widestW = 0;
-                    int widestY = 0;
-                    for (Object w : event.getListenersList()) {
-                        if (w instanceof AbstractWidget) {
-                            AbstractWidget aw = (AbstractWidget) w;
-                            if (aw.getWidth() >= 150 && (aw.getWidth() > widestW || (aw.getWidth() == widestW && aw.y > widestY))) {
-                                widest = aw;
-                                widestW = aw.getWidth();
-                                widestY = aw.y;
-                            }
-                        }
-                    }
-                    if (widest == null) return;
-                    int x = widest.x;
-                    int y = widest.y;
-                    int w = widest.getWidth();
-                    int h = widest.getHeight();
-                    int gap = 8;
-                    int leftW = (w - gap) / 2;
-                    int rightW = w - gap - leftW;
-                    widest.x = x + leftW + gap;
-                    widest.setWidth(rightW);
-                    String transferKey = ReflectionHelper.getMcpControlPauseTransferTranslationKey();
-                    Button transferBtn = new Button(x, y, leftW, h, new TranslatableComponent(transferKey), btn -> {
-                        try {
-                            Minecraft mc = Minecraft.getInstance();
-                            ReflectionHelper.enterMcpControlMode(mc);
-                            mc.setScreen(null);
-                        } catch (Exception ignored) {}
-                    });
-                    event.addListener(transferBtn);
-                    System.out.println("[MCP] Pause menu button added at x=" + x + " y=" + y + " w=" + leftW + " h=" + h);
-                }
-            } catch (Exception e) {
-                System.err.println("[MCP-MOD] InitScreenEvent.Post error: " + e.getMessage());
-                e.printStackTrace();
-            }
-        });
-
         MinecraftForge.EVENT_BUS.addListener((ScreenEvent.MouseClickedEvent.Pre event) -> {
             if (!ReflectionHelper.isMcpControlMode()) return;
             try {

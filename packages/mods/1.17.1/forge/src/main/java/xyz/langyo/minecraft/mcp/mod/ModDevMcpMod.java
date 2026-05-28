@@ -161,57 +161,6 @@ public class ModDevMcpMod {
             }
         });
 
-        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.InitGuiEvent.Post event) -> {
-            try {
-                if (event.getGui() instanceof PauseScreen) {
-                    Screen screen = event.getGui();
-                    AbstractWidget widest = null;
-                    int widestW = 0;
-                    int widestY = 0;
-                    Class<?> clazz = screen.getClass();
-                    while (clazz != null) {
-                        for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
-                            f.setAccessible(true);
-                            Object val;
-                            try { val = f.get(screen); } catch (Exception ex) { continue; }
-                            if (val instanceof java.util.List) {
-                                for (Object item : (java.util.List<?>) val) {
-                                    if (item instanceof AbstractWidget) {
-                                        AbstractWidget aw = (AbstractWidget) item;
-                                        if (aw.getWidth() >= 150 && (aw.getWidth() > widestW || (aw.getWidth() == widestW && aw.y > widestY))) {
-                                            widest = aw;
-                                            widestW = aw.getWidth();
-                                            widestY = aw.y;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        clazz = clazz.getSuperclass();
-                    }
-                    if (widest == null) return;
-                    int x = widest.x;
-                    int y = widest.y;
-                    int w = widest.getWidth();
-                    int h = widest.getHeight();
-                    int gap = 8;
-                    int leftW = (w - gap) / 2;
-                    int rightW = w - gap - leftW;
-                    widest.x = x + leftW + gap;
-                    widest.setWidth(rightW);
-                    String transferKey = ReflectionHelper.getMcpControlPauseTransferTranslationKey();
-                    Button transferBtn = new Button(x, y, leftW, h, new TranslatableComponent(transferKey), btn -> {
-                        try {
-                            Minecraft mc = Minecraft.getInstance();
-                            ReflectionHelper.enterMcpControlMode(mc);
-                            mc.setScreen(null);
-                        } catch (Exception ignored) {}
-                    });
-                    event.addWidget(transferBtn);
-                }
-            } catch (Exception ignored) {}
-        });
-
         MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseClickedEvent.Pre event) -> {
             if (!ReflectionHelper.isMcpControlMode()) return;
             if (event.getButton() == 0) {

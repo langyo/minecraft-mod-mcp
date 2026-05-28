@@ -155,58 +155,6 @@ public class ModDevMcpMod {
             }
         });
 
-        ScreenEvent.Init.Post.BUS.addListener(event -> {
-            try {
-                if (event.getScreen() instanceof PauseScreen) {
-                    Screen screen = event.getScreen();
-                    AbstractWidget widest = null;
-                    int widestW = 0;
-                    int maxBottomY = -1;
-                    Class<?> clazz = screen.getClass();
-                    while (clazz != null) {
-                        for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
-                            f.setAccessible(true);
-                            Object val;
-                            try { val = f.get(screen); } catch (Exception ex) { continue; }
-                            if (val instanceof java.util.List) {
-                                for (Object item : (java.util.List<?>) val) {
-                                    if (item instanceof AbstractWidget) {
-                                        AbstractWidget aw = (AbstractWidget) item;
-                                        int bottomY = aw.getY() + aw.getHeight();
-                                        if (aw.getWidth() >= 150 && bottomY > maxBottomY) {
-                                            widest = aw;
-                                            widestW = aw.getWidth();
-                                            maxBottomY = bottomY;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        clazz = clazz.getSuperclass();
-                    }
-                    if (widest == null) return;
-                    int x = widest.getX();
-                    int y = widest.getY();
-                    int w = widest.getWidth();
-                    int h = widest.getHeight();
-                    int gap = 8;
-                    int leftW = (w - gap) / 2;
-                    int rightW = w - gap - leftW;
-                    widest.setX(x + leftW + gap);
-                    widest.setWidth(rightW);
-                    String transferKey = ReflectionHelper.getMcpControlPauseTransferTranslationKey();
-                    Button transferBtn = Button.builder(Component.translatable(transferKey), btn -> {
-                        try {
-                            Minecraft mc = Minecraft.getInstance();
-                            ReflectionHelper.enterMcpControlMode(mc);
-                            mc.setScreen(null);
-                        } catch (Exception ignored) {}
-                    }).bounds(x, y, leftW, h).build();
-                    event.addListener(transferBtn);
-                }
-            } catch (Exception ignored) {}
-        });
-
         ScreenEvent.MouseButtonPressed.Pre.BUS.addListener(event -> {
             if (!ReflectionHelper.isMcpControlMode()) return false;
             try {

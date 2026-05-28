@@ -28,6 +28,7 @@ public final class ControlModeHelper {
     private static Field accumulatedDXField = null;
     private static Field accumulatedDYField = null;
     private static boolean mouseFieldsInit = false;
+    private static boolean hadScreenOnEnter = false;
 
     private ControlModeHelper() {}
 
@@ -52,6 +53,33 @@ public final class ControlModeHelper {
         try {
             mcpControlMode = true;
             mcpControlModeEnterTime = System.currentTimeMillis();
+            try {
+                Object s = ReflectionCache.getCurrentScreen(mc);
+                hadScreenOnEnter = (s != null);
+                System.out.println("[MCP-ENTER] screen=" + (s != null ? s.getClass().getName() : "NULL"));
+                if (s == null) {
+                    try {
+                        for (Field f : mc.getClass().getDeclaredFields()) {
+                            String fn = f.getName();
+                            if (fn.contains("screen") || fn.contains("Screen") || fn.contains("71462")) {
+                                f.setAccessible(true);
+                                Object val = f.get(mc);
+                                System.out.println("[MCP-ENTER-FIELD] " + fn + " = " + (val != null ? val.getClass().getName() : "null"));
+                            }
+                        }
+                        try {
+                            Object viaMethod = mc.getClass().getMethod("screen").invoke(mc);
+                            System.out.println("[MCP-ENTER-METHOD] screen() = " + (viaMethod != null ? viaMethod.getClass().getName() : "null"));
+                        } catch (Exception e) {
+                            System.out.println("[MCP-ENTER-METHOD] failed: " + e.getMessage());
+                        }
+                    } catch (Exception e) {
+                        System.out.println("[MCP-ENTER-DIAG] failed: " + e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("[MCP-ENTER] getCurrentScreen failed: " + e.getMessage());
+            }
             mouseReleaseActive = false;
             forceCursorAndReleaseMouse(mc);
             logModEvent("enter_control_mode", "MCP took control");
@@ -68,26 +96,21 @@ public final class ControlModeHelper {
             logModEvent("exit_control_mode", "Manual control restored");
             mouseReleaseActive = false;
             if (ReflectionCache.LWJGL3) {
-                long glfwHandle = WindowHelper.getWindowHandle(mc);
-                Method glfwSetInputMode = ReflectionCache.getGlfwSetInputModeMethod();
-                if (glfwHandle != 0 && glfwSetInputMode != null) {
-                    try {
-                        Object screen = ReflectionCache.getCurrentScreen(mc);
-                        if (screen != null) {
-                            glfwSetInputMode.invoke(null, glfwHandle, ReflectionCache.getGlfwCursor(), ReflectionCache.getGlfwCursorNormal());
-                            ReflectionHelper.dbg("exitMcpControlMode: screen open (" + screen.getClass().getSimpleName() + "), cursor NORMAL");
-                        } else {
-                            glfwSetInputMode.invoke(null, glfwHandle, ReflectionCache.getGlfwCursor(), ReflectionCache.getGlfwCursorDisabled());
-                            Object mh = ReflectionCache.getMouseHandler(mc);
-                            if (mh != null) initMouseFields(mh);
-                            if (mouseGrabbedField != null && mh != null) {
-                                mouseGrabbedField.setBoolean(mh, true);
+                try {
+                    Object mh = ReflectionCache.getMouseHandler(mc);
+                    if (mh != null) {
+                        try {
+                            for (Method m : mh.getClass().getMethods()) {
+                                if (m.getName().equals("releaseMouse") && m.getParameterCount() == 0) {
+                                    m.invoke(mh);
+                                    break;
+                                }
                             }
-                            ReflectionHelper.dbg("exitMcpControlMode: no screen, cursor DISABLED + mouse grabbed");
-                        }
-                    } catch (Exception ce) {
-                        ReflectionHelper.dbg("exitMcpControlMode: glfwSetInputMode failed: " + ce.getMessage());
+                        } catch (Exception ignored) {}
                     }
+                    ReflectionHelper.dbg("exitMcpControlMode: released mouse");
+                } catch (Exception ce) {
+                    ReflectionHelper.dbg("exitMcpControlMode: failed: " + ce.getMessage());
                 }
             } else {
                 try {
