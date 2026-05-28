@@ -256,7 +256,12 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                 try {
                     Minecraft mc = Minecraft.getInstance();
                     if (GLFW.glfwGetMouseButton(mc.mainWindow.getHandle(), GLFW.GLFW_MOUSE_BUTTON_1) == GLFW.GLFW_PRESS) {
-                        handleClick(mc, 0, 1);
+                        double mx = getMouseX(mc);
+                        double my = getMouseY(mc);
+                        String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                        if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                            return;
+                        }
                     }
                 } catch (Exception ignored) {}
                 try { event.setCanceled(true); } catch (Exception ignored) {}

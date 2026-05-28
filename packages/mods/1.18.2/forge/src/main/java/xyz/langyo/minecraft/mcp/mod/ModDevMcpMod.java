@@ -211,7 +211,10 @@ public class ModDevMcpMod {
                 Minecraft mc = Minecraft.getInstance();
                 double mx = getMouseX(mc);
                 double my = getMouseY(mc);
-                ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                    return;
+                }
             } catch (Exception ignored) {}
             event.setCanceled(true);
         });

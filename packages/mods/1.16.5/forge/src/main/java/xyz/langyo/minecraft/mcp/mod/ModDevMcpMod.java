@@ -171,14 +171,17 @@ public class ModDevMcpMod {
 
         MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseClickedEvent.Pre event) -> {
             if (!ReflectionHelper.isMcpControlMode()) return;
-            try {
-                Minecraft mc = Minecraft.getInstance();
-                if (event.getButton() == 0) {
+            if (event.getButton() == 0) {
+                try {
+                    Minecraft mc = Minecraft.getInstance();
                     double mx = getMouseX(mc);
                     double my = getMouseY(mc);
-                    ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
-                }
-            } catch (Exception ignored) {}
+                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                        return;
+                    }
+                } catch (Exception ignored) {}
+            }
             event.setCanceled(true);
         });
 

@@ -257,6 +257,15 @@ public class ModDevMcpMod {
     @SubscribeEvent
     public void onGuiMouseInputPre(GuiScreenEvent.MouseInputEvent.Pre event) {
         if (ReflectionHelper.isMcpControlMode()) {
+            if (org.lwjgl.input.Mouse.getEventButton() == 0 && org.lwjgl.input.Mouse.getEventButtonState()) {
+                Minecraft mc = Minecraft.getMinecraft();
+                int mx = getMouseX(mc);
+                int my = getMouseY(mc);
+                String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
+                if (!"blocked".equals(result) && !"cooldown".equals(result) && !"not_in_control_mode".equals(result)) {
+                    return;
+                }
+            }
             event.setCanceled(true);
         }
     }
