@@ -261,6 +261,7 @@ public class ModDevMcpMod {
 
         if (event.phase == TickEvent.Phase.START) {
             restoreOriginalMouseHelper();
+            prevMouseButton0 = Mouse.isButtonDown(0);
         }
 
         if (event.phase != TickEvent.Phase.END) return;

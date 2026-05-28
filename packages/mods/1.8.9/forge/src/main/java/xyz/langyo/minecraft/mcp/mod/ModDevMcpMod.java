@@ -165,6 +165,12 @@ public class ModDevMcpMod {
                     int h = sr.getScaledHeight();
                     int mx = getMouseX(mc);
                     int my = getMouseY(mc);
+                    boolean mouse0 = Mouse.isButtonDown(0);
+                    if (mouse0 && !prevMouseButton0) {
+                        String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
+                        System.out.println("[MCP-DBG] renderClick mx=" + mx + " my=" + my + " result=" + result);
+                    }
+                    prevMouseButton0 = mouse0;
                     McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRendererObj, net.minecraft.client.resources.I18n.format("mcpmod.control.resume"), w, h, mx, my);
                 }
             }
@@ -198,15 +204,21 @@ public class ModDevMcpMod {
 
     @SubscribeEvent
     public void onGuiMouseInputPre(GuiScreenEvent.MouseInputEvent.Pre event) {
+        if (org.lwjgl.input.Mouse.getEventButton() != 0 || !org.lwjgl.input.Mouse.getEventButtonState()) return;
+        Minecraft mc = Minecraft.getMinecraft();
+        int mx = getMouseX(mc);
+        int my = getMouseY(mc);
         if (ReflectionHelper.isMcpControlMode()) {
-            if (org.lwjgl.input.Mouse.getEventButton() == 0 && org.lwjgl.input.Mouse.getEventButtonState()) {
-                Minecraft mc = Minecraft.getMinecraft();
-                int mx = getMouseX(mc);
-                int my = getMouseY(mc);
-                String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
-                if (!"blocked".equals(result) && !"cooldown".equals(result) && !"not_in_control_mode".equals(result)) {
-                    event.setCanceled(true);
-                }
+            String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
+            System.out.println("[MCP-DBG] guiMcpClick mx=" + mx + " my=" + my + " result=" + result);
+            if (!"blocked".equals(result) && !"cooldown".equals(result) && !"not_in_control_mode".equals(result)) {
+                event.setCanceled(true);
+            }
+        } else if (mc.theWorld != null) {
+            String result = ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
+            System.out.println("[MCP-DBG] guiTransferClick mx=" + mx + " my=" + my + " result=" + result);
+            if ("transfer_to_mcp".equals(result)) {
+                event.setCanceled(true);
             }
         }
     }
@@ -223,21 +235,13 @@ public class ModDevMcpMod {
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
-                if (mc.currentScreen == null) {
-                    boolean mouse0 = Mouse.isButtonDown(0);
-                    if (mouse0 && !prevMouseButton0) {
-                        int mx = getMouseX(mc);
-                        int my = getMouseY(mc);
-                        ReflectionHelper.handleOverlayClick(mx, my, mc);
-                    }
-                    prevMouseButton0 = mouse0;
-                }
             }
             return;
         }
 
         if (event.phase == TickEvent.Phase.START) {
             restoreOriginalMouseHelper();
+            prevMouseButton0 = Mouse.isButtonDown(0);
         }
 
         if (event.phase != TickEvent.Phase.END) return;
@@ -246,14 +250,6 @@ public class ModDevMcpMod {
             ReflectionHelper.tickMouseRelease(mc);
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);
-
-            boolean mouse0 = Mouse.isButtonDown(0);
-            if (mc.theWorld != null && mc.currentScreen != null && mouse0 && !prevMouseButton0) {
-                int mx = getMouseX(mc);
-                int my = getMouseY(mc);
-                ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
-            }
-            prevMouseButton0 = mouse0;
         } catch (Exception ignored) {}
         if (INSTANCE.chatSent) return;
         try {
