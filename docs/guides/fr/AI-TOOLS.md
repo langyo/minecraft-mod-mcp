@@ -2,9 +2,49 @@
 
 **[English](../en/AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **Français** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
 
-> **Astuce** : Vous pouvez simplement demander à votre assistant IA de lire ce guide directement depuis l'URL de ce dépôt. Dans la plupart des cas, l'agent configurera automatiquement la connexion MCP — aucune configuration manuelle n'est nécessaire de votre part.
+> **🤖 Pour les agents IA** : Si un utilisateur vous demande de vous connecter à Minecraft, ajoutez cette configuration de serveur MCP et utilisez les plus de 35 outils listés à la fin de ce guide :
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "minecraft-mcp": {
+>       "type": "sse",
+>       "url": "http://localhost:9876/api/events"
+>     }
+>   }
+> }
+> ```
+>
+> **Pour les utilisateurs** : Collez simplement l'URL de cette page à votre agent IA et il se configurera automatiquement. Aucune configuration manuelle n'est nécessaire.
 
-Ce guide explique comment configurer les principaux outils de codage IA pour se connecter au serveur Minecraft MCP via HTTP.
+---
+
+## Configuration rapide
+
+La plupart des outils de codage IA utilisent la même configuration MCP basée sur SSE. Ajoutez ceci au fichier de configuration de votre outil :
+
+```json
+{
+  "mcpServers": {
+    "minecraft-mcp": {
+      "type": "sse",
+      "url": "http://localhost:9876/api/events"
+    }
+  }
+}
+```
+
+Emplacements courants des fichiers de configuration :
+
+| Outil | Fichier de configuration |
+|------|-------------|
+| Claude Code, OpenCode, CodeBuddy, WorkBuddy | `.mcp.json` à la racine du projet |
+| Cursor | `.cursor/mcp.json` à la racine du projet |
+| Cline, Roo Code, Kilo Code | `settings.json` de VS Code |
+| Claude Desktop | `claude_desktop_config.json` (chemins OS ci-dessous) |
+| Autres | Voir les sections spécifiques ci-dessous |
+
+> Consultez les [instructions par outil](#outils-agent-de-codage) ci-dessous pour les chemins exacts, la configuration via l'interface et les formats spécifiques.
 
 ## Points de terminaison HTTP de Minecraft MCP
 
@@ -535,7 +575,7 @@ flowchart TD
 
 [GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) est un serveur MCP local propulsé par GLM-4.6V, offrant :
 
-| Tool | Use Case |
+| Outil | Cas d'utilisation |
 |------|----------|
 | `ui_to_artifact` | Convertir des captures d'écran d'IU en code, invites ou spécifications de conception |
 | `extract_text_from_screenshot` | OCR du texte de l'IU du jeu (chat, panneaux, menus) |
@@ -566,6 +606,26 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
   }
 }
 ```
+
+> **Note** : Le serveur MCP de vision lit les fichiers depuis le disque, utilisez donc toujours `screenshot_to_file` (et non `screenshot`) avant d'appeler les outils de vision. Votre agent IA peut spécifier un chemin de fichier lors de l'appel à `screenshot_to_file`.
+
+### Exemple de flux de travail
+
+1. Demandez à votre agent IA : *"Prenez une capture d'écran de Minecraft, enregistrez-la dans `/tmp/mc.png`, puis analysez ce qui s'affiche à l'écran et dites-moi quel bouton cliquer pour démarrer une nouvelle partie."*
+2. L'agent appelle `minecraft-mcp` → `screenshot_to_file` → fichier enregistré
+3. L'agent appelle `zai-mcp-server` → `extract_text_from_screenshot` → lecture du texte de l'IU
+4. L'agent vous indique ce qu'il voit et ce qu'il faut faire ensuite
+
+### Autres outils de vision
+
+| Outil | Description |
+|------|------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude comprend nativement les images — collez ou référencez simplement un fichier de capture d'écran |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | Modèles de vision OpenAI accessibles via tout client compatible OpenAI |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | API de vision de Google, utilisable dans les outils compatibles Gemini |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | Modèle vision-langage open source pour les environnements auto-hébergés |
+
+> Tout LLM ou serveur MCP capable de vision peut être utilisé dans le même pipeline — la clé est d'utiliser `screenshot_to_file` pour d'abord enregistrer la capture d'écran sur le disque.
 
 ---
 

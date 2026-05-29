@@ -2,9 +2,51 @@
 
 **[English](../en/AI-TOOLS.md)** &bull; **简体中文** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
 
-> **提示**：你可以直接让你的 AI Agent 助手阅读该仓库中的本指南 URL 进行对接，一般情况下无需你手动操作。
+> **🤖 致 AI Agent**：如果有用户要求你接入 Minecraft，请添加以下 MCP 服务器配置，然后使用本指南末尾列出的 35+ 工具：
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "minecraft-mcp": {
+>       "type": "sse",
+>       "url": "http://localhost:9876/api/events"
+>     }
+>   }
+> }
+> ```
+>
+> **致用户**：你可以直接把本页链接粘贴给你的 AI Agent，它会自行完成配置，无需手动操作。
 
-本指南介绍如何将主流 AI 编程工具通过 HTTP 连接到 Minecraft MCP 服务器。
+---
+
+## 快速配置
+
+大多数 AI 编程工具使用相同的基于 SSE 的 MCP 配置。将其添加到你的工具配置文件中：
+
+```json
+{
+  "mcpServers": {
+    "minecraft-mcp": {
+      "type": "sse",
+      "url": "http://localhost:9876/api/events"
+    }
+  }
+}
+```
+
+常见配置文件位置：
+
+| 工具 | 配置文件 |
+|------|-------------|
+| Claude Code、OpenCode、CodeBuddy、WorkBuddy | 项目根目录下的 `.mcp.json` |
+| Cursor | 项目根目录下的 `.cursor/mcp.json` |
+| Cline、Roo Code、Kilo Code | VS Code `settings.json` |
+| Claude Desktop | `claude_desktop_config.json`（系统路径见下方） |
+| 其他 | 见下方各工具的详细说明 |
+
+> 查看[各工具详细配置](#编程-agent-工具)以获取具体路径、界面配置和特定工具格式。
+
+---
 
 ## Minecraft MCP HTTP 端点
 
@@ -566,6 +608,26 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
   }
 }
 ```
+
+> **注意**：视觉 MCP 会从磁盘读取文件，因此在调用视觉工具之前，请务必先使用 `screenshot_to_file`（而非 `screenshot`）。你的 AI Agent 可以在调用 `screenshot_to_file` 时指定文件路径。
+
+### 操作示例
+
+1. 向你的 AI Agent 提问：*"截取 Minecraft 的屏幕截图，保存到 `/tmp/mc.png`，然后分析屏幕上的内容，告诉我该按哪个按钮来开始新游戏。"*
+2. Agent 调用 `minecraft-mcp` → `screenshot_to_file` → 文件已保存
+3. Agent 调用 `zai-mcp-server` → `extract_text_from_screenshot` → 读取 UI 文字
+4. Agent 告诉你它看到了什么，以及下一步该做什么
+
+### 其他视觉工具
+
+| 工具 | 说明 |
+|------|------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude 原生理解图片 — 直接粘贴或引用截图文件 |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAI 视觉模型，可通过任何 OpenAI 兼容客户端使用 |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | Google 的视觉 API，可在 Gemini 兼容工具中使用 |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | 开源视觉语言模型，适用于自托管环境 |
+
+> 任何具备视觉能力的 LLM 或 MCP 服务器都可以用于相同流程 — 关键是使用 `screenshot_to_file` 先将截图保存到磁盘。
 
 ---
 
