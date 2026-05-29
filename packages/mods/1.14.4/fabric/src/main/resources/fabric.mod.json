@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "mcpmod",
+  "version": "1.0.0",
+  "name": "ModDev MCP",
+  "description": "WebSocket bridge for AI agent interaction",
+  "authors": ["langyo"],
+  "environment": "client",
+  "entrypoints": {
+    "client": ["xyz.langyo.minecraft.mcp.mod.ModDevMcpMod"]
+  },
+  "mixins": [
+    "mcpmod.mixins.json"
+  ]
+}

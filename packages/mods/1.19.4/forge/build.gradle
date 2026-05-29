@@ -1,0 +1,57 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+version = '1.0.0-SNAPSHOT'
+group = 'xyz.langyo'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'official', version: '1.19.4'
+    runs {
+        configureEach {
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+        }
+        client {
+            workingDirectory = file('run')
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = rootProject.projectDir.toPath().resolve('../../../../.maven-local').toUri()
+        allowInsecureProtocol = false
+    }
+}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+sourceSets.main.resources.srcDir '../../../common/src/main/resources'
+
+dependencies {
+    minecraft "net.minecraftforge:forge:1.19.4-45.4.3"
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+    implementation 'net.java.dev.jna:jna:5.15.0'
+    implementation 'net.java.dev.jna:jna-platform:5.15.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(ProcessResources).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+jar {
+    manifest {
+        attributes 'Automatic-Module-Name': 'mcpmod'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}

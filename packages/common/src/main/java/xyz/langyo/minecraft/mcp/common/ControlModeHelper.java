@@ -1,0 +1,326 @@
+package xyz.langyo.minecraft.mcp.common;
+
+import java.awt.Robot;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public final class ControlModeHelper {
+
+    private static volatile boolean mcpControlMode = false;
+    private static volatile long mcpControlModeEnterTime = 0;
+    private static volatile long mcpControlModeExitTime = 0;
+    private static volatile java.util.function.Consumer<String[]> eventLogger = null;
+
+    private static volatile int overlayResumeX = -999, overlayResumeY = -999, overlayResumeW, overlayResumeH;
+    private static volatile int overlayMenuX = -999, overlayMenuY = -999, overlayMenuW, overlayMenuH;
+    private static volatile int overlayTransferX = -999, overlayTransferY = -999, overlayTransferW, overlayTransferH;
+
+    private static volatile boolean mouseReleaseActive = false;
+    private static volatile boolean waitingForRelease = false;
+
+    private static int GLFW_CURSOR_VAL = -1;
+    private static int GLFW_CURSOR_NORMAL_VAL = -1;
+    private static boolean cursorCacheInit = false;
+    private static Field mouseGrabbedField = null;
+    private static Field accumulatedDXField = null;
+    private static Field accumulatedDYField = null;
+    private static boolean mouseFieldsInit = false;
+    private static boolean hadScreenOnEnter = false;
+
+    private ControlModeHelper() {}
+
+    public static void setEventLogger(java.util.function.Consumer<String[]> logger) { eventLogger = logger; }
+
+    private static void logModEvent(String method, String detail) {
+        java.util.function.Consumer<String[]> l = eventLogger;
+        if (l != null) try { l.accept(new String[]{method, detail}); } catch (Exception ignored) {}
+    }
+
+    public static boolean isMcpControlMode() { return mcpControlMode; }
+
+    public static boolean isWaitingForRelease() { return waitingForRelease; }
+
+    public static void clearWaitingForRelease() { waitingForRelease = false; }
+
+    public static boolean shouldSuppressInput() {
+        if (!mcpControlMode && mcpControlModeExitTime > 0) {
+            return System.currentTimeMillis() - mcpControlModeExitTime < 200;
+        }
+        return false;
+    }
+
+    public static String enterMcpControlMode(Object mc) {
+        ReflectionCache.initClassCache();
+        try {
+            mcpControlMode = true;
+            mcpControlModeEnterTime = System.currentTimeMillis();
+            System.out.println("[MCP-ENTER] stacktrace: " + java.util.Arrays.toString(new Exception().getStackTrace()).substring(0, 500));
+            try {
+                Object s = ReflectionCache.getCurrentScreen(mc);
+                hadScreenOnEnter = (s != null);
+                System.out.println("[MCP-ENTER] screen=" + (s != null ? s.getClass().getName() : "NULL"));
+                if (s == null) {
+                    try {
+                        for (Field f : mc.getClass().getDeclaredFields()) {
+                            String fn = f.getName();
+                            if (fn.contains("screen") || fn.contains("Screen") || fn.contains("71462")) {
+                                f.setAccessible(true);
+                                Object val = f.get(mc);
+                                System.out.println("[MCP-ENTER-FIELD] " + fn + " = " + (val != null ? val.getClass().getName() : "null"));
+                            }
+                        }
+                        try {
+                            Object viaMethod = mc.getClass().getMethod("screen").invoke(mc);
+                            System.out.println("[MCP-ENTER-METHOD] screen() = " + (viaMethod != null ? viaMethod.getClass().getName() : "null"));
+                        } catch (Exception e) {
+                            System.out.println("[MCP-ENTER-METHOD] failed: " + e.getMessage());
+                        }
+                    } catch (Exception e) {
+                        System.out.println("[MCP-ENTER-DIAG] failed: " + e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("[MCP-ENTER] getCurrentScreen failed: " + e.getMessage());
+            }
+            mouseReleaseActive = false;
+            forceCursorAndReleaseMouse(mc);
+            logModEvent("enter_control_mode", "MCP took control");
+            ReflectionHelper.dbg("enterMcpControlMode: cursor forced to NORMAL, no hook");
+            return JsonHelper.builder().put("control_mode", true).put("platform", "internal").put("hook", false).build();
+        } catch (Exception e) { return JsonHelper.error(e.getMessage()); }
+    }
+
+    public static String exitMcpControlMode(Object mc) {
+        try {
+            System.out.println("[MCP-EXIT] stacktrace: " + java.util.Arrays.toString(new Exception().getStackTrace()).substring(0, 500));
+            mcpControlMode = false;
+            mcpControlModeExitTime = System.currentTimeMillis();
+            logModEvent("exit_control_mode", "Manual control restored");
+            mouseReleaseActive = false;
+            waitingForRelease = true;
+            if (ReflectionCache.LWJGL3) {
+                try {
+                    Object mh = ReflectionCache.getMouseHandler(mc);
+                    if (mh != null) {
+                        try {
+                            for (Method m : mh.getClass().getMethods()) {
+                                if (m.getName().equals("releaseMouse") && m.getParameterCount() == 0) {
+                                    m.invoke(mh);
+                                    break;
+                                }
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    ReflectionHelper.dbg("exitMcpControlMode: released mouse");
+                } catch (Exception ce) {
+                    ReflectionHelper.dbg("exitMcpControlMode: failed: " + ce.getMessage());
+                }
+            } else {
+                try {
+                    Class<?> mouseClass = Class.forName("org.lwjgl.input.Mouse");
+                    mouseClass.getMethod("setGrabbed", boolean.class).invoke(null, false);
+                    ReflectionHelper.dbg("exitMcpControlMode LWJGL2: cursor ungrabbed, MC will re-grab if needed");
+                } catch (Exception e) {
+                    ReflectionHelper.dbg("exitMcpControlMode LWJGL2: " + e.getMessage());
+                }
+            }
+            ReflectionHelper.dbg("exitMcpControlMode: OFF");
+            return JsonHelper.kv("control_mode", false);
+        } catch (Exception e) { return JsonHelper.error(e.getMessage()); }
+    }
+
+    public static void setOverlayButtonBounds(int rx, int ry, int rw, int rh, int mx, int my, int mw, int mh) {
+        overlayResumeX = rx; overlayResumeY = ry; overlayResumeW = rw; overlayResumeH = rh;
+        overlayMenuX = mx; overlayMenuY = my; overlayMenuW = mw; overlayMenuH = mh;
+    }
+
+    public static void setTransferButtonBounds(int x, int y, int w, int h) {
+        overlayTransferX = x; overlayTransferY = y; overlayTransferW = w; overlayTransferH = h;
+    }
+
+    public static String handleTransferOverlayClick(int guiX, int guiY, Object mc) {
+        if (mcpControlMode) return "already_in_control_mode";
+        if (System.currentTimeMillis() - mcpControlModeExitTime < 500) return "cooldown";
+        boolean hit = guiX >= overlayTransferX && guiX <= overlayTransferX + overlayTransferW
+                   && guiY >= overlayTransferY && guiY <= overlayTransferY + overlayTransferH;
+        if (hit) {
+            enterMcpControlMode(mc);
+            try {
+                Object screen = ReflectionCache.getCurrentScreen(mc);
+                if (screen != null) {
+                    String cn = screen.getClass().getName().toLowerCase();
+                    if (cn.contains("ingamemenu") || cn.contains("pausemenu") || cn.contains("pausescreen")
+                            || cn.contains("gamemenu") || cn.contains("options")) {
+                        for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
+                            String n = m.getName();
+                            if ((n.equals("displayGuiScreen") || n.equals("setScreen") || n.equals("func_147108_a"))
+                                    && m.getParameterCount() == 1) {
+                                m.invoke(mc, (Object) null);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[MCP] handleTransferOverlayClick closeScreen failed: " + e.getMessage());
+            }
+            return "transfer_to_mcp";
+        }
+        return "missed";
+    }
+
+    public static String handleOverlayClick(int guiX, int guiY, Object mc) {
+        if (!mcpControlMode) return "not_in_control_mode";
+        if (System.currentTimeMillis() - mcpControlModeEnterTime < 300) return "cooldown";
+        boolean hitResume = guiX >= overlayResumeX && guiX <= overlayResumeX + overlayResumeW
+                         && guiY >= overlayResumeY && guiY <= overlayResumeY + overlayResumeH;
+        boolean hitMenu = guiX >= overlayMenuX && guiX <= overlayMenuX + overlayMenuW
+                       && guiY >= overlayMenuY && guiY <= overlayMenuY + overlayMenuH;
+        if (hitResume) {
+            exitMcpControlMode(mc);
+            return "resume_manual";
+        }
+        if (hitMenu) {
+            exitMcpControlMode(mc);
+            ReflectionHelper.openPauseMenu(mc);
+            return "system_menu";
+        }
+        return "blocked";
+    }
+
+    public static boolean isMouseReleaseActive() { return mouseReleaseActive; }
+
+    public static void tickMcpControlMode(Object mc) {
+        if (!mcpControlMode) return;
+        try {
+            if (ReflectionCache.LWJGL3) {
+                forceCursorAndReleaseMouse(mc);
+            }
+            Object mouseHandler = ReflectionCache.getMouseHandler(mc);
+            if (mouseHandler != null) {
+                initMouseFields(mouseHandler);
+                if (mouseGrabbedField != null && mouseGrabbedField.getBoolean(mouseHandler)) {
+                    mouseGrabbedField.setBoolean(mouseHandler, false);
+                }
+                if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
+                if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
+            }
+        } catch (Exception e) {
+            ReflectionHelper.dbg("tickMcpControlMode: " + e.getMessage());
+        }
+    }
+
+    public static String releaseMouse(Object mc) {
+        ReflectionCache.initClassCache();
+        try {
+            long handle = WindowHelper.getWindowHandle(mc);
+            if (handle == 0 || !ReflectionCache.LWJGL3) return JsonHelper.error("no window handle");
+            Method glfwSetInputMode = ReflectionCache.getGlfwSetInputModeMethod();
+            if (glfwSetInputMode != null) {
+                glfwSetInputMode.invoke(null, handle, ReflectionCache.getGlfwCursor(), ReflectionCache.getGlfwCursorNormal());
+            } else {
+                Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+                glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class)
+                    .invoke(null, handle, glfw.getField("GLFW_CURSOR").getInt(null), glfw.getField("GLFW_CURSOR_NORMAL").getInt(null));
+            }
+            Object mouseHandler = ReflectionCache.getMouseHandler(mc);
+            if (mouseHandler != null) {
+                for (Field f : ReflectionCache.getAllFields(mouseHandler.getClass())) {
+                    String fn = f.getName().toLowerCase();
+                    if (fn.contains("grabbed") && f.getType() == boolean.class) {
+                        f.setAccessible(true);
+                        f.setBoolean(mouseHandler, false);
+                    }
+                }
+            }
+            mouseReleaseActive = true;
+            return JsonHelper.builder().put("mouse_released", true).put("continuous", true).build();
+        } catch (Exception e) {
+            return JsonHelper.error(e.getMessage());
+        }
+    }
+
+    static void forceCursorAndReleaseMouse(Object mc) throws Exception {
+        if (ReflectionCache.LWJGL3) {
+            long handle = WindowHelper.getWindowHandle(mc);
+            if (handle == 0) return;
+            initCursorCache();
+            Method glfwSetInputMode = ReflectionCache.getGlfwSetInputModeMethod();
+            if (glfwSetInputMode != null) {
+                glfwSetInputMode.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+            }
+        } else {
+            try {
+                Class<?> mouseClass = Class.forName("org.lwjgl.input.Mouse");
+                Method setGrabbed = mouseClass.getMethod("setGrabbed", boolean.class);
+                setGrabbed.invoke(null, false);
+            } catch (Exception e) {
+                ReflectionHelper.dbg("forceCursor LWJGL2: " + e.getMessage());
+            }
+        }
+        Object mouseHandler = ReflectionCache.getMouseHandler(mc);
+        if (mouseHandler != null) {
+            initMouseFields(mouseHandler);
+            if (mouseGrabbedField != null) mouseGrabbedField.setBoolean(mouseHandler, false);
+            if (accumulatedDXField != null) accumulatedDXField.setDouble(mouseHandler, 0.0);
+            if (accumulatedDYField != null) accumulatedDYField.setDouble(mouseHandler, 0.0);
+        }
+    }
+
+    private static void initCursorCache() throws Exception {
+        if (cursorCacheInit) return;
+        ReflectionCache.initClassCache();
+        GLFW_CURSOR_VAL = ReflectionCache.getGlfwCursor();
+        GLFW_CURSOR_NORMAL_VAL = ReflectionCache.getGlfwCursorNormal();
+        cursorCacheInit = true;
+    }
+
+    private static void initMouseFields(Object mouseHandler) throws Exception {
+        if (mouseFieldsInit) return;
+        mouseFieldsInit = true;
+        List<Field> booleanFields = new ArrayList<>();
+        for (Field f : ReflectionCache.getAllFields(mouseHandler.getClass())) {
+            String fn = f.getName().toLowerCase();
+            if ((fn.contains("grabbed")) && f.getType() == boolean.class) {
+                f.setAccessible(true);
+                mouseGrabbedField = f;
+                ReflectionHelper.dbg("cursor: found mouseGrabbed=" + f.getName());
+            }
+            if (fn.contains("accumulateddx") && f.getType() == double.class) {
+                f.setAccessible(true);
+                accumulatedDXField = f;
+                ReflectionHelper.dbg("cursor: found accDX=" + f.getName());
+            }
+            if (fn.contains("accumulateddy") && f.getType() == double.class) {
+                f.setAccessible(true);
+                accumulatedDYField = f;
+                ReflectionHelper.dbg("cursor: found accDY=" + f.getName());
+            }
+            if (f.getType() == boolean.class && f.getName().toLowerCase().contains("cursor")) {
+                booleanFields.add(f);
+            }
+        }
+        if (mouseGrabbedField == null) {
+            for (Field f : ReflectionCache.getAllFields(mouseHandler.getClass())) {
+                if (f.getType() == boolean.class) {
+                    f.setAccessible(true);
+                    booleanFields.add(f);
+                    ReflectionHelper.dbg("cursor: candidate boolean field: " + f.getName());
+                }
+            }
+            if (booleanFields.size() == 1) {
+                mouseGrabbedField = booleanFields.get(0);
+                ReflectionHelper.dbg("cursor: using sole boolean field as mouseGrabbed: " + mouseGrabbedField.getName());
+            }
+        }
+        if (mouseGrabbedField == null) {
+            ReflectionHelper.dbg("cursor: WARNING - mouseGrabbedField not found, camera rotation suppression will not work");
+        }
+    }
+
+    public static String getMcpControlPauseTransferTranslationKey() { return "mcpmod.control.transfer"; }
+}

@@ -1,0 +1,8 @@
+{
+  "mcpmod.control.resume": "恢复手动控制",
+  "mcpmod.control.pause_button": "MCP 接管",
+  "mcpmod.control.transfer": "转交控制权给 MCP",
+  "mcpmod.control.overlay": "MCP 正在操纵游戏",
+  "mcpmod.control.menu": "系统菜单",
+  "mcpmod.description": "用于 AI 代理交互的 Minecraft WebSocket 桥接模组"
+}

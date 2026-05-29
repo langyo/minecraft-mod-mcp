@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
+    }
+  }
+}
