@@ -189,23 +189,26 @@ public class ModDevMcpMod {
     }
 
     public ModDevMcpMod() {
+        System.out.println("[MCP-MOD] Constructor start");
         INSTANCE = this;
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
+                System.out.println("[MCP-MOD] HTTP thread starting");
                 ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
                 int port = McpConfig.getServerPort();
                 httpServer = new McpHttpServer(handler, port);
                 httpServer.start();
                 debugUrl = "http://127.0.0.1:" + port + "/debug";
                 System.out.println("[MCP-MOD] Debug page: " + debugUrl);
-            } catch (Exception e) {
-                System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
-            } catch (Error e) {
-                System.err.println("[MCP-MOD] HTTP server error: " + e.getMessage());
+            } catch (Throwable e) {
+                System.err.println("[MCP-MOD] HTTP server failed: " + e);
+                e.printStackTrace(System.err);
             }
         }, "MCP-HTTP").start();
 
+        try {
+        System.out.println("[MCP-MOD] Registering ScreenEvent.Opening");
         ScreenEvent.Opening.BUS.addListener(event -> {
             if (ReflectionHelper.isMcpControlMode() && event.getNewScreen() instanceof PauseScreen) {
                 event.setNewScreen(null);
@@ -318,6 +321,8 @@ public class ModDevMcpMod {
                 }
                 if (!sent) System.out.println("[MCP-MOD] Debug page: " + url);
             } catch (Exception ignored) {}
-        }); } catch (Exception ignored) {}
+        }); } catch (Exception e) { System.err.println("[MCP-MOD] TickEvent registration failed: " + e); e.printStackTrace(System.err); }
+        System.out.println("[MCP-MOD] Constructor completed successfully");
+        } catch (Throwable e) { System.err.println("[MCP-MOD] Constructor FAILED: " + e); e.printStackTrace(System.err); }
     }
 }
