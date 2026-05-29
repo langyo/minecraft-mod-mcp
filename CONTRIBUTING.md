@@ -76,6 +76,33 @@ cd packages/minecraft-mod-mcp && npm test
 3. Tag and push: `git tag vX.Y.Z && git push --tags`
 4. GitHub Actions publishes the npm package and GitHub Release
 
+## Commit Conventions
+
+### Merge into `master`
+
+All merges into `master` (PR merge, dev → master) must use a merge commit message following this format:
+
+```
+{emoji} {English summary}
+```
+
+- **Emoji** — must be one from [gitmoji.dev](https://gitmoji.dev) that matches the change (e.g. `🚀` for first release, `✨` for new feature, `🐛` for bugfix, `📝` for docs)
+- **Summary** — concise one-line English, **no conventional-commit prefix** (no `feat:`, `fix:`, `chore:`, etc.), **no version number**, **no filler**
+
+Examples:
+
+```
+✨ AI-generated mod code can now control the game via MCP tools
+🐛 Fix crash when switching dimensions on Forge 1.21.7
+📝 Restructure documentation for modder-first experience
+```
+
+### Development commits (non-master)
+
+Development commits on feature branches or `dev` may use a conventional-commit prefix for internal clarity (`feat:`, `fix:`, `docs:`, etc.) — the strict rules above apply only to `master` merges.
+
+---
+
 ## Issues & Pull Requests
 
 Issues and pull requests are welcome. Please check existing issues before opening a new one.
