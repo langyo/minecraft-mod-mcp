@@ -1,8 +1,0 @@
-{
-  "mcpmod.control.resume": "Reprendre le contrôle manuel",
-  "mcpmod.control.transfer": "Transférer le contrôle à MCP",
-  "mcpmod.control.overlay": "MCP contrôle le jeu",
-  "mcpmod.control.menu": "Menu système",
-  "mcpmod.description": "Pont WebSocket pour l'interaction d'agents IA avec Minecraft",
-  "mcpmod.control.pause_button": "MCP Take Over"
-}
