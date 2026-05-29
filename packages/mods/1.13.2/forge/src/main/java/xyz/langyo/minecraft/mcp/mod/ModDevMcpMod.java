@@ -330,8 +330,13 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                     Minecraft mc2 = Minecraft.getInstance();
                     double mx = getMouseX(mc2);
                     double my = getMouseY(mc2);
-                    ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
-                    return;
+                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
+                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                        if (!ReflectionHelper.isMcpControlMode() && mc2.currentScreen == null) {
+                            GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                        }
+                        return;
+                    }
                 }
                 if (originalMouseButtonCallback != null) {
                     originalMouseButtonCallback.invoke(window, button, action, mods);

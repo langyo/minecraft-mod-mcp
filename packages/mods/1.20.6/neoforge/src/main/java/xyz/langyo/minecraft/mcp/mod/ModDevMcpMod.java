@@ -215,8 +215,13 @@ public class ModDevMcpMod {
                     double sh = mc2.getWindow().getScreenHeight();
                     double mx = mc2.mouseHandler.xpos() * w / sw;
                     double my = mc2.mouseHandler.ypos() * h / sh;
-                    ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
-                    return;
+                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
+                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                        if (!ReflectionHelper.isMcpControlMode() && mc2.screen == null) {
+                            GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                        }
+                        return;
+                    }
                 }
                 if (originalMouseButtonCallback != null) {
                     originalMouseButtonCallback.invoke(window, button, action, mods);

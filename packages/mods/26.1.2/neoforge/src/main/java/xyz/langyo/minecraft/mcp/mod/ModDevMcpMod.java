@@ -251,8 +251,13 @@ public class ModDevMcpMod {
                     Minecraft mc2 = Minecraft.getInstance();
                     double mx = mc2.mouseHandler.xpos() * mc2.getWindow().getGuiScaledWidth() / mc2.getWindow().getScreenWidth();
                     double my = mc2.mouseHandler.ypos() * mc2.getWindow().getGuiScaledHeight() / mc2.getWindow().getScreenHeight();
-                    ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
-                    return;
+                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
+                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                        if (!ReflectionHelper.isMcpControlMode() && mc2.screen == null) {
+                            GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                        }
+                        return;
+                    }
                 }
                 if (originalMouseButtonCallback != null) {
                     originalMouseButtonCallback.invoke(window, button, action, mods);
