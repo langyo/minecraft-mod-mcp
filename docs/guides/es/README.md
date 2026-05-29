@@ -31,6 +31,43 @@ Tu IA leerá la guía, configurará la conexión MCP y empezará a controlar el 
 
 ---
 
+## ¿Qué es Minecraft MCP
+
+Minecraft MCP es un puente entre los asistentes de IA y Minecraft. Se ejecuta como un mod dentro del juego, exponiendo un servidor HTTP al que las herramientas de IA pueden conectarse mediante el protocolo estándar MCP. A través de este puente, la IA puede ver el juego, hacer clic en botones, escribir comandos e interactuar con el mundo.
+
+- **Ver** — captura capturas de pantalla con cuadrículas de coordenadas
+- **Actuar** — hacer clic, escribir, desplazar, arrastrar y presionar cualquier tecla
+- **Saber** — consultar la posición del jugador, información del mundo, botones de la pantalla y campos de depuración
+- **Grabar** — transmitir eventos en tiempo real mediante SSE, capturar fotogramas de video
+
+> ¿Quieres que tu IA construya un castillo? ¿Ejecute una prueba de humo? ¿Navegue por el menú de un modpack? Minecraft MCP lo hace posible.
+
+---
+
+## Versiones compatibles
+
+| Versión MC | Forge | Fabric | NeoForge |
+|------------|:-----:|:------:|:--------:|
+| 1.8.9 | ✓ | — | — |
+| 1.9.4 | ✓ | — | — |
+| 1.10.2 | ✓ | — | — |
+| 1.11.2 | ✓ | — | — |
+| 1.12.2 | ✓ | — | — |
+| 1.13.2 | ✓ | — | — |
+| 1.14.4 | ✓ | 🚧 | — |
+| 1.15.2 | ✓ | 🚧 | — |
+| 1.16.5 | ✓ | 🚧 | — |
+| 1.17.1 | ✓ | 🚧 | — |
+| 1.18.2 | ✓ | 🚧 | — |
+| 1.19.4 | ✓ | 🚧 | — |
+| 1.20.6 | ✓ | 🚧 | 🚧 |
+| 1.21.7 | ✓ | — | — |
+| 26.1.2 | ✓ | — | 🚧 |
+
+> 🚧 = Trabajo en progreso
+
+---
+
 ## Primeros pasos
 
 ### 1. Instala el mod
@@ -68,47 +105,6 @@ https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/es/AI-TOOLS.md
 
 ---
 
-## ¿Qué es Minecraft MCP
-
-Minecraft MCP es un puente entre los asistentes de IA y Minecraft. Se ejecuta como un mod dentro del juego, exponiendo un servidor HTTP al que las herramientas de IA pueden conectarse mediante el protocolo estándar MCP. A través de este puente, la IA puede ver el juego, hacer clic en botones, escribir comandos e interactuar con el mundo.
-
-> ¿Quieres que tu IA construya un castillo? ¿Ejecute una prueba de humo? ¿Navegue por el menú de un modpack? Minecraft MCP lo hace posible.
-
-- **Ver** — captura capturas de pantalla con cuadrículas de coordenadas
-- **Actuar** — hacer clic, escribir, desplazar, arrastrar y presionar cualquier tecla
-- **Saber** — consultar la posición del jugador, información del mundo, botones de la pantalla y campos de depuración
-- **Grabar** — transmitir eventos en tiempo real mediante SSE, capturar fotogramas de video
-
-[Guía de integración de herramientas de IA →](./AI-TOOLS.md)
-
-## Versiones compatibles
-
-| Versión MC | Forge | Fabric | NeoForge |
-|------------|:-----:|:------:|:--------:|
-| 1.8.9 | ✓ | — | — |
-| 1.9.4 | ✓ | — | — |
-| 1.10.2 | ✓ | — | — |
-| 1.11.2 | ✓ | — | — |
-| 1.12.2 | ✓ | — | — |
-| 1.13.2 | ✓ | — | — |
-| 1.14.4 | ✓ | 🚧 | — |
-| 1.15.2 | ✓ | 🚧 | — |
-| 1.16.5 | ✓ | 🚧 | — |
-| 1.17.1 | ✓ | 🚧 | — |
-| 1.18.2 | ✓ | 🚧 | — |
-| 1.19.4 | ✓ | 🚧 | — |
-| 1.20.6 | ✓ | 🚧 | 🚧 |
-| 1.21.7 | ✓ | — | — |
-| 26.1.2 | ✓ | — | 🚧 |
-
-> 🚧 = Trabajo en progreso
-
-## Compilar desde el código fuente
-
-> Esta sección es para colaboradores. Si solo quieres usar el mod, consulta los [Primeros pasos](#primeros-pasos) arriba.
-
-Consulta [CONTRIBUTING.md](../../CONTRIBUTING.md) para la configuración de desarrollo, la estructura del proyecto y las pautas.
-
 ## Cómo funciona
 
 ```mermaid
@@ -123,9 +119,15 @@ flowchart LR
 
 El mod ejecuta un servidor HTTP en el puerto 9876 dentro de Minecraft. Tu herramienta de IA se conecta mediante el protocolo estándar MCP (transporte SSE), y cada comando — clic, escribir, captura de pantalla, etc. — utiliza Java reflection para funcionar en todas las versiones de Minecraft sin código específico para cada versión.
 
-## Contribuciones
+---
 
-Consulta [CONTRIBUTING.md](../../CONTRIBUTING.md) para más información.
+## Compilar desde el código fuente
+
+> Esta sección es para colaboradores. Si solo quieres usar el mod, consulta los [Primeros pasos](#primeros-pasos) arriba.
+
+Consulta [CONTRIBUTING.md](../../CONTRIBUTING.md) para la configuración de desarrollo, la estructura del proyecto y las pautas.
+
+---
 
 ## Licencia
 

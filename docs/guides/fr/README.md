@@ -129,12 +129,6 @@ Consultez [CONTRIBUTING.md](../../CONTRIBUTING.md) pour la configuration de dév
 
 ---
 
-## Contribuer
-
-Voir [CONTRIBUTING.md](../../CONTRIBUTING.md) pour savoir comment contribuer.
-
----
-
 ## Licence
 
 Sous licence, au choix :

@@ -12,7 +12,7 @@
 [![Release](https://img.shields.io/github/v/release/langyo/minecraft-mod-mcp)](https://github.com/langyo/minecraft-mod-mcp/releases)
 [![npm](https://img.shields.io/npm/v/minecraft-mod-mcp)](https://www.npmjs.com/package/minecraft-mod-mcp)
 
-**English** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
+**[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
 
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
@@ -39,10 +39,6 @@ Minecraft MCP — это мост между ИИ-ассистентами и Mi
 - **Действовать** — кликать, вводить текст, прокручивать, перетаскивать и нажимать любые клавиши
 - **Знать** — запрашивать позицию игрока, информацию о мире, кнопки на экране и отладочные поля
 - **Записывать** — транслировать события в реальном времени через SSE, захватывать видеокадры
-
-> Хотите, чтобы ИИ построил замок? Провёл smoke-тест? Разобрался в меню сборки модов? Minecraft MCP делает это возможным.
-
-[Руководство по интеграции ИИ-инструментов →](./AI-TOOLS.md)
 
 ---
 
@@ -128,12 +124,6 @@ flowchart LR
 > Этот раздел предназначен для контрибьюторов. Если вы просто хотите использовать мод, см. [Начало работы](#начало-работы) выше.
 
 Подробности см. в [CONTRIBUTING.md](../../CONTRIBUTING.md).
-
----
-
-## Участие в проекте
-
-См. [CONTRIBUTING.md](../../CONTRIBUTING.md) для информации о настройке окружения разработки, структуре проекта и руководствах.
 
 ---
 
