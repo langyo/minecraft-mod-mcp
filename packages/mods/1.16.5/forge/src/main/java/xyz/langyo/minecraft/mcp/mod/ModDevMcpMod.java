@@ -97,17 +97,6 @@ public class ModDevMcpMod {
         };
     }
 
-    private static void withFullScissor(Runnable action) {
-        try {
-            boolean wasEnabled = org.lwjgl.opengl.GL11.glIsEnabled(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
-            if (wasEnabled) org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
-            action.run();
-            if (wasEnabled) org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_SCISSOR_TEST);
-        } catch (Exception e) {
-            action.run();
-        }
-    }
-
     private static void renderScreenButton(MatrixStack ms, Minecraft mc, Screen screen) {
         int w = mc.getMainWindow().getScaledWidth();
         int h = mc.getMainWindow().getScaledHeight();
@@ -156,21 +145,6 @@ public class ModDevMcpMod {
             }
         });
 
-        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseClickedEvent.Pre event) -> {
-            if (!ReflectionHelper.isMcpControlMode()) return;
-            if (event.getButton() == 0) {
-                try {
-                    Minecraft mc = Minecraft.getInstance();
-                    double mx = getMouseX(mc);
-                    double my = getMouseY(mc);
-                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
-                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                        event.setCanceled(true);
-                    }
-                } catch (Exception ignored) {}
-            }
-        });
-
         MinecraftForge.EVENT_BUS.addListener((RenderGameOverlayEvent.Post event) -> {
             if (event.getType() != RenderGameOverlayEvent.ElementType.CHAT) return;
             if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
@@ -189,11 +163,12 @@ public class ModDevMcpMod {
                     }
 
                     if (ReflectionHelper.isMcpControlMode() && !ReflectionHelper.isScreenshotInProgress()) {
+                        MatrixStack ms = new MatrixStack();
                         int w = mc.getMainWindow().getScaledWidth();
                         int h = mc.getMainWindow().getScaledHeight();
                         double mx = getMouseX(mc);
                         double my = getMouseY(mc);
-                        McpOverlayLogic.renderResumeButton(wrapRenderer(event.getMatrixStack(), mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
+                        McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                     }
                 }
             } catch (Exception ignored) {}
@@ -210,15 +185,16 @@ public class ModDevMcpMod {
                     return;
                 }
                 if (mc.world != null) {
-                    MatrixStack ms = event.getMatrixStack();
+                    MatrixStack ms = new MatrixStack();
                     renderScreenButton(ms, mc, screen);
                 }
             } catch (Exception e) { e.printStackTrace(); }
         });
 
-        MinecraftForge.EVENT_BUS.addListener((InputEvent.MouseInputEvent event) -> {
+        MinecraftForge.EVENT_BUS.addListener((GuiScreenEvent.MouseClickedEvent.Pre event) -> {
             try {
                 Minecraft mc = Minecraft.getInstance();
+                ensureMouseButtonInterceptor(mc);
                 if (ReflectionHelper.isWaitingForRelease()) {
                     event.setCanceled(true);
                     return;
@@ -263,10 +239,13 @@ public class ModDevMcpMod {
         });
     }
 
-    private void setup(final FMLCommonSetupEvent event) {
-        Minecraft mc = Minecraft.getInstance();
+    private static boolean mouseButtonInterceptorInstalled = false;
+
+    private static void ensureMouseButtonInterceptor(Minecraft mc) {
+        if (mouseButtonInterceptorInstalled) return;
         try {
             long handle = mc.getMainWindow().getHandle();
+            if (handle == 0) return;
             originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
                 if (ReflectionHelper.isWaitingForRelease()) {
                     if (button == 0 && action == 0) {
@@ -293,9 +272,13 @@ public class ModDevMcpMod {
                     originalMouseButtonCallback.invoke(window, button, action, mods);
                 }
             });
-            System.out.println("[MCP-MOD] MouseButton interceptor installed in setup");
+            mouseButtonInterceptorInstalled = true;
+            System.out.println("[MCP-MOD] MouseButton interceptor installed");
         } catch (Exception e) {
             System.err.println("[MCP-MOD] MouseButton interceptor failed: " + e.getMessage());
         }
+    }
+
+    private void setup(final FMLCommonSetupEvent event) {
     }
 }
