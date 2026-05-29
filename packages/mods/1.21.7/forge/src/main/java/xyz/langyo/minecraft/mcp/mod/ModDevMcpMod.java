@@ -122,7 +122,6 @@ public class ModDevMcpMod {
 
     public ModDevMcpMod() {
         INSTANCE = this;
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
@@ -226,7 +225,7 @@ public class ModDevMcpMod {
             } catch (Exception ignored) { return false; }
         });
 
-        TickEvent.ClientTickEvent.BUS.addListener(event -> {
+        try { TickEvent.ClientTickEvent.BUS.addListener(event -> {
             if (INSTANCE == null || INSTANCE.debugUrl == null) return;
             if (event.phase != TickEvent.Phase.END) return;
             try {
@@ -257,7 +256,7 @@ public class ModDevMcpMod {
                     ));
                 mc.gui.getChat().addMessage(msg);
             } catch (Exception ignored) {}
-        });
+        }); } catch (Exception ignored) {}
     }
 
     private void setup(final FMLCommonSetupEvent event) {
