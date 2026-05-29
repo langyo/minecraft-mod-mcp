@@ -1,0 +1,47 @@
+.gradle/
+.kotlin/
+build/
+out/
+.maven-local/
+neoform-cache/
+run/
+
+*.class
+*.hprof
+*.log
+
+__pycache__/
+screenshots/
+test_results.json
+build-report.json
+build-error.log
+gradle.properties
+rpc_*
+.cache/
+target/
+.bf
+.build_done
+.build_flag
+.minecraft/
+tmp_fbo_extract/
+mcp_debug.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+
+# Misc
+node_modules/
+*.tmp
+*.swp
+*~
+dist/

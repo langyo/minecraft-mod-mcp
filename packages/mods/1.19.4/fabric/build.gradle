@@ -1,0 +1,33 @@
+plugins {
+    id "fabric-loom" version "1.7-SNAPSHOT"
+}
+
+version = "1.0.0-SNAPSHOT"
+group = "xyz.langyo"
+
+sourceCompatibility = "17"
+targetCompatibility = "17"
+
+repositories {
+    mavenCentral()
+    maven {
+        url = "../../../../.maven-local"
+    }
+}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+sourceSets.main.resources.srcDir '../../../common/src/main/resources'
+
+dependencies {
+    minecraft "com.mojang:minecraft:1.19.4"
+    mappings "net.fabricmc:yarn:1.19.4+build.1:v2"
+    modImplementation "net.fabricmc:fabric-loader:0.15.6"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:0.87.2+1.19.4"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+    implementation "net.java.dev.jna:jna:5.15.0"
+    implementation "net.java.dev.jna:jna-platform:5.15.0"
+}
+
+tasks.withType(ProcessResources).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}

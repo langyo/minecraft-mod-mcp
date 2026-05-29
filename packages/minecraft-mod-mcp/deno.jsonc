@@ -1,0 +1,10 @@
+{
+  // deno compat — works via npm: imports
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --allow-run --allow-env src/cli.ts",
+    "build": "deno run -A npm:tsup"
+  },
+  "compilerOptions": {
+    "lib": ["deno.ns", "deno.unstable"]
+  }
+}
