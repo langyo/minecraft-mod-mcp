@@ -154,14 +154,6 @@ dry-run version:
 # Utilities
 # ============================================================
 
-# WS client for manual testing
-ws *ARGS:
-    python scripts/ws_client.py {{ ARGS }}
-
-# Interactive WS session
-ws-shell:
-    python scripts/ws_client.py
-
 # ============================================================
 # Cleanup
 # ============================================================

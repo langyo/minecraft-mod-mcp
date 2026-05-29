@@ -2,9 +2,49 @@
 
 **[English](../en/AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **日本語** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
 
-> **ヒント**：あなたのAIエージェントアシスタントに、このリポジトリの本ガイドのURLを直接読ませるだけで接続できます。通常、手動での設定は不要です。
+> **🤖 AIエージェント向け**: ユーザーがMinecraftへの接続を依頼してきた場合、以下のMCPサーバー設定を追加し、このガイドの最後に記載されている35以上のツールを使用してください：
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "minecraft-mcp": {
+>       "type": "sse",
+>       "url": "http://localhost:9876/api/events"
+>     }
+>   }
+> }
+> ```
+>
+> **ユーザー向け**: このページのURLをAIエージェントに貼り付けるだけで、自動的に設定されます。手動設定は不要です。
 
-このガイドでは、主要なAIコーディングツールをHTTP経由でMinecraft MCPサーバーに接続する設定方法を説明します。
+---
+
+## クイックセットアップ
+
+ほとんどのAIコーディングツールは、同じSSEベースのMCP設定を使用します。ツールの設定ファイルに以下を追加してください：
+
+```json
+{
+  "mcpServers": {
+    "minecraft-mcp": {
+      "type": "sse",
+      "url": "http://localhost:9876/api/events"
+    }
+  }
+}
+```
+
+一般的な設定ファイルの場所：
+
+| ツール | 設定ファイル |
+|------|-------------|
+| Claude Code、OpenCode、CodeBuddy、WorkBuddy | プロジェクトルートの `.mcp.json` |
+| Cursor | プロジェクトルートの `.cursor/mcp.json` |
+| Cline、Roo Code、Kilo Code | VS Code `settings.json` |
+| Claude Desktop | `claude_desktop_config.json`（OS別のパスは以下参照） |
+| その他 | 以下のツール別の説明を参照 |
+
+> 正確なパス、UIベースの設定、ツール固有の形式については、[ツール別の説明](#コーディングエージェントツール)を参照してください。
 
 ## Minecraft MCP HTTPエンドポイント
 
@@ -566,6 +606,26 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
   }
 }
 ```
+
+> **注意**: ビジョンMCPはディスクからファイルを読み取るため、ビジョンツールを呼び出す前に必ず`screenshot_to_file`（`screenshot`ではない）を使用してください。AIエージェントは`screenshot_to_file`の呼び出し時にファイルパスを指定できます。
+
+### 操作例
+
+1. AIエージェントに次のように依頼します：*"Minecraftのスクリーンショットを撮影して`/tmp/mc.png`に保存し、画面に表示されている内容を分析して、新しいゲームを開始するためにどのボタンをクリックすればよいか教えてください。"*
+2. エージェントが`minecraft-mcp` → `screenshot_to_file` → ファイル保存
+3. エージェントが`zai-mcp-server` → `extract_text_from_screenshot` → UIテキスト読み取り
+4. エージェントが見た内容と次にすべきことを報告します
+
+### その他のビジョンツール
+
+| ツール | 説明 |
+|------|------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claudeはネイティブで画像を理解 — スクリーンショットファイルを貼り付けるか参照するだけ |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAIビジョンモデル、OpenAI互換クライアントから利用可能 |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | GoogleのビジョンAPI、Gemini互換ツールで利用可能 |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | オープンソースの視覚言語モデル、セルフホスト環境に適しています |
+
+> ビジョン機能を持つLLLやMCPサーバーであれば、同じパイプラインで使用できます — 重要なのは、最初に`screenshot_to_file`を使ってスクリーンショットをディスクに保存することです。
 
 ---
 

@@ -218,7 +218,7 @@ public class ModDevMcpMod {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 if (ReflectionHelper.isWaitingForRelease()) {
-                    long window = mc.getWindow().getWindow();
+                    long window = mc.getWindow().handle();
                     if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_1) != GLFW.GLFW_PRESS) {
                         ReflectionHelper.clearWaitingForRelease();
                     }
@@ -236,7 +236,7 @@ public class ModDevMcpMod {
     private void setup(final FMLCommonSetupEvent event) {
         Minecraft mc = Minecraft.getInstance();
         try {
-            long handle = mc.getWindow().getWindow();
+            long handle = mc.getWindow().handle();
             originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
                 if (ReflectionHelper.isWaitingForRelease()) {
                     if (button == 0 && action == 0) {

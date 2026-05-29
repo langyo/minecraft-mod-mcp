@@ -2,9 +2,51 @@
 
 **[English](../en/AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **繁體中文** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
 
-> **提示**：你可以直接讓你的 AI Agent 助手閱讀該倉庫中的本指南 URL 進行對接，一般情況下無需你手動操作。
+> **🤖 致 AI Agent**：如果有使用者要求你接入 Minecraft，請添加以下 MCP 伺服器設定，然後使用本指南末尾列出的 35+ 工具：
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "minecraft-mcp": {
+>       "type": "sse",
+>       "url": "http://localhost:9876/api/events"
+>     }
+>   }
+> }
+> ```
+>
+> **致使用者**：你可以直接把本頁連結貼給你的 AI Agent，它會自行完成設定，無需手動操作。
 
-本指南說明如何設定主流 AI 編碼工具，透過 HTTP 連接 Minecraft MCP 伺服器。
+---
+
+## 快速設定
+
+大多數 AI 編碼工具使用相同的基於 SSE 的 MCP 設定。將其添加到你的工具設定檔中：
+
+```json
+{
+  "mcpServers": {
+    "minecraft-mcp": {
+      "type": "sse",
+      "url": "http://localhost:9876/api/events"
+    }
+  }
+}
+```
+
+常見設定檔位置：
+
+| 工具 | 設定檔 |
+|------|-------------|
+| Claude Code、OpenCode、CodeBuddy、WorkBuddy | 專案根目錄下的 `.mcp.json` |
+| Cursor | 專案根目錄下的 `.cursor/mcp.json` |
+| Cline、Roo Code、Kilo Code | VS Code `settings.json` |
+| Claude Desktop | `claude_desktop_config.json`（系統路徑見下方） |
+| 其他 | 見下方各工具的詳細說明 |
+
+> 查看[各工具詳細設定](#編碼-agent-工具)以取得具體路徑、界面設定和特定工具格式。
+
+---
 
 ## Minecraft MCP HTTP 端點
 
@@ -535,7 +577,7 @@ flowchart TD
 
 [GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) 是一個由 GLM-4.6V 驅動的本地 MCP 伺服器，提供以下功能：
 
-| Tool | Use Case |
+| 工具 | 用途 |
 |------|----------|
 | `ui_to_artifact` | 將 UI 截圖轉換為程式碼、提示詞或設計規格 |
 | `extract_text_from_screenshot` | 從遊戲 UI 中 OCR 文字（聊天、告示牌、選單） |
@@ -578,7 +620,7 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 
 ### 其他視覺工具
 
-| Tool | Description |
+| 工具 | 說明 |
 |------|-------------|
 | [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude 原生理解圖片 — 直接貼上或引用截圖檔案 |
 | [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAI 視覺模型，可透過任何 OpenAI 相容客戶端使用 |

@@ -2,9 +2,49 @@
 
 **[English](../en/AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **한국어** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
 
-> **팁**: AI 에이전트 어시스턴트에게 이 저장소의 본 가이드 URL을 직접 읽도록 요청하면 됩니다. 대부분의 경우 에이전트가 자동으로 MCP 연결을 구성하므로 수동 설정이 필요하지 않습니다.
+> **🤖 AI 에이전트용**: 사용자가 Minecraft 연결을 요청하면 다음 MCP 서버 설정을 추가하고 이 가이드 끝에 나열된 35개 이상의 도구를 사용하세요:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "minecraft-mcp": {
+>       "type": "sse",
+>       "url": "http://localhost:9876/api/events"
+>     }
+>   }
+> }
+> ```
+>
+> **사용자용**: 이 페이지의 URL을 AI 에이전트에 붙여넣기만 하면 자동으로 설정됩니다. 수동 설정이 필요하지 않습니다.
 
-이 가이드는 주요 AI 코딩 도구를 HTTP를 통해 Minecraft MCP 서버에 연결하는 방법을 설명합니다.
+---
+
+## 빠른 설정
+
+대부분의 AI 코딩 도구는 동일한 SSE 기반 MCP 설정을 사용합니다. 도구의 설정 파일에 다음을 추가하세요:
+
+```json
+{
+  "mcpServers": {
+    "minecraft-mcp": {
+      "type": "sse",
+      "url": "http://localhost:9876/api/events"
+    }
+  }
+}
+```
+
+일반적인 설정 파일 위치:
+
+| 도구 | 설정 파일 |
+|------|-------------|
+| Claude Code, OpenCode, CodeBuddy, WorkBuddy | 프로젝트 루트의 `.mcp.json` |
+| Cursor | 프로젝트 루트의 `.cursor/mcp.json` |
+| Cline, Roo Code, Kilo Code | VS Code `settings.json` |
+| Claude Desktop | `claude_desktop_config.json` (OS별 경로는 아래 참조) |
+| 기타 | 아래 도구별 설명 참조 |
+
+> 정확한 경로, UI 기반 설정, 도구별 형식은 [도구별 설명](#코딩-에이전트-도구)을 참조하세요.
 
 ## Minecraft MCP HTTP 엔드포인트
 
@@ -535,7 +575,7 @@ flowchart TD
 
 [GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`)는 GLM-4.6V로 구동되는 로컬 MCP 서버로, 다음 기능을 제공합니다:
 
-| Tool | Use Case |
+| 도구 | 용도 |
 |------|----------|
 | `ui_to_artifact` | UI 스크린샷을 코드, 프롬프트 또는 디자인 명세로 변환 |
 | `extract_text_from_screenshot` | 게임 UI에서 텍스트 OCR (채팅, 표지판, 메뉴) |
@@ -566,6 +606,26 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
   }
 }
 ```
+
+> **참고**: 비전 MCP는 디스크에서 파일을 읽으므로, 비전 도구를 호출하기 전에 항상 `screenshot_to_file`(`screenshot`이 아님)을 사용하세요. AI 에이전트는 `screenshot_to_file`을 호출할 때 특정 파일 경로를 지정할 수 있습니다.
+
+### 예제 워크플로우
+
+1. AI 에이전트에게 질문하세요: *"Minecraft 스크린샷을 찍어 `/tmp/mc.png`에 저장한 다음, 화면에 무엇이 있는지 분석하고 새 게임을 시작하려면 어떤 버튼을 눌러야 하는지 알려주세요."*
+2. 에이전트가 `minecraft-mcp` → `screenshot_to_file` → 파일 저장
+3. 에이전트가 `zai-mcp-server` → `extract_text_from_screenshot` → UI 텍스트 읽기
+4. 에이전트가 본 내용과 다음 단계를 알려줍니다
+
+### 기타 비전 도구
+
+| 도구 | 설명 |
+|------|------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude는 이미지를 기본적으로 이해합니다 — 스크린샷 파일을 붙여넣거나 참조하세요 |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAI 비전 모델, OpenAI 호환 클라이언트에서 사용 가능 |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | Google 비전 API, Gemini 호환 도구에서 사용 가능 |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | 오픈소스 비전 언어 모델, 자체 호스팅 환경에 적합 |
+
+> 비전 기능을 갖춘 LLM 또는 MCP 서버라면 동일한 파이프라인에서 사용할 수 있습니다 — 핵심은 `screenshot_to_file`을 사용하여 먼저 스크린샷을 디스크에 저장하는 것입니다.
 
 ---
 
