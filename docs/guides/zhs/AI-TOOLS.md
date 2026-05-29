@@ -2,9 +2,51 @@
 
 **[English](../en/AI-TOOLS.md)** &bull; **简体中文** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
 
-> **提示**：你可以直接让你的 AI Agent 助手阅读该仓库中的本指南 URL 进行对接，一般情况下无需你手动操作。
+> **🤖 致 AI Agent**：如果有用户要求你接入 Minecraft，请添加以下 MCP 服务器配置，然后使用本指南末尾列出的 35+ 工具：
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "minecraft-mcp": {
+>       "type": "sse",
+>       "url": "http://localhost:9876/api/events"
+>     }
+>   }
+> }
+> ```
+>
+> **致用户**：你可以直接把本页链接粘贴给你的 AI Agent，它会自行完成配置，无需手动操作。
 
-本指南介绍如何将主流 AI 编程工具通过 HTTP 连接到 Minecraft MCP 服务器。
+---
+
+## 快速配置
+
+大多数 AI 编程工具使用相同的基于 SSE 的 MCP 配置。将其添加到你的工具配置文件中：
+
+```json
+{
+  "mcpServers": {
+    "minecraft-mcp": {
+      "type": "sse",
+      "url": "http://localhost:9876/api/events"
+    }
+  }
+}
+```
+
+常见配置文件位置：
+
+| 工具 | 配置文件 |
+|------|-------------|
+| Claude Code、OpenCode、CodeBuddy、WorkBuddy | 项目根目录下的 `.mcp.json` |
+| Cursor | 项目根目录下的 `.cursor/mcp.json` |
+| Cline、Roo Code、Kilo Code | VS Code `settings.json` |
+| Claude Desktop | `claude_desktop_config.json`（系统路径见下方） |
+| 其他 | 见下方各工具的详细说明 |
+
+> 查看[各工具详细配置](#编程-agent-工具)以获取具体路径、界面配置和特定工具格式。
+
+---
 
 ## Minecraft MCP HTTP 端点
 

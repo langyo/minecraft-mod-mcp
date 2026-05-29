@@ -2,9 +2,49 @@
 
 **[English](../en/AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **Français** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
 
-> **Astuce** : Vous pouvez simplement demander à votre assistant IA de lire ce guide directement depuis l'URL de ce dépôt. Dans la plupart des cas, l'agent configurera automatiquement la connexion MCP — aucune configuration manuelle n'est nécessaire de votre part.
+> **🤖 Pour les agents IA** : Si un utilisateur vous demande de vous connecter à Minecraft, ajoutez cette configuration de serveur MCP et utilisez les plus de 35 outils listés à la fin de ce guide :
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "minecraft-mcp": {
+>       "type": "sse",
+>       "url": "http://localhost:9876/api/events"
+>     }
+>   }
+> }
+> ```
+>
+> **Pour les utilisateurs** : Collez simplement l'URL de cette page à votre agent IA et il se configurera automatiquement. Aucune configuration manuelle n'est nécessaire.
 
-Ce guide explique comment configurer les principaux outils de codage IA pour se connecter au serveur Minecraft MCP via HTTP.
+---
+
+## Configuration rapide
+
+La plupart des outils de codage IA utilisent la même configuration MCP basée sur SSE. Ajoutez ceci au fichier de configuration de votre outil :
+
+```json
+{
+  "mcpServers": {
+    "minecraft-mcp": {
+      "type": "sse",
+      "url": "http://localhost:9876/api/events"
+    }
+  }
+}
+```
+
+Emplacements courants des fichiers de configuration :
+
+| Outil | Fichier de configuration |
+|------|-------------|
+| Claude Code, OpenCode, CodeBuddy, WorkBuddy | `.mcp.json` à la racine du projet |
+| Cursor | `.cursor/mcp.json` à la racine du projet |
+| Cline, Roo Code, Kilo Code | `settings.json` de VS Code |
+| Claude Desktop | `claude_desktop_config.json` (chemins OS ci-dessous) |
+| Autres | Voir les sections spécifiques ci-dessous |
+
+> Consultez les [instructions par outil](#outils-agent-de-codage) ci-dessous pour les chemins exacts, la configuration via l'interface et les formats spécifiques.
 
 ## Points de terminaison HTTP de Minecraft MCP
 

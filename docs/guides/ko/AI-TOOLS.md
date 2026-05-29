@@ -2,9 +2,49 @@
 
 **[English](../en/AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **한국어** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
 
-> **팁**: AI 에이전트 어시스턴트에게 이 저장소의 본 가이드 URL을 직접 읽도록 요청하면 됩니다. 대부분의 경우 에이전트가 자동으로 MCP 연결을 구성하므로 수동 설정이 필요하지 않습니다.
+> **🤖 AI 에이전트용**: 사용자가 Minecraft 연결을 요청하면 다음 MCP 서버 설정을 추가하고 이 가이드 끝에 나열된 35개 이상의 도구를 사용하세요:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "minecraft-mcp": {
+>       "type": "sse",
+>       "url": "http://localhost:9876/api/events"
+>     }
+>   }
+> }
+> ```
+>
+> **사용자용**: 이 페이지의 URL을 AI 에이전트에 붙여넣기만 하면 자동으로 설정됩니다. 수동 설정이 필요하지 않습니다.
 
-이 가이드는 주요 AI 코딩 도구를 HTTP를 통해 Minecraft MCP 서버에 연결하는 방법을 설명합니다.
+---
+
+## 빠른 설정
+
+대부분의 AI 코딩 도구는 동일한 SSE 기반 MCP 설정을 사용합니다. 도구의 설정 파일에 다음을 추가하세요:
+
+```json
+{
+  "mcpServers": {
+    "minecraft-mcp": {
+      "type": "sse",
+      "url": "http://localhost:9876/api/events"
+    }
+  }
+}
+```
+
+일반적인 설정 파일 위치:
+
+| 도구 | 설정 파일 |
+|------|-------------|
+| Claude Code, OpenCode, CodeBuddy, WorkBuddy | 프로젝트 루트의 `.mcp.json` |
+| Cursor | 프로젝트 루트의 `.cursor/mcp.json` |
+| Cline, Roo Code, Kilo Code | VS Code `settings.json` |
+| Claude Desktop | `claude_desktop_config.json` (OS별 경로는 아래 참조) |
+| 기타 | 아래 도구별 설명 참조 |
+
+> 정확한 경로, UI 기반 설정, 도구별 형식은 [도구별 설명](#코딩-에이전트-도구)을 참조하세요.
 
 ## Minecraft MCP HTTP 엔드포인트
 
