@@ -4,7 +4,7 @@ license="MIT"
 
 [[mods]]
 modId="mcpmod"
-version="1.0.0"
+version="0.1.0"
 displayName="ModDev MCP"
 description="WebSocket bridge for AI agent interaction"
 authors="langyo"

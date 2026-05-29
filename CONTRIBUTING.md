@@ -1,4 +1,4 @@
-# Contributing to Minecraft MCP
+# Contributing to Minecraft Mod MCP
 
 Thanks for your interest in contributing! This guide covers the development setup.
 

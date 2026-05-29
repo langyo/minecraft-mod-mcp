@@ -48,9 +48,9 @@ Common config file locations:
 
 ---
 
-## Minecraft MCP HTTP Endpoints
+## Minecraft Mod MCP HTTP Endpoints
 
-The Minecraft MCP server exposes the following HTTP endpoints (default port: **9876**):
+The Minecraft Mod MCP server exposes the following HTTP endpoints (default port: **9876**):
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -60,13 +60,13 @@ The Minecraft MCP server exposes the following HTTP endpoints (default port: **9
 | `/api/events` | GET | SSE (Server-Sent Events) stream for real-time call history |
 | `/api/calls` | GET | Returns last 50 call events as JSON array |
 
-> **Prerequisites**: Ensure the Minecraft MCP daemon is running and a Minecraft client with the MCP mod is connected. Run `just daemon` then `just launch <version> <loader>`.
+> **Prerequisites**: Ensure the Minecraft Mod MCP daemon is running and a Minecraft client with the MCP mod is connected. Run `just daemon` then `just launch <version> <loader>`.
 
 ---
 
 ## Integration Methods
 
-Most AI coding tools support the **Model Context Protocol (MCP)** for connecting to external servers. The Minecraft MCP server can be connected via:
+Most AI coding tools support the **Model Context Protocol (MCP)** for connecting to external servers. The Minecraft Mod MCP server can be connected via:
 
 - **SSE Transport**: Point the tool's MCP client to `http://localhost:9876/api/events`
 - **HTTP REST API**: Send POST requests directly to `http://localhost:9876/api/cmd`
@@ -521,7 +521,7 @@ Lightweight AI agent for various tasks.
 
 ## Direct HTTP REST API Access
 
-For tools that do not natively support the MCP protocol, you can interact with the Minecraft MCP server directly via its HTTP REST API:
+For tools that do not natively support the MCP protocol, you can interact with the Minecraft Mod MCP server directly via its HTTP REST API:
 
 ```bash
 # Health check
@@ -557,20 +557,20 @@ curl http://localhost:9876/api/events
 
 ## Visual Recognition Integration
 
-You can pair Minecraft MCP with **vision-capable MCP servers** to let AI agents *see and understand* what's happening in the game — reading UI text, diagnosing errors, analyzing layouts, and more.
+You can pair Minecraft Mod MCP with **vision-capable MCP servers** to let AI agents *see and understand* what's happening in the game — reading UI text, diagnosing errors, analyzing layouts, and more.
 
 ### How It Works
 
-1. Minecraft MCP takes a screenshot and saves it to a local file via `screenshot_to_file`
+1. Minecraft Mod MCP takes a screenshot and saves it to a local file via `screenshot_to_file`
 2. A vision MCP server reads that file and analyzes it
 3. The AI agent coordinates both — screenshot → analyze → act
 
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["Minecraft MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
-    A --> D["Minecraft MCP<br/>click x=400,y=300<br/>→ enters game"]
+    A --> D["Minecraft Mod MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### GLM Vision MCP Server

@@ -257,12 +257,12 @@ def get_fg_era(mc):
 # ============================================================
 
 JDK_PATHS = {
-    8:  r"C:\Users\langy\.jdks\jdk8",
-    16: None,  # Auto-downloaded by Gradle toolchain
-    17: r"C:\Program Files\Amazon Corretto\jdk17.0.19_10",
-    21: r"C:\Program Files\Amazon Corretto\jdk21.0.8_9",
-    24: r"C:\Users\langy\.jdks\openjdk-24.0.2+12-54",
-    25: r"C:\Program Files\Amazon Corretto\jdk25.0.3_9",
+    8:  None,
+    16: None,
+    17: None,
+    21: None,
+    24: None,
+    25: None,
 }
 
 def get_jdk_home(java_version):

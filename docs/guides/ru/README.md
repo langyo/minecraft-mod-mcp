@@ -1,9 +1,9 @@
 <!-- markdownlint-disable MD033 MD041 MD036 -->
 <div align="center">
 
-<img src="../../logo.webp" alt="Minecraft MCP logo" width="200"/>
+<img src="../../logo.webp" alt="Minecraft Mod MCP logo" width="200"/>
 
-# Minecraft MCP
+# Minecraft Mod MCP
 
 **Пусть ИИ играет в Minecraft**
 
@@ -31,16 +31,16 @@ https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/ru/AI-TOOLS.md
 
 ---
 
-## Что такое Minecraft MCP
+## Что такое Minecraft Mod MCP
 
-Minecraft MCP — это мост между ИИ-ассистентами и Minecraft. Он работает как мод внутри игры, предоставляя HTTP-сервер, к которому ИИ-инструменты могут подключаться через стандартный протокол MCP. Через этот мост ИИ может видеть игру, нажимать кнопки, вводить команды и взаимодействовать с миром.
+Minecraft Mod MCP — это мост между ИИ-ассистентами и Minecraft. Он работает как мод внутри игры, предоставляя HTTP-сервер, к которому ИИ-инструменты могут подключаться через стандартный протокол MCP. Через этот мост ИИ может видеть игру, нажимать кнопки, вводить команды и взаимодействовать с миром.
 
 - **Видеть** — делать скриншоты с координатной сеткой
 - **Действовать** — кликать, вводить текст, прокручивать, перетаскивать и нажимать любые клавиши
 - **Знать** — запрашивать позицию игрока, информацию о мире, кнопки на экране и отладочные поля
 - **Записывать** — транслировать события в реальном времени через SSE, захватывать видеокадры
 
-> Хотите, чтобы ИИ построил замок? Провёл smoke-тест? Разобрался в меню сборки модов? Minecraft MCP делает это возможным.
+> Хотите, чтобы ИИ построил замок? Провёл smoke-тест? Разобрался в меню сборки модов? Minecraft Mod MCP делает это возможным.
 
 ---
 
@@ -110,7 +110,7 @@ https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/ru/AI-TOOLS.md
 ```mermaid
 flowchart LR
     A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
-    B["🔌 Minecraft MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
     C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
 
     A <-- "HTTP / SSE" --> B
