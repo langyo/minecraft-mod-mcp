@@ -105,4 +105,34 @@ Development commits on feature branches or `dev` may use a conventional-commit p
 
 ## Issues & Pull Requests
 
-Issues and pull requests are welcome. Please check existing issues before opening a new one.
+### Reporting Bugs
+
+Use the [Bug Report](https://github.com/langyo/minecraft-mod-mcp/issues/new?template=bug_report.md) template. Include:
+
+- Minecraft version, modloader, and mod version
+- Clear steps to reproduce
+- Expected vs. actual behavior
+- Relevant logs or screenshots
+
+### Suggesting Features
+
+Use the [Feature Request](https://github.com/langyo/minecraft-mod-mcp/issues/new?template=feature_request.md) template. Describe the problem first, then your proposed solution.
+
+### Pull Requests
+
+1. Create a feature branch from `dev`
+2. Make your changes, following existing code style
+3. Ensure `just full` builds successfully
+4. Run `just smoke <version>` on at least one Minecraft version
+5. Open a PR against `dev` using the [PR template](https://github.com/langyo/minecraft-mod-mcp/blob/dev/.github/PULL_REQUEST_TEMPLATE.md)
+
+PRs should target `dev`. The `master` branch receives periodic merges from `dev` (see [Commit Conventions](#commit-conventions)).
+
+### Code Style
+
+- **Java**: Follow standard conventions, use reflection utilities from `common/` for cross-version compatibility
+- **TypeScript**: Run `npm run lint` in `packages/minecraft-mod-mcp/`
+- **Python**: Follow PEP 8
+- No commented-out code; no secret/credential in commits
+
+Please check existing issues and PRs before opening a new one to avoid duplicates.
