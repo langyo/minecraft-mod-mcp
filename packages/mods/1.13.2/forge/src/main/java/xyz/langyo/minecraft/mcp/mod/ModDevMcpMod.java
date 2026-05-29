@@ -144,14 +144,11 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
         if (button != 0 || action != 1) return;
         double mx = getMouseX(mc);
         double my = getMouseY(mc);
-        System.out.println("[MCP-MOD] handleClick at (" + (int)mx + "," + (int)my + ") mcpMode=" + ReflectionHelper.isMcpControlMode() + " screen=" + (mc.currentScreen != null ? mc.currentScreen.getClass().getSimpleName() : "null"));
 
         if (ReflectionHelper.isMcpControlMode()) {
             String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
-            System.out.println("[MCP-MOD] Overlay click result: " + result);
         } else if (mc.world != null && mc.currentScreen != null) {
             String result = ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc);
-            System.out.println("[MCP-MOD] Transfer click result: " + result);
         }
     }
 
@@ -224,15 +221,11 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
         MinecraftForge.EVENT_BUS.addListener((InputEvent.MouseInputEvent event) -> {
             try {
                 Minecraft mc = Minecraft.getInstance();
+                if (ReflectionHelper.isWaitingForRelease()) {
+                    event.setCanceled(true);
+                    return;
+                }
                 if (ReflectionHelper.isMcpControlMode()) {
-                    if (event.getButton() == 0 && event.getAction() == 1) {
-                        double mx = getMouseX(mc);
-                        double my = getMouseY(mc);
-                        String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
-                        if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                            event.setCanceled(true);
-                        }
-                    }
                     return;
                 }
                 if (ReflectionHelper.shouldSuppressInput()) {
@@ -268,22 +261,24 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
             Minecraft mc;
             try { mc = Minecraft.getInstance(); } catch (Exception e) { return; }
 
+            ensureCursorInterceptor(mc);
+
+            if (ReflectionHelper.isWaitingForRelease()) {
+                long window = mc.mainWindow.getHandle();
+                if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_1) != GLFW.GLFW_PRESS) {
+                    ReflectionHelper.clearWaitingForRelease();
+                }
+            }
+
             if (ReflectionHelper.isMcpControlMode()) {
                 transferCooldown = 10;
                 if (event.phase == TickEvent.Phase.START) {
                     try { forceGlfwMouseFree(mc); } catch (Exception ignored) {}
                 } else {
                     try {
-                        if (!mouseHelperDumped && mc.mouseHelper != null) {
-                            mouseHelperDumped = true;
-                            System.out.println("[MCP-MOD] MouseHelper class: " + mc.mouseHelper.getClass().getName());
-                            for (java.lang.reflect.Field f : mc.mouseHelper.getClass().getDeclaredFields()) {
-                                f.setAccessible(true);
-                                try {
-                                    System.out.println("[MCP-MOD]   " + f.getName() + " (" + f.getType().getSimpleName() + ") = " + f.get(mc.mouseHelper));
-                                } catch (Exception ignored2) {}
-                            }
-                        }
+                    if (!mouseHelperDumped && mc.mouseHelper != null) {
+                        mouseHelperDumped = true;
+                    }
                         ReflectionHelper.tickMouseRelease(mc);
                         ReflectionHelper.tickMcpControlMode(mc);
                         ReflectionHelper.tickVideoCapture(mc);
@@ -315,6 +310,36 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
         });
     }
 
+    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
+
     private void setup(final FMLCommonSetupEvent event) {
+        Minecraft mc = Minecraft.getInstance();
+        try {
+            long handle = mc.mainWindow.getHandle();
+            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
+                if (ReflectionHelper.isWaitingForRelease()) {
+                    if (button == 0 && action == 0) {
+                        ReflectionHelper.clearWaitingForRelease();
+                        if (originalMouseButtonCallback != null) {
+                            originalMouseButtonCallback.invoke(window, button, action, mods);
+                        }
+                    }
+                    return;
+                }
+                if (button == 0 && action == 1 && ReflectionHelper.isMcpControlMode()) {
+                    Minecraft mc2 = Minecraft.getInstance();
+                    double mx = getMouseX(mc2);
+                    double my = getMouseY(mc2);
+                    ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
+                    return;
+                }
+                if (originalMouseButtonCallback != null) {
+                    originalMouseButtonCallback.invoke(window, button, action, mods);
+                }
+            });
+            System.out.println("[MCP-MOD] MouseButton interceptor installed in setup");
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] MouseButton interceptor failed: " + e.getMessage());
+        }
     }
 }

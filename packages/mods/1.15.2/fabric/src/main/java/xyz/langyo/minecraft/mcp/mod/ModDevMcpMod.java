@@ -11,6 +11,7 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.text.TranslatableText;
 import net.minecraft.text.LiteralText;
 import net.minecraft.util.Formatting;
+import org.lwjgl.glfw.GLFW;
 
 public class ModDevMcpMod implements ClientModInitializer {
     public static ModDevMcpMod INSTANCE;
@@ -91,9 +92,10 @@ public class ModDevMcpMod implements ClientModInitializer {
     public boolean onMouseClicked(double mouseX, double mouseY, int button) {
         try {
             MinecraftClient mc = MinecraftClient.getInstance();
+            if (ReflectionHelper.isWaitingForRelease()) return true;
+            if (ReflectionHelper.shouldSuppressInput()) return true;
             int mx = (int) mouseX;
             int my = (int) mouseY;
-            if (ReflectionHelper.shouldSuppressInput()) return true;
             if (ReflectionHelper.isMcpControlMode()) {
                 if (button == 0) {
                     String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
@@ -120,6 +122,13 @@ public class ModDevMcpMod implements ClientModInitializer {
         if (INSTANCE == null || INSTANCE.debugUrl == null) return;
         try {
             MinecraftClient mc = MinecraftClient.getInstance();
+            if (ReflectionHelper.isWaitingForRelease()) {
+                long window = mc.getWindow().getHandle();
+                if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_1) != GLFW.GLFW_PRESS) {
+                    ReflectionHelper.clearWaitingForRelease();
+                }
+                return;
+            }
             ReflectionHelper.tickMouseRelease(mc);
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);

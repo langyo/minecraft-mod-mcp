@@ -20,6 +20,7 @@ public final class ControlModeHelper {
     private static volatile int overlayTransferX = -999, overlayTransferY = -999, overlayTransferW, overlayTransferH;
 
     private static volatile boolean mouseReleaseActive = false;
+    private static volatile boolean waitingForRelease = false;
 
     private static int GLFW_CURSOR_VAL = -1;
     private static int GLFW_CURSOR_NORMAL_VAL = -1;
@@ -40,6 +41,10 @@ public final class ControlModeHelper {
     }
 
     public static boolean isMcpControlMode() { return mcpControlMode; }
+
+    public static boolean isWaitingForRelease() { return waitingForRelease; }
+
+    public static void clearWaitingForRelease() { waitingForRelease = false; }
 
     public static boolean shouldSuppressInput() {
         if (!mcpControlMode && mcpControlModeExitTime > 0) {
@@ -95,6 +100,7 @@ public final class ControlModeHelper {
             mcpControlModeExitTime = System.currentTimeMillis();
             logModEvent("exit_control_mode", "Manual control restored");
             mouseReleaseActive = false;
+            waitingForRelease = true;
             if (ReflectionCache.LWJGL3) {
                 try {
                     Object mh = ReflectionCache.getMouseHandler(mc);

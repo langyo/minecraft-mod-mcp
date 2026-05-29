@@ -231,6 +231,14 @@ public final class ReflectionHelper {
         return ControlModeHelper.shouldSuppressInput();
     }
 
+    public static boolean isWaitingForRelease() {
+        return ControlModeHelper.isWaitingForRelease();
+    }
+
+    public static void clearWaitingForRelease() {
+        ControlModeHelper.clearWaitingForRelease();
+    }
+
     public static String enterMcpControlMode(Object mc) {
         return ControlModeHelper.enterMcpControlMode(mc);
     }

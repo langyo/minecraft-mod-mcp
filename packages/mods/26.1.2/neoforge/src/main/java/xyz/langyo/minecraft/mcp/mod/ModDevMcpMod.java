@@ -3,6 +3,7 @@ package xyz.langyo.minecraft.mcp.mod;
 import xyz.langyo.minecraft.mcp.common.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
@@ -15,6 +16,7 @@ import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ClickEvent;
+import org.lwjgl.glfw.GLFW;
 
 @Mod("mcpmod")
 public class ModDevMcpMod {
@@ -22,6 +24,8 @@ public class ModDevMcpMod {
     McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
+
+    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
 
     private static McpRenderer wrapRenderer(GuiGraphicsExtractor g, Minecraft mc) {
         return new McpRenderer() {
@@ -101,17 +105,11 @@ public class ModDevMcpMod {
         NeoForge.EVENT_BUS.addListener((InputEvent.MouseButton.Pre event) -> {
             try {
                 Minecraft mc = Minecraft.getInstance();
-                if (ReflectionHelper.shouldSuppressInput()) { event.setCanceled(true); return; }
+                if (ReflectionHelper.isWaitingForRelease()) {
+                    event.setCanceled(true);
+                    return;
+                }
                 if (ReflectionHelper.isMcpControlMode()) {
-                    if (event.getButton() == 0) {
-                        double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
-                        double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
-                        String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
-                        if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                            event.setCanceled(true);
-                            return;
-                        }
-                    }
                     return;
                 }
                 if (mc.level != null && mc.screen != null && event.getButton() == 0) {
@@ -135,6 +133,7 @@ public class ModDevMcpMod {
 
     public ModDevMcpMod(IEventBus modBus) {
         INSTANCE = this;
+        modBus.addListener(this::setup);
 
         new Thread(() -> {
             try {
@@ -218,6 +217,13 @@ public class ModDevMcpMod {
             if (INSTANCE == null || INSTANCE.debugUrl == null) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
+                if (ReflectionHelper.isWaitingForRelease()) {
+                    long window = mc.getWindow().getWindow();
+                    if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_1) != GLFW.GLFW_PRESS) {
+                        ReflectionHelper.clearWaitingForRelease();
+                    }
+                    return;
+                }
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
                 ReflectionHelper.tickVideoCapture(mc);
@@ -225,5 +231,36 @@ public class ModDevMcpMod {
         });
 
         registerInputInterception();
+    }
+
+    private void setup(final FMLCommonSetupEvent event) {
+        Minecraft mc = Minecraft.getInstance();
+        try {
+            long handle = mc.getWindow().getWindow();
+            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
+                if (ReflectionHelper.isWaitingForRelease()) {
+                    if (button == 0 && action == 0) {
+                        ReflectionHelper.clearWaitingForRelease();
+                        if (originalMouseButtonCallback != null) {
+                            originalMouseButtonCallback.invoke(window, button, action, mods);
+                        }
+                    }
+                    return;
+                }
+                if (button == 0 && action == 1 && ReflectionHelper.isMcpControlMode()) {
+                    Minecraft mc2 = Minecraft.getInstance();
+                    double mx = mc2.mouseHandler.xpos() * mc2.getWindow().getGuiScaledWidth() / mc2.getWindow().getScreenWidth();
+                    double my = mc2.mouseHandler.ypos() * mc2.getWindow().getGuiScaledHeight() / mc2.getWindow().getScreenHeight();
+                    ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
+                    return;
+                }
+                if (originalMouseButtonCallback != null) {
+                    originalMouseButtonCallback.invoke(window, button, action, mods);
+                }
+            });
+            System.out.println("[MCP-MOD] MouseButton interceptor installed in setup");
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] MouseButton interceptor failed: " + e.getMessage());
+        }
     }
 }
