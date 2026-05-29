@@ -133,6 +133,7 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
             long hwnd = mc.mainWindow.getHandle();
             if (mc.currentScreen == null && mc.mouseHelper != null) {
                 GLFW.glfwSetInputMode(hwnd, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                try { mc.mouseHelper.grabMouse(); } catch (Exception ignored2) {}
             }
         } catch (Exception ignored) {}
     }
@@ -249,6 +250,10 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                         String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                         if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                             try { event.setCanceled(true); } catch (Exception ignored) {}
+                            if (!ReflectionHelper.isMcpControlMode() && mc.currentScreen == null) {
+                                GLFW.glfwSetInputMode(mc.mainWindow.getHandle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                                try { mc.mouseHelper.grabMouse(); } catch (Exception ignored2) {}
+                            }
                         }
                     }
                 } catch (Exception ignored) {}
@@ -334,6 +339,7 @@ private static void restoreGlfwMouseGrab(Minecraft mc) {
                     if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                         if (!ReflectionHelper.isMcpControlMode() && mc2.currentScreen == null) {
                             GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                            try { mc2.mouseHelper.grabMouse(); } catch (Exception ignored2) {}
                         }
                         return;
                     }

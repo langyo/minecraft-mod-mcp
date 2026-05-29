@@ -265,6 +265,7 @@ public class ModDevMcpMod {
                     if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                         if (!ReflectionHelper.isMcpControlMode() && mc2.currentScreen == null) {
                             GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                            try { mc2.mouseHelper.grabMouse(); } catch (Exception ignored2) {}
                         }
                         return;
                     }

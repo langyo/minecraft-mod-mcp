@@ -154,6 +154,10 @@ public class ModDevMcpMod {
                 String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                 if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                     event.setCanceled(true);
+                    if (!ReflectionHelper.isMcpControlMode() && mc.screen == null) {
+                        GLFW.glfwSetInputMode(mc.getWindow().getWindow(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                        try { mc.mouseHandler.grabMouse(); } catch (Exception ignored2) {}
+                    }
                 }
             } catch (Exception ignored) {}
         });
@@ -275,6 +279,7 @@ public class ModDevMcpMod {
                     if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                         if (!ReflectionHelper.isMcpControlMode() && mc2.screen == null) {
                             GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                            try { mc2.mouseHandler.grabMouse(); } catch (Exception ignored2) {}
                         }
                         return;
                     }

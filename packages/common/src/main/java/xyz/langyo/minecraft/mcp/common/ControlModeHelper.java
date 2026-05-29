@@ -58,6 +58,7 @@ public final class ControlModeHelper {
         try {
             mcpControlMode = true;
             mcpControlModeEnterTime = System.currentTimeMillis();
+            System.out.println("[MCP-ENTER] stacktrace: " + java.util.Arrays.toString(new Exception().getStackTrace()).substring(0, 500));
             try {
                 Object s = ReflectionCache.getCurrentScreen(mc);
                 hadScreenOnEnter = (s != null);
@@ -95,7 +96,7 @@ public final class ControlModeHelper {
 
     public static String exitMcpControlMode(Object mc) {
         try {
-            ReflectionHelper.dbg("exitMcpControlMode: CALLED FROM " + Thread.currentThread().getName() + " - " + new Exception().getStackTrace()[1]);
+            System.out.println("[MCP-EXIT] stacktrace: " + java.util.Arrays.toString(new Exception().getStackTrace()).substring(0, 500));
             mcpControlMode = false;
             mcpControlModeExitTime = System.currentTimeMillis();
             logModEvent("exit_control_mode", "Manual control restored");
@@ -143,6 +144,7 @@ public final class ControlModeHelper {
 
     public static String handleTransferOverlayClick(int guiX, int guiY, Object mc) {
         if (mcpControlMode) return "already_in_control_mode";
+        if (System.currentTimeMillis() - mcpControlModeExitTime < 500) return "cooldown";
         boolean hit = guiX >= overlayTransferX && guiX <= overlayTransferX + overlayTransferW
                    && guiY >= overlayTransferY && guiY <= overlayTransferY + overlayTransferH;
         if (hit) {
