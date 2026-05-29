@@ -263,6 +263,9 @@ public class ModDevMcpMod {
                     double mx = getMouseX(mc2);
                     double my = getMouseY(mc2);
                     ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
+                    if (!ReflectionHelper.isMcpControlMode() && mc2.currentScreen == null) {
+                        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                    }
                     return;
                 }
                 if (originalMouseButtonCallback != null) {
