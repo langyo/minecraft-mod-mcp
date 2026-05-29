@@ -607,6 +607,26 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 }
 ```
 
+> **注意**: ビジョンMCPはディスクからファイルを読み取るため、ビジョンツールを呼び出す前に必ず`screenshot_to_file`（`screenshot`ではない）を使用してください。AIエージェントは`screenshot_to_file`の呼び出し時にファイルパスを指定できます。
+
+### 操作例
+
+1. AIエージェントに次のように依頼します：*"Minecraftのスクリーンショットを撮影して`/tmp/mc.png`に保存し、画面に表示されている内容を分析して、新しいゲームを開始するためにどのボタンをクリックすればよいか教えてください。"*
+2. エージェントが`minecraft-mcp` → `screenshot_to_file` → ファイル保存
+3. エージェントが`zai-mcp-server` → `extract_text_from_screenshot` → UIテキスト読み取り
+4. エージェントが見た内容と次にすべきことを報告します
+
+### その他のビジョンツール
+
+| ツール | 説明 |
+|------|------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claudeはネイティブで画像を理解 — スクリーンショットファイルを貼り付けるか参照するだけ |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAIビジョンモデル、OpenAI互換クライアントから利用可能 |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | GoogleのビジョンAPI、Gemini互換ツールで利用可能 |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | オープンソースの視覚言語モデル、セルフホスト環境に適しています |
+
+> ビジョン機能を持つLLLやMCPサーバーであれば、同じパイプラインで使用できます — 重要なのは、最初に`screenshot_to_file`を使ってスクリーンショットをディスクに保存することです。
+
 ---
 
 ## トラブルシューティング

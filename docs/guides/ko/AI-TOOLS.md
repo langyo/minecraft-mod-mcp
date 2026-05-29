@@ -575,7 +575,7 @@ flowchart TD
 
 [GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`)는 GLM-4.6V로 구동되는 로컬 MCP 서버로, 다음 기능을 제공합니다:
 
-| Tool | Use Case |
+| 도구 | 용도 |
 |------|----------|
 | `ui_to_artifact` | UI 스크린샷을 코드, 프롬프트 또는 디자인 명세로 변환 |
 | `extract_text_from_screenshot` | 게임 UI에서 텍스트 OCR (채팅, 표지판, 메뉴) |
@@ -606,6 +606,26 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
   }
 }
 ```
+
+> **참고**: 비전 MCP는 디스크에서 파일을 읽으므로, 비전 도구를 호출하기 전에 항상 `screenshot_to_file`(`screenshot`이 아님)을 사용하세요. AI 에이전트는 `screenshot_to_file`을 호출할 때 특정 파일 경로를 지정할 수 있습니다.
+
+### 예제 워크플로우
+
+1. AI 에이전트에게 질문하세요: *"Minecraft 스크린샷을 찍어 `/tmp/mc.png`에 저장한 다음, 화면에 무엇이 있는지 분석하고 새 게임을 시작하려면 어떤 버튼을 눌러야 하는지 알려주세요."*
+2. 에이전트가 `minecraft-mcp` → `screenshot_to_file` → 파일 저장
+3. 에이전트가 `zai-mcp-server` → `extract_text_from_screenshot` → UI 텍스트 읽기
+4. 에이전트가 본 내용과 다음 단계를 알려줍니다
+
+### 기타 비전 도구
+
+| 도구 | 설명 |
+|------|------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude는 이미지를 기본적으로 이해합니다 — 스크린샷 파일을 붙여넣거나 참조하세요 |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAI 비전 모델, OpenAI 호환 클라이언트에서 사용 가능 |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | Google 비전 API, Gemini 호환 도구에서 사용 가능 |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | 오픈소스 비전 언어 모델, 자체 호스팅 환경에 적합 |
+
+> 비전 기능을 갖춘 LLM 또는 MCP 서버라면 동일한 파이프라인에서 사용할 수 있습니다 — 핵심은 `screenshot_to_file`을 사용하여 먼저 스크린샷을 디스크에 저장하는 것입니다.
 
 ---
 

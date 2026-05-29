@@ -577,7 +577,7 @@ flowchart TD
 
 [GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) es un servidor MCP local impulsado por GLM-4.6V que proporciona:
 
-| Tool | Use Case |
+| Herramienta | Caso de uso |
 |------|----------|
 | `ui_to_artifact` | Convertir capturas de pantalla de IU en código, prompts o especificaciones de diseño |
 | `extract_text_from_screenshot` | OCR de texto de la IU del juego (chat, carteles, menús) |
@@ -608,6 +608,26 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
   }
 }
 ```
+
+> **Nota**: El MCP de visión lee archivos desde el disco, así que usa siempre `screenshot_to_file` (no `screenshot`) antes de llamar a las herramientas de visión. Tu agente de IA puede especificar una ruta de archivo al llamar a `screenshot_to_file`.
+
+### Ejemplo de flujo de trabajo
+
+1. Pide a tu agente de IA: *"Toma una captura de pantalla de Minecraft, guárdala en `/tmp/mc.png`, luego analiza lo que aparece en pantalla y dime qué botón hacer clic para empezar un juego nuevo."*
+2. El agente llama a `minecraft-mcp` → `screenshot_to_file` → archivo guardado
+3. El agente llama a `zai-mcp-server` → `extract_text_from_screenshot` → lee el texto de la IU
+4. El agente te dice lo que ve y qué hacer a continuación
+
+### Otras herramientas de visión
+
+| Herramienta | Descripción |
+|------|------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude entiende imágenes de forma nativa — simplemente pega o referencia un archivo de captura de pantalla |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | Modelos de visión de OpenAI accesibles vía cualquier cliente compatible con OpenAI |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | API de visión de Google, utilizable en herramientas compatibles con Gemini |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | Modelo de visión-lenguaje de código abierto para entornos autoalojados |
+
+> Cualquier LLM o servidor MCP con capacidad de visión puede usarse en el mismo pipeline — la clave es usar `screenshot_to_file` para guardar primero la captura de pantalla en disco.
 
 ---
 

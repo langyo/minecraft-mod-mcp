@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD033 MD041 MD036 -->
 <div align="center">
 
-<img src="../../logo.webp" alt="Логотип Minecraft MCP" width="200"/>
+<img src="../../logo.webp" alt="Minecraft MCP logo" width="200"/>
 
 # Minecraft MCP
 
@@ -12,7 +12,7 @@
 [![Release](https://img.shields.io/github/v/release/langyo/minecraft-mod-mcp)](https://github.com/langyo/minecraft-mod-mcp/releases)
 [![npm](https://img.shields.io/npm/v/minecraft-mod-mcp)](https://www.npmjs.com/package/minecraft-mod-mcp)
 
-**[English](../en/README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **[Русский](../ru/README.md)**
+**[English](../../README.md)** &bull; **[简体中文](../zhs/README.md)** &bull; **[繁體中文](../zht/README.md)** &bull; **[日本語](../ja/README.md)** &bull; **[한국어](../ko/README.md)** &bull; **[Français](../fr/README.md)** &bull; **[Español](../es/README.md)** &bull; **Русский**
 
 </div>
 <!-- markdownlint-enable MD033 MD041 MD036 -->
@@ -125,7 +125,7 @@ flowchart LR
 
 > Этот раздел предназначен для контрибьюторов. Если вы просто хотите использовать мод, см. [Начало работы](#начало-работы) выше.
 
-Подробности см. в [CONTRIBUTING.md](../../CONTRIBUTING.md).
+Подробности о настройке среды разработки, структуре проекта и правилах участия см. в [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ---
 

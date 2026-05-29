@@ -577,7 +577,7 @@ flowchart TD
 
 [GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) 是一個由 GLM-4.6V 驅動的本地 MCP 伺服器，提供以下功能：
 
-| Tool | Use Case |
+| 工具 | 用途 |
 |------|----------|
 | `ui_to_artifact` | 將 UI 截圖轉換為程式碼、提示詞或設計規格 |
 | `extract_text_from_screenshot` | 從遊戲 UI 中 OCR 文字（聊天、告示牌、選單） |
@@ -620,7 +620,7 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 
 ### 其他視覺工具
 
-| Tool | Description |
+| 工具 | 說明 |
 |------|-------------|
 | [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude 原生理解圖片 — 直接貼上或引用截圖檔案 |
 | [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAI 視覺模型，可透過任何 OpenAI 相容客戶端使用 |

@@ -577,7 +577,7 @@ flowchart TD
 
 [GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) — это локальный MCP-сервер на базе GLM-4.6V, предоставляющий:
 
-| Tool | Use Case |
+| Инструмент | Применение |
 |------|----------|
 | `ui_to_artifact` | Преобразование скриншотов интерфейса в код, промпты или спецификации дизайна |
 | `extract_text_from_screenshot` | OCR текста из игрового интерфейса (чат, таблички, меню) |
@@ -608,6 +608,26 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
   }
 }
 ```
+
+> **Примечание**: Vision MCP читает файлы с диска, поэтому всегда используйте `screenshot_to_file` (не `screenshot`) перед вызовом инструментов зрения. Ваш ИИ-агент может указать путь к файлу при вызове `screenshot_to_file`.
+
+### Пример рабочего процесса
+
+1. Попросите вашего ИИ-агента: *"Сделай скриншот Minecraft, сохрани его в `/tmp/mc.png`, затем проанализируй, что на экране, и скажи, какую кнопку нажать, чтобы начать новую игру."*
+2. Агент вызывает `minecraft-mcp` → `screenshot_to_file` → файл сохранён
+3. Агент вызывает `zai-mcp-server` → `extract_text_from_screenshot` → читает текст интерфейса
+4. Агент сообщает, что он видит, и что делать дальше
+
+### Другие инструменты зрения
+
+| Инструмент | Описание |
+|------|------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude нативно понимает изображения — просто вставьте или укажите файл скриншота |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | Модели зрения OpenAI, доступные через любой совместимый с OpenAI клиент |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | API зрения Google, используемый в инструментах, совместимых с Gemini |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | Открытая модель «зрение-язык» для самостоятельного хостинга |
+
+> Любой LLM или MCP-сервер с поддержкой зрения можно использовать в том же конвейере — главное, использовать `screenshot_to_file`, чтобы сначала сохранить скриншот на диск.
 
 ---
 

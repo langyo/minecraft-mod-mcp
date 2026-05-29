@@ -575,7 +575,7 @@ flowchart TD
 
 [GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) est un serveur MCP local propulsé par GLM-4.6V, offrant :
 
-| Tool | Use Case |
+| Outil | Cas d'utilisation |
 |------|----------|
 | `ui_to_artifact` | Convertir des captures d'écran d'IU en code, invites ou spécifications de conception |
 | `extract_text_from_screenshot` | OCR du texte de l'IU du jeu (chat, panneaux, menus) |
@@ -606,6 +606,26 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
   }
 }
 ```
+
+> **Note** : Le serveur MCP de vision lit les fichiers depuis le disque, utilisez donc toujours `screenshot_to_file` (et non `screenshot`) avant d'appeler les outils de vision. Votre agent IA peut spécifier un chemin de fichier lors de l'appel à `screenshot_to_file`.
+
+### Exemple de flux de travail
+
+1. Demandez à votre agent IA : *"Prenez une capture d'écran de Minecraft, enregistrez-la dans `/tmp/mc.png`, puis analysez ce qui s'affiche à l'écran et dites-moi quel bouton cliquer pour démarrer une nouvelle partie."*
+2. L'agent appelle `minecraft-mcp` → `screenshot_to_file` → fichier enregistré
+3. L'agent appelle `zai-mcp-server` → `extract_text_from_screenshot` → lecture du texte de l'IU
+4. L'agent vous indique ce qu'il voit et ce qu'il faut faire ensuite
+
+### Autres outils de vision
+
+| Outil | Description |
+|------|------|
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude comprend nativement les images — collez ou référencez simplement un fichier de capture d'écran |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | Modèles de vision OpenAI accessibles via tout client compatible OpenAI |
+| [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | API de vision de Google, utilisable dans les outils compatibles Gemini |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | Modèle vision-langage open source pour les environnements auto-hébergés |
+
+> Tout LLM ou serveur MCP capable de vision peut être utilisé dans le même pipeline — la clé est d'utiliser `screenshot_to_file` pour d'abord enregistrer la capture d'écran sur le disque.
 
 ---
 
