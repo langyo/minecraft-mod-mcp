@@ -1,0 +1,20 @@
+modLoader = "javafml"
+loaderVersion = "[3,)"
+license = "MIT"
+
+[[mods]]
+modId = "mcpmod"
+version="0.1.0"
+displayName = "ModDev MCP"
+description = "WebSocket bridge for AI agent interaction"
+authors = "langyo"
+
+[mods.description_localized]
+en_us = "WebSocket bridge for AI agent interaction"
+zh_cn = "用于 AI 代理交互的 Minecraft WebSocket 桥接模组"
+zh_tw = "用於 AI 代理交互的 Minecraft WebSocket 橋接模組"
+ja_jp = "AIエージェント連携のためのMinecraft WebSocketブリッジMOD"
+ko_kr = "AI 에이전트 상호작용을 위한 Minecraft WebSocket 브리지 모드"
+fr_fr = "Pont WebSocket pour l'interaction d'agents IA avec Minecraft"
+es_es = "Puente WebSocket para la interacción de agentes IA en Minecraft"
+ru_ru = "WebSocket-мост для взаимодействия AI-агентов с Minecraft"

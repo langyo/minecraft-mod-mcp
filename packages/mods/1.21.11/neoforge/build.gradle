@@ -1,0 +1,62 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'net.neoforged.moddev' version '2.0.141'
+}
+
+version = '0.1.0-SNAPSHOT'
+group = 'xyz.langyo'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    maven {
+        url = rootProject.projectDir.toPath().resolve('../../../../.maven-local').toUri()
+        allowInsecureProtocol = false
+    }
+    mavenCentral()
+}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+sourceSets.main.resources.srcDir '../../../common/src/main/resources'
+
+afterEvaluate {
+    tasks.withType(ProcessResources).configureEach {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+}
+
+dependencies {
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+    implementation 'net.java.dev.jna:jna:5.15.0'
+    implementation 'net.java.dev.jna:jna-platform:5.15.0'
+}
+
+neoForge {
+    version = "21.11.42"
+    runs {
+        configureEach {
+            gameDirectory = project.file('run')
+        }
+        client {
+            client()
+        }
+    }
+    mods {
+        mcpmod {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    manifest {
+        attributes 'ModSide' : 'CLIENT'
+        attributes 'Automatic-Module-Name': 'mcpmod'
+        attributes 'Implementation-Version' : project.version
+    }
+}
