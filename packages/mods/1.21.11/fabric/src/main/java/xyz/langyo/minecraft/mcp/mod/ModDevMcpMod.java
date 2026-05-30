@@ -24,7 +24,8 @@ public class ModDevMcpMod implements ClientModInitializer {
                 ctx.fill(x1, y1, x2, y2, color);
             }
             @Override public int drawString(Object font, String text, int x, int y, int color, boolean shadow) {
-                return ctx.drawText(mc.textRenderer, text, x, y, color, shadow);
+                ctx.drawText(mc.textRenderer, text, x, y, color, shadow);
+                return mc.textRenderer.getWidth(text);
             }
             @Override public int getStringWidth(Object font, String text) {
                 return mc.textRenderer.getWidth(text);
@@ -143,7 +144,7 @@ public class ModDevMcpMod implements ClientModInitializer {
                 .append(Text.literal(url).styled(s -> s
                     .withColor(0xFFFFFF)
                     .withUnderline(true)
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url))
+                    .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(url)))
                 ));
             mc.inGameHud.getChatHud().addMessage(msg);
         } catch (Exception ignored) {}

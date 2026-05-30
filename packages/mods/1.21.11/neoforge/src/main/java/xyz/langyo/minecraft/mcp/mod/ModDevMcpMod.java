@@ -149,7 +149,7 @@ public class ModDevMcpMod {
                     if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                         event.setCanceled(true);
                         if (!ReflectionHelper.isMcpControlMode() && mc.screen == null) {
-                            long window = mc.getWindow().getWindow();
+                            long window = mc.getWindow().handle();
                             GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
                             try { mc.mouseHandler.grabMouse(); } catch (Exception ignored) {}
                         }
@@ -169,7 +169,7 @@ public class ModDevMcpMod {
             try {
                 Minecraft mc = Minecraft.getInstance();
                 if (ReflectionHelper.isWaitingForRelease()) {
-                    long window = mc.getWindow().getWindow();
+                    long window = mc.getWindow().handle();
                     if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_1) != GLFW.GLFW_PRESS) {
                         ReflectionHelper.clearWaitingForRelease();
                     }
@@ -190,7 +190,7 @@ public class ModDevMcpMod {
                     .append(Component.literal(url).withStyle(st -> st
                         .withColor(0xFFFFFF)
                         .withUnderlined(true)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url))
+                        .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(url)))
                     ));
                 mc.gui.getChat().addMessage(msg);
             } catch (Exception ignored) {}

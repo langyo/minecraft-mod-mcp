@@ -36,7 +36,7 @@ public class ModDevMcpMod {
     private static void ensureMouseInterceptor(Minecraft mc) {
         if (mouseInterceptorInstalled && mouseButtonInterceptorInstalled) return;
         try {
-            long handle = mc.getWindow().getWindow();
+            long handle = mc.getWindow().handle();
             if (!mouseInterceptorInstalled) {
                 originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
                     if (ReflectionHelper.isMcpControlMode()) {
@@ -188,7 +188,7 @@ public class ModDevMcpMod {
                 String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
                 if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
                     if (!ReflectionHelper.isMcpControlMode() && mc.screen == null) {
-                        GLFW.glfwSetInputMode(mc.getWindow().getWindow(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                        GLFW.glfwSetInputMode(mc.getWindow().handle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
                         try { mc.mouseHandler.grabMouse(); } catch (Exception ignored2) {}
                     }
                     return true;
@@ -261,13 +261,12 @@ public class ModDevMcpMod {
             } catch (Exception ignored) { return false; }
         });
 
-        try { TickEvent.ClientTickEvent.BUS.addListener(event -> {
+        try { TickEvent.ClientTickEvent.Post.BUS.addListener(event -> {
             if (INSTANCE == null || INSTANCE.debugUrl == null) return;
-            if (event.phase != TickEvent.Phase.END) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
                 if (ReflectionHelper.isWaitingForRelease()) {
-                    long window = mc.getWindow().getWindow();
+                    long window = mc.getWindow().handle();
                     if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_1) != GLFW.GLFW_PRESS) {
                         ReflectionHelper.clearWaitingForRelease();
                     }
