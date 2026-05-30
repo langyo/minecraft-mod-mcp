@@ -1043,6 +1043,68 @@ def find_java(version_java=None):
     return "java"
 
 
+def _launch_neoforge_gradlew(mc_version, args):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    mod_dir = os.path.join(project_root, "packages", "mods", mc_version, "neoforge")
+
+    if not os.path.isdir(mod_dir):
+        print(f"[LAUNCH] ERROR: NeoForge mod directory not found: {mod_dir}")
+        sys.exit(1)
+
+    gradlew = os.path.join(mod_dir, "gradlew.bat" if platform.system() == "Windows" else "gradlew")
+    if not os.path.isfile(gradlew):
+        gradlew = os.path.join(mod_dir, "gradlew")
+    if not os.path.isfile(gradlew):
+        print(f"[LAUNCH] ERROR: gradlew not found in {mod_dir}")
+        sys.exit(1)
+
+    version_config = {}
+    vc_path = os.path.join(script_dir, "version_config.py")
+    if os.path.isfile(vc_path):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("version_config", vc_path)
+        vc_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(vc_mod)
+        version_config = vc_mod.ALL_VERSIONS.get(mc_version, {})
+
+    java_ver = version_config.get("java", 21)
+    java_exe = find_java(java_ver)
+
+    gradle_args = ["runClient"]
+    if args.jvm_args:
+        for a in args.jvm_args.split():
+            if a.startswith("-X"):
+                gradle_args.append(f"--jvm-args={a}")
+
+    if args.headless:
+        gradle_args.append(f"--jvm-args=-Djava.awt.headless=true")
+
+    mc_dir = args.mc_dir or MC_DIR
+    env = os.environ.copy()
+    env["JAVA_HOME"] = os.path.dirname(os.path.dirname(java_exe)) if java_exe != "java" else env.get("JAVA_HOME", "")
+
+    cmd = [gradlew] + gradle_args
+    cmd_str = " ".join(cmd)
+
+    if args.dry_run:
+        print(f"[DRY-RUN] NeoForge runClient:")
+        print(f"  cwd: {mod_dir}")
+        print(f"  cmd: {cmd_str}")
+        print(f"  JAVA_HOME: {env.get('JAVA_HOME', '(not set)')}")
+        return
+
+    print(f"[LAUNCH] NeoForge runClient: {mc_version}/neoforge")
+    print(f"  cwd: {mod_dir}")
+    print(f"  cmd: {cmd_str}")
+    print(f"  JAVA_HOME: {env.get('JAVA_HOME', '(default)')}")
+
+    proc = subprocess.Popen(cmd, cwd=mod_dir, env=env)
+    print(f"[LAUNCH] Process started: pid={proc.pid}")
+    rc = proc.wait()
+    print(f"[LAUNCH] Process exited with code {rc}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Launch Minecraft directly")
     parser.add_argument("version", help="Version name (e.g. 1.21.7-forge-57.0.2)")
@@ -1069,6 +1131,19 @@ def main():
     version_name = args.version
 
     mc_version = version_name.split("-")[0] if "-" in version_name else version_name
+
+    loader_filter = args.loader
+    if not loader_filter:
+        if "neoforge" in version_name.lower():
+            loader_filter = "neoforge"
+        elif "fabric" in version_name.lower():
+            loader_filter = "fabric"
+        else:
+            loader_filter = "forge"
+
+    if loader_filter == "neoforge":
+        _launch_neoforge_gradlew(mc_version, args)
+        return
 
     print(f"[LAUNCH] MC version: {version_name}")
     print(f"[LAUNCH] MC dir: {mc_dir}")
