@@ -21,6 +21,7 @@ public class ModDevMcpMod implements ClientModInitializer {
     private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
     private static boolean glfwInterceptorsInstalled = false;
     private static boolean wasInControlMode = false;
+    private static volatile boolean suppressCursorCallback = false;
 
     private static McpRenderer wrapRenderer(net.minecraft.client.gui.DrawContext ctx, MinecraftClient mc) {
         return new McpRenderer() {
@@ -61,6 +62,10 @@ public class ModDevMcpMod implements ClientModInitializer {
             long handle = mc.getWindow().getHandle();
 
             originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
+                if (suppressCursorCallback) {
+                    suppressCursorCallback = false;
+                    return;
+                }
                 if (ReflectionHelper.isMcpControlMode()) {
                     MinecraftClient curMc = MinecraftClient.getInstance();
                     if (curMc != null && curMc.currentScreen == null) {
@@ -109,6 +114,8 @@ public class ModDevMcpMod implements ClientModInitializer {
     private static void forceGlfwMouseGrab(MinecraftClient mc) {
         try {
             long handle = mc.getWindow().getHandle();
+            suppressCursorCallback = true;
+            GLFW.glfwSetCursorPos(handle, mc.getWindow().getWidth() / 2.0, mc.getWindow().getHeight() / 2.0);
             GLFW.glfwSetInputMode(handle, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
         } catch (Exception ignored) {}
     }
