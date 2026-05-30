@@ -1043,6 +1043,35 @@ def find_java(version_java=None):
     return "java"
 
 
+def _find_jdk_home(target_ver):
+    if platform.system() == "Windows":
+        corretto_base = r"C:\Program Files\Amazon Corretto"
+        if os.path.isdir(corretto_base):
+            for d in sorted(os.listdir(corretto_base), reverse=True):
+                if d.startswith(f"jdk{target_ver}.") or d.startswith(f"jdk1.{target_ver}."):
+                    path = os.path.join(corretto_base, d)
+                    if os.path.isfile(os.path.join(path, "bin", f"java{_EXE_SUFFIX}")):
+                        return path
+        adoptium_base = r"C:\Program Files\Eclipse Adoptium"
+        if os.path.isdir(adoptium_base):
+            for d in sorted(os.listdir(adoptium_base), reverse=True):
+                if f"-{target_ver}." in d:
+                    path = os.path.join(adoptium_base, d)
+                    if os.path.isfile(os.path.join(path, "bin", f"java{_EXE_SUFFIX}")):
+                        return path
+    jdks_dir = os.path.join(os.path.expanduser("~"), ".gradle", "jdks")
+    if os.path.isdir(jdks_dir):
+        for d in sorted(os.listdir(jdks_dir), reverse=True):
+            if f"-{target_ver}." in d and "lock" not in d:
+                path = os.path.join(jdks_dir, d)
+                exe = os.path.join(path, "bin", f"java{_EXE_SUFFIX}")
+                if platform.system() != "Windows":
+                    exe = os.path.join(path, "bin", "java")
+                if os.path.isfile(exe):
+                    return path
+    return None
+
+
 def _launch_neoforge_gradlew(mc_version, args):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
@@ -1070,19 +1099,32 @@ def _launch_neoforge_gradlew(mc_version, args):
 
     java_ver = version_config.get("java", 21)
     java_exe = find_java(java_ver)
+    found_ver = _java_major_version(java_exe) if java_exe != "java" and os.path.isfile(java_exe) else 0
+
+    if found_ver != java_ver:
+        java_home = _find_jdk_home(java_ver)
+        if java_home:
+            java_exe = os.path.join(java_home, "bin", f"java{_EXE_SUFFIX}")
+            print(f"[LAUNCH] Found JDK {java_ver} at {java_home}")
+
+    java_home_dir = os.path.dirname(os.path.dirname(java_exe)) if java_exe != "java" and os.path.isfile(java_exe) else None
 
     gradle_args = ["runClient"]
-    if args.jvm_args:
-        for a in args.jvm_args.split():
-            if a.startswith("-X"):
-                gradle_args.append(f"--jvm-args={a}")
-
-    if args.headless:
-        gradle_args.append(f"--jvm-args=-Djava.awt.headless=true")
 
     mc_dir = args.mc_dir or MC_DIR
     env = os.environ.copy()
-    env["JAVA_HOME"] = os.path.dirname(os.path.dirname(java_exe)) if java_exe != "java" else env.get("JAVA_HOME", "")
+    if java_home_dir:
+        env["JAVA_HOME"] = java_home_dir
+
+    jvm_opts = []
+    if args.jvm_args:
+        for a in args.jvm_args.split():
+            if a.startswith("-X"):
+                jvm_opts.append(a)
+    if args.headless:
+        jvm_opts.append("-Djava.awt.headless=true")
+    if jvm_opts:
+        env["GRADLE_OPTS"] = (env.get("GRADLE_OPTS", "") + " " + " ".join(jvm_opts)).strip()
 
     cmd = [gradlew] + gradle_args
     cmd_str = " ".join(cmd)
