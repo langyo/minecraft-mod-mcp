@@ -2,8 +2,7 @@ package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
@@ -31,11 +30,12 @@ public class ModDevMcpMod {
     private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
     private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
     private static boolean cursorInterceptorInstalled = false;
+    private static boolean mouseButtonInterceptorInstalled = false;
     private static java.lang.reflect.Field mousePosXField = null;
     private static java.lang.reflect.Field mousePosYField = null;
 
     private static void ensureCursorInterceptor(Minecraft mc) {
-        if (cursorInterceptorInstalled) return;
+        if (cursorInterceptorInstalled && mouseButtonInterceptorInstalled) return;
         try {
             long handle = mc.getMainWindow().getHandle();
             originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
@@ -59,6 +59,37 @@ public class ModDevMcpMod {
             if (firstDouble != null) { firstDouble.setAccessible(true); mousePosXField = firstDouble; }
             if (secondDouble != null) { secondDouble.setAccessible(true); mousePosYField = secondDouble; }
             cursorInterceptorInstalled = true;
+            if (!mouseButtonInterceptorInstalled) {
+                originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
+                    if (ReflectionHelper.isWaitingForRelease()) {
+                        if (button == 0 && action == 0) {
+                            ReflectionHelper.clearWaitingForRelease();
+                            if (originalMouseButtonCallback != null) {
+                                originalMouseButtonCallback.invoke(window, button, action, mods);
+                            }
+                        }
+                        return;
+                    }
+                    if (button == 0 && action == 1 && ReflectionHelper.isMcpControlMode()) {
+                        Minecraft mc2 = Minecraft.getInstance();
+                        double mx = getMouseX(mc2);
+                        double my = getMouseY(mc2);
+                        String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
+                        if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                            if (!ReflectionHelper.isMcpControlMode() && mc2.currentScreen == null) {
+                                GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                                try { mc2.mouseHelper.grabMouse(); } catch (Exception ignored2) {}
+                            }
+                            return;
+                        }
+                    }
+                    if (originalMouseButtonCallback != null) {
+                        originalMouseButtonCallback.invoke(window, button, action, mods);
+                    }
+                });
+                mouseButtonInterceptorInstalled = true;
+                System.out.println("[MCP-MOD] MouseButton interceptor installed");
+            }
         } catch (Exception e) {
             System.err.println("[MCP-MOD] Cursor interceptor failed: " + e.getMessage());
         }
@@ -128,7 +159,6 @@ public class ModDevMcpMod {
     @SuppressWarnings("removal")
     public ModDevMcpMod() {
         INSTANCE = this;
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
 
         new Thread(() -> {
             try {
@@ -241,42 +271,5 @@ public class ModDevMcpMod {
                 mc.ingameGUI.getChatGUI().printChatMessage(new StringTextComponent("[MCP] Debug page: " + url).applyTextStyle(TextFormatting.WHITE));
             } catch (Exception ignored) {}
         });
-    }
-
-    private void setup(final FMLCommonSetupEvent event) {
-        Minecraft mc = Minecraft.getInstance();
-        try {
-            long handle = mc.getMainWindow().getHandle();
-            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
-                if (ReflectionHelper.isWaitingForRelease()) {
-                    if (button == 0 && action == 0) {
-                        ReflectionHelper.clearWaitingForRelease();
-                        if (originalMouseButtonCallback != null) {
-                            originalMouseButtonCallback.invoke(window, button, action, mods);
-                        }
-                    }
-                    return;
-                }
-                if (button == 0 && action == 1 && ReflectionHelper.isMcpControlMode()) {
-                    Minecraft mc2 = Minecraft.getInstance();
-                    double mx = getMouseX(mc2);
-                    double my = getMouseY(mc2);
-                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
-                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                        if (!ReflectionHelper.isMcpControlMode() && mc2.currentScreen == null) {
-                            GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
-                            try { mc2.mouseHelper.grabMouse(); } catch (Exception ignored2) {}
-                        }
-                        return;
-                    }
-                }
-                if (originalMouseButtonCallback != null) {
-                    originalMouseButtonCallback.invoke(window, button, action, mods);
-                }
-            });
-            System.out.println("[MCP-MOD] MouseButton interceptor installed in setup");
-        } catch (Exception e) {
-            System.err.println("[MCP-MOD] MouseButton interceptor failed: " + e.getMessage());
-        }
     }
 }
