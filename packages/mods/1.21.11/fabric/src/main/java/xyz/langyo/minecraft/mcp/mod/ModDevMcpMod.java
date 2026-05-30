@@ -20,6 +20,7 @@ public class ModDevMcpMod implements ClientModInitializer {
     private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
     private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
     private static boolean glfwInterceptorsInstalled = false;
+    private static boolean wasInControlMode = false;
 
     private static McpRenderer wrapRenderer(net.minecraft.client.gui.DrawContext ctx, MinecraftClient mc) {
         return new McpRenderer() {
@@ -105,6 +106,13 @@ public class ModDevMcpMod implements ClientModInitializer {
         } catch (Exception ignored) {}
     }
 
+    private static void forceGlfwMouseGrab(MinecraftClient mc) {
+        try {
+            long handle = mc.getWindow().getHandle();
+            GLFW.glfwSetInputMode(handle, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+        } catch (Exception ignored) {}
+    }
+
     public void onInGameHudRender(net.minecraft.client.gui.DrawContext ctx, float tickDelta) {
         if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
         try {
@@ -116,6 +124,11 @@ public class ModDevMcpMod implements ClientModInitializer {
                 if (ReflectionHelper.isMcpControlMode()) {
                     ensureGlfwInterceptors(mc);
                     forceGlfwMouseFree(mc);
+                } else if (glfwInterceptorsInstalled) {
+                    long handle = mc.getWindow().getHandle();
+                    if (GLFW.glfwGetInputMode(handle, GLFW.GLFW_CURSOR) == GLFW.GLFW_CURSOR_NORMAL) {
+                        forceGlfwMouseGrab(mc);
+                    }
                 }
 
                 if (!ReflectionHelper.isScreenshotInProgress()) {
@@ -207,10 +220,14 @@ public class ModDevMcpMod implements ClientModInitializer {
             ReflectionHelper.tickMouseRelease(mc);
             ReflectionHelper.tickMcpControlMode(mc);
             ReflectionHelper.tickVideoCapture(mc);
-            if (ReflectionHelper.isMcpControlMode() && mc.currentScreen == null) {
+            boolean inCtrl = ReflectionHelper.isMcpControlMode();
+            if (inCtrl && mc.currentScreen == null) {
                 ensureGlfwInterceptors(mc);
                 forceGlfwMouseFree(mc);
+            } else if (wasInControlMode && !inCtrl && mc.currentScreen == null) {
+                forceGlfwMouseGrab(mc);
             }
+            wasInControlMode = inCtrl;
         } catch (Exception ignored) {}
 
         handleOverlayMousePoll();
