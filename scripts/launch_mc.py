@@ -1034,6 +1034,11 @@ def find_java(version_java=None):
                 exe = os.path.join(home, "bin", f"java{_EXE_SUFFIX}")
                 if os.path.isfile(exe):
                     return exe
+        jdk_home = _find_jdk_home(ver)
+        if jdk_home:
+            exe = os.path.join(jdk_home, "bin", f"java{_EXE_SUFFIX}")
+            if os.path.isfile(exe):
+                return exe
     for env_key in _JAVA_HOME_ENV_KEYS:
         home = os.environ.get(env_key)
         if home:
@@ -1182,6 +1187,19 @@ def main():
             loader_filter = "fabric"
         else:
             loader_filter = "forge"
+
+    if "-" not in version_name:
+        _vc_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version_config.py")
+        if os.path.isfile(_vc_path):
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("version_config", _vc_path)
+            vc_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(vc_mod)
+            vc_entry = vc_mod.ALL_VERSIONS.get(mc_version, {})
+            resolved = vc_entry.get("version_id")
+            if resolved:
+                version_name = resolved
+                print(f"[LAUNCH] Resolved version: {version_name} (loader={loader_filter})")
 
     if loader_filter == "neoforge":
         _launch_neoforge_gradlew(mc_version, args)
