@@ -1177,8 +1177,6 @@ def main():
     mc_dir = args.mc_dir or MC_DIR
     version_name = args.version
 
-    mc_version = version_name.split("-")[0] if "-" in version_name else version_name
-
     loader_filter = args.loader
     if not loader_filter:
         if "neoforge" in version_name.lower():
@@ -1187,6 +1185,13 @@ def main():
             loader_filter = "fabric"
         else:
             loader_filter = "forge"
+
+    if loader_filter == "fabric" and version_name.startswith("fabric-loader"):
+        import re
+        matches = re.findall(r"(\d+\.\d+(?:\.\d+)?)", version_name)
+        mc_version = matches[-1] if matches else version_name
+    else:
+        mc_version = version_name.split("-")[0] if "-" in version_name else version_name
 
     if "-" not in version_name:
         _vc_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version_config.py")
@@ -1365,8 +1370,8 @@ def main():
 
     cmd = [java_exe]
     cmd.extend(args.jvm_args.split())
-    mc_ver = args.version.split("-")[0] if args.version else "unknown"
-    loader = args.loader if hasattr(args, "loader") and args.loader else "forge"
+    mc_ver = mc_version
+    loader = loader_filter
 
     if args.headless:
         cmd.extend([
