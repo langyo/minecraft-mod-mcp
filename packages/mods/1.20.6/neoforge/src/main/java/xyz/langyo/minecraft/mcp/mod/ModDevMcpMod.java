@@ -3,15 +3,13 @@ package xyz.langyo.minecraft.mcp.mod;
 import xyz.langyo.minecraft.mcp.common.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -24,8 +22,6 @@ public class ModDevMcpMod {
     McpHttpServer httpServer;
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
-
-    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
 
     private static McpRenderer wrapRenderer(GuiGraphics g, Minecraft mc) {
         return new McpRenderer() {
@@ -78,8 +74,6 @@ public class ModDevMcpMod {
 
     public ModDevMcpMod(IEventBus modBus) {
         INSTANCE = this;
-        modBus.addListener(this::setup);
-        modBus.addListener(this::setup);
 
         new Thread(() -> {
             try {
@@ -97,7 +91,7 @@ public class ModDevMcpMod {
             }
         }, "MCP-HTTP").start();
 
-        NeoForge.EVENT_BUS.addListener((CustomizeGuiOverlayEvent.Chat event) -> {
+        NeoForge.EVENT_BUS.addListener((RenderGuiEvent.Post event) -> {
             if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
@@ -143,16 +137,26 @@ public class ModDevMcpMod {
         NeoForge.EVENT_BUS.addListener((InputEvent.MouseButton.Pre event) -> {
             try {
                 Minecraft mc = Minecraft.getInstance();
+                if (event.getButton() != 0 || event.getAction() != 1) return;
                 if (ReflectionHelper.isWaitingForRelease()) {
                     event.setCanceled(true);
                     return;
                 }
+                double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
+                double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
                 if (ReflectionHelper.isMcpControlMode()) {
+                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc);
+                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                        event.setCanceled(true);
+                        if (!ReflectionHelper.isMcpControlMode() && mc.screen == null) {
+                            long window = mc.getWindow().getWindow();
+                            GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                            try { mc.mouseHandler.grabMouse(); } catch (Exception ignored) {}
+                        }
+                    }
                     return;
                 }
-                if (mc.level != null && mc.screen != null && event.getButton() == 0) {
-                    double mx = mc.mouseHandler.xpos() * mc.getWindow().getGuiScaledWidth() / mc.getWindow().getScreenWidth();
-                    double my = mc.mouseHandler.ypos() * mc.getWindow().getGuiScaledHeight() / mc.getWindow().getScreenHeight();
+                if (mc.level != null && mc.screen != null) {
                     if (ReflectionHelper.handleTransferOverlayClick((int) mx, (int) my, mc).equals("transfer_to_mcp")) {
                         event.setCanceled(true);
                     }
@@ -193,44 +197,4 @@ public class ModDevMcpMod {
         });
     }
 
-    private void setup(final FMLCommonSetupEvent event) {
-        Minecraft mc = Minecraft.getInstance();
-        try {
-            long handle = mc.getWindow().getWindow();
-            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
-                if (ReflectionHelper.isWaitingForRelease()) {
-                    if (button == 0 && action == 0) {
-                        ReflectionHelper.clearWaitingForRelease();
-                        if (originalMouseButtonCallback != null) {
-                            originalMouseButtonCallback.invoke(window, button, action, mods);
-                        }
-                    }
-                    return;
-                }
-                if (button == 0 && action == 1 && ReflectionHelper.isMcpControlMode()) {
-                    Minecraft mc2 = Minecraft.getInstance();
-                    double w = mc2.getWindow().getGuiScaledWidth();
-                    double sw = mc2.getWindow().getScreenWidth();
-                    double h = mc2.getWindow().getGuiScaledHeight();
-                    double sh = mc2.getWindow().getScreenHeight();
-                    double mx = mc2.mouseHandler.xpos() * w / sw;
-                    double my = mc2.mouseHandler.ypos() * h / sh;
-                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
-                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                        if (!ReflectionHelper.isMcpControlMode() && mc2.screen == null) {
-                            GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
-                            try { mc2.mouseHandler.grabMouse(); } catch (Exception ignored2) {}
-                        }
-                        return;
-                    }
-                }
-                if (originalMouseButtonCallback != null) {
-                    originalMouseButtonCallback.invoke(window, button, action, mods);
-                }
-            });
-            System.out.println("[MCP-MOD] MouseButton interceptor installed in setup");
-        } catch (Exception e) {
-            System.err.println("[MCP-MOD] MouseButton interceptor failed: " + e.getMessage());
-        }
-    }
 }
