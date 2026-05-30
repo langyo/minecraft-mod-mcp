@@ -127,16 +127,18 @@ public class ModDevMcpMod {
             } catch (Exception ignored) {}
         });
 
+        NeoForge.EVENT_BUS.addListener((ScreenEvent.Opening event) -> {
+            if (ReflectionHelper.isMcpControlMode() && event.getScreen() instanceof PauseScreen) {
+                event.setCanceled(true);
+            }
+        });
+
         NeoForge.EVENT_BUS.addListener((ScreenEvent.Render.Post event) -> {
             if (ReflectionHelper.isScreenshotInProgress()) return;
             try {
                 Minecraft mc = Minecraft.getInstance();
                 Screen screen = event.getScreen();
                 if (screen == null) return;
-                if (ReflectionHelper.isMcpControlMode() && screen instanceof PauseScreen) {
-                    mc.screen = null;
-                    return;
-                }
                 if (mc.level != null) {
                     GuiGraphicsExtractor sg = event.getGuiGraphics();
                     renderScreenButton(sg, mc, screen);
