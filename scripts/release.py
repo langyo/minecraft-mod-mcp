@@ -24,12 +24,39 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import (
     ALL_VERSIONS, MODS_DIR,
-    get_loaders, get_jdk_home, find_jdk17,
+    get_loaders,
 )
 from mirrors import probe_all as probe_mirrors, patch_all_wrappers, generate_init_gradle
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD_TIMEOUT = 1200
+_EXE_SUFFIX = ".exe" if sys.platform == "win32" else ""
+
+_JDK_CACHE = {}
+
+
+def _find_jdk_home(target_ver):
+    if target_ver in _JDK_CACHE:
+        return _JDK_CACHE[target_ver]
+    if sys.platform == "win32":
+        for base in [r"C:\Program Files\Amazon Corretto", r"C:\Program Files\Eclipse Adoptium"]:
+            if os.path.isdir(base):
+                for d in sorted(os.listdir(base), reverse=True):
+                    if d.startswith(f"jdk{target_ver}.") or d.startswith(f"jdk1.{target_ver}."):
+                        path = os.path.join(base, d)
+                        if os.path.isfile(os.path.join(path, "bin", f"java{_EXE_SUFFIX}")):
+                            _JDK_CACHE[target_ver] = path
+                            return path
+    jdks_dir = os.path.join(os.path.expanduser("~"), ".gradle", "jdks")
+    if os.path.isdir(jdks_dir):
+        for d in sorted(os.listdir(jdks_dir), reverse=True):
+            if f"-{target_ver}." in d and "lock" not in d:
+                path = os.path.join(jdks_dir, d)
+                exe = os.path.join(path, "bin", f"java{_EXE_SUFFIX}")
+                if os.path.isfile(exe):
+                    _JDK_CACHE[target_ver] = path
+                    return path
+    return None
 
 
 def strip_v(version):
@@ -38,26 +65,27 @@ def strip_v(version):
 
 def resolve_java_home(mc, info, loader="forge"):
     fg_era = info.get("fg_era", "")
-    if loader == "forge" and fg_era in ("fg21", "fg22", "fg23", "fg3"):
-        return get_jdk_home(8)
-    if fg_era == "fg41":
-        return get_jdk_home(21) or find_jdk17() or get_jdk_home(17) or get_jdk_home(8)
+
+    needs_jdk8 = loader == "forge" and fg_era in ("fg21", "fg22", "fg23", "fg3")
+    needs_jdk21_for_mc = info.get("java", 8) >= 21
+    needs_jdk21_for_loom = loader == "fabric" and mc in ("1.20.6", "1.21.11")
+
+    if needs_jdk8:
+        return _find_jdk_home(8)
+
+    if fg_era == "fg41" and loader == "forge":
+        return _find_jdk_home(17) or _find_jdk_home(21)
+
     if loader == "fabric":
-        java_ver = info.get("java", 17)
-        if java_ver in (21, 25):
-            jdk21 = get_jdk_home(21)
-            if jdk21:
-                return jdk21
-        return find_jdk17() or get_jdk_home(21)
+        if needs_jdk21_for_mc or needs_jdk21_for_loom:
+            return _find_jdk_home(21)
+        return _find_jdk_home(17) or _find_jdk_home(21)
+
+    if loader == "neoforge":
+        return _find_jdk_home(21)
+
     java_ver = info.get("java", 8)
-    jdk = get_jdk_home(java_ver)
-    if jdk:
-        return jdk
-    if java_ver in (16, 17):
-        return find_jdk17()
-    if java_ver in (21, 25):
-        return get_jdk_home(21)
-    return None
+    return _find_jdk_home(java_ver) or _find_jdk_home(17) or _find_jdk_home(21)
 
 
 _print_lock = threading.Lock()
@@ -73,11 +101,12 @@ def build_common(tag):
     env = os.environ.copy()
     env["GRADLE_OPTS"] = "-Xmx2G"
 
-    r = subprocess.run(
-        [gradlew, "clean", "publish", "--no-daemon", "--console=plain"],
-        cwd=mc_common,
-        env=env,
-    )
+    if sys.platform == "win32":
+        cmd = [gradlew, "clean", "publish", "--no-daemon", "--console=plain"]
+    else:
+        cmd = [gradlew, "clean", "publish", "--no-daemon", "--console=plain"]
+
+    r = subprocess.run(cmd, cwd=mc_common, env=env)
     if r.returncode != 0:
         print("ERROR: common library build failed")
         sys.exit(1)
@@ -100,16 +129,22 @@ def _build_one(task_info):
     jdk = resolve_java_home(mc, info, loader)
     if jdk:
         env["JAVA_HOME"] = jdk
+    else:
+        env.pop("JAVA_HOME", None)
 
     gp = os.path.join(path, "gradle.properties")
     with open(gp, "w") as f:
         f.write("org.gradle.jvmargs=-Xmx3G\n")
     env.pop("JAVA_TOOL_OPTIONS", None)
     env["GRADLE_OPTS"] = "-Xmx3G"
+    if loader == "neoforge":
+        env["GRADLE_OPTS"] += " -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7890 -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7890"
 
     start = time.time()
-    gradlew_name = "gradlew.bat" if sys.platform == "win32" else "./gradlew"
-    cmd = [gradlew_name, "clean", "jar", "--no-daemon", "--rerun-tasks", "--console=plain"]
+    if loader == "fabric":
+        cmd = [gradlew, "clean", "build", "--no-daemon", "--rerun-tasks", "--console=plain"]
+    else:
+        cmd = [gradlew, "clean", "jar", "--no-daemon", "--rerun-tasks", "--console=plain"]
     try:
         proc = subprocess.run(
             cmd,
@@ -145,21 +180,36 @@ def collect_jars(dist_dir, tag):
     count = 0
     for mc, info in sorted(ALL_VERSIONS.items()):
         for loader in get_loaders(mc):
-            jar_dir = os.path.join(MODS_DIR, mc, loader, "build", "libs")
-            if not os.path.isdir(jar_dir):
+            found = False
+            libs_dir = os.path.join(MODS_DIR, mc, loader, "build", "libs")
+            if os.path.isdir(libs_dir):
+                for jar in os.listdir(libs_dir):
+                    if not jar.endswith(".jar"):
+                        continue
+                    if any(s in jar for s in ("-sources", "-dev", "-slim")):
+                        continue
+                    src = os.path.join(libs_dir, jar)
+                    new_name = f"minecraft-mcp-{mc}-{loader}-{tag_clean}.jar"
+                    dst = os.path.join(dist_dir, new_name)
+                    shutil.copy2(src, dst)
+                    size_kb = os.path.getsize(src) / 1024
+                    print(f"  {new_name} ({size_kb:.1f} KB)")
+                    count += 1
+                    found = True
+            if found:
                 continue
-            for jar in os.listdir(jar_dir):
-                if not jar.endswith(".jar"):
-                    continue
-                if any(s in jar for s in ("-sources", "-dev", "-slim")):
-                    continue
-                src = os.path.join(jar_dir, jar)
-                new_name = f"minecraft-mcp-{mc}-{loader}-{tag_clean}.jar"
-                dst = os.path.join(dist_dir, new_name)
-                shutil.copy2(src, dst)
-                size_kb = os.path.getsize(src) / 1024
-                print(f"  {new_name} ({size_kb:.1f} KB)")
-                count += 1
+            devlibs_dir = os.path.join(MODS_DIR, mc, loader, "build", "devlibs")
+            if os.path.isdir(devlibs_dir):
+                for jar in os.listdir(devlibs_dir):
+                    if not jar.endswith(".jar") or "-sources" in jar or "-slim" in jar:
+                        continue
+                    src = os.path.join(devlibs_dir, jar)
+                    new_name = f"minecraft-mcp-{mc}-{loader}-{tag_clean}.jar"
+                    dst = os.path.join(dist_dir, new_name)
+                    shutil.copy2(src, dst)
+                    size_kb = os.path.getsize(src) / 1024
+                    print(f"  {new_name} ({size_kb:.1f} KB) [dev]")
+                    count += 1
 
     print(f"\n  Collected {count} JARs to {dist_dir}/")
     return count
@@ -230,21 +280,45 @@ def main():
             tasks.append((mc, loader, info))
 
     total = len(tasks)
-    print(f"Building {total} mod projects with {args.jobs} workers...\n")
+    print(f"Building {total} mod projects...\n")
+
+    serial_keys = set()
+    for mc, info in ALL_VERSIONS.items():
+        fg_era = info.get("fg_era", "")
+        if fg_era in ("fg21", "fg22", "fg23", "fg3", "fg41"):
+            for loader in get_loaders(mc):
+                if loader == "forge":
+                    serial_keys.add(f"{mc}/{loader}")
+
+    serial_tasks = [t for t in tasks if f"{t[0]}/{t[1]}" in serial_keys]
+    parallel_tasks = [t for t in tasks if f"{t[0]}/{t[1]}" not in serial_keys]
 
     done = 0
     start_all = time.time()
+    results = {"success": [], "fail": [], "skip": []}
 
-    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        future_map = {pool.submit(_build_one, t): t for t in tasks}
-        for future in as_completed(future_map):
+    if serial_tasks:
+        print(f"--- Serial builds ({len(serial_tasks)} old Forge) ---")
+        for t in serial_tasks:
             done += 1
-            key, status, entry = future.result()
+            key, status, entry = _build_one(t)
             elapsed = entry.get("time", 0)
-            with _print_lock:
-                lbl = {"success": "OK", "fail": "FAIL", "skip": "SKIP"}[status]
-                print(f"  [{done}/{total}] {lbl} {key} ({elapsed:.1f}s)")
+            lbl = {"success": "OK", "fail": "FAIL", "skip": "SKIP"}[status]
+            print(f"  [{done}/{total}] {lbl} {key} ({elapsed:.1f}s)")
             results[status].append(entry)
+
+    if parallel_tasks:
+        print(f"\n--- Parallel builds ({len(parallel_tasks)} mods, {args.jobs} workers) ---")
+        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            future_map = {pool.submit(_build_one, t): t for t in parallel_tasks}
+            for future in as_completed(future_map):
+                done += 1
+                key, status, entry = future.result()
+                elapsed = entry.get("time", 0)
+                with _print_lock:
+                    lbl = {"success": "OK", "fail": "FAIL", "skip": "SKIP"}[status]
+                    print(f"  [{done}/{total}] {lbl} {key} ({elapsed:.1f}s)")
+                results[status].append(entry)
 
     total_time = time.time() - start_all
     s, f, sk = len(results["success"]), len(results["fail"]), len(results["skip"])
