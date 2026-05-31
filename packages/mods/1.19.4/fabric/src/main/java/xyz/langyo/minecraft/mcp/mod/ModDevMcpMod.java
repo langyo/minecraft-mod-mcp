@@ -3,14 +3,13 @@ package xyz.langyo.minecraft.mcp.mod;
 import xyz.langyo.minecraft.mcp.common.*;
 import net.fabricmc.api.ClientModInitializer;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.hud.InGameHud;
+import net.minecraft.client.gui.DrawableHelper;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.GameMenuScreen;
-import net.minecraft.client.util.Window;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawableHelper;
 import net.minecraft.text.Text;
+import net.minecraft.text.Style;
 import net.minecraft.text.ClickEvent;
 import org.lwjgl.glfw.GLFW;
 
@@ -20,6 +19,12 @@ public class ModDevMcpMod implements ClientModInitializer {
     volatile String debugUrl = null;
     volatile boolean chatSent = false;
     private volatile boolean prevLeftPressed = false;
+    private static org.lwjgl.glfw.GLFWCursorPosCallbackI originalCursorCallback = null;
+    private static org.lwjgl.glfw.GLFWMouseButtonCallbackI originalMouseButtonCallback = null;
+    private static boolean cursorInterceptorInstalled = false;
+    private static boolean mouseButtonInterceptorInstalled = false;
+    private static java.lang.reflect.Field mousePosXField = null;
+    private static java.lang.reflect.Field mousePosYField = null;
 
     private static McpRenderer wrapRenderer(MatrixStack ms, MinecraftClient mc) {
         return new McpRenderer() {
@@ -48,6 +53,100 @@ public class ModDevMcpMod implements ClientModInitializer {
         return mc.mouse.getY() * mc.getWindow().getScaledHeight() / (double) mc.getWindow().getHeight();
     }
 
+    private static void ensureMouseReflection() {
+        if (mousePosXField != null) return;
+        try {
+            java.lang.reflect.Field[] fields = net.minecraft.client.Mouse.class.getDeclaredFields();
+            java.lang.reflect.Field firstDouble = null, secondDouble = null;
+            for (java.lang.reflect.Field f : fields) {
+                if (f.getType() == double.class) {
+                    if (firstDouble == null) firstDouble = f;
+                    else if (secondDouble == null) { secondDouble = f; break; }
+                }
+            }
+            if (firstDouble != null) { firstDouble.setAccessible(true); mousePosXField = firstDouble; }
+            if (secondDouble != null) { secondDouble.setAccessible(true); mousePosYField = secondDouble; }
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] Mouse reflection failed: " + e.getMessage());
+        }
+    }
+
+    private static void ensureCursorInterceptor(MinecraftClient mc) {
+        if (cursorInterceptorInstalled) return;
+        try {
+            long handle = mc.getWindow().getHandle();
+            ensureMouseReflection();
+
+            originalCursorCallback = GLFW.glfwSetCursorPosCallback(handle, (window, xpos, ypos) -> {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    if (mousePosXField != null) {
+                        try { mousePosXField.setDouble(mc.mouse, xpos); } catch (Exception ignored) {}
+                    }
+                    if (mousePosYField != null) {
+                        try { mousePosYField.setDouble(mc.mouse, ypos); } catch (Exception ignored) {}
+                    }
+                } else if (originalCursorCallback != null) {
+                    originalCursorCallback.invoke(window, xpos, ypos);
+                }
+            });
+
+            cursorInterceptorInstalled = true;
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] Cursor interceptor failed: " + e.getMessage());
+        }
+    }
+
+    private static void ensureMouseButtonInterceptor(MinecraftClient mc) {
+        if (mouseButtonInterceptorInstalled) return;
+        try {
+            long handle = mc.getWindow().getHandle();
+            if (handle == 0) return;
+
+            originalMouseButtonCallback = GLFW.glfwSetMouseButtonCallback(handle, (window, button, action, mods) -> {
+                if (ReflectionHelper.isWaitingForRelease()) {
+                    if (button == 0 && action == 0) {
+                        ReflectionHelper.clearWaitingForRelease();
+                        if (originalMouseButtonCallback != null) {
+                            originalMouseButtonCallback.invoke(window, button, action, mods);
+                        }
+                    }
+                    return;
+                }
+                if (button == 0 && action == 1 && ReflectionHelper.isMcpControlMode()) {
+                    MinecraftClient mc2 = MinecraftClient.getInstance();
+                    double mx = getMouseX(mc2);
+                    double my = getMouseY(mc2);
+                    String result = ReflectionHelper.handleOverlayClick((int) mx, (int) my, mc2);
+                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
+                        if (!ReflectionHelper.isMcpControlMode() && mc2.currentScreen == null) {
+                            GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+                            try { mc2.mouse.lockCursor(); } catch (Exception ignored2) {}
+                        }
+                        return;
+                    }
+                }
+                if (originalMouseButtonCallback != null) {
+                    originalMouseButtonCallback.invoke(window, button, action, mods);
+                }
+            });
+
+            mouseButtonInterceptorInstalled = true;
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] MouseButton interceptor failed: " + e.getMessage());
+        }
+    }
+
+    private static void forceGlfwMouseFree(MinecraftClient mc) {
+        ensureCursorInterceptor(mc);
+        ensureMouseButtonInterceptor(mc);
+        try {
+            long handle = mc.getWindow().getHandle();
+            if (GLFW.glfwGetInputMode(handle, GLFW.GLFW_CURSOR) != GLFW.GLFW_CURSOR_NORMAL) {
+                GLFW.glfwSetInputMode(handle, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
+            }
+        } catch (Exception ignored) {}
+    }
+
     public void onInGameHudRender(MatrixStack ms, float tickDelta) {
         if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive()) return;
         try {
@@ -55,6 +154,10 @@ public class ModDevMcpMod implements ClientModInitializer {
             if (mc.currentScreen == null) {
                 ReflectionHelper.tickMouseRelease(mc);
                 ReflectionHelper.tickMcpControlMode(mc);
+
+                if (ReflectionHelper.isMcpControlMode()) {
+                    forceGlfwMouseFree(mc);
+                }
 
                 if (!ReflectionHelper.isScreenshotInProgress()) {
                     ReflectionHelper.cacheFrameFromRenderThread(mc);
@@ -66,7 +169,7 @@ public class ModDevMcpMod implements ClientModInitializer {
                     int mx = (int) getMouseX(mc);
                     int my = (int) getMouseY(mc);
                     McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.textRenderer,
-                            Text.translatable("mcpmod.control.resume").getString(), w, h, mx, my);
+                            "Resume Control", w, h, mx, my);
                 }
             }
         } catch (Exception ignored) {}
@@ -74,21 +177,30 @@ public class ModDevMcpMod implements ClientModInitializer {
 
     public void onScreenRender(MatrixStack ms, Screen screen, int mouseX, int mouseY, float tickDelta) {
         if (ReflectionHelper.isScreenshotInProgress()) return;
+        if (screen == null) return;
         try {
             MinecraftClient mc = MinecraftClient.getInstance();
-            int w = mc.getWindow().getScaledWidth();
-            int h = mc.getWindow().getScaledHeight();
-            int mx = (int) getMouseX(mc);
-            int my = (int) getMouseY(mc);
-            if (ReflectionHelper.isMcpControlMode()) {
-                ReflectionHelper.cacheFrameFromRenderThread(mc);
-                String resumeLabel = Text.translatable("mcpmod.control.resume").getString();
-                if (resumeLabel.equals("mcpmod.control.resume")) resumeLabel = "Resume Control";
-                McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.textRenderer, resumeLabel, w, h, mx, my);
-            } else if (mc.world != null && screen != null && !(screen instanceof GameMenuScreen)) {
-                String transferLabel = Text.translatable("mcpmod.control.pause_button").getString();
-                if (transferLabel.equals("mcpmod.control.pause_button")) transferLabel = "Transfer to MCP";
-                McpOverlayLogic.renderTransferButton(wrapRenderer(ms, mc), mc.textRenderer, transferLabel, w, h, mx, my);
+            if (ReflectionHelper.isMcpControlMode() && screen instanceof GameMenuScreen) {
+                mc.setScreen(null);
+                return;
+            }
+            if (mc.world != null) {
+                if (ReflectionHelper.isMcpControlMode()) {
+                    ensureCursorInterceptor(mc);
+                    ensureMouseButtonInterceptor(mc);
+                    ReflectionHelper.cacheFrameFromRenderThread(mc);
+                }
+                int w = mc.getWindow().getScaledWidth();
+                int h = mc.getWindow().getScaledHeight();
+                int mx = (int) getMouseX(mc);
+                int my = (int) getMouseY(mc);
+                if (ReflectionHelper.isMcpControlMode()) {
+                    McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.textRenderer,
+                            "Resume Control", w, h, mx, my);
+                } else {
+                    McpOverlayLogic.renderTransferButton(wrapRenderer(ms, mc), mc.textRenderer,
+                            "Transfer to MCP", w, h, mx, my);
+                }
             }
         } catch (Exception ignored) {}
     }
@@ -96,30 +208,20 @@ public class ModDevMcpMod implements ClientModInitializer {
     public boolean onMouseClicked(double mouseX, double mouseY, int button) {
         try {
             MinecraftClient mc = MinecraftClient.getInstance();
+            ensureMouseButtonInterceptor(mc);
             if (ReflectionHelper.isWaitingForRelease()) return true;
-
-            if (ReflectionHelper.shouldSuppressInput()) return true;
-
-            int mx = (int) mouseX;
-            int my = (int) mouseY;
-
-            if (ReflectionHelper.isMcpControlMode()) {
-                if (button == 0) {
-                    String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
-                    if (!result.equals("blocked") && !result.equals("cooldown") && !result.equals("not_in_control_mode")) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            if (mc.world != null && mc.currentScreen != null && !(mc.currentScreen instanceof GameMenuScreen) && button == 0) {
-                if (ReflectionHelper.handleTransferOverlayClick(mx, my, mc).equals("transfer_to_mcp")) {
+            if (ReflectionHelper.isMcpControlMode()) return false;
+            if (mc.world != null && mc.currentScreen != null && button == 0) {
+                if (ReflectionHelper.handleTransferOverlayClick((int) mouseX, (int) mouseY, mc).equals("transfer_to_mcp")) {
                     return true;
                 }
             }
         } catch (Exception ignored) {}
         return false;
+    }
+
+    public boolean onMouseButtonEvent(MinecraftClient mc, double mx, double my, int button) {
+        return onMouseClicked(mx, my, button);
     }
 
     public void onClientTick() {
@@ -146,7 +248,7 @@ public class ModDevMcpMod implements ClientModInitializer {
             if (mc.inGameHud == null || mc.inGameHud.getChatHud() == null) return;
             INSTANCE.chatSent = true;
             String url = INSTANCE.debugUrl;
-            Text msg = Text.empty()
+            Text msg = Text.literal("")
                 .append(Text.literal("[MCP] Debug page: ").styled(s -> s.withColor(0xFFFFFF)))
                 .append(Text.literal(url).styled(s -> s
                     .withColor(0xFFFFFF)
@@ -177,7 +279,6 @@ public class ModDevMcpMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         INSTANCE = this;
-
         new Thread(() -> {
             try {
                 Thread.sleep(5000);

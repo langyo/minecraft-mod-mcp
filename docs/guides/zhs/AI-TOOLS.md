@@ -48,9 +48,9 @@
 
 ---
 
-## Minecraft MCP HTTP 端点
+## Minecraft Mod MCP HTTP 端点
 
-Minecraft MCP 服务器提供以下 HTTP 端点（默认端口：**9876**）：
+Minecraft Mod MCP 服务器提供以下 HTTP 端点（默认端口：**9876**）：
 
 | 端点 | 方法 | 说明 |
 |----------|--------|-------------|
@@ -60,13 +60,13 @@ Minecraft MCP 服务器提供以下 HTTP 端点（默认端口：**9876**）：
 | `/api/events` | GET | SSE（服务器发送事件）流，用于实时获取调用历史 |
 | `/api/calls` | GET | 返回最近 50 条调用事件，格式为 JSON 数组 |
 
-> **前置条件**：请确保 Minecraft MCP 守护进程正在运行，并且装有 MCP 模组的 Minecraft 客户端已连接。运行 `just daemon`，然后执行 `just launch <version> <loader>`。
+> **前置条件**：请确保 Minecraft Mod MCP 守护进程正在运行，并且装有 MCP 模组的 Minecraft 客户端已连接。运行 `just daemon`，然后执行 `just launch <version> <loader>`。
 
 ---
 
 ## 集成方式
 
-大多数 AI 编程工具支持通过 **模型上下文协议（MCP）** 连接到外部服务器。Minecraft MCP 服务器可通过以下方式连接：
+大多数 AI 编程工具支持通过 **模型上下文协议（MCP）** 连接到外部服务器。Minecraft Mod MCP 服务器可通过以下方式连接：
 
 - **SSE 传输**：将工具的 MCP 客户端指向 `http://localhost:9876/api/events`
 - **HTTP REST API**：直接向 `http://localhost:9876/api/cmd` 发送 POST 请求
@@ -521,7 +521,7 @@ AI 驱动的机器人框架。
 
 ## 直接 HTTP REST API 访问
 
-对于不原生支持 MCP 协议的工具，可以直接通过 Minecraft MCP 服务器的 HTTP REST API 与之交互：
+对于不原生支持 MCP 协议的工具，可以直接通过 Minecraft Mod MCP 服务器的 HTTP REST API 与之交互：
 
 ```bash
 # 健康检查
@@ -557,20 +557,20 @@ curl http://localhost:9876/api/events
 
 ## 视觉识别集成
 
-你可以将 Minecraft MCP 与**支持视觉能力的 MCP 服务器**配合使用，让 AI 代理能够*查看并理解*游戏中正在发生的事情——读取 UI 文本、诊断错误、分析布局等。
+你可以将 Minecraft Mod MCP 与**支持视觉能力的 MCP 服务器**配合使用，让 AI 代理能够*查看并理解*游戏中正在发生的事情——读取 UI 文本、诊断错误、分析布局等。
 
 ### 工作原理
 
-1. Minecraft MCP 通过 `screenshot_to_file` 截取屏幕截图并保存到本地文件
+1. Minecraft Mod MCP 通过 `screenshot_to_file` 截取屏幕截图并保存到本地文件
 2. 视觉 MCP 服务器读取该文件并进行分析
 3. AI 代理协调两者——截图 → 分析 → 行动
 
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["Minecraft MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
-    A --> D["Minecraft MCP<br/>click x=400,y=300<br/>→ enters game"]
+    A --> D["Minecraft Mod MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### GLM 视觉 MCP 服务器

@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.client.Mouse;
 import net.minecraft.client.MinecraftClient;
+import xyz.langyo.minecraft.mcp.common.ReflectionHelper;
 import xyz.langyo.minecraft.mcp.mod.ModDevMcpMod;
 
 @Mixin(Mouse.class)
@@ -28,6 +29,13 @@ public abstract class MouseMixin {
         double mx = this.x * scaledW / actualW;
         double my = this.y * scaledH / actualH;
         if (mod.onMouseButtonEvent(mc, mx, my, button)) {
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "updateMouse", at = @At("HEAD"), cancellable = true)
+    private void onUpdateMouse(CallbackInfo ci) {
+        if (ReflectionHelper.isMcpControlMode()) {
             ci.cancel();
         }
     }

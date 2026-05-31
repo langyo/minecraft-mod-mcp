@@ -79,7 +79,7 @@ def ensure_mcp_stable_in_fg_cache(mc, info):
 def resolve_java_home(mc, info, loader="forge"):
     fg_era = info.get("fg_era", "")
     if loader == "forge" and fg_era in ("fg21", "fg22", "fg23", "fg3"):
-        return get_jdk_home(8) or "C:\\Users\\langy\\.jdks\\jdk8"
+        return get_jdk_home(8)
     if fg_era == "fg41":
         jdk21 = get_jdk_home(21)
         if jdk21:

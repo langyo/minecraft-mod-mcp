@@ -1,11 +1,11 @@
 <!-- markdownlint-disable MD033 MD041 MD036 -->
 <div align="center">
 
-<img src="docs/logo.webp" alt="Minecraft MCP logo" width="200"/>
+<img src="docs/logo.webp" alt="Minecraft Mod MCP logo" width="200"/>
 
-# Minecraft MCP
+# Minecraft Mod MCP
 
-**Let AI play Minecraft**
+**AI-powered mod development toolkit — build, test, and debug Minecraft mods with AI**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
@@ -31,16 +31,16 @@ Your AI reads the guide, sets up the MCP connection, and starts controlling the 
 
 ---
 
-## What is Minecraft MCP
+## What is Minecraft Mod MCP
 
-Minecraft MCP is a mod that lets AI assistants control Minecraft. Drop it in your `mods` folder, launch the game, and your AI can see the screen, click buttons, type commands, and interact with the world — all through the standard MCP protocol.
+Minecraft Mod MCP is a mod designed for **AI-assisted mod development**. It exposes Minecraft's internals to AI tools via the MCP protocol, letting your AI agent inspect screens, click through GUIs, and run commands — perfect for testing mods, verifying behavior, and automating repetitive workflows.
+
+> While the mod can also automate gameplay (building, mining, etc.), it's optimized for GUI interaction and debugging. For pure gameplay bots, other dedicated tools may perform better.
 
 - **See** — capture screenshots with coordinate grids
 - **Act** — click, type, scroll, drag, and press any key
 - **Know** — query player position, world info, screen buttons, and debug fields
 - **Record** — stream events in real time via SSE, capture video frames
-
-> Want your AI to build a castle? Run a smoke test? Navigate a modpack menu? Minecraft MCP makes it possible.
 
 ---
 
@@ -110,7 +110,7 @@ https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/en/AI-TOOLS.md
 ```mermaid
 flowchart LR
     A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
-    B["🔌 Minecraft MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
     C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
 
     A <-- "HTTP / SSE" --> B

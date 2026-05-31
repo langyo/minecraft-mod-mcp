@@ -46,9 +46,9 @@
 
 > 정확한 경로, UI 기반 설정, 도구별 형식은 [도구별 설명](#코딩-에이전트-도구)을 참조하세요.
 
-## Minecraft MCP HTTP 엔드포인트
+## Minecraft Mod MCP HTTP 엔드포인트
 
-Minecraft MCP 서버는 다음과 같은 HTTP 엔드포인트를 제공합니다 (기본 포트: **9876**):
+Minecraft Mod MCP 서버는 다음과 같은 HTTP 엔드포인트를 제공합니다 (기본 포트: **9876**):
 
 | 엔드포인트 | 메서드 | 설명 |
 |----------|--------|-------------|
@@ -58,13 +58,13 @@ Minecraft MCP 서버는 다음과 같은 HTTP 엔드포인트를 제공합니다
 | `/api/events` | GET | 실시간 호출 내역을 위한 SSE(Server-Sent Events) 스트림 |
 | `/api/calls` | GET | 최근 50개의 호출 이벤트를 JSON 배열로 반환 |
 
-> **사전 준비**: Minecraft MCP 데몬이 실행 중이고 MCP 모드가 적용된 Minecraft 클라이언트가 연결되어 있어야 합니다. `just daemon`을 실행한 후 `just launch <version> <loader>`를 실행하세요.
+> **사전 준비**: Minecraft Mod MCP 데몬이 실행 중이고 MCP 모드가 적용된 Minecraft 클라이언트가 연결되어 있어야 합니다. `just daemon`을 실행한 후 `just launch <version> <loader>`를 실행하세요.
 
 ---
 
 ## 통합 방법
 
-대부분의 AI 코딩 도구는 외부 서버 연결을 위해 **Model Context Protocol (MCP)**을 지원합니다. Minecraft MCP 서버는 다음 방식으로 연결할 수 있습니다:
+대부분의 AI 코딩 도구는 외부 서버 연결을 위해 **Model Context Protocol (MCP)**을 지원합니다. Minecraft Mod MCP 서버는 다음 방식으로 연결할 수 있습니다:
 
 - **SSE 전송**: 도구의 MCP 클라이언트를 `http://localhost:9876/api/events`로 지정
 - **HTTP REST API**: `http://localhost:9876/api/cmd`로 직접 POST 요청 전송
@@ -519,7 +519,7 @@ AI 기반 봇 프레임워크입니다.
 
 ## 직접 HTTP REST API 액세스
 
-MCP 프로토콜을 기본 지원하지 않는 도구의 경우, Minecraft MCP 서버의 HTTP REST API를 통해 직접 상호작용할 수 있습니다:
+MCP 프로토콜을 기본 지원하지 않는 도구의 경우, Minecraft Mod MCP 서버의 HTTP REST API를 통해 직접 상호작용할 수 있습니다:
 
 ```bash
 # 상태 확인
@@ -555,20 +555,20 @@ curl http://localhost:9876/api/events
 
 ## 시각 인식 통합
 
-Minecraft MCP를 **비전 지원 MCP 서버**와 함께 사용하면 AI 에이전트가 게임에서 일어나는 일을 *보고 이해*할 수 있습니다 — UI 텍스트 읽기, 오류 진단, 레이아웃 분석 등 다양한 작업이 가능합니다.
+Minecraft Mod MCP를 **비전 지원 MCP 서버**와 함께 사용하면 AI 에이전트가 게임에서 일어나는 일을 *보고 이해*할 수 있습니다 — UI 텍스트 읽기, 오류 진단, 레이아웃 분석 등 다양한 작업이 가능합니다.
 
 ### 작동 방식
 
-1. Minecraft MCP가 `screenshot_to_file`을 통해 스크린샷을 로컬 파일로 저장합니다
+1. Minecraft Mod MCP가 `screenshot_to_file`을 통해 스크린샷을 로컬 파일로 저장합니다
 2. 비전 MCP 서버가 해당 파일을 읽고 분석합니다
 3. AI 에이전트가 두 서버를 조율합니다 — 스크린샷 → 분석 → 동작
 
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["Minecraft MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
-    A --> D["Minecraft MCP<br/>click x=400,y=300<br/>→ enters game"]
+    A --> D["Minecraft Mod MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### GLM Vision MCP 서버

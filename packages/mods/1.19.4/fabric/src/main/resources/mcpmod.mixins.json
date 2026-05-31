@@ -5,7 +5,7 @@
   "client": [
     "InGameHudMixin",
     "ScreenMixin",
-    "MouseClickMixin",
+    "MouseMixin",
     "MinecraftClientMixin"
   ],
   "injectors": {

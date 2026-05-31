@@ -71,7 +71,7 @@ FABRIC_LOADER_VERSIONS = {
     "1.16.1": "0.12.12",
     "1.16.3": "0.12.12",
     "1.16.4": "0.12.12",
-    "1.16.5": "0.12.12",
+    "1.16.5": "0.15.11",
     "1.17.1": "0.14.9",
     "1.18":   "0.14.9",
     "1.18.2": "0.14.9",
@@ -173,7 +173,7 @@ def write_forge_build_fg2(mc, info, path):
 
 apply plugin: "net.minecraftforge.gradle.forge"
 
-version = "1.0.0-SNAPSHOT"
+version = "0.1.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
@@ -233,7 +233,7 @@ def write_forge_build_fg3(mc, info, path):
 
 apply plugin: "net.minecraftforge.gradle"
 
-version = "1.0.0-SNAPSHOT"
+version = "0.1.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
@@ -293,7 +293,7 @@ def write_forge_build_fg41(mc, info, path):
 
 apply plugin: "net.minecraftforge.gradle"
 
-version = "1.0.0-SNAPSHOT"
+version = "0.1.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
@@ -349,7 +349,7 @@ def write_forge_build_fg51(mc, info, path):
 
 apply plugin: "net.minecraftforge.gradle"
 
-version = "1.0.0-SNAPSHOT"
+version = "0.1.0-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
@@ -410,7 +410,7 @@ def write_forge_build_fg6(mc, info, path):
     id 'net.minecraftforge.gradle' version '{fg}'
 }}
 
-version = '1.0.0-SNAPSHOT'
+version = '0.1.0-SNAPSHOT'
 group = 'xyz.langyo'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of({java})
@@ -476,7 +476,7 @@ def write_forge_build_fg7(mc, info, path):
     id 'net.minecraftforge.gradle' version '{fg}'
 }}
 
-version = '1.0.0-SNAPSHOT'
+version = '0.1.0-SNAPSHOT'
 group = 'xyz.langyo'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of({java})
@@ -582,7 +582,7 @@ def write_neoforge_build_fg6(mc, info, path):
     id 'net.minecraftforge.gradle' version '{fg}'
 }}
 
-version = '1.0.0-SNAPSHOT'
+version = '0.1.0-SNAPSHOT'
 group = 'xyz.langyo'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of({java})
@@ -648,7 +648,7 @@ def write_neoforge_build(mc, info, path):
     id 'net.neoforged.moddev' version '{mdg}'
 }}
 
-version = '1.0.0-SNAPSHOT'
+version = '0.1.0-SNAPSHOT'
 group = 'xyz.langyo'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of({java})
@@ -745,7 +745,7 @@ def write_fabric_build(mc, info, path):
     id "fabric-loom" version "{loom_ver}"
 }}
 
-version = "1.0.0-SNAPSHOT"
+version = "0.1.0-SNAPSHOT"
 group = "xyz.langyo"
 
 sourceCompatibility = "{java_str}"
@@ -796,7 +796,7 @@ def write_fabric_mod_json(mc, info, path):
     content = """{
   "schemaVersion": 1,
   "id": "mcpmod",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "name": {
     "en_us": "ModDev MCP",
     "zh_cn": "ModDev MCP",
