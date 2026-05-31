@@ -180,6 +180,7 @@ def collect_jars(dist_dir, tag):
     count = 0
     for mc, info in sorted(ALL_VERSIONS.items()):
         for loader in get_loaders(mc):
+            new_name = f"minecraft-mcp-{mc}-{loader}.jar"
             found = False
             libs_dir = os.path.join(MODS_DIR, mc, loader, "build", "libs")
             if os.path.isdir(libs_dir):
@@ -189,13 +190,13 @@ def collect_jars(dist_dir, tag):
                     if any(s in jar for s in ("-sources", "-dev", "-slim")):
                         continue
                     src = os.path.join(libs_dir, jar)
-                    new_name = f"minecraft-mcp-{mc}-{loader}-{tag_clean}.jar"
                     dst = os.path.join(dist_dir, new_name)
                     shutil.copy2(src, dst)
                     size_kb = os.path.getsize(src) / 1024
                     print(f"  {new_name} ({size_kb:.1f} KB)")
                     count += 1
                     found = True
+                    break
             if found:
                 continue
             devlibs_dir = os.path.join(MODS_DIR, mc, loader, "build", "devlibs")
@@ -204,12 +205,12 @@ def collect_jars(dist_dir, tag):
                     if not jar.endswith(".jar") or "-sources" in jar or "-slim" in jar:
                         continue
                     src = os.path.join(devlibs_dir, jar)
-                    new_name = f"minecraft-mcp-{mc}-{loader}-{tag_clean}.jar"
                     dst = os.path.join(dist_dir, new_name)
                     shutil.copy2(src, dst)
                     size_kb = os.path.getsize(src) / 1024
                     print(f"  {new_name} ({size_kb:.1f} KB) [dev]")
                     count += 1
+                    break
 
     print(f"\n  Collected {count} JARs to {dist_dir}/")
     return count
