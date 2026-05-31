@@ -215,6 +215,49 @@ def collect_jars(dist_dir, tag):
     return count
 
 
+def _get_previous_tag():
+    r = subprocess.run(
+        ["git", "tag", "--sort=-version:refname"],
+        capture_output=True, text=True, cwd=BASE, encoding="utf-8", errors="replace",
+    )
+    tags = [t.strip() for t in r.stdout.strip().split("\n") if t.strip()]
+    return tags[0] if tags else None
+
+
+def _generate_release_notes(tag):
+    prev_tag = _get_previous_tag()
+    if prev_tag == tag:
+        all_tags = [t.strip() for t in subprocess.run(
+            ["git", "tag", "--sort=-version:refname"],
+            capture_output=True, text=True, cwd=BASE, encoding="utf-8", errors="replace",
+        ).stdout.strip().split("\n") if t.strip()]
+        idx = all_tags.index(tag)
+        prev_tag = all_tags[idx + 1] if idx + 1 < len(all_tags) else None
+
+    if prev_tag:
+        r = subprocess.run(
+            ["git", "log", "--format=- %s", f"{prev_tag}..HEAD", "master"],
+            capture_output=True, text=True, cwd=BASE, encoding="utf-8", errors="replace",
+        )
+        commits = r.stdout.strip()
+    else:
+        r = subprocess.run(
+            ["git", "log", "--format=- %s", "master"],
+            capture_output=True, text=True, cwd=BASE, encoding="utf-8", errors="replace",
+        )
+        commits = r.stdout.strip()
+
+    lines = [
+        f"## {tag}",
+        "",
+    ]
+    if commits:
+        lines.append("### Changes")
+        lines.append(commits)
+        lines.append("")
+    return "\n".join(lines)
+
+
 def create_release(tag, dist_dir, dry_run=False):
     jars = sorted([f for f in os.listdir(dist_dir) if f.endswith(".jar")])
     if not jars:
@@ -222,20 +265,27 @@ def create_release(tag, dist_dir, dry_run=False):
         sys.exit(1)
 
     jar_paths = [os.path.join(dist_dir, jar) for jar in jars]
+    notes = _generate_release_notes(tag)
+
+    notes_file = os.path.join(dist_dir, "_release_notes.md")
+    with open(notes_file, "w", encoding="utf-8") as f:
+        f.write(notes)
 
     cmd = [
         "gh", "release", "create", tag,
     ] + jar_paths + [
         "--title", tag,
-        "--notes", f"## {tag}\n\nMod JARs for {len(jars)} version+loader combinations.\n\nSee [README](https://github.com/langyo/minecraft-mod-mcp#readme) for usage.",
+        "--notes-file", notes_file,
     ]
 
     if dry_run:
         print("Dry run — would run:")
         print("  " + " ".join(cmd))
+        print(f"\nRelease notes:\n{notes}")
         return
 
     print(f"\n=== Creating GitHub Release {tag} with {len(jars)} JARs ===")
+    print(f"Release notes:\n{notes}\n")
     r = subprocess.run(cmd, cwd=BASE)
     if r.returncode != 0:
         print("ERROR: gh release create failed")
