@@ -286,7 +286,6 @@ def create_release(tag, dist_dir, dry_run=False):
         return
 
     print(f"\n=== Creating GitHub Release {tag} with {len(jars)} JARs ===")
-    print(f"Release notes:\n{notes}\n")
     r = subprocess.run(cmd, cwd=BASE)
     if r.returncode != 0:
         print("ERROR: gh release create failed")
