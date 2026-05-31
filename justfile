@@ -155,6 +155,17 @@ dry-run version:
 # ============================================================
 
 # ============================================================
+# Release
+# ============================================================
+
+# Build all mods and publish JARs to GitHub Release
+# Usage: just release v0.1.0
+#        just release v0.1.0 --no-upload
+#        just release v0.1.0 --loader forge --loader fabric
+release tag *ARGS:
+    python scripts/release.py {{ tag }} {{ ARGS }}
+
+# ============================================================
 # Cleanup
 # ============================================================
 
