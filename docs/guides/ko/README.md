@@ -48,23 +48,21 @@ Minecraft Mod MCP는 AI 어시스턴트와 마인크래프트 사이의 다리 �
 
 | MC 버전 | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
-| 1.8.9 | ✓ | — | — |
-| 1.9.4 | ✓ | — | — |
-| 1.10.2 | ✓ | — | — |
-| 1.11.2 | ✓ | — | — |
-| 1.12.2 | ✓ | — | — |
-| 1.13.2 | ✓ | — | — |
-| 1.14.4 | ✓ | 🚧 | — |
-| 1.15.2 | ✓ | 🚧 | — |
-| 1.16.5 | ✓ | 🚧 | — |
-| 1.17.1 | ✓ | 🚧 | — |
-| 1.18.2 | ✓ | 🚧 | — |
-| 1.19.4 | ✓ | 🚧 | — |
-| 1.20.6 | ✓ | 🚧 | 🚧 |
-| 1.21.7 | ✓ | — | — |
-| 26.1.2 | ✓ | — | 🚧 |
-
-> 🚧 = 작업 진행 중
+| 1.8.9 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.8.9-forge.jar) | — | — |
+| 1.9.4 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.9.4-forge.jar) | — | — |
+| 1.10.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.10.2-forge.jar) | — | — |
+| 1.11.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.11.2-forge.jar) | — | — |
+| 1.12.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.12.2-forge.jar) | — | — |
+| 1.13.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.13.2-forge.jar) | — | — |
+| 1.14.4 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.14.4-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.14.4-fabric.jar) | — |
+| 1.15.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.15.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.15.2-fabric.jar) | — |
+| 1.16.5 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.16.5-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.16.5-fabric.jar) | — |
+| 1.17.1 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.17.1-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.17.1-fabric.jar) | — |
+| 1.18.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.18.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.18.2-fabric.jar) | — |
+| 1.19.4 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.19.4-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.19.4-fabric.jar) | — |
+| 1.20.6 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.20.6-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.20.6-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.20.6-neoforge.jar) |
+| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge.jar) |
+| 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge.jar) |
 
 ---
 
