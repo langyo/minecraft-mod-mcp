@@ -221,15 +221,14 @@ def create_release(tag, dist_dir, dry_run=False):
         print("ERROR: no JARs found in dist/")
         sys.exit(1)
 
-    jar_args = []
-    for jar in jars:
-        jar_args.extend(["--file", os.path.join(dist_dir, jar)])
+    jar_paths = [os.path.join(dist_dir, jar) for jar in jars]
 
     cmd = [
         "gh", "release", "create", tag,
+    ] + jar_paths + [
         "--title", tag,
         "--notes", f"## {tag}\n\nMod JARs for {len(jars)} version+loader combinations.\n\nSee [README](https://github.com/langyo/minecraft-mod-mcp#readme) for usage.",
-    ] + jar_args
+    ]
 
     if dry_run:
         print("Dry run — would run:")
