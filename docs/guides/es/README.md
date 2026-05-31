@@ -5,7 +5,7 @@
 
 # Minecraft Mod MCP
 
-**Deja que la IA juegue a Minecraft**
+**Kit de desarrollo de mods potenciado por IA**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
@@ -33,14 +33,14 @@ Tu IA leerá la guía, configurará la conexión MCP y empezará a controlar el 
 
 ## ¿Qué es Minecraft Mod MCP
 
-Minecraft Mod MCP es un puente entre los asistentes de IA y Minecraft. Se ejecuta como un mod dentro del juego, exponiendo un servidor HTTP al que las herramientas de IA pueden conectarse mediante el protocolo estándar MCP. A través de este puente, la IA puede ver el juego, hacer clic en botones, escribir comandos e interactuar con el mundo.
+Minecraft Mod MCP es una herramienta de asistencia IA **para desarrolladores de mods**. Ponlo en tu carpeta `mods`, inicia el juego, y tu IA podrá ver el juego, hacer clic en botones GUI, escribir comandos e interactuar con el mundo — todo mediante el protocolo MCP estándar. Diseñado para probar mods, verificar comportamientos y automatizar flujos repetitivos.
 
 - **Ver** — captura capturas de pantalla con cuadrículas de coordenadas
 - **Actuar** — hacer clic, escribir, desplazar, arrastrar y presionar cualquier tecla
 - **Saber** — consultar la posición del jugador, información del mundo, botones de la pantalla y campos de depuración
 - **Grabar** — transmitir eventos en tiempo real mediante SSE, capturar fotogramas de video
 
-> ¿Quieres que tu IA construya un castillo? ¿Ejecute una prueba de humo? ¿Navegue por el menú de un modpack? Minecraft Mod MCP lo hace posible.
+> ¿Quieres que tu IA pruebe la GUI de tu mod? ¿Ejecute una prueba de humo? ¿Verifique la interacción de un nuevo bloque? Minecraft Mod MCP lo hace posible. Para la automatización de juego puro, otras herramientas dedicadas son mejores.
 
 ---
 

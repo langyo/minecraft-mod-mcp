@@ -35,7 +35,7 @@ Your AI reads the guide, sets up the MCP connection, and starts controlling the 
 
 Minecraft Mod MCP is a mod designed for **AI-assisted mod development**. It exposes Minecraft's internals to AI tools via the MCP protocol, letting your AI agent inspect screens, click through GUIs, and run commands — perfect for testing mods, verifying behavior, and automating repetitive workflows.
 
-> While the mod can also automate gameplay (building, mining, etc.), it's optimized for GUI interaction and debugging. For pure gameplay bots, other dedicated tools may perform better.
+> Built for mod developers — test your GUIs, verify block/item behavior, and run smoke tests on new features. While it can automate gameplay (building, mining, etc.), dedicated Minecraft bots may handle pure gameplay better.
 
 - **See** — capture screenshots with coordinate grids
 - **Act** — click, type, scroll, drag, and press any key

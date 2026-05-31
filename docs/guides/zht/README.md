@@ -5,7 +5,7 @@
 
 # Minecraft Mod MCP
 
-**讓 AI 玩 Minecraft**
+**AI 驅動的模組開發工具鏈**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
@@ -33,14 +33,14 @@ https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/zht/AI-TOOLS.m
 
 ## 什麼是 Minecraft Mod MCP
 
-Minecraft Mod MCP 是一個讓 AI 助手操控 Minecraft 的模組。把它放入你的 `mods` 資料夾，啟動遊戲，你的 AI 就能看到遊戲畫面、點擊按鈕、輸入指令、與世界互動——全部透過標準的 MCP 協定。
+Minecraft Mod MCP 是一個**面向模組開發**的 AI 輔助工具。放入你的 `mods` 資料夾，啟動遊戲，你的 AI 就能看到遊戲畫面、點擊 GUI 按鈕、輸入指令、與世界互動——全部透過標準的 MCP 協定。專為測試模組、驗證行為、自動化重複流程而設計。
 
 - **觀察** —— 擷取帶有座標網格的螢幕截圖
 - **操作** —— 點擊、輸入、滾動、拖曳及按下任意按鍵
 - **了解** —— 查詢玩家位置、世界資訊、畫面按鈕及除錯欄位
 - **記錄** —— 透過 SSE 即時串流事件、擷取影片幀
 
-> 想要讓你的 AI 建造一座城堡？執行煙霧測試？操作模組包選單？Minecraft Mod MCP 讓這一切成為可能。
+> 想要讓你的 AI 測試你的模組 GUI？跑一遍煙霧測試？驗證新方塊的互動邏輯？Minecraft Mod MCP 讓這一切成為可能。純粹的 Minecraft 玩法自動化，其他專用工具做得更好。
 
 ---
 
