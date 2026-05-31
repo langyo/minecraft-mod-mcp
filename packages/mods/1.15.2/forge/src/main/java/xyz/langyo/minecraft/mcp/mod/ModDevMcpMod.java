@@ -138,6 +138,7 @@ public class ModDevMcpMod {
     private static void renderScreenButton(Minecraft mc, Screen screen) {
         int w = mc.getMainWindow().getScaledWidth();
         int h = mc.getMainWindow().getScaledHeight();
+        McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRenderer, w, h, INSTANCE.httpServer);
         double mx = getMouseX(mc);
         double my = getMouseY(mc);
         if (ReflectionHelper.isMcpControlMode()) {
@@ -207,7 +208,6 @@ public class ModDevMcpMod {
                         McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getFormattedText(), w, h, (int) mx, (int) my);
                     }
                 }
-                    McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRenderer, w, h, httpServer);
             } catch (Exception ignored) {}
         });
 

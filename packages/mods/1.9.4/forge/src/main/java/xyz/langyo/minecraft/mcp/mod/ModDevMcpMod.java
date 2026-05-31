@@ -184,6 +184,7 @@ public class ModDevMcpMod {
             ScaledResolution sr = new ScaledResolution(mc);
             int w = sr.getScaledWidth();
             int h = sr.getScaledHeight();
+            McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRendererObj, w, h, httpServer);
             int mx = getMouseX(mc);
             int my = getMouseY(mc);
 
@@ -199,7 +200,6 @@ public class ModDevMcpMod {
                 String label = net.minecraft.client.resources.I18n.format("mcpmod.control.pause_button");
                 McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRendererObj, label, w, h, mx, my);
             }
-                McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRendererObj, w, h, httpServer);
         } catch (Exception ignored) {}
     }
 

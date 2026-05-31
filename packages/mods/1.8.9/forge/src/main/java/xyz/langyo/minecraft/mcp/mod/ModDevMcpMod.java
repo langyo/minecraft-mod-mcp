@@ -185,6 +185,7 @@ public class ModDevMcpMod {
             ScaledResolution sr = new ScaledResolution(mc);
             int w = sr.getScaledWidth();
             int h = sr.getScaledHeight();
+            McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRendererObj, w, h, httpServer);
             int mx = getMouseX(mc);
             int my = getMouseY(mc);
 
@@ -198,7 +199,6 @@ public class ModDevMcpMod {
                 GL11.glEnable(GL11.GL_SCISSOR_TEST);
                 McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRendererObj, "", w, h, mx, my);
             }
-                McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRendererObj, w, h, httpServer);
         } catch (Exception ignored) {}
     }
 

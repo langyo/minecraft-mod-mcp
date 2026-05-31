@@ -58,6 +58,7 @@ public class ModDevMcpMod {
     private static void renderScreenButton(Minecraft mc, GuiScreen screen) {
         int w = mc.mainWindow.getScaledWidth();
         int h = mc.mainWindow.getScaledHeight();
+        McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRenderer, w, h, INSTANCE.httpServer);
         double mx = getMouseX(mc);
         double my = getMouseY(mc);
         if (ReflectionHelper.isMcpControlMode()) {
@@ -148,7 +149,6 @@ public class ModDevMcpMod {
                 mouseButtonInterceptorInstalled = true;
                 System.out.println("[MCP-MOD] MouseButton interceptor installed");
             }
-                McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRenderer, w, h, httpServer);
         } catch (Exception e) {
             System.err.println("[MCP-MOD] Cursor interceptor failed: " + e.getMessage());
         }

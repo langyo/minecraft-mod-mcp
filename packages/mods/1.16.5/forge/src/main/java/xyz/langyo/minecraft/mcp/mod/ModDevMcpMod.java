@@ -99,6 +99,7 @@ public class ModDevMcpMod {
     private static void renderScreenButton(MatrixStack ms, Minecraft mc, Screen screen) {
         int w = mc.getMainWindow().getScaledWidth();
         int h = mc.getMainWindow().getScaledHeight();
+        McpOverlayLogic.renderPortInfo(wrapRenderer(ms, mc), mc.fontRenderer, w, h, INSTANCE.httpServer);
         double mx = getMouseX(mc);
         double my = getMouseY(mc);
         if (ReflectionHelper.isMcpControlMode()) {
@@ -169,7 +170,6 @@ public class ModDevMcpMod {
                         McpOverlayLogic.renderResumeButton(wrapRenderer(ms, mc), mc.fontRenderer, new TranslationTextComponent("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                     }
                 }
-                    McpOverlayLogic.renderPortInfo(wrapRenderer(ms, mc), mc.fontRenderer, w, h, httpServer);
             } catch (Exception ignored) {}
         });
 

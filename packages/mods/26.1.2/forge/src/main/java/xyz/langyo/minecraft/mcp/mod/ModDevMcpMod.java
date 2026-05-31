@@ -142,6 +142,7 @@ public class ModDevMcpMod {
     private static void renderScreenButton(GuiGraphicsExtractor g, Minecraft mc, Screen screen) {
         int w = mc.getWindow().getGuiScaledWidth();
         int h = mc.getWindow().getGuiScaledHeight();
+        McpOverlayLogic.renderPortInfo(wrapRenderer(g, mc), mc.font, w, h, INSTANCE.httpServer);
         double mx = getMouseX(mc);
         double my = getMouseY(mc);
         if (ReflectionHelper.isMcpControlMode()) {
@@ -169,7 +170,6 @@ public class ModDevMcpMod {
                     }
                 }
                 return false;
-                    McpOverlayLogic.renderPortInfo(wrapRenderer(g, mc), mc.font, w, h, httpServer);
             } catch (Exception ignored) { return false; }
         });
 

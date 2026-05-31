@@ -164,6 +164,7 @@ public class ModDevMcpMod implements ClientModInitializer {
             }
             int w = mc.getWindow().getScaledWidth();
             int h = mc.getWindow().getScaledHeight();
+            McpOverlayLogic.renderPortInfo(wrapRenderer(ctx, mc), mc.textRenderer, w, h, httpServer);
             int mx = (int) getMouseX(mc);
             int my = (int) getMouseY(mc);
             if (ReflectionHelper.isMcpControlMode()) {
@@ -174,7 +175,6 @@ public class ModDevMcpMod implements ClientModInitializer {
                 McpOverlayLogic.renderTransferButton(wrapRenderer(ctx, mc), mc.textRenderer,
                         "Transfer to MCP", w, h, mx, my);
             }
-                McpOverlayLogic.renderPortInfo(wrapRenderer(ctx, mc), mc.textRenderer, w, h, httpServer);
         } catch (Exception ignored) {}
     }
 
