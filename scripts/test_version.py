@@ -1,4 +1,4 @@
-﻿"""Per-version automated test runner for Minecraft MCP mods.
+"""Per-version automated test runner for Minecraft MCP mods.
 
 Usage:
   python scripts/test_version.py 1.21.7-forge-57.0.2

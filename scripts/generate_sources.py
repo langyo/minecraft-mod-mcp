@@ -1,4 +1,4 @@
-﻿"""Generate Java source files for ALL mod projects.
+"""Generate Java source files for ALL mod projects.
 
 Architecture: Each mod has a thin ModDevMcpMod.java that handles FML lifecycle
 and event registration, then delegates to ReflectedInputHandler from mcp-common

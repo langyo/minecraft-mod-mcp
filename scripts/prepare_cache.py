@@ -1,4 +1,4 @@
-﻿"""Pre-populate ALL caches for ALL mod projects.
+"""Pre-populate ALL caches for ALL mod projects.
 
 Every build (not just legacy) benefits from pre-cached artifacts:
   - Forge/NeoForge userdev jars, POMs

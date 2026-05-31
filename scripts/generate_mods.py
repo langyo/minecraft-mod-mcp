@@ -1,4 +1,4 @@
-﻿"""Generate mod projects for all supported MC versions and loaders.
+"""Generate mod projects for all supported MC versions and loaders.
 
 All version/era data comes from version_config.py — nothing is hardcoded here.
 

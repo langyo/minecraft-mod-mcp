@@ -1,4 +1,4 @@
-﻿modLoader = "javafml"
+modLoader = "javafml"
 loaderVersion = "[3,)"
 license = "MIT"
 

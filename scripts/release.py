@@ -1,4 +1,4 @@
-﻿"""Build all mods and publish JARs to GitHub Release.
+"""Build all mods and publish JARs to GitHub Release.
 
 Builds common library, then all mod JARs with correct JDK per version,
 collects the artifacts, and creates/updates a GitHub Release via `gh`.

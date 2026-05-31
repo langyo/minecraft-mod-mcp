@@ -1,4 +1,4 @@
-﻿"""Pre-release version consistency check.
+"""Pre-release version consistency check.
 
 Verifies that all mod version strings across the project match the
 release tag version. Run automatically in CI before building.

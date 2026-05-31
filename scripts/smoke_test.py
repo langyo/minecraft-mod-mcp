@@ -1,4 +1,4 @@
-﻿"""Smoke test: launch MC, navigate menus, create Redstone Ready superflat world,
+"""Smoke test: launch MC, navigate menus, create Redstone Ready superflat world,
 place a sign with 'Hello World', then exit cleanly.
 
 CI mode (--ci) uses a pre-built test world, skips GUI navigation, and focuses

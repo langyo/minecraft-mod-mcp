@@ -1,4 +1,4 @@
-﻿package xyz.langyo.minecraft.mcp.mod;
+package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.fabricmc.api.ClientModInitializer;

@@ -1,4 +1,4 @@
-﻿"""Minecraft MCP Test Daemon — decoupled process lifecycle manager.
+"""Minecraft MCP Test Daemon — decoupled process lifecycle manager.
 
 Architecture:
   1. Launches MCP WS server as a child process (stdin-controlled)
