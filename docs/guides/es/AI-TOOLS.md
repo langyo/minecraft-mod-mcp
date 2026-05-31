@@ -48,7 +48,7 @@ Ubicaciones comunes de archivos de configuración:
 
 ---
 
-## Endpoints HTTP de Minecraft MCP
+## Endpoints HTTP de Minecraft Mod MCP
 
 El servidor MCP de Minecraft expone los siguientes endpoints HTTP (puerto por defecto: **9876**):
 
@@ -60,7 +60,7 @@ El servidor MCP de Minecraft expone los siguientes endpoints HTTP (puerto por de
 | `/api/events` | GET | Flujo SSE (Server-Sent Events) para historial de llamadas en tiempo real |
 | `/api/calls` | GET | Devuelve los últimos 50 eventos de llamada como array JSON |
 
-> **Requisitos previos**: Asegúrate de que el daemon de Minecraft MCP esté en ejecución y que un cliente de Minecraft con el mod MCP esté conectado. Ejecuta `just daemon` y luego `just launch <version> <loader>`.
+> **Requisitos previos**: Asegúrate de que el daemon de Minecraft Mod MCP esté en ejecución y que un cliente de Minecraft con el mod MCP esté conectado. Ejecuta `just daemon` y luego `just launch <version> <loader>`.
 
 ---
 
@@ -557,20 +557,20 @@ curl http://localhost:9876/api/events
 
 ## Integración de Reconocimiento Visual
 
-Puedes combinar Minecraft MCP con **servidores MCP con capacidad de visión** para que los agentes de IA puedan *ver y entender* lo que sucede en el juego — leer texto de la IU, diagnosticar errores, analizar diseños y más.
+Puedes combinar Minecraft Mod MCP con **servidores MCP con capacidad de visión** para que los agentes de IA puedan *ver y entender* lo que sucede en el juego — leer texto de la IU, diagnosticar errores, analizar diseños y más.
 
 ### Cómo Funciona
 
-1. Minecraft MCP toma una captura de pantalla y la guarda en un archivo local mediante `screenshot_to_file`
+1. Minecraft Mod MCP toma una captura de pantalla y la guarda en un archivo local mediante `screenshot_to_file`
 2. Un servidor MCP de visión lee ese archivo y lo analiza
 3. El agente de IA coordina ambos — captura → analizar → actuar
 
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["Minecraft MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
-    A --> D["Minecraft MCP<br/>click x=400,y=300<br/>→ enters game"]
+    A --> D["Minecraft Mod MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### Servidor MCP GLM Vision

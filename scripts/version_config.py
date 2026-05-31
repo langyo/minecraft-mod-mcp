@@ -153,9 +153,11 @@ ALL_VERSIONS = {
                "neoforge": "20.6.139", "mdg": "2.0.141",
                "fabric_yarn": "1.20.6+build.1"},
 
-    # --- FG 7.x (MC 1.21.7+) ---
-    "1.21.7": {"forge": "1.21.7-57.0.2",             "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.7",
-               "version_id": "1.21.7-forge-57.0.2"},
+    # --- FG 7.x (MC 1.21.11+) ---
+    "1.21.11": {"forge": "1.21.11-61.1.5",            "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.11",
+                 "version_id": "1.21.11-forge-61.1.5",
+                 "neoforge": "21.11.42", "mdg": "2.0.141",
+                 "fabric_yarn": "1.21.11+build.6"},
 
     # --- FG 7.x (MC 26.x) ---
     "26.1.2": {"forge": "26.1.2-64.0.8",             "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
@@ -181,7 +183,7 @@ def get_api_group(mc):
         "1.17.1": "fg5", "1.18.2": "fg5",
         "1.19.4": "fg6",
         "1.20.6": "fg6",
-        "1.21.7": "mc26",
+        "1.21.11": "mc26",
         "26.1.2": "mc26",
     }
     return _MAP.get(mc, "fg6")
@@ -200,6 +202,7 @@ def get_fabric_loom(mc):
         (["1.17.1", "1.18.2"], "1.0-SNAPSHOT"),
         (["1.19.4"], "1.3-SNAPSHOT"),
         (["1.20.6"], "1.5-SNAPSHOT"),
+        (["1.21.11"], "1.14-SNAPSHOT"),
     ]
     for versions, loom in _MAP:
         if mc in versions:
@@ -257,12 +260,12 @@ def get_fg_era(mc):
 # ============================================================
 
 JDK_PATHS = {
-    8:  r"C:\Users\langy\.jdks\jdk8",
-    16: None,  # Auto-downloaded by Gradle toolchain
-    17: r"C:\Program Files\Amazon Corretto\jdk17.0.19_10",
-    21: r"C:\Program Files\Amazon Corretto\jdk21.0.8_9",
-    24: r"C:\Users\langy\.jdks\openjdk-24.0.2+12-54",
-    25: r"C:\Program Files\Amazon Corretto\jdk25.0.3_9",
+    8:  None,
+    16: None,
+    17: None,
+    21: None,
+    24: None,
+    25: None,
 }
 
 def get_jdk_home(java_version):

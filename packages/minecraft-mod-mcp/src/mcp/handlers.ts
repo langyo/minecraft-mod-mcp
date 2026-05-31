@@ -106,7 +106,7 @@ async function handleTool(name: string, params: Record<string, unknown>, mod: Mo
       const loader = String(params.loader || "forge");
       const scriptPath = findLaunchScript();
       if (!scriptPath) throw new Error("launch_mc.py not found. Run from minecraft-mcp project root or set MINECRAFT_MCP_HOME.");
-      const proc = spawn("python", [scriptPath, `${version}-${loader}`], {
+      const proc = spawn("python", [scriptPath, `${version}-${loader}`, "--loader", loader], {
         stdio: "pipe",
         env: { ...process.env },
       });

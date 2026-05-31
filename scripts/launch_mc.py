@@ -1034,6 +1034,11 @@ def find_java(version_java=None):
                 exe = os.path.join(home, "bin", f"java{_EXE_SUFFIX}")
                 if os.path.isfile(exe):
                     return exe
+        jdk_home = _find_jdk_home(ver)
+        if jdk_home:
+            exe = os.path.join(jdk_home, "bin", f"java{_EXE_SUFFIX}")
+            if os.path.isfile(exe):
+                return exe
     for env_key in _JAVA_HOME_ENV_KEYS:
         home = os.environ.get(env_key)
         if home:
@@ -1041,6 +1046,110 @@ def find_java(version_java=None):
             if os.path.isfile(exe):
                 return exe
     return "java"
+
+
+def _find_jdk_home(target_ver):
+    if platform.system() == "Windows":
+        corretto_base = r"C:\Program Files\Amazon Corretto"
+        if os.path.isdir(corretto_base):
+            for d in sorted(os.listdir(corretto_base), reverse=True):
+                if d.startswith(f"jdk{target_ver}.") or d.startswith(f"jdk1.{target_ver}."):
+                    path = os.path.join(corretto_base, d)
+                    if os.path.isfile(os.path.join(path, "bin", f"java{_EXE_SUFFIX}")):
+                        return path
+        adoptium_base = r"C:\Program Files\Eclipse Adoptium"
+        if os.path.isdir(adoptium_base):
+            for d in sorted(os.listdir(adoptium_base), reverse=True):
+                if f"-{target_ver}." in d:
+                    path = os.path.join(adoptium_base, d)
+                    if os.path.isfile(os.path.join(path, "bin", f"java{_EXE_SUFFIX}")):
+                        return path
+    jdks_dir = os.path.join(os.path.expanduser("~"), ".gradle", "jdks")
+    if os.path.isdir(jdks_dir):
+        for d in sorted(os.listdir(jdks_dir), reverse=True):
+            if f"-{target_ver}." in d and "lock" not in d:
+                path = os.path.join(jdks_dir, d)
+                exe = os.path.join(path, "bin", f"java{_EXE_SUFFIX}")
+                if platform.system() != "Windows":
+                    exe = os.path.join(path, "bin", "java")
+                if os.path.isfile(exe):
+                    return path
+    return None
+
+
+def _launch_neoforge_gradlew(mc_version, args):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    mod_dir = os.path.join(project_root, "packages", "mods", mc_version, "neoforge")
+
+    if not os.path.isdir(mod_dir):
+        print(f"[LAUNCH] ERROR: NeoForge mod directory not found: {mod_dir}")
+        sys.exit(1)
+
+    gradlew = os.path.join(mod_dir, "gradlew.bat" if platform.system() == "Windows" else "gradlew")
+    if not os.path.isfile(gradlew):
+        gradlew = os.path.join(mod_dir, "gradlew")
+    if not os.path.isfile(gradlew):
+        print(f"[LAUNCH] ERROR: gradlew not found in {mod_dir}")
+        sys.exit(1)
+
+    version_config = {}
+    vc_path = os.path.join(script_dir, "version_config.py")
+    if os.path.isfile(vc_path):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("version_config", vc_path)
+        vc_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(vc_mod)
+        version_config = vc_mod.ALL_VERSIONS.get(mc_version, {})
+
+    java_ver = version_config.get("java", 21)
+    java_exe = find_java(java_ver)
+    found_ver = _java_major_version(java_exe) if java_exe != "java" and os.path.isfile(java_exe) else 0
+
+    if found_ver != java_ver:
+        java_home = _find_jdk_home(java_ver)
+        if java_home:
+            java_exe = os.path.join(java_home, "bin", f"java{_EXE_SUFFIX}")
+            print(f"[LAUNCH] Found JDK {java_ver} at {java_home}")
+
+    java_home_dir = os.path.dirname(os.path.dirname(java_exe)) if java_exe != "java" and os.path.isfile(java_exe) else None
+
+    gradle_args = ["runClient"]
+
+    mc_dir = args.mc_dir or MC_DIR
+    env = os.environ.copy()
+    if java_home_dir:
+        env["JAVA_HOME"] = java_home_dir
+
+    jvm_opts = []
+    if args.jvm_args:
+        for a in args.jvm_args.split():
+            if a.startswith("-X"):
+                jvm_opts.append(a)
+    if args.headless:
+        jvm_opts.append("-Djava.awt.headless=true")
+    if jvm_opts:
+        env["GRADLE_OPTS"] = (env.get("GRADLE_OPTS", "") + " " + " ".join(jvm_opts)).strip()
+
+    cmd = [gradlew] + gradle_args
+    cmd_str = " ".join(cmd)
+
+    if args.dry_run:
+        print(f"[DRY-RUN] NeoForge runClient:")
+        print(f"  cwd: {mod_dir}")
+        print(f"  cmd: {cmd_str}")
+        print(f"  JAVA_HOME: {env.get('JAVA_HOME', '(not set)')}")
+        return
+
+    print(f"[LAUNCH] NeoForge runClient: {mc_version}/neoforge")
+    print(f"  cwd: {mod_dir}")
+    print(f"  cmd: {cmd_str}")
+    print(f"  JAVA_HOME: {env.get('JAVA_HOME', '(default)')}")
+
+    proc = subprocess.Popen(cmd, cwd=mod_dir, env=env)
+    print(f"[LAUNCH] Process started: pid={proc.pid}")
+    rc = proc.wait()
+    print(f"[LAUNCH] Process exited with code {rc}")
 
 
 def main():
@@ -1061,6 +1170,8 @@ def main():
                         help="Skip asset downloading (CI pre-cache)")
     parser.add_argument("--no-mod-sync", action="store_true",
                         help="Skip mod JAR syncing from packages/mods (CI pre-installed)")
+    parser.add_argument("--build", action="store_true",
+                        help="Clean build mod before launching (removes build dir, runs gradle clean build)")
     parser.add_argument("--fixed-framerate", type=int, default=0,
                         help="Fixed framerate cap (0=uncapped)")
     args = parser.parse_args()
@@ -1068,7 +1179,114 @@ def main():
     mc_dir = args.mc_dir or MC_DIR
     version_name = args.version
 
-    mc_version = version_name.split("-")[0] if "-" in version_name else version_name
+    loader_filter = args.loader
+    if not loader_filter:
+        if "neoforge" in version_name.lower():
+            loader_filter = "neoforge"
+        elif "fabric" in version_name.lower():
+            loader_filter = "fabric"
+        else:
+            loader_filter = "forge"
+
+    if loader_filter == "fabric" and version_name.startswith("fabric-loader"):
+        import re
+        matches = re.findall(r"(\d+\.\d+(?:\.\d+)?)", version_name)
+        mc_version = matches[-1] if matches else version_name
+    else:
+        mc_version = version_name.split("-")[0] if "-" in version_name else version_name
+
+    if "-" not in version_name:
+        _vc_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version_config.py")
+        if os.path.isfile(_vc_path):
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("version_config", _vc_path)
+            vc_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(vc_mod)
+            vc_entry = vc_mod.ALL_VERSIONS.get(mc_version, {})
+            resolved = vc_entry.get("version_id")
+            if resolved:
+                version_name = resolved
+                print(f"[LAUNCH] Resolved version: {version_name} (loader={loader_filter})")
+
+    if loader_filter == "neoforge":
+        _launch_neoforge_gradlew(mc_version, args)
+        return
+
+    # --build: clean build mod before launching
+    if args.build:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(script_dir)
+        mod_dir = os.path.join(project_root, "packages", "mods", mc_version, loader_filter)
+        if os.path.isdir(mod_dir):
+            build_dir = os.path.join(mod_dir, "build")
+            if os.path.isdir(build_dir):
+                shutil.rmtree(build_dir, ignore_errors=True)
+                print(f"[BUILD] Removed {build_dir}")
+            gradlew = os.path.join(mod_dir, "gradlew.bat" if platform.system() == "Windows" else "gradlew")
+            if not os.path.isfile(gradlew):
+                gradlew = os.path.join(mod_dir, "gradlew")
+            if os.path.isfile(gradlew):
+                _vc_path2 = os.path.join(script_dir, "version_config.py")
+                java_ver_for_build = 17
+                if os.path.isfile(_vc_path2):
+                    try:
+                        import importlib.util as _ilu
+                        _spec2 = _ilu.spec_from_file_location("version_config", _vc_path2)
+                        _vc2 = _ilu.module_from_spec(_spec2)
+                        _spec2.loader.exec_module(_vc2)
+                        _entry2 = _vc2.ALL_VERSIONS.get(mc_version, {})
+                        java_ver_for_build = _entry2.get("java", 17)
+                    except Exception:
+                        pass
+                # Fabric always needs JDK 17+ for Loom, even if MC itself uses Java 8
+                if loader_filter == "fabric" and java_ver_for_build < 17:
+                    java_ver_for_build = 17
+                build_env = os.environ.copy()
+                java_home_for_build = find_java(java_ver_for_build)
+                if java_home_for_build:
+                    if os.path.isfile(java_home_for_build):
+                        java_home_for_build = os.path.dirname(os.path.dirname(java_home_for_build))
+                    build_env["JAVA_HOME"] = java_home_for_build
+                proxy_host = "127.0.0.1"
+                proxy_port = "7890"
+                build_env["GRADLE_OPTS"] = f"-Dhttp.proxyHost={proxy_host} -Dhttp.proxyPort={proxy_port} -Dhttps.proxyHost={proxy_host} -Dhttps.proxyPort={proxy_port}"
+                build_cmd = [gradlew, "clean", "build", "--no-daemon"]
+                print(f"[BUILD] Running: {' '.join(build_cmd)}")
+                print(f"[BUILD]   cwd: {mod_dir}")
+                print(f"[BUILD]   JAVA_HOME: {build_env.get('JAVA_HOME', '(not set)')}")
+                rc = subprocess.call(build_cmd, cwd=mod_dir, env=build_env)
+                if rc != 0:
+                    print(f"[BUILD] FAILED with exit code {rc}")
+                    sys.exit(1)
+                print(f"[BUILD] SUCCESS")
+                # Also deploy dependency jars to mods dir
+                mods_dir_build = os.path.join(mc_dir, "versions", version_name.replace("-forge-", "-fabric-").replace(mc_version, f"{mc_version}-fabric") if loader_filter == "fabric" else version_name, "mods")
+                # Find the actual version dir
+                if loader_filter == "fabric":
+                    ver_dir_name = f"{mc_version}-fabric"
+                else:
+                    ver_dir_name = version_name
+                mods_dir_build = os.path.join(mc_dir, "versions", ver_dir_name, "mods")
+                if os.path.isdir(mods_dir_build):
+                    # Deploy deps
+                    gradle_cache = os.path.join(os.path.expanduser("~"), ".gradle", "caches", "modules-2", "files-2.1")
+                    for group, artifact, version in [
+                        ("org.java-websocket", "Java-WebSocket", "1.5.4"),
+                        ("net.java.dev.jna", "jna", "5.15.0"),
+                        ("net.java.dev.jna", "jna-platform", "5.15.0"),
+                    ]:
+                        cache_dir = os.path.join(gradle_cache, group, artifact, version)
+                        if os.path.isdir(cache_dir):
+                            for root, dirs, files in os.walk(cache_dir):
+                                for f in files:
+                                    if f.endswith(".jar") and "sources" not in f and "javadoc" not in f:
+                                        shutil.copy2(os.path.join(root, f), os.path.join(mods_dir_build, f))
+                                        break
+                    print(f"[BUILD] Deployed dependencies to {mods_dir_build}")
+            else:
+                print(f"[BUILD] WARNING: No gradlew found in {mod_dir}")
+        else:
+            print(f"[BUILD] WARNING: Mod directory not found: {mod_dir}")
 
     print(f"[LAUNCH] MC version: {version_name}")
     print(f"[LAUNCH] MC dir: {mc_dir}")
@@ -1230,8 +1448,8 @@ def main():
 
     cmd = [java_exe]
     cmd.extend(args.jvm_args.split())
-    mc_ver = args.version.split("-")[0] if args.version else "unknown"
-    loader = args.loader if hasattr(args, "loader") and args.loader else "forge"
+    mc_ver = mc_version
+    loader = loader_filter
 
     if args.headless:
         cmd.extend([

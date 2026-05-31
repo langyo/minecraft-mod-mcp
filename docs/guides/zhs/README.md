@@ -1,9 +1,9 @@
 <!-- markdownlint-disable MD033 MD041 MD036 -->
 <div align="center">
 
-<img src="../../logo.webp" alt="Minecraft MCP logo" width="200"/>
+<img src="../../logo.webp" alt="Minecraft Mod MCP logo" width="200"/>
 
-# Minecraft MCP
+# Minecraft Mod MCP
 
 **让 AI 玩 Minecraft**
 
@@ -31,16 +31,16 @@ https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/zhs/AI-TOOLS.m
 
 ---
 
-## 什么是 Minecraft MCP
+## 什么是 Minecraft Mod MCP
 
-Minecraft MCP 是一个让 AI 助手操控 Minecraft 的模组。把它放入你的 `mods` 文件夹，启动游戏，你的 AI 就能看到游戏画面、点击按钮、输入命令、与世界交互——全部通过标准的 MCP 协议。
+Minecraft Mod MCP 是一个让 AI 助手操控 Minecraft 的模组。把它放入你的 `mods` 文件夹，启动游戏，你的 AI 就能看到游戏画面、点击按钮、输入命令、与世界交互——全部通过标准的 MCP 协议。
 
 - **看** —— 截取带有坐标网格的屏幕截图
 - **动** —— 点击、输入、滚动、拖拽、按下任意按键
 - **知** —— 查询玩家位置、世界信息、屏幕按钮和调试字段
 - **录** —— 通过 SSE 实时推送事件流，捕获视频帧
 
-> 想让你的 AI 建造一座城堡？运行冒烟测试？浏览整合包菜单？Minecraft MCP 让这一切成为可能。
+> 想让你的 AI 建造一座城堡？运行冒烟测试？浏览整合包菜单？Minecraft Mod MCP 让这一切成为可能。
 
 ---
 
@@ -110,7 +110,7 @@ https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/zhs/AI-TOOLS.m
 ```mermaid
 flowchart LR
     A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
-    B["🔌 Minecraft MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
     C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
 
     A <-- "HTTP / SSE" --> B

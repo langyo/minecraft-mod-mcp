@@ -51,10 +51,10 @@ def check_file(path: Path, pattern: str, expected: str, label: str) -> list[str]
 def check_build_gradle(expected: str) -> list[str]:
     """Check all build.gradle / build.gradle.kts for version strings."""
     errors = []
-    # Old forge (groovy): version = "1.0.0-SNAPSHOT"
+    # Old forge (groovy): version = "0.1.0-SNAPSHOT"
     pattern_groovy = r'version\s*=\s*["\']([^"\']+)["\']'
 
-    # New forge/neoforge/fabric: version = '1.0.0-SNAPSHOT'
+    # New forge/neoforge/fabric: version = '0.1.0-SNAPSHOT'
     # Combined pattern catches both
     for path in MODS_DIR.rglob("build.gradle*"):
         # Skip non-mod build files

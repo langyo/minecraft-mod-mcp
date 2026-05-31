@@ -556,8 +556,8 @@ def main():
     # ================================================================
     print("\n[Phase 11] Shared dependencies")
     shared = [
-        ("xyz.langyo.minecraft.mcp", "mcp-common", "1.0.0-SNAPSHOT",
-         "mcp-common-1.0.0-SNAPSHOT.jar", "maven-local"),
+        ("xyz.langyo.minecraft.mcp", "mcp-common", "0.1.0-SNAPSHOT",
+         "mcp-common-0.1.0-SNAPSHOT.jar", "maven-local"),
     ]
     import urllib.request
     for mc, info in sorted(ALL_VERSIONS.items()):
@@ -577,7 +577,7 @@ def _get_fabric_loader(mc):
     _MAP = {
         "1.14.4": "0.11.3", "1.15": "0.11.3", "1.15.2": "0.11.3",
         "1.16.1": "0.12.12", "1.16.3": "0.12.12",
-        "1.16.4": "0.12.12", "1.16.5": "0.12.12",
+        "1.16.4": "0.12.12", "1.16.5": "0.15.11",
         "1.17.1": "0.14.9", "1.18": "0.14.9", "1.18.2": "0.14.9",
         "1.19": "0.14.21", "1.19.2": "0.14.21",
         "1.19.3": "0.15.6", "1.19.4": "0.15.6",

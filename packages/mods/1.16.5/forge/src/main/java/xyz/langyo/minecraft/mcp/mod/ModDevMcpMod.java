@@ -2,8 +2,7 @@ package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
@@ -121,7 +120,6 @@ public class ModDevMcpMod {
     @SuppressWarnings("removal")
     public ModDevMcpMod() {
         INSTANCE = this;
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
 
         new Thread(() -> {
             try {
@@ -278,8 +276,5 @@ public class ModDevMcpMod {
         } catch (Exception e) {
             System.err.println("[MCP-MOD] MouseButton interceptor failed: " + e.getMessage());
         }
-    }
-
-    private void setup(final FMLCommonSetupEvent event) {
     }
 }

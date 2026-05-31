@@ -28,7 +28,7 @@ export function createApiApp(mod: ModClient): Hono {
     const scriptPath = findLaunchScript();
     if (!scriptPath) return c.json({ error: "launch_mc.py not found" }, 500);
     const { spawn } = await import("node:child_process");
-    const proc = spawn("python", [scriptPath, `${version}-${loader}`], { stdio: "pipe" });
+    const proc = spawn("python", [scriptPath, `${version}-${loader}`, "--loader", loader], { stdio: "pipe" });
     mod.setMcProcess(proc);
     return c.json({ launched: true, version, loader, pid: proc.pid });
   });

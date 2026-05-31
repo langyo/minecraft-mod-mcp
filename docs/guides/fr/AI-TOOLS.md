@@ -46,9 +46,9 @@ Emplacements courants des fichiers de configuration :
 
 > Consultez les [instructions par outil](#outils-agent-de-codage) ci-dessous pour les chemins exacts, la configuration via l'interface et les formats spécifiques.
 
-## Points de terminaison HTTP de Minecraft MCP
+## Points de terminaison HTTP de Minecraft Mod MCP
 
-Le serveur Minecraft MCP expose les points de terminaison HTTP suivants (port par défaut : **9876**) :
+Le serveur Minecraft Mod MCP expose les points de terminaison HTTP suivants (port par défaut : **9876**) :
 
 | Point de terminaison | Méthode | Description |
 |----------|--------|-------------|
@@ -58,13 +58,13 @@ Le serveur Minecraft MCP expose les points de terminaison HTTP suivants (port pa
 | `/api/events` | GET | Flux SSE (Server-Sent Events) pour l'historique des appels en temps réel |
 | `/api/calls` | GET | Retourne les 50 derniers événements d'appel sous forme de tableau JSON |
 
-> **Prérequis** : Assurez-vous que le démon Minecraft MCP est en cours d'exécution et qu'un client Minecraft avec le mod MCP est connecté. Exécutez `just daemon` puis `just launch <version> <loader>`.
+> **Prérequis** : Assurez-vous que le démon Minecraft Mod MCP est en cours d'exécution et qu'un client Minecraft avec le mod MCP est connecté. Exécutez `just daemon` puis `just launch <version> <loader>`.
 
 ---
 
 ## Méthodes d'intégration
 
-La plupart des outils de codage IA prennent en charge le **Model Context Protocol (MCP)** pour se connecter à des serveurs externes. Le serveur Minecraft MCP peut être connecté via :
+La plupart des outils de codage IA prennent en charge le **Model Context Protocol (MCP)** pour se connecter à des serveurs externes. Le serveur Minecraft Mod MCP peut être connecté via :
 
 - **Transport SSE** : Pointer le client MCP de l'outil vers `http://localhost:9876/api/events`
 - **API REST HTTP** : Envoyer des requêtes POST directement à `http://localhost:9876/api/cmd`
@@ -519,7 +519,7 @@ Agent IA léger pour diverses tâches.
 
 ## Accès direct à l'API REST HTTP
 
-Pour les outils qui ne prennent pas en charge nativement le protocole MCP, vous pouvez interagir directement avec le serveur Minecraft MCP via son API REST HTTP :
+Pour les outils qui ne prennent pas en charge nativement le protocole MCP, vous pouvez interagir directement avec le serveur Minecraft Mod MCP via son API REST HTTP :
 
 ```bash
 # Vérification de l'état
@@ -555,20 +555,20 @@ curl http://localhost:9876/api/events
 
 ## Intégration de la reconnaissance visuelle
 
-Vous pouvez associer Minecraft MCP à des **serveurs MCP compatibles vision** pour permettre aux agents IA de *voir et comprendre* ce qui se passe dans le jeu — lire le texte de l'IU, diagnostiquer les erreurs, analyser les dispositions, et plus encore.
+Vous pouvez associer Minecraft Mod MCP à des **serveurs MCP compatibles vision** pour permettre aux agents IA de *voir et comprendre* ce qui se passe dans le jeu — lire le texte de l'IU, diagnostiquer les erreurs, analyser les dispositions, et plus encore.
 
 ### Comment ça fonctionne
 
-1. Minecraft MCP prend une capture d'écran et l'enregistre dans un fichier local via `screenshot_to_file`
+1. Minecraft Mod MCP prend une capture d'écran et l'enregistre dans un fichier local via `screenshot_to_file`
 2. Un serveur MCP vision lit ce fichier et l'analyse
 3. L'agent IA coordonne les deux — capture → analyser → agir
 
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["Minecraft MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
-    A --> D["Minecraft MCP<br/>click x=400,y=300<br/>→ enters game"]
+    A --> D["Minecraft Mod MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### Serveur MCP GLM Vision

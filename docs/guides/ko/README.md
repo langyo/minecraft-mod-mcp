@@ -1,9 +1,9 @@
 <!-- markdownlint-disable MD033 MD041 MD036 -->
 <div align="center">
 
-<img src="../../logo.webp" alt="Minecraft MCP logo" width="200"/>
+<img src="../../logo.webp" alt="Minecraft Mod MCP logo" width="200"/>
 
-# Minecraft MCP
+# Minecraft Mod MCP
 
 **AI가 Minecraft를 플레이하게 하세요**
 
@@ -31,16 +31,16 @@ AI가 가이드를 읽고 MCP 연결을 설정한 뒤 게임을 제어합니다.
 
 ---
 
-## Minecraft MCP란?
+## Minecraft Mod MCP란?
 
-Minecraft MCP는 AI 어시스턴트와 마인크래프트 사이의 다리 역할을 합니다. 게임 내에서 모드로 실행되며, AI 도구들이 표준 MCP 프로토콜을 통해 연결할 수 있는 HTTP 서버를 노출합니다. 이 다리를 통해 AI는 게임을 보고, 버튼을 클릭하고, 명령어를 입력하고, 세계와 상호작용할 수 있습니다.
+Minecraft Mod MCP는 AI 어시스턴트와 마인크래프트 사이의 다리 역할을 합니다. 게임 내에서 모드로 실행되며, AI 도구들이 표준 MCP 프로토콜을 통해 연결할 수 있는 HTTP 서버를 노출합니다. 이 다리를 통해 AI는 게임을 보고, 버튼을 클릭하고, 명령어를 입력하고, 세계와 상호작용할 수 있습니다.
 
 - **보기** — 좌표 격자가 포함된 스크린샷 캡처
 - **행동하기** — 클릭, 타이핑, 스크롤, 드래그 및 모든 키 입력
 - **알기** — 플레이어 위치, 세계 정보, 화면 버튼, 디버그 필드 조회
 - **기록하기** — SSE를 통한 실시간 이벤트 스트리밍, 비디오 프레임 캡처
 
-> AI가 성을 짓게 하고 싶으신가요? 스모크 테스트를 실행하고 싶으신가요? 모드팩 메뉴를 탐색하고 싶으신가요? Minecraft MCP가 가능하게 합니다.
+> AI가 성을 짓게 하고 싶으신가요? 스모크 테스트를 실행하고 싶으신가요? 모드팩 메뉴를 탐색하고 싶으신가요? Minecraft Mod MCP가 가능하게 합니다.
 
 ---
 
@@ -110,7 +110,7 @@ https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/ko/AI-TOOLS.md
 ```mermaid
 flowchart LR
     A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
-    B["🔌 Minecraft MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
     C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
 
     A <-- "HTTP / SSE" --> B
