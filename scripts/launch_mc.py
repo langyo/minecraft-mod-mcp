@@ -1170,6 +1170,8 @@ def main():
                         help="Skip asset downloading (CI pre-cache)")
     parser.add_argument("--no-mod-sync", action="store_true",
                         help="Skip mod JAR syncing from packages/mods (CI pre-installed)")
+    parser.add_argument("--build", action="store_true",
+                        help="Clean build mod before launching (removes build dir, runs gradle clean build)")
     parser.add_argument("--fixed-framerate", type=int, default=0,
                         help="Fixed framerate cap (0=uncapped)")
     args = parser.parse_args()
@@ -1209,6 +1211,82 @@ def main():
     if loader_filter == "neoforge":
         _launch_neoforge_gradlew(mc_version, args)
         return
+
+    # --build: clean build mod before launching
+    if args.build:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(script_dir)
+        mod_dir = os.path.join(project_root, "packages", "mods", mc_version, loader_filter)
+        if os.path.isdir(mod_dir):
+            build_dir = os.path.join(mod_dir, "build")
+            if os.path.isdir(build_dir):
+                shutil.rmtree(build_dir, ignore_errors=True)
+                print(f"[BUILD] Removed {build_dir}")
+            gradlew = os.path.join(mod_dir, "gradlew.bat" if platform.system() == "Windows" else "gradlew")
+            if not os.path.isfile(gradlew):
+                gradlew = os.path.join(mod_dir, "gradlew")
+            if os.path.isfile(gradlew):
+                _vc_path2 = os.path.join(script_dir, "version_config.py")
+                java_ver_for_build = 17
+                if os.path.isfile(_vc_path2):
+                    try:
+                        import importlib.util as _ilu
+                        _spec2 = _ilu.spec_from_file_location("version_config", _vc_path2)
+                        _vc2 = _ilu.module_from_spec(_spec2)
+                        _spec2.loader.exec_module(_vc2)
+                        _entry2 = _vc2.ALL_VERSIONS.get(mc_version, {})
+                        java_ver_for_build = _entry2.get("java", 17)
+                    except Exception:
+                        pass
+                # Fabric always needs JDK 17+ for Loom, even if MC itself uses Java 8
+                if loader_filter == "fabric" and java_ver_for_build < 17:
+                    java_ver_for_build = 17
+                build_env = os.environ.copy()
+                java_home_for_build = find_java(java_ver_for_build)
+                if java_home_for_build:
+                    if os.path.isfile(java_home_for_build):
+                        java_home_for_build = os.path.dirname(os.path.dirname(java_home_for_build))
+                    build_env["JAVA_HOME"] = java_home_for_build
+                proxy_host = "127.0.0.1"
+                proxy_port = "7890"
+                build_env["GRADLE_OPTS"] = f"-Dhttp.proxyHost={proxy_host} -Dhttp.proxyPort={proxy_port} -Dhttps.proxyHost={proxy_host} -Dhttps.proxyPort={proxy_port}"
+                build_cmd = [gradlew, "clean", "build", "--no-daemon"]
+                print(f"[BUILD] Running: {' '.join(build_cmd)}")
+                print(f"[BUILD]   cwd: {mod_dir}")
+                print(f"[BUILD]   JAVA_HOME: {build_env.get('JAVA_HOME', '(not set)')}")
+                rc = subprocess.call(build_cmd, cwd=mod_dir, env=build_env)
+                if rc != 0:
+                    print(f"[BUILD] FAILED with exit code {rc}")
+                    sys.exit(1)
+                print(f"[BUILD] SUCCESS")
+                # Also deploy dependency jars to mods dir
+                mods_dir_build = os.path.join(mc_dir, "versions", version_name.replace("-forge-", "-fabric-").replace(mc_version, f"{mc_version}-fabric") if loader_filter == "fabric" else version_name, "mods")
+                # Find the actual version dir
+                if loader_filter == "fabric":
+                    ver_dir_name = f"{mc_version}-fabric"
+                else:
+                    ver_dir_name = version_name
+                mods_dir_build = os.path.join(mc_dir, "versions", ver_dir_name, "mods")
+                if os.path.isdir(mods_dir_build):
+                    # Deploy deps
+                    gradle_cache = os.path.join(os.path.expanduser("~"), ".gradle", "caches", "modules-2", "files-2.1")
+                    for group, artifact, version in [
+                        ("org.java-websocket", "Java-WebSocket", "1.5.4"),
+                        ("net.java.dev.jna", "jna", "5.15.0"),
+                        ("net.java.dev.jna", "jna-platform", "5.15.0"),
+                    ]:
+                        cache_dir = os.path.join(gradle_cache, group, artifact, version)
+                        if os.path.isdir(cache_dir):
+                            for root, dirs, files in os.walk(cache_dir):
+                                for f in files:
+                                    if f.endswith(".jar") and "sources" not in f and "javadoc" not in f:
+                                        shutil.copy2(os.path.join(root, f), os.path.join(mods_dir_build, f))
+                                        break
+                    print(f"[BUILD] Deployed dependencies to {mods_dir_build}")
+            else:
+                print(f"[BUILD] WARNING: No gradlew found in {mod_dir}")
+        else:
+            print(f"[BUILD] WARNING: Mod directory not found: {mod_dir}")
 
     print(f"[LAUNCH] MC version: {version_name}")
     print(f"[LAUNCH] MC dir: {mc_dir}")
