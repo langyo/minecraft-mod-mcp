@@ -1,4 +1,4 @@
-package xyz.langyo.minecraft.mcp.mod;
+﻿package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
@@ -148,6 +148,7 @@ public class ModDevMcpMod {
                 mouseButtonInterceptorInstalled = true;
                 System.out.println("[MCP-MOD] MouseButton interceptor installed");
             }
+                McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRenderer, w, h, httpServer);
         } catch (Exception e) {
             System.err.println("[MCP-MOD] Cursor interceptor failed: " + e.getMessage());
         }

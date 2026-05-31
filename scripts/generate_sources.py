@@ -1,4 +1,4 @@
-"""Generate Java source files for ALL mod projects.
+﻿"""Generate Java source files for ALL mod projects.
 
 Architecture: Each mod has a thin ModDevMcpMod.java that handles FML lifecycle
 and event registration, then delegates to ReflectedInputHandler from mcp-common
@@ -390,7 +390,7 @@ license="MIT"
 
 [[mods]]
 modId="mcpmod"
-version="0.1.0"
+version="0.1.1"
 displayName="ModDev MCP"
 description="WebSocket bridge for AI agent interaction"
 authors="langyo"
@@ -421,7 +421,7 @@ MCMOD_INFO = """[
       "es_es": "Puente WebSocket para la interacci\\u00f3n de agentes IA en Minecraft",
       "ru_ru": "WebSocket-\\u043c\\u043e\\u0441\\u0442 \\u0434\\u043b\\u044f \\u0432\\u0437\\u0430\\u0438\\u043c\\u043e\\u0434\\u0435\\u0439\\u0441\\u0442\\u0432\\u0438\\u044f AI-\\u0430\\u0433\\u0435\\u043d\\u0442\\u043e\\u0432 \\u0441 Minecraft"
     },
-    "version": "0.1.0",
+    "version": "0.1.1",
     "authorList": ["langyo"],
     "credits": ""
   }
@@ -434,7 +434,7 @@ license = "MIT"
 
 [[mods]]
 modId = "mcpmod"
-version="0.1.0"
+version="0.1.1"
 displayName = "ModDev MCP"
 description = "WebSocket bridge for AI agent interaction"
 authors = "langyo"

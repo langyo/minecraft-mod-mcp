@@ -1,4 +1,4 @@
-"""Build all mods and publish JARs to GitHub Release.
+﻿"""Build all mods and publish JARs to GitHub Release.
 
 Builds common library, then all mod JARs with correct JDK per version,
 collects the artifacts, and creates/updates a GitHub Release via `gh`.
@@ -6,10 +6,10 @@ collects the artifacts, and creates/updates a GitHub Release via `gh`.
 Can be used locally or from CI.
 
 Usage:
-  python scripts/release.py v0.1.0
-  python scripts/release.py v0.1.0 --no-upload
-  python scripts/release.py v0.1.0 --loader forge --loader fabric
-  python scripts/release.py v0.1.0 --mc 1.21.11
+  python scripts/release.py v0.1.1
+  python scripts/release.py v0.1.1 --no-upload
+  python scripts/release.py v0.1.1 --loader forge --loader fabric
+  python scripts/release.py v0.1.1 --mc 1.21.11
 """
 import subprocess
 import sys
@@ -295,7 +295,7 @@ def create_release(tag, dist_dir, dry_run=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Build mods and publish GitHub Release")
-    parser.add_argument("tag", help="Release tag (e.g. v0.1.0)")
+    parser.add_argument("tag", help="Release tag (e.g. v0.1.1)")
     parser.add_argument("--no-upload", action="store_true", help="Build and collect JARs only, skip gh release")
     parser.add_argument("--loader", action="append", help="Only build specific loader(s)")
     parser.add_argument("--mc", help="Only build specific MC version")

@@ -1,4 +1,4 @@
-buildscript {
+﻿buildscript {
     repositories {
         maven { url = "https://maven.minecraftforge.net/" }
         mavenCentral()
@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: "net.minecraftforge.gradle"
 
-version = "0.1.0-SNAPSHOT"
+version = "0.1.1-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 

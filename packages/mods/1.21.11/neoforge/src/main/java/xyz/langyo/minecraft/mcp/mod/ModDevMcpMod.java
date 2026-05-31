@@ -1,4 +1,4 @@
-package xyz.langyo.minecraft.mcp.mod;
+﻿package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.neoforged.bus.api.IEventBus;
@@ -112,6 +112,7 @@ public class ModDevMcpMod {
                         McpOverlayLogic.renderResumeButton(wrapRenderer(g, mc), mc.font, Component.translatable("mcpmod.control.resume").getString(), w, h, (int) mx, (int) my);
                     }
                 }
+                    McpOverlayLogic.renderPortInfo(wrapRenderer(g, mc), mc.font, w, h, httpServer);
             } catch (Exception ignored) {}
         });
 

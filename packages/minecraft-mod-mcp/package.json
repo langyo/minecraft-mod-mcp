@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "minecraft-mod-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server bridge for Minecraft — connect AI tools to Minecraft via Model Context Protocol",
   "type": "module",
   "main": "dist/index.cjs",

@@ -1,12 +1,12 @@
-"""Pre-release version consistency check.
+﻿"""Pre-release version consistency check.
 
 Verifies that all mod version strings across the project match the
 release tag version. Run automatically in CI before building.
 
 Usage:
     python scripts/check_versions.py <tag_version>
-    python scripts/check_versions.py v0.1.0
-    python scripts/check_versions.py 0.1.0
+    python scripts/check_versions.py v0.1.1
+    python scripts/check_versions.py 0.1.1
 """
 import os
 import re
@@ -51,10 +51,10 @@ def check_file(path: Path, pattern: str, expected: str, label: str) -> list[str]
 def check_build_gradle(expected: str) -> list[str]:
     """Check all build.gradle / build.gradle.kts for version strings."""
     errors = []
-    # Old forge (groovy): version = "0.1.0-SNAPSHOT"
+    # Old forge (groovy): version = "0.1.1-SNAPSHOT"
     pattern_groovy = r'version\s*=\s*["\']([^"\']+)["\']'
 
-    # New forge/neoforge/fabric: version = '0.1.0-SNAPSHOT'
+    # New forge/neoforge/fabric: version = '0.1.1-SNAPSHOT'
     # Combined pattern catches both
     for path in MODS_DIR.rglob("build.gradle*"):
         # Skip non-mod build files

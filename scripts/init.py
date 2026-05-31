@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Minecraft MCP Project - One-Command Initializer
 
@@ -233,7 +233,7 @@ def _gen_minimal_mdk(version):
         f'neo_version={version}\n'
         f'mod_id=mcpmod\n'
         f'mod_name=ModDev MCP\n'
-        f'mod_version=0.1.0-SNAPSHOT\n'
+        f'mod_version=0.1.1-SNAPSHOT\n'
         f'mod_group_id=xyz.langyo\n'
     )
     wp = NEOFORGE_DEV / "gradle" / "wrapper" / "gradle-wrapper.properties"
@@ -267,7 +267,7 @@ def configure_dual_mods():
 }
 
 group = "xyz.langyo"
-version = "0.1.0-SNAPSHOT"
+version = "0.1.1-SNAPSHOT"
 
 base { archivesName.set("minecraft-mcp-neoforge") }
 
@@ -321,7 +321,7 @@ def build_mcp_server(java_path=None):
     log("  Building MCP server shadowJar...", M)
     r = run(["gradlew.bat" if platform.system() == "Windows" else "./gradlew",
               "shadowJar", "--quiet"], env=env, timeout=180)
-    jar = BUILD_DIR / "libs" / "mcp-server-0.1.0.jar"
+    jar = BUILD_DIR / "libs" / "mcp-server-0.1.1.jar"
     if jar.exists():
         log(f"  PASS: MCP JAR ({jar.stat().st_size // 1024}KB)", G); return True
     log(f"  FAIL: Build error:\n{r.stderr[-500:]}", R); return False
@@ -370,7 +370,7 @@ def print_summary(jp):
     log(f"  Python: {sys.version.split()[0]}", W)
     log(f"  PWD:   {PROJECT_ROOT}", W)
     log(f"  Java:  {jp}", G if jp else R)
-    jar = BUILD_DIR / "libs" / "mcp-server-0.1.0.jar"
+    jar = BUILD_DIR / "libs" / "mcp-server-0.1.1.jar"
     log(f"  JAR:   {'EXISTS (' + str(jar.stat().st_size // 1024) + 'KB)' if jar.exists() else 'NOT BUILT'}", W)
     mk = (NEOFORGE_DEV / ".mdk-done").exists()
     log(f"  MDK:   {'SETUP' if mk else 'NOT SETUP'}", W)

@@ -1,4 +1,4 @@
-"""Pre-populate ALL caches for ALL mod projects.
+﻿"""Pre-populate ALL caches for ALL mod projects.
 
 Every build (not just legacy) benefits from pre-cached artifacts:
   - Forge/NeoForge userdev jars, POMs
@@ -556,8 +556,8 @@ def main():
     # ================================================================
     print("\n[Phase 11] Shared dependencies")
     shared = [
-        ("xyz.langyo.minecraft.mcp", "mcp-common", "0.1.0-SNAPSHOT",
-         "mcp-common-0.1.0-SNAPSHOT.jar", "maven-local"),
+        ("xyz.langyo.minecraft.mcp", "mcp-common", "0.1.1-SNAPSHOT",
+         "mcp-common-0.1.1-SNAPSHOT.jar", "maven-local"),
     ]
     import urllib.request
     for mc, info in sorted(ALL_VERSIONS.items()):

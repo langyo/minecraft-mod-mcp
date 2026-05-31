@@ -1,10 +1,10 @@
-modLoader="javafml"
+﻿modLoader="javafml"
 loaderVersion="[31,)"
 license="MIT"
 
 [[mods]]
 modId="mcpmod"
-version="0.1.0"
+version="0.1.1"
 displayName="ModDev MCP"
 description="WebSocket bridge for AI agent interaction"
 authors="langyo"

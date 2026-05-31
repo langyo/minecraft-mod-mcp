@@ -1,4 +1,4 @@
-package xyz.langyo.minecraft.mcp.mod;
+﻿package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
@@ -199,6 +199,7 @@ public class ModDevMcpMod {
                 String label = net.minecraft.client.resources.I18n.format("mcpmod.control.pause_button");
                 McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRendererObj, label, w, h, mx, my);
             }
+                McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRendererObj, w, h, httpServer);
         } catch (Exception ignored) {}
     }
 

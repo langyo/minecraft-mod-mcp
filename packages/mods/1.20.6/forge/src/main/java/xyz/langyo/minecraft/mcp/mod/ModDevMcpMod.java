@@ -1,4 +1,4 @@
-package xyz.langyo.minecraft.mcp.mod;
+﻿package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
@@ -162,6 +162,7 @@ public class ModDevMcpMod {
                         try { mc.mouseHandler.grabMouse(); } catch (Exception ignored2) {}
                     }
                 }
+                    McpOverlayLogic.renderPortInfo(wrapRenderer(g, mc), mc.font, w, h, httpServer);
             } catch (Exception ignored) {}
         });
 

@@ -1,4 +1,4 @@
-[
+﻿[
   {
     "modid": "mcpmod",
     "name": "ModDev MCP",
@@ -13,7 +13,7 @@
       "es_es": "Puente WebSocket para la interacción de agentes IA en Minecraft",
       "ru_ru": "WebSocket-мост для взаимодействия AI-агентов с Minecraft"
     },
-    "version": "0.1.0",
+    "version": "0.1.1",
     "authorList": ["langyo"],
     "credits": ""
   }

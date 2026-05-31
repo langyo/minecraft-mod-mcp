@@ -1,4 +1,4 @@
-"""Minecraft MCP Test Daemon — decoupled process lifecycle manager.
+﻿"""Minecraft MCP Test Daemon — decoupled process lifecycle manager.
 
 Architecture:
   1. Launches MCP WS server as a child process (stdin-controlled)
@@ -50,7 +50,7 @@ if platform.system() == "Windows":
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
-SERVER_JAR = ROOT / "build" / "libs" / "mcp-server-0.1.0.jar"
+SERVER_JAR = ROOT / "build" / "libs" / "mcp-server-0.1.1.jar"
 MC_DIR = Path(os.environ.get("APPDATA", os.path.expanduser("~"))) / ".minecraft"
 
 WS_PORT = 9876
