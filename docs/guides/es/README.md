@@ -40,7 +40,7 @@ Minecraft Mod MCP es una herramienta de asistencia IA **para desarrolladores de 
 - **Saber** — consultar la posición del jugador, información del mundo, botones de la pantalla y campos de depuración
 - **Grabar** — transmitir eventos en tiempo real mediante SSE, capturar fotogramas de video
 
-> ¿Quieres que tu IA pruebe la GUI de tu mod? ¿Ejecute una prueba de humo? ¿Verifique la interacción de un nuevo bloque? Minecraft Mod MCP lo hace posible. Para la automatización de juego puro, otras herramientas dedicadas son mejores.
+> ¿Quieres que tu IA pruebe la GUI de tu mod? ¿Ejecute una prueba de humo? ¿Verifique la interacción de un nuevo bloque? Minecraft Mod MCP lo hace posible.
 
 ---
 
@@ -101,9 +101,17 @@ Normalmente, al cambiar de Minecraft a otra ventana se abre la pantalla de pausa
 - **Pantalla de pausa**: Presiona `Esc` para abrir la pantalla de pausa, luego haz clic en el botón **liberar ratón** del overlay MCP. Esto te permite cambiar de ventana libremente sin que se reactive la pantalla de pausa.
 - **Overlay en juego**: En la vista 3D, haz clic en el botón del overlay MCP en la **esquina superior derecha** para soltar temporalmente el cursor. Una vez liberado, puedes hacer `Alt+Tab` y el juego no se pausará automáticamente — perfecto para trabajar en tu IDE o herramienta de IA mientras la conexión MCP sigue activa.
 
-### Página web de depuración integrada
+### Puerto y servidor HTTP
 
-El mod inicia un servidor HTTP en `http://localhost:9876` al arrancar el juego, con un panel de depuración en vivo — la captura de arriba muestra exactamente esta página. Ábrela en tu navegador para ver los registros MCP, el estado de conexión y otros diagnósticos en tiempo real mientras programas.
+El mod inicia un servidor HTTP al cargar el juego. Primero intenta el puerto **9876**; si está ocupado, retrocede por **9875 → 9874 → ... → 9000** hasta encontrar uno libre. Puedes fijar un puerto con `-Dmcp.port=XXXX` (argumento JVM) o `MC_MCP_PORT` (variable de entorno).
+
+Para confirmar qué puerto eligió el mod:
+- La consola imprime `[MCP-MOD] Debug page: http://127.0.0.1:{port}/debug`
+- Aparece un mensaje cliqueable en el chat del juego con la URL de depuración
+- `GET /api/status` devuelve `version`, `loader`, `port`, `pid`, `uptime` — el puente Node.js lo usa para la detección automática
+- Abre `http://localhost:{port}/debug` en tu navegador para un panel en vivo con logs MCP, eventos SSE y estado de conexión
+
+La versión de MC y el loader se confirman en el handshake vía `/api/status`, permitiendo que tanto el puente como la página de depuración sepan con qué entorno MC están conectados.
 
 ---
 

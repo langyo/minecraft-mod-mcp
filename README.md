@@ -35,7 +35,7 @@ Your AI reads the guide, sets up the MCP connection, and starts controlling the 
 
 Minecraft Mod MCP is a mod designed for **AI-assisted mod development**. It exposes Minecraft's internals to AI tools via the MCP protocol, letting your AI agent inspect screens, click through GUIs, and run commands — perfect for testing mods, verifying behavior, and automating repetitive workflows.
 
-> Built for mod developers — test your GUIs, verify block/item behavior, and run smoke tests on new features. While it can automate gameplay (building, mining, etc.), dedicated Minecraft bots may handle pure gameplay better.
+> Built for mod developers — test your GUIs, verify block/item behavior, and run smoke tests on new features.
 
 - **See** — capture screenshots with coordinate grids
 - **Act** — click, type, scroll, drag, and press any key
@@ -101,9 +101,17 @@ Normally, switching away from Minecraft opens the pause screen, which can interr
 - **Pause screen**: Press `Esc` to open the pause screen, then click the MCP overlay's **release mouse** button. This lets you switch windows freely without re-triggering the pause screen.
 - **In-game overlay**: In the 3D view, click the MCP overlay button in the **top-right corner** to temporarily detach the mouse cursor. Once released, you can `Alt+Tab` away and the game won't auto-pause — perfect for working in your IDE or AI tool while the MCP connection stays alive.
 
-### Built-in debug web page
+### Port & HTTP server
 
-The mod serves a live debug dashboard at `http://localhost:9876` — the screenshot above shows it in action. Open it in your browser to view MCP logs, connection status, and other real-time diagnostics side-by-side with your IDE.
+The mod starts an HTTP server when the game loads. It tries port **9876** first; if occupied it falls back through **9875 → 9874 → ... → 9000** until it finds a free one. Set a fixed port with `-Dmcp.port=XXXX` (JVM arg) or `MC_MCP_PORT` (env).
+
+To confirm which port the mod chose:
+- The game prints `[MCP-MOD] Debug page: http://127.0.0.1:{port}/debug` to the console
+- A clickable chat message with the debug page URL appears in-game
+- `GET /api/status` returns `version`, `loader`, `port`, `pid`, `uptime` — the Node.js bridge uses this to auto-discover the mod on any port
+- Open `http://localhost:{port}/debug` in your browser for a live dashboard with MCP logs, SSE events, and connection status
+
+The version and loader (Forge/Fabric/NeoForge) are confirmed at handshake via `/api/status` so both the bridge and the debug page know exactly which mod environment they're talking to.
 
 ---
 

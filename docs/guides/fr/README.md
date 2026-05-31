@@ -40,7 +40,7 @@ Minecraft Mod MCP est un outil d'assistance IA **pour les développeurs de mods*
 - **Savoir** — interroger la position du joueur, les informations du monde, les boutons de l'écran et les champs de débogage
 - **Enregistrer** — diffuser des événements en temps réel via SSE, capturer des images vidéo
 
-> Vous voulez que votre IA teste l'interface de votre mod ? Lance un test de fumée ? Vérifie le comportement d'un nouveau bloc ? Minecraft Mod MCP rend cela possible. Pour l'automatisation pure du gameplay, d'autres outils dédiés sont plus adaptés.
+> Vous voulez que votre IA teste l'interface de votre mod ? Lance un test de fumée ? Vérifie le comportement d'un nouveau bloc ? Minecraft Mod MCP rend cela possible.
 
 ---
 
@@ -101,9 +101,17 @@ Normalement, basculer hors de Minecraft ouvre l'écran de pause, ce qui peut int
 - **Écran de pause** : Appuyez sur `Échap` pour ouvrir l'écran de pause, puis cliquez sur le bouton **libérer la souris** de l'overlay MCP. Cela vous permet de changer de fenêtre librement sans réactiver l'écran de pause.
 - **Overlay en jeu** : En vue 3D, cliquez sur le bouton de l'overlay MCP dans le **coin supérieur droit** pour détacher temporairement le curseur. Une fois libéré, vous pouvez faire `Alt+Tab` sans que le jeu ne se mette en pause — idéal pour travailler dans votre IDE ou outil IA tout en gardant la connexion MCP active.
 
-### Page web de débogage intégrée
+### Port et serveur HTTP
 
-Le mod démarre un serveur HTTP sur `http://localhost:9876` au lancement du jeu, avec un tableau de bord de débogage en direct — c'est ce que montre la capture ci-dessus. Ouvrez-le dans votre navigateur pour voir les logs MCP, l'état de la connexion et d'autres diagnostics en temps réel pendant que vous codez.
+Le mod démarre un serveur HTTP au lancement du jeu. Il essaie d'abord le port **9876** ; s'il est occupé, il bascule sur **9875 → 9874 → ... → 9000** jusqu'à en trouver un libre. Vous pouvez fixer un port avec `-Dmcp.port=XXXX` (argument JVM) ou `MC_MCP_PORT` (variable d'env).
+
+Pour savoir quel port a été choisi :
+- La console affiche `[MCP-MOD] Debug page: http://127.0.0.1:{port}/debug`
+- Un message cliquable avec l'URL de la page de débogage apparaît dans le chat en jeu
+- `GET /api/status` renvoie `version`, `loader`, `port`, `pid`, `uptime` — le pont Node.js s'en sert pour la découverte automatique
+- Ouvrez `http://localhost:{port}/debug` dans votre navigateur pour un tableau de bord en direct avec les logs MCP, les événements SSE et l'état de connexion
+
+La version MC et le loader sont confirmés lors de la poignée de main via `/api/status`, permettant au pont et à la page de débogage d'identifier l'environnement MC connecté.
 
 ---
 
