@@ -7,21 +7,10 @@ export async function listVersions(): Promise<VersionInfo[]> {
   return res.data
 }
 
-export async function getVersion(mc: string): Promise<VersionInfo> {
-  const res = await invoke<CommandResult<VersionInfo>>('get_version', { mc })
-  if (!res.ok || !res.data) throw new Error(res.error ?? 'failed')
-  return res.data
-}
-
 export async function getMcpPort(): Promise<number | null> {
   const res = await invoke<CommandResult<number | null>>('get_mcp_port')
   if (!res.ok) throw new Error(res.error ?? 'failed')
   return res.data
-}
-
-export async function setMcpPort(port: number): Promise<void> {
-  const res = await invoke<CommandResult<null>>('set_mcp_port', { port })
-  if (!res.ok) throw new Error(res.error ?? 'failed')
 }
 
 export async function fetchRemoteVersions(): Promise<ManifestVersion[]> {
@@ -31,7 +20,7 @@ export async function fetchRemoteVersions(): Promise<ManifestVersion[]> {
 }
 
 export async function installVersion(versionId: string, versionUrl: string): Promise<void> {
-  const res = await invoke<CommandResult<null>>('install_version', { versionId, versionUrl })
+  const res = await invoke<CommandResult<null>>('install_version', { version_id: versionId, version_url: versionUrl })
   if (!res.ok) throw new Error(res.error ?? 'failed')
 }
 
@@ -42,7 +31,7 @@ export async function listInstalledVersions(): Promise<string[]> {
 }
 
 export async function launchGame(versionId: string, loader?: string): Promise<void> {
-  const args: Record<string, string> = { versionId }
+  const args: Record<string, string> = { version_id: versionId }
   if (loader) args.loader = loader
   const res = await invoke<CommandResult<null>>('launch_game', args)
   if (!res.ok) throw new Error(res.error ?? 'failed')

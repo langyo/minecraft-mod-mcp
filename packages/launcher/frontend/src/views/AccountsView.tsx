@@ -1,4 +1,4 @@
-import { defineComponent, ref, computed } from 'vue'
+import { defineComponent, ref, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Globe, User, Plus, Trash2, RefreshCw, X, Check } from 'lucide-vue-next'
 
@@ -28,9 +28,14 @@ export default defineComponent({
     const offlineUsername = ref('')
     const offlineError = ref<string | null>(null)
     const refreshingUuid = ref<string | null>(null)
+    const pollTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
 
     const accounts = computed(() => store.config?.accounts ?? [])
     const selectedUuid = computed(() => store.config?.selected_account ?? null)
+
+    onUnmounted(() => {
+      if (pollTimeout.value) clearTimeout(pollTimeout.value)
+    })
 
     async function handleStartMicrosoft() {
       showMsDialog.value = true
@@ -40,36 +45,31 @@ export default defineComponent({
       try {
         const info = await startMicrosoftAuth()
         deviceCodeInfo.value = info
-        pollLoop(info.device_code, info.expires_in)
+        startPoll(info.device_code, info.expires_in)
       } catch (e) {
         authError.value = String(e)
         authPolling.value = false
       }
     }
 
-    async function pollLoop(deviceCode: string, expiresInSeconds: number) {
-      const startTime = Date.now()
-      const intervalMs = 5000
-      const timeoutMs = expiresInSeconds * 1000
-      function tick() {
-        if (!showMsDialog.value) return
-        const elapsed = Date.now() - startTime
-        if (elapsed >= timeoutMs) {
-          authError.value = t('accounts.authExpired')
-          authPolling.value = false
-          return
-        }
-        pollMicrosoftAuth(deviceCode).then(() => {
-          authPolling.value = false
-          showMsDialog.value = false
-          store.fetchConfig()
-        }).catch(() => {
-          if (showMsDialog.value) {
-            setTimeout(tick, intervalMs)
-          }
-        })
+    async function startPoll(deviceCode: string, expiresInSeconds: number) {
+      authPolling.value = true
+      authError.value = null
+      pollTimeout.value = setTimeout(() => {
+        authError.value = t('accounts.authExpired')
+        authPolling.value = false
+      }, expiresInSeconds * 1000)
+      try {
+        await pollMicrosoftAuth(deviceCode)
+        if (pollTimeout.value) clearTimeout(pollTimeout.value)
+        authPolling.value = false
+        showMsDialog.value = false
+        await store.fetchConfig()
+      } catch (e) {
+        if (pollTimeout.value) clearTimeout(pollTimeout.value)
+        authError.value = String(e)
+        authPolling.value = false
       }
-      tick()
     }
 
     function closeMsDialog() {

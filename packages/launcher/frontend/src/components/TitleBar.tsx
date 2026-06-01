@@ -11,19 +11,19 @@ export default defineComponent({
     const appWindow = getCurrentWindow()
 
     function handleDoubleClick() {
-      appWindow.toggleMaximize()
+      try { appWindow.toggleMaximize() } catch {}
     }
 
     function minimize() {
-      appWindow.minimize()
+      try { appWindow.minimize() } catch {}
     }
 
     function toggleMaximize() {
-      appWindow.toggleMaximize()
+      try { appWindow.toggleMaximize() } catch {}
     }
 
     function close() {
-      appWindow.close()
+      try { appWindow.close() } catch {}
     }
 
     return () => (

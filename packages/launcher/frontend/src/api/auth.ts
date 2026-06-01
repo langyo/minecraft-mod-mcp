@@ -8,7 +8,7 @@ export async function startMicrosoftAuth(): Promise<DeviceCodeInfo> {
 }
 
 export async function pollMicrosoftAuth(deviceCode: string): Promise<MicrosoftProfile> {
-  const res = await invoke<CommandResult<MicrosoftProfile>>('poll_microsoft_auth', { deviceCode })
+  const res = await invoke<CommandResult<MicrosoftProfile>>('poll_microsoft_auth', { device_code: deviceCode })
   if (!res.ok || !res.data) throw new Error(res.error ?? 'failed')
   return res.data
 }

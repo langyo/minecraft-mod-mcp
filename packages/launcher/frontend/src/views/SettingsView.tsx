@@ -49,21 +49,31 @@ export default defineComponent({
     onMounted(() => {
       const cfg = store.config
       if (cfg) {
-        form.java_dir = cfg.java_dir ?? ''
-        form.java_version = cfg.java_version?.toString() ?? ''
-        form.max_memory_mb = cfg.max_memory_mb.toString()
-        form.min_memory_mb = cfg.min_memory_mb.toString()
-        form.game_dir = cfg.game_dir ?? ''
-        form.width = cfg.width.toString()
-        form.height = cfg.height.toString()
-        form.fullscreen = cfg.fullscreen
-        form.java_args = cfg.java_args ?? ''
-        form.game_args = cfg.game_args ?? ''
-        form.download_source = cfg.download_source
-        form.language = cfg.language
-        locale.value = cfg.language
+        populateForm(cfg)
       }
     })
+
+    watch(() => store.config, (cfg) => {
+      if (cfg) {
+        populateForm(cfg)
+      }
+    })
+
+    function populateForm(cfg: LauncherConfig) {
+      form.java_dir = cfg.java_dir ?? ''
+      form.java_version = cfg.java_version?.toString() ?? ''
+      form.max_memory_mb = cfg.max_memory_mb.toString()
+      form.min_memory_mb = cfg.min_memory_mb.toString()
+      form.game_dir = cfg.game_dir ?? ''
+      form.width = cfg.width.toString()
+      form.height = cfg.height.toString()
+      form.fullscreen = cfg.fullscreen
+      form.java_args = cfg.java_args ?? ''
+      form.game_args = cfg.game_args ?? ''
+      form.download_source = cfg.download_source
+      form.language = cfg.language
+      locale.value = cfg.language
+    }
 
     watch(() => form.language, (val) => {
       locale.value = val
