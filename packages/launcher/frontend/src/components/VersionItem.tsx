@@ -1,5 +1,6 @@
 import { defineComponent, type PropType } from 'vue'
 import { Flame, Zap, Box } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 
 import type { VersionInfo, Loader } from '@/types'
 import { getLoaders } from '@/types'
@@ -18,6 +19,12 @@ const loaderColors: Record<Loader, string> = {
   fabric: '#7dcfff',
 }
 
+const loaderKeys: Record<Loader, string> = {
+  forge: 'loaders.forge',
+  neoforge: 'loaders.neoforge',
+  fabric: 'loaders.fabric',
+}
+
 export default defineComponent({
   props: {
     version: {
@@ -31,6 +38,8 @@ export default defineComponent({
   },
   emits: ['select'],
   setup(props, { emit }) {
+    const { t } = useI18n()
+
     function handleClick() {
       emit('select', props.version)
     }
@@ -42,7 +51,7 @@ export default defineComponent({
       >
         <div class={styles.itemHeader}>
           <span class={styles.mcVersion}>{props.version.mc_version}</span>
-          <span class={styles.javaBadge}>JDK {props.version.java}</span>
+          <span class={styles.javaBadge}>{t('common.jdk')} {props.version.java}</span>
         </div>
         <div class={styles.loaders}>
           {getLoaders(props.version).map((loader: Loader) => (
@@ -51,13 +60,13 @@ export default defineComponent({
               key={loader}
               style={{ color: loaderColors[loader] }}
             >
-              {(() => { const Icon = loaderIcons[loader]; return <Icon size={12} color={loaderColors[loader]} /> })()} {loader}
+              {(() => { const Icon = loaderIcons[loader]; return <Icon size={12} color={loaderColors[loader]} /> })()} {t(loaderKeys[loader])}
             </span>
           ))}
         </div>
         {props.version.neoforge && (
           <div class={styles.forgeVer}>
-            NF {props.version.neoforge}
+            {t('versionItem.neoforge')} {props.version.neoforge}
           </div>
         )}
       </div>

@@ -16,6 +16,7 @@ export default defineComponent({
     const javas = ref<JavaInfo[]>([])
     const detecting = ref(false)
     const saved = ref(false)
+    const saveError = ref<string | null>(null)
 
     const form = reactive<{
       java_dir: string
@@ -99,11 +100,12 @@ export default defineComponent({
       }
       try {
         await saveConfig(cfg)
+        saveError.value = null
         await store.fetchConfig()
         saved.value = true
         setTimeout(() => { saved.value = false }, 2000)
       } catch (e) {
-        console.error(e)
+        saveError.value = String(e)
       }
     }
 
@@ -244,7 +246,7 @@ export default defineComponent({
                 class={styles.textarea}
                 value={form.java_args}
                 onInput={(e) => { form.java_args = (e.target as HTMLTextAreaElement).value }}
-                placeholder="-XX:+UseG1GC"
+                placeholder={t('settings.jvmArgsPlaceholder')}
               />
             </div>
             <div class={styles.formGroup}>
@@ -253,7 +255,7 @@ export default defineComponent({
                 class={styles.textarea}
                 value={form.game_args}
                 onInput={(e) => { form.game_args = (e.target as HTMLTextAreaElement).value }}
-                placeholder="--demo"
+                placeholder={t('settings.gameArgsPlaceholder')}
               />
             </div>
           </div>
@@ -282,10 +284,9 @@ export default defineComponent({
         <div class={styles.section}>
           <div class={styles.sectionTitle}>{t('settings.language')}</div>
           <select
-            class={styles.select}
+            class={styles.narrowSelect}
             value={form.language}
             onChange={(e) => { form.language = (e.target as HTMLSelectElement).value }}
-            style={{ width: '200px' }}
           >
             <option value="zh-CN">简体中文</option>
             <option value="en-US">English</option>
@@ -297,6 +298,7 @@ export default defineComponent({
             <Save size={14} /> {t('settings.save')}
           </button>
           {saved.value && <span class={styles.savedText}><Check size={14} /> {t('settings.saved')}</span>}
+          {saveError.value && <span class={styles.errorText}>{saveError.value}</span>}
         </div>
       </div>
     )

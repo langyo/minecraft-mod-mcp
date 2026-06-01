@@ -24,10 +24,18 @@ export default defineComponent({
     })
 
     async function handleLaunch() {
+      if (!store.selectedVersion) {
+        launchError.value = t('home.selectVersion')
+        return
+      }
+      if (!store.config?.selected_account) {
+        launchError.value = t('home.noAccount')
+        return
+      }
       launching.value = true
       launchError.value = null
       try {
-        await launchGame('1.20.1-forge-47.3.0')
+        await launchGame(store.selectedVersion.version_id)
       } catch (e) {
         launchError.value = String(e)
       } finally {
@@ -67,14 +75,14 @@ export default defineComponent({
 
           <button
             class={styles.launchBtn}
-            disabled={launching.value || !selectedAccount.value}
+            disabled={launching.value || !selectedAccount.value || !store.selectedVersion}
             onClick={handleLaunch}
           >
             {launching.value ? t('home.launching') : t('home.launchBtn')}
           </button>
 
           {launchError.value && (
-            <p class={styles.noVersion}>{launchError.value}</p>
+            <p class={styles.launchHint}>{launchError.value}</p>
           )}
 
           <div class={styles.stats}>

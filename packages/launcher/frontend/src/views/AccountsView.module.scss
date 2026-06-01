@@ -42,7 +42,7 @@
 }
 
 .btn {
-  padding: 6px 14px;
+  padding: 8px 16px;
   font-size: var(--font-sm);
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -120,8 +120,8 @@
 }
 
 .badgeMicrosoft {
-  background: rgba(158, 206, 106, 0.15);
-  color: var(--color-success);
+  background: rgba(122, 162, 247, 0.15);
+  color: var(--color-primary);
 }
 
 .badgeOffline {
@@ -243,4 +243,8 @@
 .errorText {
   font-size: var(--font-sm);
   color: var(--color-error);
+}
+
+.primaryColor {
+  color: var(--color-primary);
 }

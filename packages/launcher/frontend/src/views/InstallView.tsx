@@ -110,9 +110,9 @@ export default defineComponent({
         <div class={styles.versionTable}>
           <div class={[styles.versionRow, styles.versionRowHeader].join(' ')}>
             <span>{t('install.version')}</span>
-            <span style={{ textAlign: 'center' }}>{t('install.type')}</span>
-            <span style={{ textAlign: 'center' }}>{t('install.released')}</span>
-            <span style={{ textAlign: 'right' }}>{t('install.action')}</span>
+            <span class={styles.colCenter}>{t('install.type')}</span>
+            <span class={styles.colCenter}>{t('install.released')}</span>
+            <span class={styles.colAction}>{t('install.action')}</span>
           </div>
 
           {store.loading ? (

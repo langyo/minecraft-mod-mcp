@@ -1,17 +1,14 @@
 import { defineComponent } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Minus, Square, X } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 
 import styles from './TitleBar.module.scss'
 
 export default defineComponent({
   setup() {
+    const { t } = useI18n()
     const appWindow = getCurrentWindow()
-
-    function handleDrag(e: MouseEvent) {
-      if ((e.target as HTMLElement).closest('button')) return
-      appWindow.startDragging()
-    }
 
     function handleDoubleClick() {
       appWindow.toggleMaximize()
@@ -43,21 +40,21 @@ export default defineComponent({
           <button
             class={[styles.titlebarBtn, styles.minimize].join(' ')}
             onClick={minimize}
-            title="Minimize"
+            title={t('titlebar.minimize')}
           >
             <Minus size={10} />
           </button>
           <button
             class={[styles.titlebarBtn, styles.maximize].join(' ')}
             onClick={toggleMaximize}
-            title="Maximize"
+            title={t('titlebar.maximize')}
           >
             <Square size={10} />
           </button>
           <button
             class={[styles.titlebarBtn, styles.close].join(' ')}
             onClick={close}
-            title="Close"
+            title={t('titlebar.close')}
           >
             <X size={12} />
           </button>

@@ -2,7 +2,7 @@ import { defineComponent, ref, onMounted, onUnmounted, watch, type PropType } fr
 import { Transition } from 'vue'
 import { RouterView } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Menu, ChevronLeft } from 'lucide-vue-next'
+import { Menu, ChevronLeft, X } from 'lucide-vue-next'
 
 import TitleBar from '@/components/TitleBar'
 import Sidebar from '@/components/Sidebar'
@@ -31,12 +31,13 @@ export default defineComponent({
 
     function handleSelectVersion(v: VersionInfo) {
       if (selectedVersion.value?.mc_version === v.mc_version && rightPanelOpen.value) {
+        rightPanelOpen.value = false
+        store.setSelectedVersion(null)
         return
       }
       selectedVersion.value = v
-      if (!rightPanelOpen.value) {
-        rightPanelOpen.value = true
-      }
+      store.setSelectedVersion(v)
+      rightPanelOpen.value = true
       if (isMobile.value) {
         sidebarCollapsed.value = true
       }
@@ -112,7 +113,7 @@ export default defineComponent({
             {rightPanelOpen.value && (
               <aside class={styles.rightPanel}>
                 {selectedVersion.value ? (
-                  <DetailPanel version={selectedVersion.value} />
+                  <DetailPanel version={selectedVersion.value} onClose={() => { rightPanelOpen.value = false }} />
                 ) : (
                   <div class={styles.panelContent}>
                     <p class={styles.panelPlaceholder}>{t('detail.selectVersion')}</p>
@@ -130,6 +131,7 @@ export default defineComponent({
 const DetailPanel = defineComponent({
   props: {
     version: { type: Object as PropType<VersionInfo>, required: true },
+    onClose: { type: Function as PropType<() => void>, default: undefined },
   },
   setup(props) {
     const { t } = useI18n()
@@ -137,17 +139,22 @@ const DetailPanel = defineComponent({
       <div class={styles.detailPanel}>
         <div class={styles.detailHeader}>
           <span class={styles.detailMcVer}>{props.version.mc_version}</span>
-          <span class={[styles.detailBadge, styles.badgeJava].join(' ')}>JDK {props.version.java}</span>
+          <span class={[styles.detailBadge, styles.badgeJava].join(' ')}>{t('common.jdk')} {props.version.java}</span>
+          {props.onClose && (
+            <button class={styles.iconBtn} onClick={props.onClose} style={{ marginLeft: 'auto' }}>
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <div class={styles.detailSection}>
-          <h3 class={styles.sectionTitle}>Forge</h3>
+          <h3 class={styles.sectionTitle}>{t('detail.forge')}</h3>
           <code class={styles.codeBlock}>{props.version.forge}</code>
         </div>
 
         {props.version.neoforge && (
           <div class={styles.detailSection}>
-            <h3 class={styles.sectionTitle}>NeoForge</h3>
+            <h3 class={styles.sectionTitle}>{t('detail.neoForge')}</h3>
             <code class={styles.codeBlock}>{props.version.neoforge}</code>
           </div>
         )}

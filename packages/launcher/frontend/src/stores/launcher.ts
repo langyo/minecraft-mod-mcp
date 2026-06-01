@@ -13,6 +13,11 @@ export const useLauncherStore = defineStore('launcher', () => {
   const installedVersions = ref<string[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const selectedVersion = ref<VersionInfo | null>(null)
+
+  function setSelectedVersion(v: VersionInfo | null) {
+    selectedVersion.value = v
+  }
 
   async function fetchVersions() {
     loading.value = true
@@ -70,6 +75,8 @@ export const useLauncherStore = defineStore('launcher', () => {
     installedVersions,
     loading,
     error,
+    selectedVersion,
+    setSelectedVersion,
     fetchVersions,
     fetchMcpPort,
     fetchConfig,

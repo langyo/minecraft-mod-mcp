@@ -60,18 +60,23 @@ export default defineComponent({
 
         <div class={styles.versionList}>
           {store.loading ? (
-            <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 'var(--font-sm)', color: 'var(--color-info)' }}>
+            <div class={styles.loadingState}>
               {t('common.loading')}
             </div>
           ) : store.error ? (
             <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 'var(--font-sm)', color: 'var(--color-error)' }}>
               {store.error}
             </div>
+          ) : store.versions.length === 0 ? (
+            <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 'var(--font-sm)', color: 'var(--color-info)' }}>
+              {t('sidebar.noVersions')}
+            </div>
           ) : (
             store.versions.map((v) => (
               <VersionItem
                 key={v.mc_version}
                 version={v}
+                active={store.selectedVersion?.mc_version === v.mc_version}
                 onSelect={() => handleSelect(v)}
               />
             ))

@@ -104,6 +104,22 @@
   }
 }
 
+.narrowSelect {
+  width: 200px;
+  padding: 8px 12px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-sm);
+  cursor: pointer;
+
+  &:focus {
+    border-color: var(--color-primary);
+    outline: none;
+  }
+}
+
 .toggleRow {
   display: flex;
   align-items: center;
@@ -270,5 +286,11 @@
 .savedText {
   font-size: var(--font-xs);
   color: var(--color-success);
+  margin-left: 12px;
+}
+
+.errorText {
+  font-size: var(--font-xs);
+  color: var(--color-error);
   margin-left: 12px;
 }

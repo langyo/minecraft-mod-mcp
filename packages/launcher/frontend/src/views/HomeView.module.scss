@@ -56,8 +56,8 @@
 }
 
 .badgeMicrosoft {
-  background: rgba(78, 204, 163, 0.15);
-  color: var(--color-success);
+  background: rgba(122, 162, 247, 0.15);
+  color: var(--color-primary);
 }
 
 .badgeOffline {
@@ -151,7 +151,7 @@
   color: var(--color-text-muted);
 }
 
-.noVersion {
+.launchHint {
   margin-top: 8px;
   font-size: var(--font-sm);
   color: var(--color-warning);

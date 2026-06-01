@@ -26,9 +26,24 @@
   margin-bottom: 16px;
 }
 
+.searchWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
 .searchInput {
   flex: 1;
-  padding: 8px 12px;
+  width: 100%;
+  padding: 8px 12px 8px 32px;
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -218,4 +233,8 @@
   text-align: center;
   font-size: var(--font-sm);
   color: var(--color-error);
+}
+
+.colCenter {
+  text-align: center;
 }

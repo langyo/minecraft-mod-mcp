@@ -23,6 +23,7 @@ const router = createRouter({
       name: 'install',
       component: () => import('@/views/InstallView'),
     },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 

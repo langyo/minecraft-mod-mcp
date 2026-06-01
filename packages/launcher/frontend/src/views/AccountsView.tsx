@@ -40,24 +40,36 @@ export default defineComponent({
       try {
         const info = await startMicrosoftAuth()
         deviceCodeInfo.value = info
-        pollLoop(info.device_code)
+        pollLoop(info.device_code, info.expires_in)
       } catch (e) {
         authError.value = String(e)
         authPolling.value = false
       }
     }
 
-    async function pollLoop(deviceCode: string) {
-      try {
-        await pollMicrosoftAuth(deviceCode)
-        authPolling.value = false
-        showMsDialog.value = false
-        await store.fetchConfig()
-      } catch {
-        if (showMsDialog.value) {
-          setTimeout(() => pollLoop(deviceCode), 5000)
+    async function pollLoop(deviceCode: string, expiresInSeconds: number) {
+      const startTime = Date.now()
+      const intervalMs = 5000
+      const timeoutMs = expiresInSeconds * 1000
+      function tick() {
+        if (!showMsDialog.value) return
+        const elapsed = Date.now() - startTime
+        if (elapsed >= timeoutMs) {
+          authError.value = t('accounts.authExpired')
+          authPolling.value = false
+          return
         }
+        pollMicrosoftAuth(deviceCode).then(() => {
+          authPolling.value = false
+          showMsDialog.value = false
+          store.fetchConfig()
+        }).catch(() => {
+          if (showMsDialog.value) {
+            setTimeout(tick, intervalMs)
+          }
+        })
       }
+      tick()
     }
 
     function closeMsDialog() {
@@ -80,6 +92,7 @@ export default defineComponent({
     }
 
     async function handleRemove(uuid: string) {
+      if (!confirm(t('accounts.confirmRemove'))) return
       try {
         await removeAccount(uuid)
         await store.fetchConfig()
@@ -159,7 +172,7 @@ export default defineComponent({
                         disabled={refreshingUuid.value === account.uuid}
                         onClick={(e) => { e.stopPropagation(); handleRefresh(account.uuid) }}
                       >
-                        <RefreshCw size={14} /> {refreshingUuid.value === account.uuid ? '...' : t('accounts.refresh')}
+                        <RefreshCw size={14} /> {refreshingUuid.value === account.uuid ? t('accounts.refreshing') : t('accounts.refresh')}
                       </button>
                     )}
                     <button
@@ -189,10 +202,10 @@ export default defineComponent({
                         <div class={styles.codeUrl}>
                         {t('accounts.authStep1')}{' '}
                         <a
+                          class={styles.primaryColor}
                           href={deviceCodeInfo.value.verification_uri}
                           target="_blank"
                           rel="noopener"
-                          style={{ color: 'var(--color-primary)' }}
                         >
                           {deviceCodeInfo.value.verification_uri}
                         </a>
