@@ -35,7 +35,7 @@ export interface Account {
 }
 
 export type DownloadSource = 'mojang' | 'bmclapi'
-export type Language = 'zh-CN' | 'en-US'
+export type Language = 'zh-CN' | 'zh-TW' | 'en-US' | 'ja-JP' | 'ko-KR' | 'de-DE' | 'fr-FR' | 'es-ES'
 export type Theme = 'dark' | 'light'
 
 export interface LauncherConfig {

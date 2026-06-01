@@ -26,6 +26,16 @@
   &.compact {
     padding: 2px 6px;
     gap: 4px;
+    min-width: 90px;
+    justify-content: space-between;
+
+    .triggerLabel {
+      margin-right: 4px;
+    }
+
+    .chevron {
+      opacity: 0.45;
+    }
   }
 }
 
@@ -40,6 +50,14 @@
 
   &.chevronOpen {
     transform: rotate(180deg);
+  }
+
+  .compact & {
+    transform: scale(0.8);
+
+    &.chevronOpen {
+      transform: rotate(180deg) scale(0.8);
+    }
   }
 }
 

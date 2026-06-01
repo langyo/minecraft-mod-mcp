@@ -21,8 +21,20 @@ pub enum DownloadSource {
 pub enum Language {
     #[serde(rename = "zh-CN")]
     ZhCN,
+    #[serde(rename = "zh-TW")]
+    ZhTW,
     #[serde(rename = "en-US")]
     EnUS,
+    #[serde(rename = "ja-JP")]
+    JaJP,
+    #[serde(rename = "ko-KR")]
+    KoKR,
+    #[serde(rename = "de-DE")]
+    DeDE,
+    #[serde(rename = "fr-FR")]
+    FrFR,
+    #[serde(rename = "es-ES")]
+    EsES,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]

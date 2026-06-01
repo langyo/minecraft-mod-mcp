@@ -300,7 +300,13 @@ export default defineComponent({
             onChange={(e) => { form.language = (e.target as HTMLSelectElement).value as Language }}
           >
             <option value="zh-CN">简体中文</option>
+            <option value="zh-TW">繁體中文</option>
             <option value="en-US">English</option>
+            <option value="ja-JP">日本語</option>
+            <option value="ko-KR">한국어</option>
+            <option value="de-DE">Deutsch</option>
+            <option value="fr-FR">Français</option>
+            <option value="es-ES">Español</option>
           </select>
         </div>
 
