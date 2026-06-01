@@ -10,6 +10,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      '@i18n': resolve(__dirname, '../../shared/i18n'),
     },
   },
   clearScreen: false,
@@ -17,6 +18,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     host: host || false,
+    fs: {
+      allow: ['..', resolve(__dirname, '../../shared')],
+    },
     hmr: host
       ? {
           protocol: 'ws',
