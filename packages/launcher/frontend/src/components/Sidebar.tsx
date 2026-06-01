@@ -2,16 +2,23 @@ import { defineComponent, onMounted } from 'vue'
 
 import { useLauncherStore } from '@/stores'
 import VersionItem from '@/components/VersionItem'
+import type { VersionInfo } from '@/types'
 
 import styles from './Sidebar.module.scss'
 
 export default defineComponent({
-  setup() {
+  emits: ['select'],
+  setup(_, { emit }) {
     const store = useLauncherStore()
 
     onMounted(() => {
       store.fetchVersions()
+      store.fetchMcpPort()
     })
+
+    function handleSelect(version: VersionInfo) {
+      emit('select', version)
+    }
 
     return () => (
       <div class={styles.sidebarContent}>
@@ -29,9 +36,18 @@ export default defineComponent({
             <div class={styles.error}>{store.error}</div>
           ) : (
             store.versions.map((v) => (
-              <VersionItem key={v.mc_version} version={v} />
+              <VersionItem
+                key={v.mc_version}
+                version={v}
+                onSelect={() => handleSelect(v)}
+              />
             ))
           )}
+        </div>
+        <div class={styles.sidebarStatus}>
+          <span class={[styles.statusDot, store.mcpPort != null && styles.connected].join(' ')}>
+            {store.mcpPort != null ? `MCP :${store.mcpPort}` : 'MCP Offline'}
+          </span>
         </div>
       </div>
     )

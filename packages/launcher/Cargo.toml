@@ -22,7 +22,7 @@ edition = "2024"
 rust-version = "1.85"
 authors = ["langyo <langyo.china@gmail.com>"]
 license = "MIT OR Apache-2.0"
-description = "Minecraft Mod MCP Launcher"
+description = "Minecraft Mod MCP Launcher (MMML)"
 repository = "https://github.com/langyo/minecraft-mcp"
 
 [workspace.dependencies]

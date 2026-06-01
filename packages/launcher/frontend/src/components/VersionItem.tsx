@@ -12,9 +12,9 @@ const loaderIcons: Record<Loader, string> = {
 }
 
 const loaderColors: Record<Loader, string> = {
-  forge: 'var(--color-error)',
-  neoforge: 'var(--color-warning)',
-  fabric: 'var(--color-info)',
+  forge: '#f7768e',
+  neoforge: '#e0af68',
+  fabric: '#7dcfff',
 }
 
 export default defineComponent({
@@ -28,10 +28,16 @@ export default defineComponent({
       default: false,
     },
   },
-  setup(props) {
+  emits: ['select'],
+  setup(props, { emit }) {
+    function handleClick() {
+      emit('select', props.version)
+    }
+
     return () => (
       <div
         class={[styles.item, props.active && styles.active].filter(Boolean).join(' ')}
+        onClick={handleClick}
       >
         <div class={styles.itemHeader}>
           <span class={styles.mcVersion}>{props.version.mc_version}</span>
@@ -48,6 +54,11 @@ export default defineComponent({
             </span>
           ))}
         </div>
+        {props.version.neoforge && (
+          <div class={styles.forgeVer}>
+            NF {props.version.neoforge}
+          </div>
+        )}
       </div>
     )
   },

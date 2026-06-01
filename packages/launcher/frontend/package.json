@@ -12,10 +12,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "vue": "^3.5",
-    "vue-router": "^4.5",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-window": "2.0.0-alpha.1",
     "pinia": "^3.0",
-    "@tauri-apps/api": "^2"
+    "vue": "^3.5",
+    "vue-router": "^4.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue-jsx": "^4.2",

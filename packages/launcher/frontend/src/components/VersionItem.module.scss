@@ -1,7 +1,7 @@
 .item {
   padding: 10px 14px;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), border-left-color var(--transition-fast);
   border-left: 2px solid transparent;
 
   &:hover {
@@ -11,6 +11,11 @@
   &.active {
     background: var(--color-primary-light);
     border-left-color: var(--color-primary);
+
+    .mc-version {
+      color: var(--color-primary);
+      font-weight: 700;
+    }
   }
 }
 
@@ -25,11 +30,12 @@
   font-size: var(--font-base);
   font-weight: 600;
   color: var(--color-text);
+  transition: color var(--transition-fast);
 }
 
 .java-badge {
   font-size: var(--font-xs);
-  padding: 1px 6px;
+  padding: 1px 7px;
   border-radius: var(--radius-xs);
   background: var(--color-bg-tertiary);
   color: var(--color-text-muted);
@@ -39,12 +45,21 @@
 .loaders {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .loader-tag {
   font-size: var(--font-xs);
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  opacity: 0.8;
+  gap: 3px;
+  opacity: 0.85;
+  padding: 1px 0;
+}
+
+.forge-ver {
+  margin-top: 4px;
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
 }

@@ -12,9 +12,9 @@ export default defineComponent({
     return () => (
       <div class={styles.home}>
         <div class={styles.welcome}>
-          <div class={styles.welcomeLogo}>&#x26CF;</div>
-          <h2>Minecraft MCP Launcher</h2>
-          <p>Select a version from the sidebar to get started</p>
+          <img class={styles.welcomeIcon} src="/logo.webp" alt="MMML" />
+          <h2>Minecraft Mod MCP Launcher</h2>
+          <p class={styles.subtitle}>MMML — Select a version from the sidebar</p>
           <div class={styles.stats}>
             <div class={styles.stat}>
               <span class={styles.statValue}>{store.versions.length}</span>

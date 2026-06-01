@@ -4,7 +4,6 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg);
 }
 
 .welcome {
@@ -12,29 +11,32 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  color: var(--color-text-muted);
+  gap: 16px;
 }
 
-.welcome-logo {
-  font-size: 3em;
-  color: var(--color-primary);
+.welcome-icon {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
   opacity: 0.6;
+  border-radius: 12px;
 }
 
 .welcome h2 {
   font-size: var(--font-md);
   color: var(--color-text-secondary);
+  font-weight: 600;
 }
 
-.welcome p {
+.subtitle {
   font-size: var(--font-sm);
+  color: var(--color-text-muted);
 }
 
 .stats {
   display: flex;
-  gap: 32px;
-  margin-top: 24px;
+  gap: 40px;
+  margin-top: 28px;
 }
 
 .stat {
@@ -59,5 +61,5 @@
   font-size: var(--font-xs);
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }

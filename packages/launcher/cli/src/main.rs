@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "mcp-launcher", about = "Minecraft MCP Launcher CLI")]
+#[command(name = "mmml", about = "Minecraft Mod MCP Launcher (MMML)")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
