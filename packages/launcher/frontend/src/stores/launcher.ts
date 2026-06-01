@@ -1,12 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { listVersions, getMcpPort } from '@/api/versions'
-import type { VersionInfo } from '@/types'
+import { listVersions, getMcpPort, fetchRemoteVersions, listInstalledVersions } from '@/api/versions'
+import { getConfig } from '@/api/config'
+import type { VersionInfo, LauncherConfig, ManifestVersion } from '@/types'
 
 export const useLauncherStore = defineStore('launcher', () => {
   const versions = ref<VersionInfo[]>([])
   const mcpPort = ref<number | null>(null)
+  const config = ref<LauncherConfig | null>(null)
+  const remoteVersions = ref<ManifestVersion[]>([])
+  const installedVersions = ref<string[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -30,5 +34,46 @@ export const useLauncherStore = defineStore('launcher', () => {
     }
   }
 
-  return { versions, mcpPort, loading, error, fetchVersions, fetchMcpPort }
+  async function fetchConfig() {
+    try {
+      config.value = await getConfig()
+    } catch (e) {
+      error.value = String(e)
+    }
+  }
+
+  async function fetchRemote() {
+    loading.value = true
+    error.value = null
+    try {
+      remoteVersions.value = await fetchRemoteVersions()
+    } catch (e) {
+      error.value = String(e)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchInstalled() {
+    try {
+      installedVersions.value = await listInstalledVersions()
+    } catch {
+      installedVersions.value = []
+    }
+  }
+
+  return {
+    versions,
+    mcpPort,
+    config,
+    remoteVersions,
+    installedVersions,
+    loading,
+    error,
+    fetchVersions,
+    fetchMcpPort,
+    fetchConfig,
+    fetchRemote,
+    fetchInstalled,
+  }
 })

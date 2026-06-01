@@ -8,6 +8,21 @@ const router = createRouter({
       name: 'home',
       component: () => import('@/views/HomeView'),
     },
+    {
+      path: '/accounts',
+      name: 'accounts',
+      component: () => import('@/views/AccountsView'),
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('@/views/SettingsView'),
+    },
+    {
+      path: '/install',
+      name: 'install',
+      component: () => import('@/views/InstallView'),
+    },
   ],
 })
 

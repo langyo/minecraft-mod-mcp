@@ -4,6 +4,7 @@ import { RouterView } from 'vue-router'
 
 import TitleBar from '@/components/TitleBar'
 import Sidebar from '@/components/Sidebar'
+import { useLauncherStore } from '@/stores'
 import type { VersionInfo } from '@/types'
 import { getLoaders } from '@/types'
 
@@ -11,8 +12,9 @@ import styles from './App.module.scss'
 
 export default defineComponent({
   setup() {
+    const store = useLauncherStore()
     const sidebarCollapsed = ref(false)
-    const rightPanelOpen = ref(true)
+    const rightPanelOpen = ref(false)
     const isMobile = ref(false)
     const selectedVersion = ref<VersionInfo | null>(null)
 
@@ -40,6 +42,9 @@ export default defineComponent({
     onMounted(() => {
       checkMobile()
       window.addEventListener('resize', checkMobile)
+      store.fetchVersions()
+      store.fetchMcpPort()
+      store.fetchConfig()
     })
 
     onUnmounted(() => {
@@ -120,70 +125,51 @@ const DetailPanel = defineComponent({
     version: { type: Object as PropType<VersionInfo>, required: true },
   },
   setup(props) {
-    const s = useDetailStyles()
-
     return () => (
-      <div class={s.detail}>
-        <div class={s.detailHeader}>
-          <span class={s.detailMcVer}>{props.version.mc_version}</span>
-          <span class={[s.detailBadge, s.java].join(' ')}>JDK {props.version.java}</span>
+      <div class={styles.detailPanel}>
+        <div class={styles.detailHeader}>
+          <span class={styles.detailMcVer}>{props.version.mc_version}</span>
+          <span class={[styles.detailBadge, styles.badgeJava].join(' ')}>JDK {props.version.java}</span>
         </div>
 
-        <div class={s.detailSection}>
-          <h3 class={s.sectionTitle}>Forge</h3>
-          <code class={s.codeBlock}>{props.version.forge}</code>
+        <div class={styles.detailSection}>
+          <h3 class={styles.sectionTitle}>Forge</h3>
+          <code class={styles.codeBlock}>{props.version.forge}</code>
         </div>
 
         {props.version.neoforge && (
-          <div class={s.detailSection}>
-            <h3 class={s.sectionTitle}>NeoForge</h3>
-            <code class={s.codeBlock}>{props.version.neoforge}</code>
+          <div class={styles.detailSection}>
+            <h3 class={styles.sectionTitle}>NeoForge</h3>
+            <code class={styles.codeBlock}>{props.version.neoforge}</code>
           </div>
         )}
 
-        <div class={s.detailSection}>
-          <h3 class={s.sectionTitle}>Version ID</h3>
-          <code class={s.codeBlock}>{props.version.version_id}</code>
+        <div class={styles.detailSection}>
+          <h3 class={styles.sectionTitle}>Version ID</h3>
+          <code class={styles.codeBlock}>{props.version.version_id}</code>
         </div>
 
-        <div class={s.detailSection}>
-          <h3 class={s.sectionTitle}>FG Era</h3>
-          <code class={s.codeBlock}>{props.version.fg_era}</code>
+        <div class={styles.detailSection}>
+          <h3 class={styles.sectionTitle}>FG Era</h3>
+          <code class={styles.codeBlock}>{props.version.fg_era}</code>
         </div>
 
-        <div class={s.detailSection}>
-          <h3 class={s.sectionTitle}>Mappings</h3>
-          <code class={s.codeBlock}>{props.version.mappings}</code>
+        <div class={styles.detailSection}>
+          <h3 class={styles.sectionTitle}>Mappings</h3>
+          <code class={styles.codeBlock}>{props.version.mappings}</code>
         </div>
 
-        <div class={s.detailRow}>
-          <div class={s.detailStat}>
-            <span class={s.statValue}>{getLoaders(props.version).length}</span>
-            <span class={s.statLabel}>Loaders</span>
+        <div class={styles.detailRow}>
+          <div class={styles.detailStat}>
+            <span class={styles.statValue}>{getLoaders(props.version).length}</span>
+            <span class={styles.statLabel}>Loaders</span>
           </div>
-          <div class={s.detailStat}>
-            <span class={s.statValue}>--</span>
-            <span class={s.statLabel}>Legacy</span>
+          <div class={styles.detailStat}>
+            <span class={styles.statValue}>--</span>
+            <span class={styles.statLabel}>Legacy</span>
           </div>
         </div>
       </div>
     )
   },
 })
-
-function useDetailStyles() {
-  return {
-    detail: 'detail-panel',
-    detailHeader: 'detail-header',
-    detailMcVer: 'detail-mc-ver',
-    detailBadge: 'detail-badge',
-    java: 'badge-java',
-    detailSection: 'detail-section',
-    sectionTitle: 'section-title',
-    codeBlock: 'code-block',
-    detailRow: 'detail-row',
-    detailStat: 'detail-stat',
-    statValue: 'stat-value',
-    statLabel: 'stat-label',
-  }
-}

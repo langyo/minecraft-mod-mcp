@@ -1,0 +1,221 @@
+.install {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.pageTitle {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.pageSubtitle {
+  font-size: var(--font-sm);
+  color: var(--color-text-muted);
+  margin-bottom: 20px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.searchInput {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-sm);
+  transition: border-color var(--transition-fast);
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  &:focus {
+    border-color: var(--color-primary);
+    outline: none;
+  }
+}
+
+.filterGroup {
+  display: flex;
+  gap: 4px;
+}
+
+.filterBtn {
+  padding: 6px 12px;
+  font-size: var(--font-xs);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-border-light);
+    color: var(--color-text-secondary);
+  }
+}
+
+.filterBtnActive {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.btn {
+  padding: 8px 18px;
+  font-size: var(--font-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+  }
+}
+
+.versionTable {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.versionRow {
+  display: grid;
+  grid-template-columns: 1fr 100px 140px 80px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-border-light);
+    background: var(--color-surface-hover);
+  }
+}
+
+.versionRowHeader {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: none;
+  border: none;
+
+  &:hover {
+    background: none;
+  }
+}
+
+.colId {
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colType {
+  font-size: var(--font-xs);
+  text-align: center;
+}
+
+.typeBadge {
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-weight: 600;
+  font-size: var(--font-xs);
+}
+
+.typeRelease {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--color-success);
+}
+
+.typeSnapshot {
+  background: rgba(224, 175, 104, 0.15);
+  color: var(--color-warning);
+}
+
+.typeOther {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
+}
+
+.colDate {
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.colAction {
+  text-align: right;
+}
+
+.btnInstall {
+  padding: 4px 12px;
+  font-size: var(--font-xs);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--color-primary);
+    color: #0a0b0f;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.installedBadge {
+  font-size: var(--font-xs);
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.loading {
+  padding: 40px;
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--color-info);
+}
+
+.empty {
+  padding: 40px;
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--color-text-muted);
+}
+
+.error {
+  padding: 40px;
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--color-error);
+}

@@ -10,39 +10,39 @@
   flex-shrink: 0;
 }
 
-.titlebar-left {
+.titlebarLeft {
   display: flex;
   align-items: center;
   gap: 8px;
   padding-left: 12px;
 }
 
-.titlebar-logo {
+.titlebarLogo {
   font-size: 0.9em;
   color: var(--color-primary);
 }
 
-.titlebar-logo-img {
+.titlebarLogoImg {
   width: 16px;
   height: 16px;
   object-fit: contain;
   border-radius: 2px;
 }
 
-.titlebar-title {
+.titlebarTitle {
   font-size: var(--font-sm);
   font-weight: 600;
   color: var(--color-text-secondary);
   letter-spacing: 0.02em;
 }
 
-.titlebar-controls {
+.titlebarControls {
   display: flex;
   height: 100%;
   -webkit-app-region: no-drag;
 }
 
-.titlebar-btn {
+.titlebarBtn {
   width: 46px;
   height: 100%;
   display: flex;
@@ -60,8 +60,16 @@
     background: var(--color-surface-hover);
     color: var(--color-text);
   }
+}
 
-  &.close:hover {
+.minimize {
+}
+
+.maximize {
+}
+
+.close {
+  &:hover {
     background: #c42b1c;
     color: #fff;
   }

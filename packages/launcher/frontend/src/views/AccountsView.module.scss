@@ -1,0 +1,246 @@
+.accounts {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.pageTitle {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.pageSubtitle {
+  font-size: var(--font-sm);
+  color: var(--color-text-muted);
+  margin-bottom: 20px;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.sectionTitle {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.btnRow {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 6px 14px;
+  font-size: var(--font-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+  }
+}
+
+.btnPrimary {
+  background: var(--color-primary);
+  color: #0a0b0f;
+  border-color: var(--color-primary);
+  font-weight: 600;
+
+  &:hover {
+    filter: brightness(1.1);
+  }
+}
+
+.btnDanger {
+  background: transparent;
+  color: var(--color-error);
+  border-color: var(--color-error);
+
+  &:hover {
+    background: rgba(247, 118, 142, 0.1);
+  }
+}
+
+.btnSm {
+  padding: 3px 10px;
+  font-size: var(--font-xs);
+}
+
+.accountList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.accountItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-border-light);
+    background: var(--color-surface-hover);
+  }
+}
+
+.accountItemSelected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.accountBadge {
+  font-size: var(--font-xs);
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.badgeMicrosoft {
+  background: rgba(158, 206, 106, 0.15);
+  color: var(--color-success);
+}
+
+.badgeOffline {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
+}
+
+.accountDetails {
+  flex: 1;
+  min-width: 0;
+}
+
+.accountName {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.accountUuid {
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.accountActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: var(--shadow-md);
+}
+
+.modalTitle {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 16px;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.codeDisplay {
+  padding: 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.codeText {
+  font-size: 1.6em;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  color: var(--color-primary);
+}
+
+.codeUrl {
+  font-size: var(--font-sm);
+  color: var(--color-text-muted);
+  margin-top: 8px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-base);
+  transition: border-color var(--transition-fast);
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  &:focus {
+    border-color: var(--color-primary);
+    outline: none;
+  }
+}
+
+.statusText {
+  font-size: var(--font-sm);
+  color: var(--color-info);
+  text-align: center;
+}
+
+.errorText {
+  font-size: var(--font-sm);
+  color: var(--color-error);
+}

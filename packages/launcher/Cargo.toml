@@ -7,6 +7,9 @@ members = [
     "shared/mc_metadata",
     "shared/mc_launch",
     "shared/mc_forge",
+    "shared/mc_settings",
+    "shared/mc_auth",
+    "shared/mc_download",
     "backend",
     "cli",
     "ci",
@@ -32,6 +35,9 @@ _shared_mc_version = { path = "shared/mc_version" }
 _shared_mc_metadata = { path = "shared/mc_metadata" }
 _shared_mc_launch = { path = "shared/mc_launch" }
 _shared_mc_forge = { path = "shared/mc_forge" }
+_shared_mc_settings = { path = "shared/mc_settings" }
+_shared_mc_auth = { path = "shared/mc_auth" }
+_shared_mc_download = { path = "shared/mc_download" }
 
 anyhow = "1"
 thiserror = "2"
@@ -49,6 +55,7 @@ futures = "0.3"
 clap = { version = "4", features = ["derive"] }
 dirs = "5"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+sha1 = "0.10"
 sha2 = "0.10"
 hex = "0.4"
 zip = "2"
