@@ -37,7 +37,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
-SERVER_JAR = ROOT / "build" / "libs" / "mcp-server-0.1.0.jar"
+SERVER_JAR = ROOT / "build" / "libs" / "mcp-server-0.1.1.jar"
 MC_DIR = Path(os.environ.get("APPDATA", os.path.expanduser("~"))) / ".minecraft"
 
 sys.path.insert(0, str(SCRIPTS))

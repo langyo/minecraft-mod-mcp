@@ -170,6 +170,13 @@ public class ModDevMcpMod implements ClientModInitializer {
     public void onScreenRender(net.minecraft.client.gui.DrawContext ctx, Screen screen, int mouseX, int mouseY, float tickDelta) {
         if (ReflectionHelper.isScreenshotInProgress()) return;
         if (screen == null) return;
+            if (httpServer != null) {
+                int port = httpServer.getPort();
+                String portText = "MCP Port at " + port;
+                int screenH = mc.getWindow().getScaledWidth();
+                int y = screenH - 12 - mc.textRenderer.fontHeight * 2;
+                ctx.drawText(mc.textRenderer, portText, 2, y, 0xFFCCCCCC, true);
+            }
         try {
             MinecraftClient mc = MinecraftClient.getInstance();
             if (ReflectionHelper.isMcpControlMode() && screen instanceof GameMenuScreen) {

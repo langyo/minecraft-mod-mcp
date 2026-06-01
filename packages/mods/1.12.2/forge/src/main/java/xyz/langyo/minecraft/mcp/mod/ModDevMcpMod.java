@@ -226,6 +226,12 @@ public class ModDevMcpMod {
             ScaledResolution sr = new ScaledResolution(mc);
             int w = sr.getScaledWidth();
             int h = sr.getScaledHeight();
+            if (httpServer != null) {
+                int port = httpServer.getPort();
+                String portText = "MCP Port at " + port;
+                int y = h - 12 - mc.fontRenderer.FONT_HEIGHT * 2;
+                mc.fontRenderer.drawStringWithShadow(portText, 2, y, 0xFFCCCCCC);
+                }
             int mx = getMouseX(mc);
             int my = getMouseY(mc);
 

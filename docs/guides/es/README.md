@@ -5,7 +5,7 @@
 
 # Minecraft Mod MCP
 
-**Deja que la IA juegue a Minecraft**
+**Kit de desarrollo de mods potenciado por IA**
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE-MIT)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
@@ -33,14 +33,14 @@ Tu IA leerá la guía, configurará la conexión MCP y empezará a controlar el 
 
 ## ¿Qué es Minecraft Mod MCP
 
-Minecraft Mod MCP es un puente entre los asistentes de IA y Minecraft. Se ejecuta como un mod dentro del juego, exponiendo un servidor HTTP al que las herramientas de IA pueden conectarse mediante el protocolo estándar MCP. A través de este puente, la IA puede ver el juego, hacer clic en botones, escribir comandos e interactuar con el mundo.
+Minecraft Mod MCP es una herramienta de asistencia IA **para desarrolladores de mods**. Ponlo en tu carpeta `mods`, inicia el juego, y tu IA podrá ver el juego, hacer clic en botones GUI, escribir comandos e interactuar con el mundo — todo mediante el protocolo MCP estándar. Diseñado para probar mods, verificar comportamientos y automatizar flujos repetitivos.
 
 - **Ver** — captura capturas de pantalla con cuadrículas de coordenadas
 - **Actuar** — hacer clic, escribir, desplazar, arrastrar y presionar cualquier tecla
 - **Saber** — consultar la posición del jugador, información del mundo, botones de la pantalla y campos de depuración
 - **Grabar** — transmitir eventos en tiempo real mediante SSE, capturar fotogramas de video
 
-> ¿Quieres que tu IA construya un castillo? ¿Ejecute una prueba de humo? ¿Navegue por el menú de un modpack? Minecraft Mod MCP lo hace posible.
+> ¿Quieres que tu IA pruebe la GUI de tu mod? ¿Ejecute una prueba de humo? ¿Verifique la interacción de un nuevo bloque? Minecraft Mod MCP lo hace posible.
 
 ---
 
@@ -48,21 +48,10 @@ Minecraft Mod MCP es un puente entre los asistentes de IA y Minecraft. Se ejecut
 
 | Versión MC | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
-| 1.8.9 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.8.9-forge.jar) | — | — |
-| 1.9.4 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.9.4-forge.jar) | — | — |
-| 1.10.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.10.2-forge.jar) | — | — |
-| 1.11.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.11.2-forge.jar) | — | — |
-| 1.12.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.12.2-forge.jar) | — | — |
-| 1.13.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.13.2-forge.jar) | — | — |
-| 1.14.4 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.14.4-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.14.4-fabric.jar) | — |
-| 1.15.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.15.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.15.2-fabric.jar) | — |
-| 1.16.5 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.16.5-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.16.5-fabric.jar) | — |
-| 1.17.1 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.17.1-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.17.1-fabric.jar) | — |
-| 1.18.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.18.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.18.2-fabric.jar) | — |
-| 1.19.4 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.19.4-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.19.4-fabric.jar) | — |
-| 1.20.6 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.20.6-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.20.6-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.20.6-neoforge.jar) |
-| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge.jar) |
 | 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge.jar) |
+| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge.jar) |
+
+> Las versiones anteriores (1.8.9 – 1.20.6) están disponibles en la [página de releases](https://github.com/langyo/minecraft-mod-mcp/releases).
 
 ---
 
@@ -103,7 +92,37 @@ https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/es/AI-TOOLS.md
 
 ---
 
+## Consejos de uso
+
+### Trabajar junto al mod
+
+Normalmente, al cambiar de Minecraft a otra ventana se abre la pantalla de pausa, lo que puede interrumpir los comandos MCP. Usa uno de estos métodos para evitarlo:
+
+- **Pantalla de pausa**: Presiona `Esc` para abrir la pantalla de pausa, luego haz clic en el botón **liberar ratón** del overlay MCP. Esto te permite cambiar de ventana libremente sin que se reactive la pantalla de pausa.
+- **Overlay en juego**: En la vista 3D, haz clic en el botón del overlay MCP en la **esquina superior derecha** para soltar temporalmente el cursor. Una vez liberado, puedes hacer `Alt+Tab` y el juego no se pausará automáticamente — perfecto para trabajar en tu IDE o herramienta de IA mientras la conexión MCP sigue activa.
+
+### Puerto y servidor HTTP
+
+El mod inicia un servidor HTTP al cargar el juego. Primero intenta el puerto **9876**; si está ocupado, retrocede por **9875 → 9874 → ... → 9000** hasta encontrar uno libre. Puedes fijar un puerto con `-Dmcp.port=XXXX` (argumento JVM) o `MC_MCP_PORT` (variable de entorno).
+
+Para confirmar qué puerto eligió el mod:
+- La consola imprime `[MCP-MOD] Debug page: http://127.0.0.1:{port}/debug`
+- Aparece un mensaje cliqueable en el chat del juego con la URL de depuración
+- `GET /api/status` devuelve `version`, `loader`, `port`, `pid`, `uptime` — el puente Node.js lo usa para la detección automática
+- Abre `http://localhost:{port}/debug` en tu navegador para un panel en vivo con logs MCP, eventos SSE y estado de conexión
+
+La versión de MC y el loader se confirman en el handshake vía `/api/status`, permitiendo que tanto el puente como la página de depuración sepan con qué entorno MC están conectados.
+
+---
+
 ## Cómo funciona
+
+<details>
+<summary>📸 Captura de pantalla — clic para expandir</summary>
+
+<img src="../screenshot.webp" alt="Captura de Minecraft Mod MCP" width="100%"/>
+
+</details>
 
 ```mermaid
 flowchart LR
