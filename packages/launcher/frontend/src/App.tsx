@@ -1,4 +1,4 @@
-import { defineComponent, ref, onMounted, onUnmounted, watch, type PropType } from 'vue'
+import { defineComponent, ref, onMounted, watch, type PropType } from 'vue'
 import { Transition } from 'vue'
 import { RouterView } from 'vue-router'
 
@@ -31,7 +31,6 @@ export default defineComponent({
     }
 
     onMounted(() => {
-      window.addEventListener('resize', () => {})
       store.fetchVersions()
       store.fetchMcpPort()
       store.fetchConfig()
@@ -43,23 +42,8 @@ export default defineComponent({
     })
 
     watch(() => store.config?.theme, (theme) => {
-      if (theme === 'light') {
-        document.documentElement.classList.add('light')
-      } else {
-        document.documentElement.classList.remove('light')
-      }
-    })
-
-    onMounted(() => {
-      const theme = store.config?.theme
-      if (theme === 'light') {
-        document.documentElement.classList.add('light')
-      }
-    })
-
-    onUnmounted(() => {
-      window.removeEventListener('resize', () => {})
-    })
+      document.documentElement.classList.toggle('light', theme === 'light')
+    }, { immediate: true })
 
         return () => (
       <div class={styles.root}>

@@ -25,7 +25,7 @@
   "home": {
     "subtitle": "Lanzador Minecraft Mod MCP",
     "launchBtn": "INICIAR",
-    "lanzando": "Iniciando...",
+    "launching": "Iniciando...",
     "noAccount": "Sin cuenta seleccionada",
     "selectVersion": "Por favor selecciona una versión",
     "noAccountSelected": "Sin cuenta —",

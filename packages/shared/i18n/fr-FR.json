@@ -43,7 +43,7 @@
     "connectedInstances": "Instances connectées",
     "runningNotConnected": "En cours (Non connecté)",
     "noConnected": "Aucune instance connectée",
-    "noUnConnected": "Toutes les instances sont connectées",
+    "noUnconnected": "Toutes les instances sont connectées",
     "setupHint": "Configurez le port MCP dans les paramètres VM pour activer le débogage"
   },
   "accounts": {
@@ -121,7 +121,7 @@
     "noVersions": "Aucune version trouvée"
   },
   "sidebar": {
-    "title": "Versions",
+    "versions": "Versions",
     "collapse": "Réduire",
     "expand": "Développer",
     "mcpOnline": "MCP en ligne",
