@@ -1,8 +1,7 @@
-import { defineComponent, onMounted } from 'vue'
+import { defineComponent } from 'vue'
 
 import { useLauncherStore } from '@/stores'
-import VersionList from '@/components/VersionList'
-import StatusBar from '@/components/StatusBar'
+import { getLoaders } from '@/types'
 
 import styles from './HomeView.module.scss'
 
@@ -10,26 +9,31 @@ export default defineComponent({
   setup() {
     const store = useLauncherStore()
 
-    onMounted(() => {
-      store.fetchVersions()
-      store.fetchMcpPort()
-    })
-
     return () => (
-      <div class={styles.homeView}>
-        <header class={styles.header}>
-          <h1 class={styles.title}>Minecraft MCP Launcher</h1>
-          <StatusBar />
-        </header>
-        <main class={styles.content}>
-          {store.loading ? (
-            <div class={styles.loading}>Loading versions...</div>
-          ) : store.error ? (
-            <div class={styles.error}>{store.error}</div>
-          ) : (
-            <VersionList versions={store.versions} />
-          )}
-        </main>
+      <div class={styles.home}>
+        <div class={styles.welcome}>
+          <div class={styles.welcomeLogo}>&#x26CF;</div>
+          <h2>Minecraft MCP Launcher</h2>
+          <p>Select a version from the sidebar to get started</p>
+          <div class={styles.stats}>
+            <div class={styles.stat}>
+              <span class={styles.statValue}>{store.versions.length}</span>
+              <span class={styles.statLabel}>Versions</span>
+            </div>
+            <div class={styles.stat}>
+              <span class={styles.statValue}>
+                {store.versions.reduce((acc, v) => acc + getLoaders(v).length, 0)}
+              </span>
+              <span class={styles.statLabel}>Profiles</span>
+            </div>
+            <div class={styles.stat}>
+              <span class={[styles.statValue, store.mcpPort != null && styles.connected].filter(Boolean).join(' ')}>
+                {store.mcpPort ?? '--'}
+              </span>
+              <span class={styles.statLabel}>MCP Port</span>
+            </div>
+          </div>
+        </div>
       </div>
     )
   },

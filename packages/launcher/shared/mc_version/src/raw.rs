@@ -8,7 +8,12 @@ pub struct VersionsToml {
     pub api_groups: HashMap<String, String>,
     pub fabric_loom: HashMap<String, String>,
     pub neoforge_gradle: NeoForgeGradleRaw,
-    pub legacy_eras: Vec<String>,
+    pub legacy: LegacyRaw,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LegacyRaw {
+    pub eras: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

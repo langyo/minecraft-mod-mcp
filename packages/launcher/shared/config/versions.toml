@@ -239,4 +239,5 @@ mdg_other_gradle = "8.10"
 
 # ── Legacy FG eras (need pre-cache due to Cloudflare TLS) ───
 
-legacy_eras = ["fg21", "fg22", "fg23", "fg3", "fg41"]
+[legacy]
+eras = ["fg21", "fg22", "fg23", "fg3", "fg41"]

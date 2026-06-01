@@ -1,0 +1,55 @@
+:root {
+  --color-bg: #0a0b0f;
+  --color-bg-secondary: #111219;
+  --color-bg-tertiary: #1a1b26;
+  --color-surface: #161722;
+  --color-surface-hover: #1f2133;
+  --color-border: #222337;
+  --color-border-light: #2e3048;
+
+  --color-text: #c0caf5;
+  --color-text-secondary: #a9b1d6;
+  --color-text-muted: #565f89;
+
+  --color-primary: #7aa2f7;
+  --color-primary-hover: #89b4fa;
+  --color-primary-light: rgba(122, 162, 247, 0.12);
+
+  --color-success: #9ece6a;
+  --color-warning: #e0af68;
+  --color-error: #f7768e;
+  --color-info: #7dcfff;
+
+  --sidebar-width: 280px;
+  --detail-panel-width: 360px;
+  --header-height: 48px;
+
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+  --transition-fast: 120ms ease;
+  --transition-normal: 200ms ease;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+
+  --font-xs: 0.6875rem;
+  --font-sm: 0.8125rem;
+  --font-base: 0.875rem;
+  --font-md: 1rem;
+
+  --status-completed: #22c55e;
+  --status-waiting: #9ca3af;
+  --status-thinking: #3b82f6;
+  --status-failed: #ef4444;
+
+  --status-waiting-bg: rgba(156, 163, 175, 0.1);
+  --status-thinking-bg: rgba(59, 130, 246, 0.1);
+  --status-completed-bg: rgba(34, 197, 94, 0.1);
+  --status-failed-bg: rgba(239, 68, 68, 0.1);
+}

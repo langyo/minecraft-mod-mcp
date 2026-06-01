@@ -17,3 +17,11 @@ export interface CommandResult<T> {
   data: T | null
   error: string | null
 }
+
+export function getLoaders(v: VersionInfo): Loader[] {
+  const loaders: Loader[] = []
+  if (v.forge) loaders.push('forge')
+  if (v.neoforge) loaders.push('neoforge')
+  if (v.fabric_yarn) loaders.push('fabric')
+  return loaders
+}

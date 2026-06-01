@@ -44,7 +44,7 @@ impl VersionInfo {
 
     pub fn is_legacy(&self) -> bool {
         static DATA: LazyLock<raw::VersionsToml> = LazyLock::new(raw::parse);
-        DATA.legacy_eras.contains(&self.fg_era)
+        DATA.legacy.eras.contains(&self.fg_era)
     }
 }
 
