@@ -92,14 +92,14 @@ export default defineComponent({
         </div>
         <div class={styles.titlebarControls}>
           <button
-            class={[styles.titlebarBtn, styles.minimize].join(' ')}
+            class={styles.titlebarBtn}
             onClick={minimize}
             title={t('titlebar.minimize')}
           >
             <Minus size={10} />
           </button>
           <button
-            class={[styles.titlebarBtn, styles.maximize].join(' ')}
+            class={styles.titlebarBtn}
             onClick={toggleMaximize}
             title={t('titlebar.maximize')}
           >
