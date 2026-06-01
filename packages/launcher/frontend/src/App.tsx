@@ -2,6 +2,7 @@ import { defineComponent, ref, onMounted, onUnmounted, watch, type PropType } fr
 import { Transition } from 'vue'
 import { RouterView } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Menu, ChevronLeft } from 'lucide-vue-next'
 
 import TitleBar from '@/components/TitleBar'
 import Sidebar from '@/components/Sidebar'
@@ -91,7 +92,7 @@ export default defineComponent({
                 }}
                 title={sidebarCollapsed.value ? t('sidebar.expand') : t('sidebar.collapse')}
               >
-                {sidebarCollapsed.value ? <span>&#9776;</span> : <span>&#9664;</span>}
+                {sidebarCollapsed.value ? <Menu size={16} /> : <ChevronLeft size={16} />}
               </button>
             </div>
           </aside>

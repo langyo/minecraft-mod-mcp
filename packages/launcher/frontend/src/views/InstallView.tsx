@@ -1,5 +1,6 @@
 import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RefreshCw, Search, Download, CheckCircle, Tag, Zap } from 'lucide-vue-next'
 
 import { useLauncherStore } from '@/stores'
 import { fetchRemoteVersions, installVersion, listInstalledVersions } from '@/api/versions'
@@ -78,13 +79,16 @@ export default defineComponent({
         <p class={styles.pageSubtitle}>{t('install.subtitle')}</p>
 
         <div class={styles.toolbar}>
-          <input
-            class={styles.searchInput}
-            type="text"
-            placeholder={t('install.search')}
-            value={search.value}
-            onInput={(e) => { search.value = (e.target as HTMLInputElement).value }}
-          />
+          <div class={styles.searchWrapper}>
+            <Search size={14} class={styles.searchIcon} />
+            <input
+              class={styles.searchInput}
+              type="text"
+              placeholder={t('install.search')}
+              value={search.value}
+              onInput={(e) => { search.value = (e.target as HTMLInputElement).value }}
+            />
+          </div>
           <div class={styles.filterGroup}>
             {(['all', 'release', 'snapshot'] as FilterType[]).map((f) => (
               <button
@@ -97,7 +101,7 @@ export default defineComponent({
             ))}
           </div>
           <button class={styles.btn} onClick={handleRefresh} disabled={store.loading}>
-            {t('install.refresh')}
+            <RefreshCw size={14} /> {t('install.refresh')}
           </button>
         </div>
 
@@ -119,29 +123,29 @@ export default defineComponent({
             versions.value.map((v) => (
               <div key={v.id} class={styles.versionRow}>
                 <span class={styles.colId}>{v.id}</span>
-                <span class={styles.colType}>
-                  <span
-                    class={[
-                      styles.typeBadge,
-                      v.type === 'release' ? styles.typeRelease
-                        : v.type === 'snapshot' ? styles.typeSnapshot
-                        : styles.typeOther,
-                    ].join(' ')}
-                  >
-                    {v.type}
+                  <span class={styles.colType}>
+                    <span
+                      class={[
+                        styles.typeBadge,
+                        v.type === 'release' ? styles.typeRelease
+                          : v.type === 'snapshot' ? styles.typeSnapshot
+                          : styles.typeOther,
+                      ].join(' ')}
+                    >
+                      {v.type === 'release' ? <Tag size={12} /> : v.type === 'snapshot' ? <Zap size={12} /> : null} {v.type}
+                    </span>
                   </span>
-                </span>
                 <span class={styles.colDate}>{formatDate(v.releaseTime)}</span>
                 <span class={styles.colAction}>
                   {installedSet.value.has(v.id) ? (
-                    <span class={styles.installedBadge}>{t('install.installed')}</span>
+                    <span class={styles.installedBadge}><CheckCircle size={14} /> {t('install.installed')}</span>
                   ) : (
                     <button
                       class={styles.btnInstall}
                       disabled={installing.value === v.id}
                       onClick={() => handleInstall(v)}
                     >
-                      {installing.value === v.id ? t('install.installing') : t('install.install')}
+                      <Download size={14} /> {installing.value === v.id ? t('install.installing') : t('install.install')}
                     </button>
                   )}
                 </span>

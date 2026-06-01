@@ -1,5 +1,6 @@
 import { defineComponent, ref, reactive, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Search, Save, Check } from 'lucide-vue-next'
 
 import { useLauncherStore } from '@/stores'
 import { saveConfig } from '@/api/config'
@@ -115,14 +116,14 @@ export default defineComponent({
           <div class={styles.sectionTitle}>{t('settings.javaDetection')}</div>
           <div class={styles.btnRow}>
             <button class={styles.btn} disabled={detecting.value} onClick={handleDetect}>
-              {detecting.value ? t('settings.detecting') : t('settings.detectJavas')}
+              <Search size={14} /> {detecting.value ? t('settings.detecting') : t('settings.detectJavas')}
             </button>
           </div>
           {javas.value.length > 0 && (
             <div class={styles.javaList}>
               {javas.value.map((j) => (
                 <div key={j.path} class={styles.javaItem}>
-                  <span class={styles.javaVersion}>JDK {j.version}</span>
+                  <span class={styles.javaVersion}><Check size={14} /> JDK {j.version}</span>
                   <span class={styles.javaPath}>{j.path}</span>
                 </div>
               ))}
@@ -293,9 +294,9 @@ export default defineComponent({
 
         <div class={styles.btnRow}>
           <button class={[styles.btn, styles.btnSave].join(' ')} onClick={handleSave}>
-            {t('settings.save')}
+            <Save size={14} /> {t('settings.save')}
           </button>
-          {saved.value && <span class={styles.savedText}>{t('settings.saved')}</span>}
+          {saved.value && <span class={styles.savedText}><Check size={14} /> {t('settings.saved')}</span>}
         </div>
       </div>
     )

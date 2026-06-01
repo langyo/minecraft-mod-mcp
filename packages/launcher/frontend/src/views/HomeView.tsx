@@ -1,6 +1,7 @@
 import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Package } from 'lucide-vue-next'
 
 import { useLauncherStore } from '@/stores'
 import { getLoaders } from '@/types'
@@ -37,7 +38,7 @@ export default defineComponent({
     return () => (
       <div class={styles.home}>
         <div class={styles.welcome}>
-          <div class={styles.welcomeIcon}>📦</div>
+          <div class={styles.welcomeIcon}><Package size={48} /></div>
           <h2>{t('app.name')}</h2>
           <p class={styles.subtitle}>{t('home.subtitle')}</p>
 

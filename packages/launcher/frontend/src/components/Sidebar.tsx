@@ -1,6 +1,7 @@
 import { defineComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Home, Package, User, Settings } from 'lucide-vue-next'
 
 import { useLauncherStore } from '@/stores'
 import VersionItem from '@/components/VersionItem'
@@ -9,10 +10,10 @@ import type { VersionInfo } from '@/types'
 import styles from './Sidebar.module.scss'
 
 const navItems = [
-  { path: '/', icon: '\u{1F3E0}', labelKey: 'nav.home' },
-  { path: '/install', icon: '\u{1F4E6}', labelKey: 'nav.install' },
-  { path: '/accounts', icon: '\u{1F464}', labelKey: 'nav.accounts' },
-  { path: '/settings', icon: '\u{2699}\u{FE0F}', labelKey: 'nav.settings' },
+  { path: '/', icon: Home, labelKey: 'nav.home' },
+  { path: '/install', icon: Package, labelKey: 'nav.install' },
+  { path: '/accounts', icon: User, labelKey: 'nav.accounts' },
+  { path: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ]
 
 export default defineComponent({
@@ -47,7 +48,7 @@ export default defineComponent({
               }}
               href={item.path}
             >
-              <span class={styles.navIcon}>{item.icon}</span>
+              <span class={styles.navIcon}>{<item.icon size={16} />}</span>
               <span class={styles.navLabel}>{t(item.labelKey)}</span>
             </a>
           ))}

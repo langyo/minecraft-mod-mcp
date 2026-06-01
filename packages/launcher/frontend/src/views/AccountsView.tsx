@@ -1,5 +1,6 @@
 import { defineComponent, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Globe, User, Plus, Trash2, RefreshCw, X, Check } from 'lucide-vue-next'
 
 import { useLauncherStore } from '@/stores'
 import {
@@ -118,10 +119,10 @@ export default defineComponent({
             <span class={styles.sectionTitle}>{t('accounts.yourAccounts')}</span>
             <div class={styles.btnRow}>
               <button class={styles.btn} onClick={handleStartMicrosoft}>
-                {t('accounts.addMicrosoft')}
+                <Plus size={16} /> {t('accounts.addMicrosoft')}
               </button>
               <button class={styles.btn} onClick={() => { showOfflineDialog.value = true; offlineError.value = null }}>
-                {t('accounts.addOffline')}
+                <Plus size={16} /> {t('accounts.addOffline')}
               </button>
             </div>
           </div>
@@ -145,7 +146,7 @@ export default defineComponent({
                       account.type === 'microsoft' ? styles.badgeMicrosoft : styles.badgeOffline,
                     ].join(' ')}
                   >
-                    {account.type === 'microsoft' ? t('accounts.msa') : t('accounts.offline')}
+                    {account.type === 'microsoft' ? <Globe size={14} /> : <User size={14} />} {account.type === 'microsoft' ? t('accounts.msa') : t('accounts.offline')}
                   </span>
                   <div class={styles.accountDetails}>
                     <div class={styles.accountName}>{account.username}</div>
@@ -158,14 +159,14 @@ export default defineComponent({
                         disabled={refreshingUuid.value === account.uuid}
                         onClick={(e) => { e.stopPropagation(); handleRefresh(account.uuid) }}
                       >
-                        {refreshingUuid.value === account.uuid ? '...' : t('accounts.refresh')}
+                        <RefreshCw size={14} /> {refreshingUuid.value === account.uuid ? '...' : t('accounts.refresh')}
                       </button>
                     )}
                     <button
                       class={[styles.btn, styles.btnSm, styles.btnDanger].join(' ')}
                       onClick={(e) => { e.stopPropagation(); handleRemove(account.uuid) }}
                     >
-                      {t('accounts.remove')}
+                      <Trash2 size={14} /> {t('accounts.remove')}
                     </button>
                   </div>
                 </div>
@@ -204,7 +205,7 @@ export default defineComponent({
                 ) : null}
               </div>
               <div class={styles.modalActions}>
-                <button class={styles.btn} onClick={closeMsDialog}>{t('accounts.cancel')}</button>
+                <button class={styles.btn} onClick={closeMsDialog}><X size={16} /> {t('accounts.cancel')}</button>
               </div>
             </div>
           </div>
@@ -227,7 +228,7 @@ export default defineComponent({
               </div>
               <div class={styles.modalActions}>
                 <button class={styles.btn} onClick={() => { showOfflineDialog.value = false }}>{t('accounts.cancel')}</button>
-                <button class={[styles.btn, styles.btnPrimary].join(' ')} onClick={handleAddOffline}>{t('accounts.add')}</button>
+                <button class={[styles.btn, styles.btnPrimary].join(' ')} onClick={handleAddOffline}><Check size={14} /> {t('accounts.add')}</button>
               </div>
             </div>
           </div>

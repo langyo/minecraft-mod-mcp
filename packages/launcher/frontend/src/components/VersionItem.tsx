@@ -1,14 +1,15 @@
 import { defineComponent, type PropType } from 'vue'
+import { Flame, Zap, Box } from 'lucide-vue-next'
 
 import type { VersionInfo, Loader } from '@/types'
 import { getLoaders } from '@/types'
 
 import styles from './VersionItem.module.scss'
 
-const loaderIcons: Record<Loader, string> = {
-  forge: '\u{1F525}',
-  neoforge: '\u{26A1}',
-  fabric: '\u{1F9F5}',
+const loaderIcons: Record<Loader, typeof Flame> = {
+  forge: Flame,
+  neoforge: Zap,
+  fabric: Box,
 }
 
 const loaderColors: Record<Loader, string> = {
@@ -50,7 +51,7 @@ export default defineComponent({
               key={loader}
               style={{ color: loaderColors[loader] }}
             >
-              {loaderIcons[loader]} {loader}
+              {(() => { const Icon = loaderIcons[loader]; return <Icon size={12} color={loaderColors[loader]} /> })()} {loader}
             </span>
           ))}
         </div>
