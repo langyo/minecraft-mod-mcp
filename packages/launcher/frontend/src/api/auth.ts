@@ -13,8 +13,10 @@ export async function pollMicrosoftAuth(deviceCode: string): Promise<MicrosoftPr
   return res.data
 }
 
-export async function addOfflineAccount(username: string): Promise<void> {
-  const res = await invoke<CommandResult<null>>('add_offline_account', { username })
+export async function addOfflineAccount(username: string, uuid?: string): Promise<void> {
+  const args: Record<string, string> = { username }
+  if (uuid) args.uuid = uuid
+  const res = await invoke<CommandResult<null>>('add_offline_account', args)
   if (!res.ok) throw new Error(res.error ?? 'failed')
 }
 

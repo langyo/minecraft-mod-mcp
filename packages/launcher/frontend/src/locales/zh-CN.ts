@@ -68,6 +68,7 @@ export default {
     noAccounts: '暂无账户',
     addOfflineTitle: '添加离线账户',
     confirmRemove: '确定要移除此账户吗？',
+    randomUuid: '随机生成 UUID',
   },
   settings: {
     title: '虚拟机配置',
@@ -156,5 +157,6 @@ export default {
   common: {
     jdk: 'JDK',
     loading: '加载中...',
+    copy: '复制',
   },
 }

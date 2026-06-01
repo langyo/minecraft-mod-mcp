@@ -1,6 +1,6 @@
 import { defineComponent, ref, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Globe, User, Plus, Trash2, RefreshCw, X, Check } from 'lucide-vue-next'
+import { Globe, User, Plus, Trash2, RefreshCw, X, Check, Copy, Shuffle } from 'lucide-vue-next'
 
 import { useLauncherStore } from '@/stores'
 import {
@@ -15,6 +15,18 @@ import type { DeviceCodeInfo } from '@/types'
 
 import styles from './AccountsView.module.scss'
 
+function generateRandomUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
+function copyToClipboard(text: string) {
+  navigator.clipboard.writeText(text).catch(() => {})
+}
+
 export default defineComponent({
   setup() {
     const { t } = useI18n()
@@ -26,6 +38,7 @@ export default defineComponent({
     const authPolling = ref(false)
     const authError = ref<string | null>(null)
     const offlineUsername = ref('')
+    const offlineUuid = ref('')
     const offlineError = ref<string | null>(null)
     const refreshingUuid = ref<string | null>(null)
     const actionError = ref<string | null>(null)
@@ -78,13 +91,19 @@ export default defineComponent({
       authPolling.value = false
     }
 
+    function handleOpenOfflineDialog() {
+      offlineUsername.value = ''
+      offlineUuid.value = generateRandomUUID()
+      offlineError.value = null
+      showOfflineDialog.value = true
+    }
+
     async function handleAddOffline() {
       const name = offlineUsername.value.trim()
       if (!name) return
       offlineError.value = null
       try {
-        await addOfflineAccount(name)
-        offlineUsername.value = ''
+        await addOfflineAccount(name, offlineUuid.value || undefined)
         showOfflineDialog.value = false
         await store.fetchConfig()
       } catch (e) {
@@ -136,19 +155,26 @@ export default defineComponent({
             <span class={styles.sectionTitle}>{t('accounts.yourAccounts')}</span>
             <div class={styles.btnRow}>
               <button class={styles.btn} onClick={handleStartMicrosoft}>
-                <Plus size={16} /> {t('accounts.addMicrosoft')}
+                <Plus size={14} /> {t('accounts.addMicrosoft')}
               </button>
-              <button class={styles.btn} onClick={() => { showOfflineDialog.value = true; offlineError.value = null }}>
-                <Plus size={16} /> {t('accounts.addOffline')}
+              <button class={styles.btn} onClick={handleOpenOfflineDialog}>
+                <Plus size={14} /> {t('accounts.addOffline')}
               </button>
             </div>
           </div>
 
-          {actionError.value && <div class={styles.errorText}>{actionError.value}</div>}
+          {actionError.value && (
+            <div class={styles.errorRow}>
+              <span class={styles.errorText}>{actionError.value}</span>
+              <button class={styles.copyBtn} onClick={() => copyToClipboard(actionError.value!)} title={t('common.copy')}>
+                <Copy size={12} />
+              </button>
+            </div>
+          )}
 
           <div class={styles.accountList}>
             {accounts.value.length === 0 ? (
-              <p class={styles.errorText}>{t('accounts.noAccounts')}</p>
+              <p class={styles.emptyHint}>{t('accounts.noAccounts')}</p>
             ) : (
               accounts.value.map((account) => (
                 <div
@@ -220,11 +246,16 @@ export default defineComponent({
                     <p class={styles.statusText}>{t('accounts.authPolling')}</p>
                   </>
                 ) : authError.value ? (
-                  <p class={styles.errorText}>{authError.value}</p>
+                  <div class={styles.errorRow}>
+                    <span class={styles.errorText}>{authError.value}</span>
+                    <button class={styles.copyBtn} onClick={() => copyToClipboard(authError.value!)} title={t('common.copy')}>
+                      <Copy size={12} />
+                    </button>
+                  </div>
                 ) : null}
               </div>
               <div class={styles.modalActions}>
-                <button class={styles.btn} onClick={closeMsDialog}><X size={16} /> {t('accounts.cancel')}</button>
+                <button class={styles.btn} onClick={closeMsDialog}><X size={14} /> {t('accounts.cancel')}</button>
               </div>
             </div>
           </div>
@@ -235,15 +266,44 @@ export default defineComponent({
             <div class={styles.modal} onClick={(e) => e.stopPropagation()}>
               <h3 class={styles.modalTitle}>{t('accounts.addOfflineTitle')}</h3>
               <div class={styles.modalBody}>
-                <input
-                  class={styles.input}
-                  type="text"
-                  placeholder={t('accounts.usernamePlaceholder')}
-                  value={offlineUsername.value}
-                  onInput={(e) => { offlineUsername.value = (e.target as HTMLInputElement).value }}
-                  onKeydown={(e) => { if (e.key === 'Enter') handleAddOffline() }}
-                />
-                {offlineError.value && <p class={styles.errorText}>{offlineError.value}</p>}
+                <div class={styles.formGroup}>
+                  <label class={styles.formLabel}>{t('accounts.usernamePlaceholder')}</label>
+                  <input
+                    class={styles.input}
+                    type="text"
+                    placeholder={t('accounts.usernamePlaceholder')}
+                    value={offlineUsername.value}
+                    onInput={(e) => { offlineUsername.value = (e.target as HTMLInputElement).value }}
+                    onKeydown={(e) => { if (e.key === 'Enter') handleAddOffline() }}
+                  />
+                </div>
+                <div class={styles.formGroup}>
+                  <label class={styles.formLabel}>UUID</label>
+                  <div class={styles.uuidRow}>
+                    <input
+                      class={[styles.input, styles.uuidInput].join(' ')}
+                      type="text"
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      value={offlineUuid.value}
+                      onInput={(e) => { offlineUuid.value = (e.target as HTMLInputElement).value }}
+                    />
+                    <button
+                      class={styles.btnIcon}
+                      onClick={() => { offlineUuid.value = generateRandomUUID() }}
+                      title={t('accounts.randomUuid')}
+                    >
+                      <Shuffle size={14} />
+                    </button>
+                  </div>
+                </div>
+                {offlineError.value && (
+                  <div class={styles.errorRow}>
+                    <span class={styles.errorText}>{offlineError.value}</span>
+                    <button class={styles.copyBtn} onClick={() => copyToClipboard(offlineError.value!)} title={t('common.copy')}>
+                      <Copy size={12} />
+                    </button>
+                  </div>
+                )}
               </div>
               <div class={styles.modalActions}>
                 <button class={styles.btn} onClick={() => { showOfflineDialog.value = false }}>{t('accounts.cancel')}</button>

@@ -1,4 +1,7 @@
 :root {
+  user-select: none;
+  -webkit-user-select: none;
+
   --color-bg: #0a0b0f;
   --color-bg-secondary: #111219;
   --color-bg-tertiary: #1a1b26;
@@ -53,4 +56,29 @@
   --status-thinking-bg: rgba(59, 130, 246, 0.1);
   --status-completed-bg: rgba(34, 197, 94, 0.1);
   --status-failed-bg: rgba(239, 68, 68, 0.1);
+}
+
+input, textarea, [contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-base);
+  color: var(--color-text);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+button, a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

@@ -78,23 +78,31 @@ impl Account {
     }
 
     pub fn new_offline(username: String) -> Self {
-        let uuid = {
-            let hash = {
-                use std::hash::{Hash, Hasher};
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                username.hash(&mut hasher);
-                hasher.finish()
-            };
-            format!(
-                "{:08x}-{:04x}-{:04x}-{:04x}-{:08x}{:04x}",
-                (hash >> 32) as u32,
-                ((hash >> 16) & 0xFFFF) as u16,
-                (hash & 0xFFFF) as u16,
-                ((hash >> 32) & 0xFFFF) as u16 ^ 0x4000,
-                (hash >> 16) as u32 ^ 0xBADC0FFE,
-                (hash & 0xFFFF) as u16,
-            )
-        };
+        Self::Offline {
+            uuid: Self::generate_uuid(&username),
+            username,
+        }
+    }
+
+    pub fn new_offline_with_uuid(username: String, uuid: String) -> Self {
         Self::Offline { uuid, username }
+    }
+
+    fn generate_uuid(seed: &str) -> String {
+        let hash = {
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            seed.hash(&mut hasher);
+            hasher.finish()
+        };
+        format!(
+            "{:08x}-{:04x}-{:04x}-{:04x}-{:08x}{:04x}",
+            (hash >> 32) as u32,
+            ((hash >> 16) & 0xFFFF) as u16,
+            (hash & 0xFFFF) as u16,
+            ((hash >> 32) & 0xFFFF) as u16 ^ 0x4000,
+            (hash >> 16) as u32 ^ 0xBADC0FFE,
+            (hash & 0xFFFF) as u16,
+        )
     }
 }

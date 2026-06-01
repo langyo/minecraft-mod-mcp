@@ -28,24 +28,8 @@
   overflow: hidden;
   transition: grid-template-columns var(--transition-normal);
 
-  &.sidebarCollapsed {
-    grid-template-columns: 48px 1fr var(--detail-panel-width);
-  }
-
   &.rightCollapsed {
     grid-template-columns: var(--sidebar-width) 1fr 0px;
-
-    &.sidebarCollapsed {
-      grid-template-columns: 48px 1fr 0px;
-    }
-  }
-
-  &.mobile {
-    grid-template-columns: 0px 1fr 0px;
-
-    &.sidebarCollapsed {
-      grid-template-columns: 48px 1fr 0px;
-    }
   }
 }
 

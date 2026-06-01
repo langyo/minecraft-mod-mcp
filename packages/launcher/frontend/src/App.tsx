@@ -2,7 +2,7 @@ import { defineComponent, ref, onMounted, onUnmounted, watch, type PropType } fr
 import { Transition } from 'vue'
 import { RouterView } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Menu, ChevronLeft, X } from 'lucide-vue-next'
+import { X } from 'lucide-vue-next'
 
 import TitleBar from '@/components/TitleBar'
 import Sidebar from '@/components/Sidebar'
@@ -16,18 +16,8 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const store = useLauncherStore()
-    const sidebarCollapsed = ref(false)
     const rightPanelOpen = ref(false)
-    const isMobile = ref(false)
     const selectedVersion = ref<VersionInfo | null>(null)
-
-    function checkMobile() {
-      isMobile.value = window.innerWidth < 768
-      if (isMobile.value) {
-        sidebarCollapsed.value = true
-        rightPanelOpen.value = false
-      }
-    }
 
     function handleSelectVersion(v: VersionInfo) {
       if (selectedVersion.value?.mc_version === v.mc_version && rightPanelOpen.value) {
@@ -38,14 +28,10 @@ export default defineComponent({
       selectedVersion.value = v
       store.setSelectedVersion(v)
       rightPanelOpen.value = true
-      if (isMobile.value) {
-        sidebarCollapsed.value = true
-      }
     }
 
     onMounted(() => {
-      checkMobile()
-      window.addEventListener('resize', checkMobile)
+      window.addEventListener('resize', () => {})
       store.fetchVersions()
       store.fetchMcpPort()
       store.fetchConfig()
@@ -57,7 +43,7 @@ export default defineComponent({
     })
 
     onUnmounted(() => {
-      window.removeEventListener('resize', checkMobile)
+      window.removeEventListener('resize', () => {})
     })
 
         return () => (
@@ -67,31 +53,11 @@ export default defineComponent({
         <div
           class={[
             styles.shell,
-            sidebarCollapsed.value && styles.sidebarCollapsed,
             !rightPanelOpen.value && styles.rightCollapsed,
-            isMobile.value && styles.mobile,
           ].filter(Boolean).join(' ')}
         >
-          <aside
-            class={[
-              styles.sidebar,
-              sidebarCollapsed.value && styles.collapsed,
-            ].filter(Boolean).join(' ')}
-          >
-            {!sidebarCollapsed.value && (
-              <Sidebar onSelect={handleSelectVersion} />
-            )}
-            <div class={styles.sidebarFooter}>
-              <button
-                class={styles.iconBtn}
-                onClick={() => {
-                  sidebarCollapsed.value = !sidebarCollapsed.value
-                }}
-                title={sidebarCollapsed.value ? t('sidebar.expand') : t('sidebar.collapse')}
-              >
-                {sidebarCollapsed.value ? <Menu size={16} /> : <ChevronLeft size={16} />}
-              </button>
-            </div>
+          <aside class={styles.sidebar}>
+            <Sidebar onSelect={handleSelectVersion} />
           </aside>
 
           <main class={styles.center}>

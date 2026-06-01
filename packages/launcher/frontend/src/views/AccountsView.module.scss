@@ -243,6 +243,89 @@
 .errorText {
   font-size: var(--font-sm);
   color: var(--color-error);
+  user-select: none;
+}
+
+.errorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--status-failed-bg);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.copyBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-xs);
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+    border-color: var(--color-primary);
+  }
+}
+
+.emptyHint {
+  font-size: var(--font-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 24px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.formLabel {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.uuidRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.uuidInput {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+}
+
+.btnIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+  }
 }
 
 .primaryColor {

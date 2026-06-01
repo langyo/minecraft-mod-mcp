@@ -68,6 +68,7 @@ export default {
     noAccounts: 'No accounts added yet',
     addOfflineTitle: 'Add Offline Account',
     confirmRemove: 'Are you sure you want to remove this account?',
+    randomUuid: 'Random UUID',
   },
   settings: {
     title: 'VM Configuration',
@@ -156,5 +157,6 @@ export default {
   common: {
     jdk: 'JDK',
     loading: 'Loading...',
+    copy: 'Copy',
   },
 }

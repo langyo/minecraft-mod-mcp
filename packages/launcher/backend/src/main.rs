@@ -131,8 +131,11 @@ async fn poll_microsoft_auth(state: tauri::State<'_, AppState>, device_code: Str
 }
 
 #[tauri::command]
-async fn add_offline_account(state: tauri::State<'_, AppState>, username: String) -> Result<CommandResult<()>, String> {
-    let account = _shared_mc_settings::Account::new_offline(username);
+async fn add_offline_account(state: tauri::State<'_, AppState>, username: String, uuid: Option<String>) -> Result<CommandResult<()>, String> {
+    let account = match uuid {
+        Some(u) if !u.is_empty() => _shared_mc_settings::Account::new_offline_with_uuid(username, u),
+        _ => _shared_mc_settings::Account::new_offline(username),
+    };
     let mut cfg = state.config.lock().await;
     cfg.add_account(account);
     if cfg.selected_account.is_none() {
