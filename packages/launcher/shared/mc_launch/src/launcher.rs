@@ -82,7 +82,22 @@ pub fn build_launch_command(config: &LaunchConfig, vj: &VersionJson) -> Result<L
         }
     }
 
-    all_args.extend(jvm_args);
+    let mut resolved_jvm = Vec::new();
+    for arg in &jvm_args {
+        let s = arg
+            .replace("${natives_directory}", &natives_dir.to_string_lossy())
+            .replace("${launcher_name}", "MMML")
+            .replace("${launcher_version}", "0.1.0")
+            .replace("${classpath}", &classpath)
+            .replace("${classpath_separator}", separator)
+            .replace("${library_directory}", &platform::libraries_dir().to_string_lossy())
+            .replace("${version_name}", &config.version_id)
+            .replace("${game_directory}", &game_dir)
+            .replace("${assets_root}", &assets_dir.to_string_lossy())
+            .replace("${assets_index_name}", assets_index);
+        resolved_jvm.push(s);
+    }
+    all_args.extend(resolved_jvm);
 
     let mut resolved_game = Vec::new();
     for arg in &game_args {
@@ -114,6 +129,8 @@ pub fn build_launch_command(config: &LaunchConfig, vj: &VersionJson) -> Result<L
             }
         }
     }
+
+    all_args.push(vj.main_class.clone());
 
     Ok(LaunchCommand {
         java,

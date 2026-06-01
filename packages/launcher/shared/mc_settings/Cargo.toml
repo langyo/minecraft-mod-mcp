@@ -13,3 +13,4 @@ serde_json.workspace = true
 anyhow.workspace = true
 dirs.workspace = true
 tracing.workspace = true
+ts-rs.workspace = true

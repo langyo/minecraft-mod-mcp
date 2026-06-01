@@ -13,3 +13,4 @@ tokio.workspace = true
 reqwest.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
+ts-rs.workspace = true

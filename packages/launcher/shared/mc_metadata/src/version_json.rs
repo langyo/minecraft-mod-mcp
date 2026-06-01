@@ -14,12 +14,33 @@ pub struct VersionJson {
     #[serde(rename = "assetIndex")]
     pub asset_index: Option<AssetIndex>,
     pub assets: Option<String>,
+    pub downloads: Option<VersionDownloads>,
     #[serde(rename = "inheritsFrom")]
     pub inherits_from: Option<String>,
     #[serde(rename = "jar")]
     pub jar: Option<String>,
     #[serde(rename = "releaseTime")]
     pub release_time: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionDownloads {
+    pub client: Option<ClientDownload>,
+    pub server: Option<ServerDownload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientDownload {
+    pub sha1: Option<String>,
+    pub size: Option<u64>,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerDownload {
+    pub sha1: Option<String>,
+    pub size: Option<u64>,
+    pub url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

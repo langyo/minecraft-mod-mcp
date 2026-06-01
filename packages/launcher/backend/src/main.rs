@@ -260,7 +260,7 @@ async fn launch_game(state: tauri::State<'_, AppState>, version_id: String, load
 
     let launch_config = _shared_mc_launch::LaunchConfig {
         version_id: version_id.clone(),
-        mc_dir: Some(mc_dir),
+        mc_dir: Some(mc_dir.clone()),
         loader: resolved_loader,
         mod_jar: None,
         mcp_port,
@@ -298,6 +298,7 @@ async fn launch_game(state: tauri::State<'_, AppState>, version_id: String, load
 
     let mut child = match tokio::process::Command::new(&cmd.java)
         .args(&args)
+        .current_dir(&mc_dir)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()

@@ -5,7 +5,7 @@ import { Search, Save, Check } from 'lucide-vue-next'
 import { useLauncherStore } from '@/stores'
 import { saveConfig } from '@/api/config'
 import { detectJavas } from '@/api/auth'
-import type { JavaInfo, LauncherConfig } from '@/types'
+import type { JavaInfo, LauncherConfig, DownloadSource, Language } from '@/types'
 
 import styles from './SettingsView.module.scss'
 
@@ -29,8 +29,8 @@ export default defineComponent({
       fullscreen: boolean
       java_args: string
       game_args: string
-      download_source: string
-      language: string
+      download_source: DownloadSource
+      language: Language
     }>({
       java_dir: '',
       java_version: '',
@@ -42,8 +42,8 @@ export default defineComponent({
       fullscreen: false,
       java_args: '',
       game_args: '',
-      download_source: 'bmclapi',
-      language: 'zh-CN',
+      download_source: 'bmclapi' as DownloadSource,
+      language: 'zh-CN' as Language,
     })
 
     onMounted(() => {
@@ -296,7 +296,7 @@ export default defineComponent({
           <select
             class={styles.narrowSelect}
             value={form.language}
-            onChange={(e) => { form.language = (e.target as HTMLSelectElement).value }}
+            onChange={(e) => { form.language = (e.target as HTMLSelectElement).value as Language }}
           >
             <option value="zh-CN">简体中文</option>
             <option value="en-US">English</option>

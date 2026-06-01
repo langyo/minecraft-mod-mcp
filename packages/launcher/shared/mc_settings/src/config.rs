@@ -2,10 +2,30 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tracing::debug;
+use ts_rs::TS;
 
 use crate::account::Account;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum DownloadSource {
+    Mojang,
+    Bmclapi,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum Language {
+    #[serde(rename = "zh-CN")]
+    ZhCN,
+    #[serde(rename = "en-US")]
+    EnUS,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct LauncherConfig {
     pub java_dir: Option<String>,
     pub java_version: Option<u32>,
@@ -19,9 +39,9 @@ pub struct LauncherConfig {
     pub fullscreen: bool,
     pub accounts: Vec<Account>,
     pub selected_account: Option<String>,
-    pub download_source: String,
+    pub download_source: DownloadSource,
     pub mcp_port: Option<u16>,
-    pub language: String,
+    pub language: Language,
 }
 
 impl Default for LauncherConfig {
@@ -39,9 +59,9 @@ impl Default for LauncherConfig {
             fullscreen: false,
             accounts: Vec::new(),
             selected_account: None,
-            download_source: "bmclapi".to_string(),
+            download_source: DownloadSource::Bmclapi,
             mcp_port: None,
-            language: "zh-CN".to_string(),
+            language: Language::ZhCN,
         }
     }
 }

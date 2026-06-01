@@ -22,6 +22,21 @@ pub fn library_path(name: &str) -> PathBuf {
     platform::libraries_dir().join(&group).join(artifact).join(version).join(filename)
 }
 
+pub fn library_maven_path(name: &str) -> String {
+    let parts: Vec<&str> = name.split(':').collect();
+    if parts.len() < 3 {
+        return name.replace(':', "/");
+    }
+    let group = parts[0].replace('.', "/");
+    let artifact = parts[1];
+    let version = parts[2];
+    let classifier = parts.get(3);
+    match classifier {
+        Some(c) => format!("{}/{}/{}/{}-{}-{}.jar", group, artifact, version, artifact, version, c),
+        None => format!("{}/{}/{}/{}-{}.jar", group, artifact, version, artifact, version),
+    }
+}
+
 pub fn resolve_classpath(libraries: &[Library]) -> Result<Vec<PathBuf>> {
     let mut classpath = Vec::new();
 

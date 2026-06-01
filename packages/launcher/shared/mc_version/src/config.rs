@@ -2,8 +2,10 @@ use crate::fg_era::Loader;
 use crate::raw;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
+use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct FgEra {
     pub key: String,
     pub fg_version: String,
@@ -14,7 +16,8 @@ pub struct FgEra {
     pub max_mc: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct VersionInfo {
     pub mc_version: String,
     pub forge: String,

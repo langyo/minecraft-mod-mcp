@@ -34,6 +34,9 @@ export interface Account {
   not_after?: number
 }
 
+export type DownloadSource = 'mojang' | 'bmclapi'
+export type Language = 'zh-CN' | 'en-US'
+
 export interface LauncherConfig {
   java_dir: string | null
   java_version: number | null
@@ -47,9 +50,9 @@ export interface LauncherConfig {
   fullscreen: boolean
   accounts: Account[]
   selected_account: string | null
-  download_source: string
+  download_source: DownloadSource
   mcp_port: number | null
-  language: string
+  language: Language
 }
 
 export interface ManifestVersion {

@@ -184,6 +184,34 @@ where
                 }
             }
         }
+        // FALLBACK: construct URL from name (Maven convention)
+        else if !lib.name.is_empty() {
+            let path = _shared_mc_metadata::library_maven_path(&lib.name);
+            let url = format!("https://libraries.minecraft.net/{}", path);
+            let file_path = platform::libraries_dir().join(&path);
+            if !file_path.is_file() {
+                if let Some(ref dir) = file_path.parent() {
+                    std::fs::create_dir_all(dir)?;
+                }
+                download_file(&url, &file_path, None).await?;
+            }
+        }
+    }
+
+    if let Some(ref downloads) = version_json.downloads {
+        if let Some(ref client) = downloads.client {
+            if let Some(ref url) = client.url {
+                let jar_path = platform::versions_dir()
+                    .join(&version_json.id)
+                    .join(format!("{}.jar", version_json.id));
+                if !jar_path.is_file() {
+                    if let Some(ref dir) = jar_path.parent() {
+                        std::fs::create_dir_all(dir)?;
+                    }
+                    download_file(url, &jar_path, client.sha1.as_deref()).await?;
+                }
+            }
+        }
     }
 
     info!("Version {version_id} download complete");
