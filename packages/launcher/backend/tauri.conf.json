@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "identifier": "xyz.langyo.minecraft.mmml",
   "build": {
+    "beforeDevCommand": "pnpm --dir ../frontend dev",
     "beforeBuildCommand": "pnpm --dir ../frontend build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../frontend/dist"
