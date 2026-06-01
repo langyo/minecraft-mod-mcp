@@ -115,6 +115,8 @@ export default {
     mappings: 'Mappings',
     loaders: 'Loaders',
     legacy: 'Legacy',
+    yes: 'Yes',
+    no: 'No',
   },
   titlebar: {
     minimize: 'Minimize',

@@ -28,6 +28,7 @@ export default defineComponent({
     const offlineUsername = ref('')
     const offlineError = ref<string | null>(null)
     const refreshingUuid = ref<string | null>(null)
+    const actionError = ref<string | null>(null)
     const pollTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
 
     const accounts = computed(() => store.config?.accounts ?? [])
@@ -93,30 +94,33 @@ export default defineComponent({
 
     async function handleRemove(uuid: string) {
       if (!confirm(t('accounts.confirmRemove'))) return
+      actionError.value = null
       try {
         await removeAccount(uuid)
         await store.fetchConfig()
       } catch (e) {
-        console.error(e)
+        actionError.value = String(e)
       }
     }
 
     async function handleSelect(uuid: string) {
+      actionError.value = null
       try {
         await selectAccount(uuid)
         await store.fetchConfig()
       } catch (e) {
-        console.error(e)
+        actionError.value = String(e)
       }
     }
 
     async function handleRefresh(uuid: string) {
       refreshingUuid.value = uuid
+      actionError.value = null
       try {
         await refreshAccount(uuid)
         await store.fetchConfig()
       } catch (e) {
-        console.error(e)
+        actionError.value = String(e)
       } finally {
         refreshingUuid.value = null
       }
@@ -139,6 +143,8 @@ export default defineComponent({
               </button>
             </div>
           </div>
+
+          {actionError.value && <div class={styles.errorText}>{actionError.value}</div>}
 
           <div class={styles.accountList}>
             {accounts.value.length === 0 ? (

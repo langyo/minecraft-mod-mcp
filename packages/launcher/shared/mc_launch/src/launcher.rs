@@ -68,20 +68,6 @@ pub fn build_launch_command(config: &LaunchConfig, vj: &VersionJson) -> Result<L
 
     let mut all_args = Vec::new();
 
-    if let Some(max) = config.max_memory_mb {
-        all_args.push(format!("-Xmx{max}m"));
-    }
-    if let Some(min) = config.min_memory_mb {
-        all_args.push(format!("-Xms{min}m"));
-    }
-    if let Some(ref extra) = config.extra_jvm_args {
-        for arg in extra.split_whitespace() {
-            if !arg.is_empty() {
-                all_args.push(arg.to_string());
-            }
-        }
-    }
-
     let mut resolved_jvm = Vec::new();
     for arg in &jvm_args {
         let s = arg
@@ -98,6 +84,20 @@ pub fn build_launch_command(config: &LaunchConfig, vj: &VersionJson) -> Result<L
         resolved_jvm.push(s);
     }
     all_args.extend(resolved_jvm);
+
+    if let Some(max) = config.max_memory_mb {
+        all_args.push(format!("-Xmx{max}m"));
+    }
+    if let Some(min) = config.min_memory_mb {
+        all_args.push(format!("-Xms{min}m"));
+    }
+    if let Some(ref extra) = config.extra_jvm_args {
+        for arg in extra.split_whitespace() {
+            if !arg.is_empty() {
+                all_args.push(arg.to_string());
+            }
+        }
+    }
 
     let mut resolved_game = Vec::new();
     for arg in &game_args {

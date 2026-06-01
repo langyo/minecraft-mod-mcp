@@ -115,6 +115,8 @@ export default {
     mappings: '映射',
     loaders: '加载器',
     legacy: '旧版',
+    yes: '是',
+    no: '否',
   },
   titlebar: {
     minimize: '最小化',

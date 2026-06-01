@@ -18,6 +18,7 @@ export default defineComponent({
     const search = ref('')
     const installing = ref<string | null>(null)
     const installError = ref<string | null>(null)
+    const loadError = ref<string | null>(null)
 
     const versions = computed(() => {
       let list = store.remoteVersions
@@ -36,11 +37,12 @@ export default defineComponent({
     const installedSet = computed(() => new Set(store.installedVersions))
 
     async function handleRefresh() {
+      loadError.value = null
       try {
         await store.fetchRemote()
         await store.fetchInstalled()
       } catch (e) {
-        console.error(e)
+        loadError.value = String(e)
       }
     }
 
@@ -106,6 +108,7 @@ export default defineComponent({
         </div>
 
         {installError.value && <p class={styles.error}>{installError.value}</p>}
+        {loadError.value && <div class={styles.error}>{loadError.value}</div>}
 
         <div class={styles.versionTable}>
           <div class={[styles.versionRow, styles.versionRowHeader].join(' ')}>

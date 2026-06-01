@@ -59,8 +59,9 @@ export default defineComponent({
       window.removeEventListener('resize', checkMobile)
     })
 
-    return () => (
+        return () => (
       <div class={styles.root}>
+        {!store.config && <div class={styles.initLoading}>{t('common.loading')}</div>}
         <TitleBar />
         <div
           class={[
@@ -113,7 +114,7 @@ export default defineComponent({
             {rightPanelOpen.value && (
               <aside class={styles.rightPanel}>
                 {selectedVersion.value ? (
-                  <DetailPanel version={selectedVersion.value} onClose={() => { rightPanelOpen.value = false }} />
+                  <DetailPanel version={selectedVersion.value} onClose={() => { rightPanelOpen.value = false; store.setSelectedVersion(null) }} />
                 ) : (
                   <div class={styles.panelContent}>
                     <p class={styles.panelPlaceholder}>{t('detail.selectVersion')}</p>
@@ -180,7 +181,7 @@ const DetailPanel = defineComponent({
             <span class={styles.statLabel}>{t('detail.loaders')}</span>
           </div>
           <div class={styles.detailStat}>
-            <span class={styles.statValue}>--</span>
+            <span class={styles.statValue}>{['fg21', 'fg22', 'fg23', 'fg3', 'fg41'].includes(props.version.fg_era) ? t('detail.yes') : t('detail.no')}</span>
             <span class={styles.statLabel}>{t('detail.legacy')}</span>
           </div>
         </div>

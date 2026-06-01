@@ -29,7 +29,6 @@ export default defineComponent({
     return () => (
       <div
         class={styles.titlebar}
-        data-tauri-drag-region
         onDblclick={handleDoubleClick}
       >
         <div class={styles.titlebarLeft}>
