@@ -1,0 +1,26 @@
+{
+  "productName": "Minecraft MCP Launcher",
+  "version": "0.1.0",
+  "identifier": "xyz.langyo.minecraft.mcp-launcher",
+  "build": {
+    "beforeBuildCommand": "pnpm --filter @minecraft-mcp/frontend build",
+    "beforeDevCommand": "pnpm --filter @minecraft-mcp/frontend dev",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Minecraft MCP Launcher",
+        "width": 1024,
+        "height": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src ws://localhost:* http://localhost:* https://localhost:*; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "plugins": {}
+}

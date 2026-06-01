@@ -1,0 +1,21 @@
+.statusBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.connected {
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  background: rgba(102, 187, 106, 0.15);
+  color: var(--success);
+}
+
+.disconnected {
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  background: rgba(239, 83, 80, 0.15);
+  color: var(--error);
+}
