@@ -65,10 +65,16 @@ pub struct LauncherConfig {
     pub language: Language,
     #[serde(default = "default_theme")]
     pub theme: Theme,
+    #[serde(default = "default_true")]
+    pub follow_system_theme: bool,
 }
 
 fn default_theme() -> Theme {
     Theme::Dark
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for LauncherConfig {
@@ -90,6 +96,7 @@ impl Default for LauncherConfig {
             mcp_port: None,
             language: Language::ZhCN,
             theme: Theme::Dark,
+            follow_system_theme: true,
         }
     }
 }

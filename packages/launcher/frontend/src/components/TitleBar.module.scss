@@ -21,7 +21,7 @@
   width: 16px;
   height: 16px;
   object-fit: contain;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 .titlebarTitle {
@@ -75,7 +75,7 @@
   background: transparent;
   border: none;
   color: var(--color-text-secondary);
-  font-size: 10px;
+  font-size: var(--font-2xs);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 
@@ -87,7 +87,7 @@
 
 .close {
   &:hover {
-    background: #c42b1c;
-    color: #fff;
+    background: var(--color-close-hover);
+    color: var(--color-btn-text);
   }
 }

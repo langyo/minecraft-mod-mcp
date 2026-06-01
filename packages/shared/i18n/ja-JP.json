@@ -118,7 +118,9 @@
     "action": "アクション",
     "released": "公開日",
     "loadingVersions": "バージョンを読み込み中...",
-    "noVersions": "バージョンが見つかりません"
+    "noVersions": "バージョンが見つかりません",
+    "localVersions": "ローカルバージョン",
+    "launch": "起動"
   },
   "sidebar": {
     "versions": "バージョン一覧",
@@ -126,7 +128,11 @@
     "expand": "展開",
     "mcpOnline": "MCP オンライン",
     "mcpOffline": "MCP オフライン",
-    "noVersions": "利用可能なバージョンはありません"
+    "noVersions": "利用可能なバージョンはありません",
+    "instances": "実行インスタンス",
+    "noInstances": "実行中のインスタンスはありません",
+    "connect": "接続",
+    "kill": "終了"
   },
   "detail": {
     "selectVersion": "バージョンを選択して詳細を表示",
@@ -146,7 +152,8 @@
     "maximize": "最大化",
     "close": "閉じる",
     "lightMode": "ライトモードに切り替え",
-    "darkMode": "ダークモードに切り替え"
+    "darkMode": "ダークモードに切り替え",
+    "systemMode": "システムに従う（クリックで切替）"
   },
   "versionItem": {
     "neoforge": "NF"

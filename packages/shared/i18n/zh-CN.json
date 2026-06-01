@@ -118,7 +118,9 @@
     "action": "操作",
     "released": "发布时间",
     "loadingVersions": "正在加载版本...",
-    "noVersions": "未找到版本"
+    "noVersions": "未找到版本",
+    "localVersions": "本地版本",
+    "launch": "启动"
   },
   "sidebar": {
     "versions": "版本列表",
@@ -126,7 +128,11 @@
     "expand": "展开",
     "mcpOnline": "MCP 在线",
     "mcpOffline": "MCP 离线",
-    "noVersions": "暂无可用版本"
+    "noVersions": "暂无可用版本",
+    "instances": "运行实例",
+    "noInstances": "暂无运行实例",
+    "connect": "连接",
+    "kill": "终止"
   },
   "detail": {
     "selectVersion": "选择版本查看详情",
@@ -146,7 +152,8 @@
     "maximize": "最大化",
     "close": "关闭",
     "lightMode": "切换浅色模式",
-    "darkMode": "切换深色模式"
+    "darkMode": "切换深色模式",
+    "systemMode": "跟随系统（点击切换）"
   },
   "versionItem": {
     "neoforge": "NF"

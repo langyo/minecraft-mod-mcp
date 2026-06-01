@@ -14,9 +14,9 @@ const loaderIcons: Record<Loader, typeof Flame> = {
 }
 
 const loaderColors: Record<Loader, string> = {
-  forge: '#f7768e',
-  neoforge: '#e0af68',
-  fabric: '#7dcfff',
+  forge: 'var(--color-loader-forge)',
+  neoforge: 'var(--color-loader-neoforge)',
+  fabric: 'var(--color-loader-fabric)',
 }
 
 const loaderKeys: Record<Loader, string> = {

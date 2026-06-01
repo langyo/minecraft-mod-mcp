@@ -12,7 +12,7 @@ html, body {
   height: 100%;
   overflow: hidden;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--font-base);
   line-height: 1.6;
   color: var(--color-text);
   background: var(--color-bg);
@@ -62,7 +62,7 @@ ul, ol {
 
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 ::-webkit-scrollbar-thumb:hover {

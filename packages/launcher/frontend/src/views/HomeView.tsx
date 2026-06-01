@@ -1,20 +1,12 @@
-import { defineComponent, ref, computed, onMounted, onUnmounted } from 'vue'
+import { defineComponent, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { Play, Square, RefreshCw, Clock, Cpu, Globe } from 'lucide-vue-next'
+import { Play, Square, RefreshCw, Clock } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
-import type { RunningProcess } from '@/types'
 import styles from './HomeView.module.scss'
-import { launchGame } from '@/api/versions'
 import { killProcess } from '@/api/versions'
 import { useLauncherStore } from '@/stores'
-import { getLoaders } from '@/types'
-
-function getDefaultLoader(v: import('@/types').VersionInfo): string | undefined {
-  const loaders = getLoaders(v)
-  return loaders[0]
-}
 
 function formatUptime(startedAt: number): string {
   const elapsed = Math.floor(Date.now() / 1000 - startedAt)
@@ -30,15 +22,7 @@ export default defineComponent({
     const { t } = useI18n()
     const store = useLauncherStore()
     const router = useRouter()
-    const launching = ref(false)
-    const launchError = ref<string | null>(null)
     let pollTimer: ReturnType<typeof setInterval> | null = null
-
-    const selectedAccount = computed(() => {
-      const cfg = store.config
-      if (!cfg || !cfg.selected_account) return null
-      return cfg.accounts.find((a) => a.uuid === cfg.selected_account) ?? null
-    })
 
     onMounted(() => {
       pollTimer = setInterval(() => {
@@ -50,34 +34,11 @@ export default defineComponent({
       if (pollTimer) clearInterval(pollTimer)
     })
 
-    async function handleLaunch() {
-      if (!store.selectedVersion) {
-        launchError.value = t('home.selectVersion')
-        return
-      }
-      if (!store.config?.selected_account) {
-        launchError.value = t('home.noAccount')
-        return
-      }
-      launching.value = true
-      launchError.value = null
-      try {
-        await launchGame(store.selectedVersion.version_id, getDefaultLoader(store.selectedVersion))
-        await store.fetchProcesses()
-      } catch (e) {
-        launchError.value = String(e)
-      } finally {
-        launching.value = false
-      }
-    }
-
-    async function handleKill(proc: RunningProcess) {
+    async function handleKill(proc: import('@/types').RunningProcess) {
       try {
         await killProcess(proc.id)
         await store.fetchProcesses()
-      } catch (e) {
-        launchError.value = String(e)
-      }
+      } catch {}
     }
 
     return () => (
@@ -99,16 +60,7 @@ export default defineComponent({
             </div>
           </div>
           <div class={styles.summaryCard}>
-            <div class={styles.summaryIcon}><Cpu size={20} /></div>
-            <div class={styles.summaryInfo}>
-              <span class={[styles.summaryValue, store.mcpPort != null && styles.connected].filter(Boolean).join(' ')}>
-                {store.mcpPort ?? '--'}
-              </span>
-              <span class={styles.summaryLabel}>{t('dashboard.mcpPort')}</span>
-            </div>
-          </div>
-          <div class={styles.summaryCard}>
-            <div class={styles.summaryIcon}><Globe size={20} /></div>
+            <div class={styles.summaryIcon}><Square size={20} /></div>
             <div class={styles.summaryInfo}>
               <span class={styles.summaryValue}>
                 {store.runningProcesses.filter((p) => p.mcp_port != null).length}
@@ -147,7 +99,7 @@ export default defineComponent({
                       <span class={styles.processMetaItem}>
                         <Clock size={12} /> {formatUptime(proc.started_at)}
                       </span>
-                      <span class={styles.processMetaItem}>PID: {proc.pid}</span>
+                      <span class={styles.processMetaItem}>PID {proc.pid}</span>
                       {proc.mcp_port != null && (
                         <span class={[styles.processMetaItem, styles.mcpConnected].join(' ')}>
                           MCP :{proc.mcp_port}
@@ -174,47 +126,6 @@ export default defineComponent({
                 </div>
               ))}
             </div>
-          )}
-        </div>
-
-        <div class={styles.launchSection}>
-          {selectedAccount.value ? (
-            <div class={styles.accountRow}>
-              <span
-                class={[
-                  styles.accountBadge,
-                  selectedAccount.value.type === 'microsoft'
-                    ? styles.badgeMicrosoft
-                    : styles.badgeOffline,
-                ].join(' ')}
-              >
-                {selectedAccount.value.type === 'microsoft' ? t('home.msa') : t('home.offline')}
-              </span>
-              <span class={styles.accountName}>{selectedAccount.value.username}</span>
-            </div>
-          ) : (
-            <div class={styles.noAccount}>
-              {t('home.noAccountSelected')}{' '}
-              <a class={styles.link} onClick={() => router.push('/accounts')}>
-                {t('home.addAnAccount')}
-              </a>
-            </div>
-          )}
-
-          <button
-            class={styles.launchBtn}
-            disabled={launching.value || !selectedAccount.value || !store.selectedVersion}
-            onClick={handleLaunch}
-          >
-            <Play size={16} /> {launching.value ? t('home.launching') : t('home.launchBtn')}
-          </button>
-
-          {launchError.value && (
-            <p class={styles.launchHint}>{launchError.value}</p>
-          )}
-
-          {!store.selectedVersion && (
-            <p class={styles.hint}>{t('home.selectVersionHint')}</p>
           )}
         </div>
       </div>

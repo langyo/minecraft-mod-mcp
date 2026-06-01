@@ -105,7 +105,7 @@
 }
 
 .narrowSelect {
-  width: 200px;
+  width: var(--select-narrow);
   padding: 8px 12px;
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
@@ -130,7 +130,7 @@
 .toggle {
   width: 36px;
   height: 20px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
   position: relative;
@@ -156,7 +156,7 @@
 
   &::after {
     left: 18px;
-    background: #fff;
+    background: var(--color-btn-text);
   }
 }
 
@@ -190,7 +190,7 @@
 .btnSave {
   background: var(--color-success);
   border-color: var(--color-success);
-  color: #0a0b0f;
+  color: var(--color-btn-text);
   font-weight: 600;
 
   &:hover {

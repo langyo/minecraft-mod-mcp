@@ -118,7 +118,9 @@
     "action": "Aktion",
     "released": "Veröffentlicht",
     "loadingVersions": "Versionen werden geladen...",
-    "noVersions": "Keine Versionen gefunden"
+    "noVersions": "Keine Versionen gefunden",
+    "localVersions": "Lokale Versionen",
+    "launch": "Starten"
   },
   "sidebar": {
     "versions": "Versionen",
@@ -126,7 +128,11 @@
     "expand": "Ausklappen",
     "mcpOnline": "MCP Online",
     "mcpOffline": "MCP Offline",
-    "noVersions": "Keine Versionen verfügbar"
+    "noVersions": "Keine Versionen verfügbar",
+    "instances": "Laufende Instanzen",
+    "noInstances": "Keine laufenden Instanzen",
+    "connect": "Verbinden",
+    "kill": "Beenden"
   },
   "detail": {
     "selectVersion": "Version wählen, um Details anzuzeigen",
@@ -146,7 +152,8 @@
     "maximize": "Maximieren",
     "close": "Schließen",
     "lightMode": "Zum Hellmodus wechseln",
-    "darkMode": "Zum Dunkelmodus wechseln"
+    "darkMode": "Zum Dunkelmodus wechseln",
+    "systemMode": "System folgen (Klick zum Wechseln)"
   },
   "versionItem": {
     "neoforge": "NF"

@@ -59,7 +59,7 @@
 
 .btnPrimary {
   background: var(--color-primary);
-  color: #0a0b0f;
+  color: var(--color-btn-text);
   border-color: var(--color-primary);
   font-weight: 600;
 
@@ -74,7 +74,7 @@
   border-color: var(--color-error);
 
   &:hover {
-    background: rgba(247, 118, 142, 0.1);
+    background: var(--color-error-tint);
   }
 }
 
@@ -120,7 +120,7 @@
 }
 
 .badgeMicrosoft {
-  background: rgba(122, 162, 247, 0.15);
+  background: var(--color-primary-tint);
   color: var(--color-primary);
 }
 
@@ -155,7 +155,7 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -167,7 +167,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 24px;
-  width: 420px;
+  width: var(--modal-width);
   max-width: 90vw;
   box-shadow: var(--shadow-md);
 }
@@ -194,7 +194,7 @@
 }
 
 .codeText {
-  font-size: 1.6em;
+  font-size: var(--font-2xl);
   font-weight: 700;
   font-family: var(--font-mono);
   letter-spacing: 0.1em;

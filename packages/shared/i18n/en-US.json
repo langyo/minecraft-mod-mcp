@@ -118,7 +118,9 @@
     "action": "Action",
     "released": "Released",
     "loadingVersions": "Loading versions...",
-    "noVersions": "No versions found"
+    "noVersions": "No versions found",
+    "localVersions": "Local Versions",
+    "launch": "Launch"
   },
   "sidebar": {
     "versions": "Versions",
@@ -126,7 +128,11 @@
     "expand": "Expand",
     "mcpOnline": "MCP Online",
     "mcpOffline": "MCP Offline",
-    "noVersions": "No versions available"
+    "noVersions": "No versions available",
+    "instances": "Running Instances",
+    "noInstances": "No running instances",
+    "connect": "Connect",
+    "kill": "Kill"
   },
   "detail": {
     "selectVersion": "Select a version to view details",
@@ -146,7 +152,8 @@
     "maximize": "Maximize",
     "close": "Close",
     "lightMode": "Switch to light mode",
-    "darkMode": "Switch to dark mode"
+    "darkMode": "Switch to dark mode",
+    "systemMode": "Follow system (click to change)"
   },
   "versionItem": {
     "neoforge": "NF"

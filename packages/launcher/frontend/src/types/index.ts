@@ -55,6 +55,7 @@ export interface LauncherConfig {
   mcp_port: number | null
   language: Language
   theme: Theme
+  follow_system_theme: boolean
 }
 
 export interface ManifestVersion {

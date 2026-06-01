@@ -1,7 +1,7 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -14,19 +14,19 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 24px;
-  width: 420px;
+  width: var(--modal-width);
   max-width: 90vw;
   box-shadow: var(--shadow-md);
 }
 
 .modalSmall {
-  min-width: 320px;
-  max-width: 380px;
+  min-width: var(--modal-small-min);
+  max-width: var(--modal-small-max);
 }
 
 .modalWide {
-  min-width: 480px;
-  max-width: 640px;
+  min-width: var(--modal-wide-min);
+  max-width: var(--modal-wide-max);
 }
 
 .modalTitle {

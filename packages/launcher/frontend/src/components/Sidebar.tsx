@@ -1,12 +1,11 @@
-import { defineComponent } from 'vue'
+import { defineComponent, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { LayoutDashboard, Activity, Package, User, Cpu } from 'lucide-vue-next'
+import { LayoutDashboard, Activity, Package, User, Cpu, Square } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
-import type { VersionInfo } from '@/types'
 import styles from './Sidebar.module.scss'
-import VersionItem from '@/components/VersionItem'
+import { killProcess } from '@/api/versions'
 import { useLauncherStore } from '@/stores'
 
 const navItems = [
@@ -17,20 +16,42 @@ const navItems = [
   { path: '/vm', icon: Cpu, labelKey: 'nav.vm' },
 ]
 
+function formatUptime(startedAt: number): string {
+  const elapsed = Math.floor(Date.now() / 1000 - startedAt)
+  if (elapsed < 60) return `${elapsed}s`
+  if (elapsed < 3600) return `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+  const h = Math.floor(elapsed / 3600)
+  const m = Math.floor((elapsed % 3600) / 60)
+  return `${h}h ${m}m`
+}
+
 export default defineComponent({
-  emits: ['select'],
-  setup(_, { emit }) {
+  setup() {
     const { t } = useI18n()
     const store = useLauncherStore()
     const route = useRoute()
     const router = useRouter()
+    let pollTimer: ReturnType<typeof setInterval> | null = null
 
-    function handleSelect(version: VersionInfo) {
-      emit('select', version)
-    }
+    onMounted(() => {
+      pollTimer = setInterval(() => {
+        store.fetchProcesses()
+      }, 3000)
+    })
+
+    onUnmounted(() => {
+      if (pollTimer) clearInterval(pollTimer)
+    })
 
     function handleNav(path: string) {
       router.push(path)
+    }
+
+    async function handleKill(id: number) {
+      try {
+        await killProcess(id)
+        await store.fetchProcesses()
+      } catch {}
     }
 
     return () => (
@@ -57,37 +78,46 @@ export default defineComponent({
 
         <div class={styles.separator} />
 
-        <div class={styles.sectionTitle}>{t('sidebar.versions')}</div>
+        <div class={styles.sectionTitle}>{t('sidebar.instances')}</div>
 
-        <div class={styles.versionList}>
-          {store.loading ? (
-            <div class={styles.loadingState}>
-              {t('common.loading')}
-            </div>
-          ) : store.error ? (
-            <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 'var(--font-sm)', color: 'var(--color-error)' }}>
-              {store.error}
-            </div>
-          ) : store.versions.length === 0 ? (
-            <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 'var(--font-sm)', color: 'var(--color-info)' }}>
-              {t('sidebar.noVersions')}
+        <div class={styles.instanceList}>
+          {store.runningProcesses.length === 0 ? (
+            <div class={styles.emptyState}>
+              {t('sidebar.noInstances')}
             </div>
           ) : (
-            store.versions.map((v) => (
-              <VersionItem
-                key={v.mc_version}
-                version={v}
-                active={store.selectedVersion?.mc_version === v.mc_version}
-                onSelect={() => handleSelect(v)}
-              />
+            store.runningProcesses.map((proc) => (
+              <div key={proc.id} class={styles.instanceCard}>
+                <div class={styles.instanceHeader}>
+                  <span class={styles.instanceVersion}>{proc.version_id}</span>
+                  <span class={styles.instanceLoader}>{proc.loader}</span>
+                </div>
+                <div class={styles.instanceMeta}>
+                  <span>PID {proc.pid}</span>
+                  <span>{formatUptime(proc.started_at)}</span>
+                  {proc.mcp_port != null && (
+                    <span class={styles.instanceMcp}>MCP :{proc.mcp_port}</span>
+                  )}
+                </div>
+                <div class={styles.instanceActions}>
+                  {proc.mcp_port != null && (
+                    <button
+                      class={[styles.instanceBtn, styles.btnConnect].join(' ')}
+                      onClick={() => router.push('/mcp')}
+                    >
+                      {t('sidebar.connect')}
+                    </button>
+                  )}
+                  <button
+                    class={[styles.instanceBtn, styles.btnKill].join(' ')}
+                    onClick={() => handleKill(proc.id)}
+                  >
+                    <Square size={10} /> {t('sidebar.kill')}
+                  </button>
+                </div>
+              </div>
             ))
           )}
-        </div>
-
-        <div class={styles.sidebarStatus}>
-          <span class={[styles.statusDot, store.mcpPort != null && styles.connected].join(' ')}>
-            {store.mcpPort != null ? `${t('sidebar.mcpOnline')} :${store.mcpPort}` : t('sidebar.mcpOffline')}
-          </span>
         </div>
       </div>
     )

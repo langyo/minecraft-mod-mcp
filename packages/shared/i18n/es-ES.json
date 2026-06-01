@@ -118,7 +118,9 @@
     "action": "Acción",
     "released": "Publicada",
     "loadingVersions": "Cargando versiones...",
-    "noVersions": "No se encontraron versiones"
+    "noVersions": "No se encontraron versiones",
+    "localVersions": "Versiones locales",
+    "launch": "Iniciar"
   },
   "sidebar": {
     "versions": "Lista de versiones",
@@ -126,7 +128,11 @@
     "expand": "Expandir",
     "mcpOnline": "MCP en línea",
     "mcpOffline": "MCP fuera de línea",
-    "noVersions": "Sin versiones disponibles"
+    "noVersions": "Sin versiones disponibles",
+    "instances": "Instancias activas",
+    "noInstances": "Sin instancias activas",
+    "connect": "Conectar",
+    "kill": "Terminar"
   },
   "detail": {
     "selectVersion": "Selecciona una versión para ver detalles",
@@ -146,7 +152,8 @@
     "maximize": "Maximizar",
     "close": "Cerrar",
     "lightMode": "Cambiar a modo claro",
-    "darkMode": "Cambiar a modo oscuro"
+    "darkMode": "Cambiar a modo oscuro",
+    "systemMode": "Seguir el sistema (clic para cambiar)"
   },
   "versionItem": {
     "neoforge": "NF"

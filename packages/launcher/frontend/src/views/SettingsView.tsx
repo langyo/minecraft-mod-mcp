@@ -108,6 +108,7 @@ export default defineComponent({
         mcp_port: store.config?.mcp_port ?? null,
         language: form.language,
         theme: store.config?.theme ?? 'dark' as Theme,
+        follow_system_theme: store.config?.follow_system_theme ?? true,
       }
       try {
         await saveConfig(cfg)
