@@ -116,22 +116,4 @@
   color: var(--color-info);
 }
 
-.errorState {
-  padding: 24px 16px;
-  text-align: center;
-  font-size: var(--font-sm);
-  color: var(--color-error);
-}
 
-.searchWrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.searchIcon {
-  position: absolute;
-  left: 10px;
-  color: var(--color-text-muted);
-  pointer-events: none;
-}

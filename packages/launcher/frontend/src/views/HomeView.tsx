@@ -9,6 +9,11 @@ import { launchGame } from '@/api/versions'
 
 import styles from './HomeView.module.scss'
 
+function getDefaultLoader(v: import('@/types').VersionInfo): string | undefined {
+  const loaders = getLoaders(v)
+  return loaders[0]
+}
+
 export default defineComponent({
   setup() {
     const { t } = useI18n()
@@ -35,7 +40,7 @@ export default defineComponent({
       launching.value = true
       launchError.value = null
       try {
-        await launchGame(store.selectedVersion.version_id)
+        await launchGame(store.selectedVersion.version_id, getDefaultLoader(store.selectedVersion))
       } catch (e) {
         launchError.value = String(e)
       } finally {

@@ -187,17 +187,6 @@
   }
 }
 
-.btnPrimary {
-  background: var(--color-primary);
-  color: #0a0b0f;
-  border-color: var(--color-primary);
-  font-weight: 600;
-
-  &:hover {
-    filter: brightness(1.1);
-  }
-}
-
 .btnSave {
   background: var(--color-success);
   border-color: var(--color-success);

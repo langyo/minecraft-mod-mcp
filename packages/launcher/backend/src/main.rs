@@ -219,7 +219,7 @@ async fn list_installed_versions() -> Result<CommandResult<Vec<String>>, String>
 }
 
 #[tauri::command]
-async fn launch_game(state: tauri::State<'_, AppState>, version_id: String) -> Result<CommandResult<()>, String> {
+async fn launch_game(state: tauri::State<'_, AppState>, version_id: String, loader: Option<String>) -> Result<CommandResult<()>, String> {
     let cfg = state.config.lock().await;
 
     let vj = match _shared_mc_metadata::VersionJson::load_version(&version_id) {
@@ -248,13 +248,27 @@ async fn launch_game(state: tauri::State<'_, AppState>, version_id: String) -> R
     let mc_dir = cfg.game_dir_path();
     let mcp_port = cfg.mcp_port;
 
+    let resolved_loader = match loader.as_deref() {
+        Some(l) => l.parse::<_shared_mc_version::Loader>().unwrap_or(_shared_mc_version::Loader::Forge),
+        None => _shared_mc_version::Loader::Forge,
+    };
+
+    let natives_dir = _shared_core::platform::natives_dir(&version_id);
+    if let Err(e) = _shared_mc_launch::extract_natives(&vj, &natives_dir) {
+        eprintln!("warning: failed to extract natives: {e}");
+    }
+
     let launch_config = _shared_mc_launch::LaunchConfig {
         version_id: version_id.clone(),
         mc_dir: Some(mc_dir),
-        loader: _shared_mc_version::Loader::Forge,
+        loader: resolved_loader,
         mod_jar: None,
         mcp_port,
         dry_run: false,
+        max_memory_mb: Some(cfg.max_memory_mb),
+        min_memory_mb: Some(cfg.min_memory_mb),
+        extra_jvm_args: cfg.java_args.clone(),
+        extra_game_args: cfg.game_args.clone(),
     };
 
     let mut cmd = match _shared_mc_launch::build_launch_command(&launch_config, &vj) {

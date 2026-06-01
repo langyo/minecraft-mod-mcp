@@ -2,6 +2,7 @@ use _shared_core::platform;
 use _shared_mc_metadata::{resolve_classpath, VersionJson};
 use _shared_mc_version::Loader;
 use anyhow::Result;
+use std::io::Read;
 use std::path::PathBuf;
 
 pub struct LaunchConfig {
@@ -11,6 +12,10 @@ pub struct LaunchConfig {
     pub mod_jar: Option<PathBuf>,
     pub mcp_port: Option<u16>,
     pub dry_run: bool,
+    pub max_memory_mb: Option<u32>,
+    pub min_memory_mb: Option<u32>,
+    pub extra_jvm_args: Option<String>,
+    pub extra_game_args: Option<String>,
 }
 
 pub struct LaunchCommand {
@@ -63,6 +68,20 @@ pub fn build_launch_command(config: &LaunchConfig, vj: &VersionJson) -> Result<L
 
     let mut all_args = Vec::new();
 
+    if let Some(max) = config.max_memory_mb {
+        all_args.push(format!("-Xmx{max}m"));
+    }
+    if let Some(min) = config.min_memory_mb {
+        all_args.push(format!("-Xms{min}m"));
+    }
+    if let Some(ref extra) = config.extra_jvm_args {
+        for arg in extra.split_whitespace() {
+            if !arg.is_empty() {
+                all_args.push(arg.to_string());
+            }
+        }
+    }
+
     all_args.extend(jvm_args);
 
     let mut resolved_game = Vec::new();
@@ -88,10 +107,154 @@ pub fn build_launch_command(config: &LaunchConfig, vj: &VersionJson) -> Result<L
 
     all_args.extend(resolved_game);
 
+    if let Some(ref extra) = config.extra_game_args {
+        for arg in extra.split_whitespace() {
+            if !arg.is_empty() {
+                all_args.push(arg.to_string());
+            }
+        }
+    }
+
     Ok(LaunchCommand {
         java,
         args: all_args,
         classpath,
         main_class: vj.main_class.clone(),
     })
+}
+
+pub fn extract_natives(version_json: &VersionJson, natives_dir: &std::path::Path) -> Result<()> {
+    std::fs::create_dir_all(natives_dir)?;
+
+    let classifier_key = get_native_classifier();
+
+    for lib in &version_json.libraries {
+        if let Some(ref rules) = lib.rules {
+            if !should_include_library(rules) {
+                continue;
+            }
+        }
+
+        let downloads = match lib.downloads {
+            Some(ref d) => d,
+            None => continue,
+        };
+
+        let classifiers = match downloads.classifiers {
+            Some(ref c) => c,
+            None => continue,
+        };
+
+        let classifier = match classifiers.get(&classifier_key) {
+            Some(c) => c,
+            None => continue,
+        };
+
+        let artifact_path = match classifier.get("path").and_then(|p| p.as_str()) {
+            Some(p) => p,
+            None => continue,
+        };
+
+        let jar_path = platform::libraries_dir().join(artifact_path);
+        if !jar_path.is_file() {
+            continue;
+        }
+
+        let file = std::fs::File::open(&jar_path)?;
+        let mut archive = zip::ZipArchive::new(file)?;
+
+        let exclude_patterns: Vec<String> = lib
+            .extract
+            .as_ref()
+            .and_then(|e| e.exclude.clone())
+            .unwrap_or_default();
+
+        for i in 0..archive.len() {
+            let mut entry = archive.by_index(i)?;
+            let name = entry.name().to_string();
+
+            if name.ends_with(".sha1") || name.ends_with(".git") {
+                continue;
+            }
+
+            let skip = exclude_patterns.iter().any(|pat| {
+                if let Some(rest) = pat.strip_prefix('/') {
+                    name.starts_with(rest)
+                } else {
+                    name.contains(pat)
+                }
+            });
+            if skip {
+                continue;
+            }
+
+            let out_path = natives_dir.join(&name);
+            if entry.is_dir() {
+                std::fs::create_dir_all(&out_path)?;
+            } else {
+                if let Some(parent) = out_path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut buf = Vec::new();
+                entry.read_to_end(&mut buf)?;
+                std::fs::write(&out_path, buf)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn get_native_classifier() -> String {
+    if cfg!(target_os = "windows") {
+        if cfg!(target_arch = "x86_64") {
+            "natives-windows".to_string()
+        } else {
+            "natives-windows-arm64".to_string()
+        }
+    } else if cfg!(target_os = "macos") {
+        if cfg!(target_arch = "aarch64") {
+            "natives-macos-arm64".to_string()
+        } else {
+            "natives-macos".to_string()
+        }
+    } else {
+        "natives-linux".to_string()
+    }
+}
+
+fn should_include_library(rules: &[_shared_mc_metadata::Rule]) -> bool {
+    let mut allow = false;
+    let mut deny = false;
+
+    for rule in rules {
+        let os_match = match &rule.os {
+            Some(os) => {
+                let name_ok = match &os.name {
+                    Some(name) => match name.as_str() {
+                        "windows" => cfg!(windows),
+                        "linux" => cfg!(target_os = "linux"),
+                        "osx" => cfg!(target_os = "macos"),
+                        _ => true,
+                    },
+                    None => true,
+                };
+                name_ok
+            }
+            None => true,
+        };
+
+        if os_match {
+            match rule.action.as_str() {
+                "allow" => allow = true,
+                "disallow" => deny = true,
+                _ => {}
+            }
+        }
+    }
+
+    if rules.is_empty() {
+        return true;
+    }
+    allow && !deny
 }

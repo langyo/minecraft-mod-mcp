@@ -41,7 +41,9 @@ export async function listInstalledVersions(): Promise<string[]> {
   return res.data
 }
 
-export async function launchGame(versionId: string): Promise<void> {
-  const res = await invoke<CommandResult<null>>('launch_game', { versionId })
+export async function launchGame(versionId: string, loader?: string): Promise<void> {
+  const args: Record<string, string> = { versionId }
+  if (loader) args.loader = loader
+  const res = await invoke<CommandResult<null>>('launch_game', args)
   if (!res.ok) throw new Error(res.error ?? 'failed')
 }

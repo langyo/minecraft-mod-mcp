@@ -11,9 +11,6 @@ importers:
       '@tauri-apps/api':
         specifier: ^2
         version: 2.11.0
-      '@tauri-apps/plugin-window':
-        specifier: 2.0.0-alpha.1
-        version: 2.0.0-alpha.1
       lucide-vue-next:
         specifier: ^1.0.0
         version: 1.0.0(vue@3.5.35(typescript@5.9.3))
@@ -563,15 +560,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@tauri-apps/api@2.0.0-alpha.6':
-    resolution: {integrity: sha512-ZMOc3eu9amwvkC6M69h3hWt4/EsFaAXmtkiw4xd2LN59/lTb4ZQiVfq2QKlRcu1rj3n/Tcr7U30ZopvHwXBGIg==, tarball: https://registry.npmjs.org/@tauri-apps/api/-/api-2.0.0-alpha.6.tgz}
-    engines: {node: '>= 14.6.0', npm: '>= 6.6.0', yarn: '>= 1.19.1'}
-
   '@tauri-apps/api@2.11.0':
     resolution: {integrity: sha512-7CinYODhky9lmO23xHnUFv0Xt43fbtWMyxZcLcRBlFkcgXKuEirBvHpmtJ89YMhyeGcq20Wuc47Fa4XjyniywA==, tarball: https://registry.npmjs.org/@tauri-apps/api/-/api-2.11.0.tgz}
-
-  '@tauri-apps/plugin-window@2.0.0-alpha.1':
-    resolution: {integrity: sha512-dFOAgal/3Txz3SQ+LNQq0AK1EPC+acdaFlwPVB/6KXUZYmaFleIlzgxDVoJCQ+/xOhxvYrdQaFLefh0I/Kldbg==, tarball: https://registry.npmjs.org/@tauri-apps/plugin-window/-/plugin-window-2.0.0-alpha.1.tgz}
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==, tarball: https://registry.npmjs.org/@types/estree/-/estree-1.0.8.tgz}
@@ -1391,13 +1381,7 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.60.4':
     optional: true
 
-  '@tauri-apps/api@2.0.0-alpha.6': {}
-
   '@tauri-apps/api@2.11.0': {}
-
-  '@tauri-apps/plugin-window@2.0.0-alpha.1':
-    dependencies:
-      '@tauri-apps/api': 2.0.0-alpha.6
 
   '@types/estree@1.0.8': {}
 

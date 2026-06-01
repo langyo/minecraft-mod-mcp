@@ -12,28 +12,28 @@
     background: var(--color-primary-light);
     border-left-color: var(--color-primary);
 
-    .mc-version {
+    .mcVersion {
       color: var(--color-primary);
       font-weight: 700;
     }
   }
 }
 
-.item-header {
+.itemHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
 }
 
-.mc-version {
+.mcVersion {
   font-size: var(--font-base);
   font-weight: 600;
   color: var(--color-text);
   transition: color var(--transition-fast);
 }
 
-.java-badge {
+.javaBadge {
   font-size: var(--font-xs);
   padding: 1px 7px;
   border-radius: var(--radius-xs);
@@ -48,7 +48,7 @@
   flex-wrap: wrap;
 }
 
-.loader-tag {
+.loaderTag {
   font-size: var(--font-xs);
   display: inline-flex;
   align-items: center;
@@ -57,7 +57,7 @@
   padding: 1px 0;
 }
 
-.forge-ver {
+.forgeVer {
   margin-top: 4px;
   font-size: var(--font-xs);
   color: var(--color-text-muted);
