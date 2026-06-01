@@ -98,13 +98,13 @@ pub struct ExtractRule {
 }
 
 impl VersionJson {
-    pub fn load(path: &std::path::Path) -> _shared_core::Result<Self> {
+    pub fn load(path: &std::path::Path) -> anyhow::Result<Self> {
         let data = std::fs::read_to_string(path)?;
         let vj: VersionJson = serde_json::from_str(&data)?;
         Ok(vj)
     }
 
-    pub fn load_version(version_id: &str) -> _shared_core::Result<Self> {
+    pub fn load_version(version_id: &str) -> anyhow::Result<Self> {
         let path = _shared_core::platform::versions_dir()
             .join(version_id)
             .join(format!("{version_id}.json"));

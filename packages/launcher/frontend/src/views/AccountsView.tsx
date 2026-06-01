@@ -1,4 +1,5 @@
 import { defineComponent, ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { useLauncherStore } from '@/stores'
 import {
@@ -15,6 +16,7 @@ import styles from './AccountsView.module.scss'
 
 export default defineComponent({
   setup() {
+    const { t } = useI18n()
     const store = useLauncherStore()
 
     const showMsDialog = ref(false)
@@ -108,25 +110,25 @@ export default defineComponent({
 
     return () => (
       <div class={styles.accounts}>
-        <h1 class={styles.pageTitle}>Accounts</h1>
-        <p class={styles.pageSubtitle}>Manage your Minecraft accounts</p>
+        <h1 class={styles.pageTitle}>{t('accounts.title')}</h1>
+        <p class={styles.pageSubtitle}>{t('accounts.subtitle')}</p>
 
         <div class={styles.section}>
           <div class={styles.sectionHeader}>
-            <span class={styles.sectionTitle}>Your Accounts</span>
+            <span class={styles.sectionTitle}>{t('accounts.yourAccounts')}</span>
             <div class={styles.btnRow}>
               <button class={styles.btn} onClick={handleStartMicrosoft}>
-                Add Microsoft
+                {t('accounts.addMicrosoft')}
               </button>
               <button class={styles.btn} onClick={() => { showOfflineDialog.value = true; offlineError.value = null }}>
-                Add Offline
+                {t('accounts.addOffline')}
               </button>
             </div>
           </div>
 
           <div class={styles.accountList}>
             {accounts.value.length === 0 ? (
-              <p class={styles.errorText}>No accounts added yet</p>
+              <p class={styles.errorText}>{t('accounts.noAccounts')}</p>
             ) : (
               accounts.value.map((account) => (
                 <div
@@ -143,7 +145,7 @@ export default defineComponent({
                       account.type === 'microsoft' ? styles.badgeMicrosoft : styles.badgeOffline,
                     ].join(' ')}
                   >
-                    {account.type === 'microsoft' ? 'MSA' : 'Offline'}
+                    {account.type === 'microsoft' ? t('accounts.msa') : t('accounts.offline')}
                   </span>
                   <div class={styles.accountDetails}>
                     <div class={styles.accountName}>{account.username}</div>
@@ -156,14 +158,14 @@ export default defineComponent({
                         disabled={refreshingUuid.value === account.uuid}
                         onClick={(e) => { e.stopPropagation(); handleRefresh(account.uuid) }}
                       >
-                        {refreshingUuid.value === account.uuid ? '...' : 'Refresh'}
+                        {refreshingUuid.value === account.uuid ? '...' : t('accounts.refresh')}
                       </button>
                     )}
                     <button
                       class={[styles.btn, styles.btnSm, styles.btnDanger].join(' ')}
                       onClick={(e) => { e.stopPropagation(); handleRemove(account.uuid) }}
                     >
-                      Remove
+                      {t('accounts.remove')}
                     </button>
                   </div>
                 </div>
@@ -175,16 +177,16 @@ export default defineComponent({
         {showMsDialog.value && (
           <div class={styles.modalOverlay} onClick={closeMsDialog}>
             <div class={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <h3 class={styles.modalTitle}>Microsoft Authentication</h3>
+              <h3 class={styles.modalTitle}>{t('accounts.authTitle')}</h3>
               <div class={styles.modalBody}>
                 {authPolling.value && !deviceCodeInfo.value ? (
-                  <p class={styles.statusText}>Requesting device code...</p>
+                  <p class={styles.statusText}>{t('accounts.authRequesting')}</p>
                 ) : deviceCodeInfo.value ? (
                   <>
                     <div class={styles.codeDisplay}>
                       <div class={styles.codeText}>{deviceCodeInfo.value.user_code}</div>
-                      <div class={styles.codeUrl}>
-                        Visit{' '}
+                        <div class={styles.codeUrl}>
+                        {t('accounts.authStep1')}{' '}
                         <a
                           href={deviceCodeInfo.value.verification_uri}
                           target="_blank"
@@ -195,14 +197,14 @@ export default defineComponent({
                         </a>
                       </div>
                     </div>
-                    <p class={styles.statusText}>Waiting for authorization...</p>
+                    <p class={styles.statusText}>{t('accounts.authPolling')}</p>
                   </>
                 ) : authError.value ? (
                   <p class={styles.errorText}>{authError.value}</p>
                 ) : null}
               </div>
               <div class={styles.modalActions}>
-                <button class={styles.btn} onClick={closeMsDialog}>Cancel</button>
+                <button class={styles.btn} onClick={closeMsDialog}>{t('accounts.cancel')}</button>
               </div>
             </div>
           </div>
@@ -211,12 +213,12 @@ export default defineComponent({
         {showOfflineDialog.value && (
           <div class={styles.modalOverlay} onClick={() => { showOfflineDialog.value = false }}>
             <div class={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <h3 class={styles.modalTitle}>Add Offline Account</h3>
+              <h3 class={styles.modalTitle}>{t('accounts.addOfflineTitle')}</h3>
               <div class={styles.modalBody}>
                 <input
                   class={styles.input}
                   type="text"
-                  placeholder="Username"
+                  placeholder={t('accounts.usernamePlaceholder')}
                   value={offlineUsername.value}
                   onInput={(e) => { offlineUsername.value = (e.target as HTMLInputElement).value }}
                   onKeydown={(e) => { if (e.key === 'Enter') handleAddOffline() }}
@@ -224,8 +226,8 @@ export default defineComponent({
                 {offlineError.value && <p class={styles.errorText}>{offlineError.value}</p>}
               </div>
               <div class={styles.modalActions}>
-                <button class={styles.btn} onClick={() => { showOfflineDialog.value = false }}>Cancel</button>
-                <button class={[styles.btn, styles.btnPrimary].join(' ')} onClick={handleAddOffline}>Add</button>
+                <button class={styles.btn} onClick={() => { showOfflineDialog.value = false }}>{t('accounts.cancel')}</button>
+                <button class={[styles.btn, styles.btnPrimary].join(' ')} onClick={handleAddOffline}>{t('accounts.add')}</button>
               </div>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { defineComponent, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 import { useLauncherStore } from '@/stores'
 import { getLoaders } from '@/types'
@@ -9,6 +10,7 @@ import styles from './HomeView.module.scss'
 
 export default defineComponent({
   setup() {
+    const { t } = useI18n()
     const store = useLauncherStore()
     const router = useRouter()
     const launching = ref(false)
@@ -36,8 +38,8 @@ export default defineComponent({
       <div class={styles.home}>
         <div class={styles.welcome}>
           <div class={styles.welcomeIcon}>📦</div>
-          <h2>MMML</h2>
-          <p class={styles.subtitle}>Minecraft Mod MCP Launcher</p>
+          <h2>{t('app.name')}</h2>
+          <p class={styles.subtitle}>{t('home.subtitle')}</p>
 
           {selectedAccount.value ? (
             <div class={styles.accountInfo}>
@@ -49,15 +51,15 @@ export default defineComponent({
                     : styles.badgeOffline,
                 ].join(' ')}
               >
-                {selectedAccount.value.type === 'microsoft' ? 'MSA' : 'Offline'}
+                {selectedAccount.value.type === 'microsoft' ? t('home.msa') : t('home.offline')}
               </span>
               <span class={styles.accountName}>{selectedAccount.value.username}</span>
             </div>
           ) : (
             <div class={styles.noAccount}>
-              No account selected —{' '}
+              {t('home.noAccountSelected')}{' '}
               <a class={styles.link} onClick={() => router.push('/accounts')}>
-                Add an account
+                {t('home.addAnAccount')}
               </a>
             </div>
           )}
@@ -67,7 +69,7 @@ export default defineComponent({
             disabled={launching.value || !selectedAccount.value}
             onClick={handleLaunch}
           >
-            {launching.value ? 'Launching...' : 'LAUNCH'}
+            {launching.value ? t('home.launching') : t('home.launchBtn')}
           </button>
 
           {launchError.value && (
@@ -77,23 +79,23 @@ export default defineComponent({
           <div class={styles.stats}>
             <div class={styles.stat}>
               <span class={styles.statValue}>{store.versions.length}</span>
-              <span class={styles.statLabel}>Versions</span>
+              <span class={styles.statLabel}>{t('home.versions')}</span>
             </div>
             <div class={styles.stat}>
               <span class={styles.statValue}>
                 {store.versions.reduce((acc, v) => acc + getLoaders(v).length, 0)}
               </span>
-              <span class={styles.statLabel}>Profiles</span>
+              <span class={styles.statLabel}>{t('home.profiles')}</span>
             </div>
             <div class={styles.stat}>
               <span class={[styles.statValue, store.mcpPort != null && styles.connected].filter(Boolean).join(' ')}>
                 {store.mcpPort ?? '--'}
               </span>
-              <span class={styles.statLabel}>MCP Port</span>
+              <span class={styles.statLabel}>{t('home.mcpPort')}</span>
             </div>
           </div>
 
-          <p class={styles.hint}>Select a version from the sidebar for details</p>
+          <p class={styles.hint}>{t('home.selectVersionHint')}</p>
         </div>
       </div>
     )

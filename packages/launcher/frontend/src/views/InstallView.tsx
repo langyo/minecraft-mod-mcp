@@ -1,4 +1,5 @@
 import { defineComponent, ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { useLauncherStore } from '@/stores'
 import { fetchRemoteVersions, installVersion, listInstalledVersions } from '@/api/versions'
@@ -10,6 +11,7 @@ type FilterType = 'all' | 'release' | 'snapshot'
 
 export default defineComponent({
   setup() {
+    const { t } = useI18n()
     const store = useLauncherStore()
     const filter = ref<FilterType>('all')
     const search = ref('')
@@ -72,14 +74,14 @@ export default defineComponent({
 
     return () => (
       <div class={styles.install}>
-        <h1 class={styles.pageTitle}>Install Version</h1>
-        <p class={styles.pageSubtitle}>Browse and install Minecraft versions</p>
+        <h1 class={styles.pageTitle}>{t('install.title')}</h1>
+        <p class={styles.pageSubtitle}>{t('install.subtitle')}</p>
 
         <div class={styles.toolbar}>
           <input
             class={styles.searchInput}
             type="text"
-            placeholder="Search versions..."
+            placeholder={t('install.search')}
             value={search.value}
             onInput={(e) => { search.value = (e.target as HTMLInputElement).value }}
           />
@@ -90,12 +92,12 @@ export default defineComponent({
                 class={[styles.filterBtn, filter.value === f && styles.filterBtnActive].filter(Boolean).join(' ')}
                 onClick={() => { filter.value = f }}
               >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {t(`install.${f}`)}
               </button>
             ))}
           </div>
           <button class={styles.btn} onClick={handleRefresh} disabled={store.loading}>
-            Refresh
+            {t('install.refresh')}
           </button>
         </div>
 
@@ -103,16 +105,16 @@ export default defineComponent({
 
         <div class={styles.versionTable}>
           <div class={[styles.versionRow, styles.versionRowHeader].join(' ')}>
-            <span>Version</span>
-            <span style={{ textAlign: 'center' }}>Type</span>
-            <span style={{ textAlign: 'center' }}>Released</span>
-            <span style={{ textAlign: 'right' }}>Action</span>
+            <span>{t('install.version')}</span>
+            <span style={{ textAlign: 'center' }}>{t('install.type')}</span>
+            <span style={{ textAlign: 'center' }}>{t('install.released')}</span>
+            <span style={{ textAlign: 'right' }}>{t('install.action')}</span>
           </div>
 
           {store.loading ? (
-            <div class={styles.loading}>Loading versions...</div>
+            <div class={styles.loading}>{t('install.loadingVersions')}</div>
           ) : versions.value.length === 0 ? (
-            <div class={styles.empty}>No versions found</div>
+            <div class={styles.empty}>{t('install.noVersions')}</div>
           ) : (
             versions.value.map((v) => (
               <div key={v.id} class={styles.versionRow}>
@@ -132,14 +134,14 @@ export default defineComponent({
                 <span class={styles.colDate}>{formatDate(v.releaseTime)}</span>
                 <span class={styles.colAction}>
                   {installedSet.value.has(v.id) ? (
-                    <span class={styles.installedBadge}>Installed</span>
+                    <span class={styles.installedBadge}>{t('install.installed')}</span>
                   ) : (
                     <button
                       class={styles.btnInstall}
                       disabled={installing.value === v.id}
                       onClick={() => handleInstall(v)}
                     >
-                      {installing.value === v.id ? 'Installing...' : 'Install'}
+                      {installing.value === v.id ? t('install.installing') : t('install.install')}
                     </button>
                   )}
                 </span>

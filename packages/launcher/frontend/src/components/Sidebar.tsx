@@ -1,5 +1,6 @@
 import { defineComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 import { useLauncherStore } from '@/stores'
 import VersionItem from '@/components/VersionItem'
@@ -8,15 +9,16 @@ import type { VersionInfo } from '@/types'
 import styles from './Sidebar.module.scss'
 
 const navItems = [
-  { path: '/', icon: '\u{1F3E0}', label: 'Home' },
-  { path: '/install', icon: '\u{1F4E6}', label: 'Install Version' },
-  { path: '/accounts', icon: '\u{1F464}', label: 'Accounts' },
-  { path: '/settings', icon: '\u{2699}\u{FE0F}', label: 'Settings' },
+  { path: '/', icon: '\u{1F3E0}', labelKey: 'nav.home' },
+  { path: '/install', icon: '\u{1F4E6}', labelKey: 'nav.install' },
+  { path: '/accounts', icon: '\u{1F464}', labelKey: 'nav.accounts' },
+  { path: '/settings', icon: '\u{2699}\u{FE0F}', labelKey: 'nav.settings' },
 ]
 
 export default defineComponent({
   emits: ['select'],
   setup(_, { emit }) {
+    const { t } = useI18n()
     const store = useLauncherStore()
     const route = useRoute()
     const router = useRouter()
@@ -46,19 +48,19 @@ export default defineComponent({
               href={item.path}
             >
               <span class={styles.navIcon}>{item.icon}</span>
-              <span class={styles.navLabel}>{item.label}</span>
+              <span class={styles.navLabel}>{t(item.labelKey)}</span>
             </a>
           ))}
         </nav>
 
         <div class={styles.separator} />
 
-        <div class={styles.sectionTitle}>Versions</div>
+        <div class={styles.sectionTitle}>{t('sidebar.versions')}</div>
 
         <div class={styles.versionList}>
           {store.loading ? (
             <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 'var(--font-sm)', color: 'var(--color-info)' }}>
-              Loading...
+              {t('common.loading')}
             </div>
           ) : store.error ? (
             <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 'var(--font-sm)', color: 'var(--color-error)' }}>
@@ -77,7 +79,7 @@ export default defineComponent({
 
         <div class={styles.sidebarStatus}>
           <span class={[styles.statusDot, store.mcpPort != null && styles.connected].join(' ')}>
-            {store.mcpPort != null ? `MCP :${store.mcpPort}` : 'MCP Offline'}
+            {store.mcpPort != null ? `${t('sidebar.mcpOnline')} :${store.mcpPort}` : t('sidebar.mcpOffline')}
           </span>
         </div>
       </div>

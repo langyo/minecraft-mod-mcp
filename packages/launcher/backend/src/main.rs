@@ -183,7 +183,7 @@ async fn fetch_remote_versions() -> Result<CommandResult<_shared_mc_download::Ve
 }
 
 #[tauri::command]
-async fn install_version(version_id: String, version_url: String) -> Result<CommandResult<()>, String> {
+async fn install_version(_version_id: String, version_url: String) -> Result<CommandResult<()>, String> {
     let vj = match _shared_mc_download::fetch_version_json(&version_url).await {
         Ok(vj) => vj,
         Err(e) => return Ok(CommandResult::err(format!("failed to fetch version json: {e}"))),

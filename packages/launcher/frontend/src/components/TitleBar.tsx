@@ -63,7 +63,7 @@ export default defineComponent({
             title="Close"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M1 1l8 8m0-8l8 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+              <path d="M1 1l8 8m0-8l-8 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
             </svg>
           </button>
         </div>

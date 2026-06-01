@@ -83,9 +83,9 @@ pub fn jdk_home(java_version: u32) -> Option<PathBuf> {
     None
 }
 
-pub fn java_exec(java_version: u32) -> Result<PathBuf, crate::LauncherError> {
+pub fn java_exec(java_version: u32) -> anyhow::Result<PathBuf> {
     let home = jdk_home(java_version).ok_or_else(|| {
-        crate::LauncherError::JavaNotFound(java_version)
+        anyhow::anyhow!("Java not found: version {java_version}")
     })?;
 
     let exe = if cfg!(windows) {
@@ -97,6 +97,6 @@ pub fn java_exec(java_version: u32) -> Result<PathBuf, crate::LauncherError> {
     if exe.is_file() {
         Ok(exe)
     } else {
-        Err(crate::LauncherError::JavaNotFound(java_version))
+        Err(anyhow::anyhow!("Java not found: version {java_version}"))
     }
 }

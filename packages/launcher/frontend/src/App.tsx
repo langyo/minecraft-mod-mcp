@@ -1,6 +1,7 @@
-import { defineComponent, ref, onMounted, onUnmounted, type PropType } from 'vue'
+import { defineComponent, ref, onMounted, onUnmounted, watch, type PropType } from 'vue'
 import { Transition } from 'vue'
 import { RouterView } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 import TitleBar from '@/components/TitleBar'
 import Sidebar from '@/components/Sidebar'
@@ -12,6 +13,7 @@ import styles from './App.module.scss'
 
 export default defineComponent({
   setup() {
+    const { t, locale } = useI18n()
     const store = useLauncherStore()
     const sidebarCollapsed = ref(false)
     const rightPanelOpen = ref(false)
@@ -45,6 +47,10 @@ export default defineComponent({
       store.fetchVersions()
       store.fetchMcpPort()
       store.fetchConfig()
+    })
+
+    watch(() => store.config?.language, (lang) => {
+      if (lang) locale.value = lang
     })
 
     onUnmounted(() => {
@@ -83,7 +89,7 @@ export default defineComponent({
                 onClick={() => {
                   sidebarCollapsed.value = !sidebarCollapsed.value
                 }}
-                title={sidebarCollapsed.value ? 'Expand' : 'Collapse'}
+                title={sidebarCollapsed.value ? t('sidebar.expand') : t('sidebar.collapse')}
               >
                 {sidebarCollapsed.value ? <span>&#9776;</span> : <span>&#9664;</span>}
               </button>
@@ -108,7 +114,7 @@ export default defineComponent({
                   <DetailPanel version={selectedVersion.value} />
                 ) : (
                   <div class={styles.panelContent}>
-                    <p class={styles.panelPlaceholder}>Select a version to view details</p>
+                    <p class={styles.panelPlaceholder}>{t('detail.selectVersion')}</p>
                   </div>
                 )}
               </aside>
@@ -125,6 +131,7 @@ const DetailPanel = defineComponent({
     version: { type: Object as PropType<VersionInfo>, required: true },
   },
   setup(props) {
+    const { t } = useI18n()
     return () => (
       <div class={styles.detailPanel}>
         <div class={styles.detailHeader}>
@@ -145,28 +152,28 @@ const DetailPanel = defineComponent({
         )}
 
         <div class={styles.detailSection}>
-          <h3 class={styles.sectionTitle}>Version ID</h3>
+          <h3 class={styles.sectionTitle}>{t('detail.versionId')}</h3>
           <code class={styles.codeBlock}>{props.version.version_id}</code>
         </div>
 
         <div class={styles.detailSection}>
-          <h3 class={styles.sectionTitle}>FG Era</h3>
+          <h3 class={styles.sectionTitle}>{t('detail.fgEra')}</h3>
           <code class={styles.codeBlock}>{props.version.fg_era}</code>
         </div>
 
         <div class={styles.detailSection}>
-          <h3 class={styles.sectionTitle}>Mappings</h3>
+          <h3 class={styles.sectionTitle}>{t('detail.mappings')}</h3>
           <code class={styles.codeBlock}>{props.version.mappings}</code>
         </div>
 
         <div class={styles.detailRow}>
           <div class={styles.detailStat}>
             <span class={styles.statValue}>{getLoaders(props.version).length}</span>
-            <span class={styles.statLabel}>Loaders</span>
+            <span class={styles.statLabel}>{t('detail.loaders')}</span>
           </div>
           <div class={styles.detailStat}>
             <span class={styles.statValue}>--</span>
-            <span class={styles.statLabel}>Legacy</span>
+            <span class={styles.statLabel}>{t('detail.legacy')}</span>
           </div>
         </div>
       </div>

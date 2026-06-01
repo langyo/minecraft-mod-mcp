@@ -1,4 +1,5 @@
-import { defineComponent, ref, reactive, onMounted } from 'vue'
+import { defineComponent, ref, reactive, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { useLauncherStore } from '@/stores'
 import { saveConfig } from '@/api/config'
@@ -9,6 +10,7 @@ import styles from './SettingsView.module.scss'
 
 export default defineComponent({
   setup() {
+    const { t, locale } = useI18n()
     const store = useLauncherStore()
     const javas = ref<JavaInfo[]>([])
     const detecting = ref(false)
@@ -57,7 +59,12 @@ export default defineComponent({
         form.game_args = cfg.game_args ?? ''
         form.download_source = cfg.download_source
         form.language = cfg.language
+        locale.value = cfg.language
       }
+    })
+
+    watch(() => form.language, (val) => {
+      locale.value = val
     })
 
     async function handleDetect() {
@@ -101,14 +108,14 @@ export default defineComponent({
 
     return () => (
       <div class={styles.settings}>
-        <h1 class={styles.pageTitle}>Settings</h1>
-        <p class={styles.pageSubtitle}>Configure your launcher</p>
+        <h1 class={styles.pageTitle}>{t('settings.title')}</h1>
+        <p class={styles.pageSubtitle}>{t('settings.subtitle')}</p>
 
         <div class={styles.section}>
-          <div class={styles.sectionTitle}>Java Detection</div>
+          <div class={styles.sectionTitle}>{t('settings.javaDetection')}</div>
           <div class={styles.btnRow}>
             <button class={styles.btn} disabled={detecting.value} onClick={handleDetect}>
-              {detecting.value ? 'Detecting...' : 'Detect JDKs'}
+              {detecting.value ? t('settings.detecting') : t('settings.detectJavas')}
             </button>
           </div>
           {javas.value.length > 0 && (
@@ -124,26 +131,26 @@ export default defineComponent({
         </div>
 
         <div class={styles.section}>
-          <div class={styles.sectionTitle}>Java Configuration</div>
+          <div class={styles.sectionTitle}>{t('settings.javaConfiguration')}</div>
           <div class={styles.formGrid}>
             <div class={styles.formGroup}>
-              <label class={styles.formLabel}>Java Path</label>
+              <label class={styles.formLabel}>{t('settings.javaPath')}</label>
               <input
                 class={styles.input}
                 type="text"
-                placeholder="Auto-detect"
+                placeholder={t('settings.autoDetect')}
                 value={form.java_dir}
                 onInput={(e) => { form.java_dir = (e.target as HTMLInputElement).value }}
               />
             </div>
             <div class={styles.formGroup}>
-              <label class={styles.formLabel}>Java Version</label>
+              <label class={styles.formLabel}>{t('settings.javaVersion')}</label>
               <select
                 class={styles.select}
                 value={form.java_version}
                 onChange={(e) => { form.java_version = (e.target as HTMLSelectElement).value }}
               >
-                <option value="">Auto</option>
+                <option value="">{t('settings.auto')}</option>
                 <option value="8">8</option>
                 <option value="16">16</option>
                 <option value="17">17</option>
@@ -155,10 +162,10 @@ export default defineComponent({
         </div>
 
         <div class={styles.section}>
-          <div class={styles.sectionTitle}>Memory</div>
+          <div class={styles.sectionTitle}>{t('settings.memory')}</div>
           <div class={styles.formGrid}>
             <div class={styles.formGroup}>
-              <label class={styles.formLabel}>Min Memory (MB)</label>
+              <label class={styles.formLabel}>{t('settings.minMemory')}</label>
               <input
                 class={styles.input}
                 type="number"
@@ -167,7 +174,7 @@ export default defineComponent({
               />
             </div>
             <div class={styles.formGroup}>
-              <label class={styles.formLabel}>Max Memory (MB)</label>
+              <label class={styles.formLabel}>{t('settings.maxMemory')}</label>
               <input
                 class={styles.input}
                 type="number"
@@ -179,14 +186,14 @@ export default defineComponent({
         </div>
 
         <div class={styles.section}>
-          <div class={styles.sectionTitle}>Game Directory</div>
+          <div class={styles.sectionTitle}>{t('settings.gameDir')}</div>
           <div class={styles.formGrid}>
             <div class={[styles.formGroup, styles.formGroupFull].join(' ')}>
-              <label class={styles.formLabel}>Game Directory</label>
+              <label class={styles.formLabel}>{t('settings.gameDir')}</label>
               <input
                 class={styles.input}
                 type="text"
-                placeholder="Default ~/.minecraft"
+                placeholder={t('settings.defaultGameDir')}
                 value={form.game_dir}
                 onInput={(e) => { form.game_dir = (e.target as HTMLInputElement).value }}
               />
@@ -195,10 +202,10 @@ export default defineComponent({
         </div>
 
         <div class={styles.section}>
-          <div class={styles.sectionTitle}>Window Size</div>
+          <div class={styles.sectionTitle}>{t('settings.window')}</div>
           <div class={styles.formGrid}>
             <div class={styles.formGroup}>
-              <label class={styles.formLabel}>Width</label>
+              <label class={styles.formLabel}>{t('settings.width')}</label>
               <input
                 class={styles.input}
                 type="number"
@@ -207,7 +214,7 @@ export default defineComponent({
               />
             </div>
             <div class={styles.formGroup}>
-              <label class={styles.formLabel}>Height</label>
+              <label class={styles.formLabel}>{t('settings.height')}</label>
               <input
                 class={styles.input}
                 type="number"
@@ -221,17 +228,17 @@ export default defineComponent({
                   class={[styles.toggle, form.fullscreen && styles.toggleActive].filter(Boolean).join(' ')}
                   onClick={() => { form.fullscreen = !form.fullscreen }}
                 />
-                <span class={styles.toggleLabel}>Fullscreen</span>
+                <span class={styles.toggleLabel}>{t('settings.fullscreen')}</span>
               </div>
             </div>
           </div>
         </div>
 
         <div class={styles.section}>
-          <div class={styles.sectionTitle}>Extra Arguments</div>
+          <div class={styles.sectionTitle}>{t('settings.extraArguments')}</div>
           <div class={styles.formGrid}>
             <div class={styles.formGroup}>
-              <label class={styles.formLabel}>JVM Arguments</label>
+              <label class={styles.formLabel}>{t('settings.jvmArgs')}</label>
               <textarea
                 class={styles.textarea}
                 value={form.java_args}
@@ -240,7 +247,7 @@ export default defineComponent({
               />
             </div>
             <div class={styles.formGroup}>
-              <label class={styles.formLabel}>Game Arguments</label>
+              <label class={styles.formLabel}>{t('settings.gameArgs')}</label>
               <textarea
                 class={styles.textarea}
                 value={form.game_args}
@@ -252,27 +259,27 @@ export default defineComponent({
         </div>
 
         <div class={styles.section}>
-          <div class={styles.sectionTitle}>Download Source</div>
+          <div class={styles.sectionTitle}>{t('settings.downloadSource')}</div>
           <div class={styles.radioGroup}>
             <label
               class={styles.radioLabel}
               onClick={() => { form.download_source = 'mojang' }}
             >
               <span class={[styles.radioDot, form.download_source === 'mojang' && styles.radioDotActive].filter(Boolean).join(' ')} />
-              Mojang
+              {t('settings.mojang')}
             </label>
             <label
               class={styles.radioLabel}
               onClick={() => { form.download_source = 'bmclapi' }}
             >
               <span class={[styles.radioDot, form.download_source === 'bmclapi' && styles.radioDotActive].filter(Boolean).join(' ')} />
-              BMCLAPI
+              {t('settings.bmclapi')}
             </label>
           </div>
         </div>
 
         <div class={styles.section}>
-          <div class={styles.sectionTitle}>Language</div>
+          <div class={styles.sectionTitle}>{t('settings.language')}</div>
           <select
             class={styles.select}
             value={form.language}
@@ -286,9 +293,9 @@ export default defineComponent({
 
         <div class={styles.btnRow}>
           <button class={[styles.btn, styles.btnSave].join(' ')} onClick={handleSave}>
-            Save Settings
+            {t('settings.save')}
           </button>
-          {saved.value && <span class={styles.savedText}>Saved!</span>}
+          {saved.value && <span class={styles.savedText}>{t('settings.saved')}</span>}
         </div>
       </div>
     )
