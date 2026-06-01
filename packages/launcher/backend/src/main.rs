@@ -1,11 +1,27 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::Serialize;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tauri::Manager;
 use tokio::sync::Mutex;
 
+static NEXT_PID: AtomicU32 = AtomicU32::new(1);
+
+#[derive(Serialize, Clone)]
+struct RunningProcess {
+    id: u32,
+    pid: u32,
+    version_id: String,
+    loader: String,
+    started_at: u64,
+    mcp_port: Option<u16>,
+}
+
 struct AppState {
     config: Mutex<_shared_mc_settings::LauncherConfig>,
+    processes: Mutex<HashMap<u32, RunningProcess>>,
+    child_pids: Mutex<HashMap<u32, u32>>,
 }
 
 #[derive(Serialize)]
@@ -219,7 +235,7 @@ async fn list_installed_versions() -> Result<CommandResult<Vec<String>>, String>
 }
 
 #[tauri::command]
-async fn launch_game(state: tauri::State<'_, AppState>, version_id: String, loader: Option<String>) -> Result<CommandResult<()>, String> {
+async fn launch_game(state: tauri::State<'_, AppState>, version_id: String, loader: Option<String>) -> Result<CommandResult<u32>, String> {
     let cfg = state.config.lock().await;
 
     let vj = match _shared_mc_metadata::VersionJson::load_version(&version_id) {
@@ -307,11 +323,30 @@ async fn launch_game(state: tauri::State<'_, AppState>, version_id: String, load
         Err(e) => return Ok(CommandResult::err(format!("failed to launch: {e}"))),
     };
 
+    let os_pid = child.id().unwrap_or(0);
+    let proc_id = NEXT_PID.fetch_add(1, Ordering::Relaxed);
+    let loader_str = format!("{resolved_loader:?}").to_lowercase();
+
+    let proc = RunningProcess {
+        id: proc_id,
+        pid: os_pid,
+        version_id: version_id.clone(),
+        loader: loader_str,
+        started_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        mcp_port,
+    };
+
+    state.processes.lock().await.insert(proc_id, proc.clone());
+    state.child_pids.lock().await.insert(proc_id, os_pid);
+
     tokio::spawn(async move {
         let _ = child.wait().await;
     });
 
-    Ok(ok_unit())
+    Ok(CommandResult::ok(proc_id))
 }
 
 #[tauri::command]
@@ -328,6 +363,27 @@ async fn set_mcp_port(state: tauri::State<'_, AppState>, port: u16) -> Result<Co
     Ok(ok_unit())
 }
 
+#[tauri::command]
+async fn list_running_processes(state: tauri::State<'_, AppState>) -> Result<CommandResult<Vec<RunningProcess>>, String> {
+    let procs = state.processes.lock().await;
+    Ok(CommandResult::ok(procs.values().cloned().collect()))
+}
+
+#[tauri::command]
+async fn kill_process(state: tauri::State<'_, AppState>, id: u32) -> Result<CommandResult<()>, String> {
+    let child_pids = state.child_pids.lock().await;
+    if let Some(&os_pid) = child_pids.get(&id) {
+        #[cfg(windows)]
+        { let _ = std::process::Command::new("taskkill").args(["/PID", &os_pid.to_string(), "/F"]).spawn(); }
+        #[cfg(not(windows))]
+        { let _ = std::process::Command::new("kill").args(["-9", &os_pid.to_string()]).spawn(); }
+    }
+    drop(child_pids);
+    state.processes.lock().await.remove(&id);
+    state.child_pids.lock().await.remove(&id);
+    Ok(ok_unit())
+}
+
 fn main() {
     let config = _shared_mc_settings::LauncherConfig::load()
         .unwrap_or_else(|_| _shared_mc_settings::LauncherConfig::default());
@@ -336,6 +392,8 @@ fn main() {
         .setup(move |app| {
             app.manage(AppState {
                 config: Mutex::new(config),
+                processes: Mutex::new(HashMap::new()),
+                child_pids: Mutex::new(HashMap::new()),
             });
             Ok(())
         })
@@ -357,6 +415,8 @@ fn main() {
             launch_game,
             get_mcp_port,
             set_mcp_port,
+            list_running_processes,
+            kill_process,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

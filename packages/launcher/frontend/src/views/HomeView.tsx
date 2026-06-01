@@ -1,17 +1,28 @@
-import { defineComponent, ref, computed } from 'vue'
+import { defineComponent, ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Package } from 'lucide-vue-next'
+import { Play, Square, RefreshCw, Clock, Cpu, Globe } from 'lucide-vue-next'
 
 import { useLauncherStore } from '@/stores'
 import { getLoaders } from '@/types'
 import { launchGame } from '@/api/versions'
+import { killProcess } from '@/api/versions'
+import type { RunningProcess } from '@/types'
 
 import styles from './HomeView.module.scss'
 
 function getDefaultLoader(v: import('@/types').VersionInfo): string | undefined {
   const loaders = getLoaders(v)
   return loaders[0]
+}
+
+function formatUptime(startedAt: number): string {
+  const elapsed = Math.floor(Date.now() / 1000 - startedAt)
+  if (elapsed < 60) return `${elapsed}s`
+  if (elapsed < 3600) return `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+  const h = Math.floor(elapsed / 3600)
+  const m = Math.floor((elapsed % 3600) / 60)
+  return `${h}h ${m}m`
 }
 
 export default defineComponent({
@@ -21,11 +32,22 @@ export default defineComponent({
     const router = useRouter()
     const launching = ref(false)
     const launchError = ref<string | null>(null)
+    let pollTimer: ReturnType<typeof setInterval> | null = null
 
     const selectedAccount = computed(() => {
       const cfg = store.config
       if (!cfg || !cfg.selected_account) return null
       return cfg.accounts.find((a) => a.uuid === cfg.selected_account) ?? null
+    })
+
+    onMounted(() => {
+      pollTimer = setInterval(() => {
+        store.fetchProcesses()
+      }, 3000)
+    })
+
+    onUnmounted(() => {
+      if (pollTimer) clearInterval(pollTimer)
     })
 
     async function handleLaunch() {
@@ -41,6 +63,7 @@ export default defineComponent({
       launchError.value = null
       try {
         await launchGame(store.selectedVersion.version_id, getDefaultLoader(store.selectedVersion))
+        await store.fetchProcesses()
       } catch (e) {
         launchError.value = String(e)
       } finally {
@@ -48,15 +71,112 @@ export default defineComponent({
       }
     }
 
+    async function handleKill(proc: RunningProcess) {
+      try {
+        await killProcess(proc.id)
+        await store.fetchProcesses()
+      } catch (e) {
+        launchError.value = String(e)
+      }
+    }
+
     return () => (
       <div class={styles.home}>
-        <div class={styles.welcome}>
-          <div class={styles.welcomeIcon}><Package size={48} /></div>
-          <h2>{t('app.name')}</h2>
-          <p class={styles.subtitle}>{t('home.subtitle')}</p>
+        <div class={styles.header}>
+          <h1 class={styles.pageTitle}>{t('dashboard.title')}</h1>
+          <p class={styles.pageSubtitle}>{t('dashboard.subtitle')}</p>
+        </div>
 
+        <div class={styles.summaryCards}>
+          <div class={styles.summaryCard}>
+            <div class={styles.summaryIcon}><Play size={20} /></div>
+            <div class={styles.summaryInfo}>
+              <span class={styles.summaryValue}>{store.runningProcesses.length}</span>
+              <span class={styles.summaryLabel}>{t('dashboard.running')}</span>
+            </div>
+          </div>
+          <div class={styles.summaryCard}>
+            <div class={styles.summaryIcon}><Cpu size={20} /></div>
+            <div class={styles.summaryInfo}>
+              <span class={[styles.summaryValue, store.mcpPort != null && styles.connected].filter(Boolean).join(' ')}>
+                {store.mcpPort ?? '--'}
+              </span>
+              <span class={styles.summaryLabel}>{t('dashboard.mcpPort')}</span>
+            </div>
+          </div>
+          <div class={styles.summaryCard}>
+            <div class={styles.summaryIcon}><Globe size={20} /></div>
+            <div class={styles.summaryInfo}>
+              <span class={styles.summaryValue}>
+                {store.runningProcesses.filter((p) => p.mcp_port != null).length}
+              </span>
+              <span class={styles.summaryLabel}>{t('dashboard.debuggable')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class={styles.section}>
+          <div class={styles.sectionHeader}>
+            <h2 class={styles.sectionTitle}>{t('dashboard.instances')}</h2>
+            <button
+              class={styles.iconBtn}
+              onClick={() => store.fetchProcesses()}
+              title={t('dashboard.refresh')}
+            >
+              <RefreshCw size={14} />
+            </button>
+          </div>
+
+          {store.runningProcesses.length === 0 ? (
+            <div class={styles.emptyState}>
+              <p>{t('dashboard.noInstances')}</p>
+            </div>
+          ) : (
+            <div class={styles.processList}>
+              {store.runningProcesses.map((proc) => (
+                <div key={proc.id} class={styles.processCard}>
+                  <div class={styles.processMain}>
+                    <div class={styles.processInfo}>
+                      <span class={styles.processVersion}>{proc.version_id}</span>
+                      <span class={styles.processLoader}>{proc.loader}</span>
+                    </div>
+                    <div class={styles.processMeta}>
+                      <span class={styles.processMetaItem}>
+                        <Clock size={12} /> {formatUptime(proc.started_at)}
+                      </span>
+                      <span class={styles.processMetaItem}>PID: {proc.pid}</span>
+                      {proc.mcp_port != null && (
+                        <span class={[styles.processMetaItem, styles.mcpConnected].join(' ')}>
+                          MCP :{proc.mcp_port}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div class={styles.processActions}>
+                    {proc.mcp_port != null && (
+                      <button
+                        class={styles.btnConnect}
+                        onClick={() => router.push('/mcp')}
+                      >
+                        {t('dashboard.connect')}
+                      </button>
+                    )}
+                    <button
+                      class={styles.btnKill}
+                      onClick={() => handleKill(proc)}
+                    >
+                      <Square size={12} /> {t('dashboard.kill')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div class={styles.launchSection}>
           {selectedAccount.value ? (
-            <div class={styles.accountInfo}>
+            <div class={styles.accountRow}>
               <span
                 class={[
                   styles.accountBadge,
@@ -83,33 +203,16 @@ export default defineComponent({
             disabled={launching.value || !selectedAccount.value || !store.selectedVersion}
             onClick={handleLaunch}
           >
-            {launching.value ? t('home.launching') : t('home.launchBtn')}
+            <Play size={16} /> {launching.value ? t('home.launching') : t('home.launchBtn')}
           </button>
 
           {launchError.value && (
             <p class={styles.launchHint}>{launchError.value}</p>
           )}
 
-          <div class={styles.stats}>
-            <div class={styles.stat}>
-              <span class={styles.statValue}>{store.versions.length}</span>
-              <span class={styles.statLabel}>{t('home.versions')}</span>
-            </div>
-            <div class={styles.stat}>
-              <span class={styles.statValue}>
-                {store.versions.reduce((acc, v) => acc + getLoaders(v).length, 0)}
-              </span>
-              <span class={styles.statLabel}>{t('home.profiles')}</span>
-            </div>
-            <div class={styles.stat}>
-              <span class={[styles.statValue, store.mcpPort != null && styles.connected].filter(Boolean).join(' ')}>
-                {store.mcpPort ?? '--'}
-              </span>
-              <span class={styles.statLabel}>{t('home.mcpPort')}</span>
-            </div>
-          </div>
-
-          <p class={styles.hint}>{t('home.selectVersionHint')}</p>
+          {!store.selectedVersion && (
+            <p class={styles.hint}>{t('home.selectVersionHint')}</p>
+          )}
         </div>
       </div>
     )

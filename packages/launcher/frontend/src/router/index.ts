@@ -5,8 +5,18 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
+      name: 'dashboard',
       component: () => import('@/views/HomeView'),
+    },
+    {
+      path: '/mcp',
+      name: 'mcp',
+      component: () => import('@/views/MCPMonitorView'),
+    },
+    {
+      path: '/versions',
+      name: 'versions',
+      component: () => import('@/views/InstallView'),
     },
     {
       path: '/accounts',
@@ -14,14 +24,9 @@ const router = createRouter({
       component: () => import('@/views/AccountsView'),
     },
     {
-      path: '/settings',
-      name: 'settings',
+      path: '/vm',
+      name: 'vm',
       component: () => import('@/views/SettingsView'),
-    },
-    {
-      path: '/install',
-      name: 'install',
-      component: () => import('@/views/InstallView'),
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],

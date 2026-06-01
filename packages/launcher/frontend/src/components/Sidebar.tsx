@@ -1,7 +1,7 @@
 import { defineComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Home, Package, User, Settings } from 'lucide-vue-next'
+import { LayoutDashboard, Activity, Package, User, Cpu } from 'lucide-vue-next'
 
 import { useLauncherStore } from '@/stores'
 import VersionItem from '@/components/VersionItem'
@@ -10,10 +10,11 @@ import type { VersionInfo } from '@/types'
 import styles from './Sidebar.module.scss'
 
 const navItems = [
-  { path: '/', icon: Home, labelKey: 'nav.home' },
-  { path: '/install', icon: Package, labelKey: 'nav.install' },
+  { path: '/', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+  { path: '/mcp', icon: Activity, labelKey: 'nav.mcp' },
+  { path: '/versions', icon: Package, labelKey: 'nav.versions' },
   { path: '/accounts', icon: User, labelKey: 'nav.accounts' },
-  { path: '/settings', icon: Settings, labelKey: 'nav.settings' },
+  { path: '/vm', icon: Cpu, labelKey: 'nav.vm' },
 ]
 
 export default defineComponent({

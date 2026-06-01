@@ -80,6 +80,15 @@ export interface MicrosoftProfile {
   expires_at: number
 }
 
+export interface RunningProcess {
+  id: number
+  pid: number
+  version_id: string
+  loader: string
+  started_at: number
+  mcp_port: number | null
+}
+
 export function getLoaders(v: VersionInfo): Loader[] {
   const loaders: Loader[] = []
   if (v.forge) loaders.push('forge')

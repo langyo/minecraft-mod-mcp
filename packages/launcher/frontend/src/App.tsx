@@ -49,6 +49,7 @@ export default defineComponent({
       store.fetchVersions()
       store.fetchMcpPort()
       store.fetchConfig()
+      store.fetchProcesses()
     })
 
     watch(() => store.config?.language, (lang) => {
@@ -77,12 +78,6 @@ export default defineComponent({
               sidebarCollapsed.value && styles.collapsed,
             ].filter(Boolean).join(' ')}
           >
-            <div class={styles.sidebarHeader}>
-              <img class={styles.logoImg} src="/logo.webp" alt="MMML" />
-              {!sidebarCollapsed.value && (
-                <span class={styles.appName}>MMML</span>
-              )}
-            </div>
             {!sidebarCollapsed.value && (
               <Sidebar onSelect={handleSelectVersion} />
             )}

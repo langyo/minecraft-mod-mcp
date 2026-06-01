@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { listVersions, getMcpPort, fetchRemoteVersions, listInstalledVersions } from '@/api/versions'
+import { listVersions, getMcpPort, fetchRemoteVersions, listInstalledVersions, listRunningProcesses } from '@/api/versions'
 import { getConfig } from '@/api/config'
-import type { VersionInfo, LauncherConfig, ManifestVersion } from '@/types'
+import type { VersionInfo, LauncherConfig, ManifestVersion, RunningProcess } from '@/types'
 
 export const useLauncherStore = defineStore('launcher', () => {
   const versions = ref<VersionInfo[]>([])
@@ -11,6 +11,7 @@ export const useLauncherStore = defineStore('launcher', () => {
   const config = ref<LauncherConfig | null>(null)
   const remoteVersions = ref<ManifestVersion[]>([])
   const installedVersions = ref<string[]>([])
+  const runningProcesses = ref<RunningProcess[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
   const selectedVersion = ref<VersionInfo | null>(null)
@@ -67,12 +68,21 @@ export const useLauncherStore = defineStore('launcher', () => {
     }
   }
 
+  async function fetchProcesses() {
+    try {
+      runningProcesses.value = await listRunningProcesses()
+    } catch {
+      runningProcesses.value = []
+    }
+  }
+
   return {
     versions,
     mcpPort,
     config,
     remoteVersions,
     installedVersions,
+    runningProcesses,
     loading,
     error,
     selectedVersion,
@@ -82,5 +92,6 @@ export const useLauncherStore = defineStore('launcher', () => {
     fetchConfig,
     fetchRemote,
     fetchInstalled,
+    fetchProcesses,
   }
 })
