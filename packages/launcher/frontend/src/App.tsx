@@ -45,7 +45,7 @@ export default defineComponent({
       document.documentElement.classList.toggle('light', theme === 'light')
     }, { immediate: true })
 
-        return () => (
+    return () => (
       <div class={styles.root}>
         {!store.config && <div class={styles.initLoading}>{t('common.loading')}</div>}
         <TitleBar />

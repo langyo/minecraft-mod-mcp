@@ -83,6 +83,11 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
 
+  --status-completed: #1a8c3e;
+  --status-waiting: #6b7280;
+  --status-thinking: #2563eb;
+  --status-failed: #c42b2b;
+
   --status-waiting-bg: rgba(120, 120, 140, 0.08);
   --status-thinking-bg: rgba(59, 130, 246, 0.08);
   --status-completed-bg: rgba(34, 197, 94, 0.08);

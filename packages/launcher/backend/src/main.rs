@@ -3,7 +3,10 @@
 use serde::Serialize;
 use std::{
     collections::HashMap,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicU32, Ordering},
+    },
 };
 use tokio::sync::Mutex;
 
@@ -23,8 +26,8 @@ struct RunningProcess {
 
 struct AppState {
     config: Mutex<_shared_mc_settings::LauncherConfig>,
-    processes: Mutex<HashMap<u32, RunningProcess>>,
-    child_pids: Mutex<HashMap<u32, u32>>,
+    processes: Arc<Mutex<HashMap<u32, RunningProcess>>>,
+    child_pids: Arc<Mutex<HashMap<u32, u32>>>,
 }
 
 #[derive(Serialize)]
@@ -230,7 +233,7 @@ async fn fetch_remote_versions()
 
 #[tauri::command]
 async fn install_version(
-    version_id: String,
+    _version_id: String,
     version_url: String,
 ) -> Result<CommandResult<()>, String> {
     let vj = match _shared_mc_download::fetch_version_json(&version_url).await {
@@ -389,8 +392,12 @@ async fn launch_game(
     state.processes.lock().await.insert(proc_id, proc.clone());
     state.child_pids.lock().await.insert(proc_id, os_pid);
 
+    let procs = state.processes.clone();
+    let cpids = state.child_pids.clone();
     tokio::spawn(async move {
         let _ = child.wait().await;
+        procs.lock().await.remove(&proc_id);
+        cpids.lock().await.remove(&proc_id);
     });
 
     Ok(CommandResult::ok(proc_id))
@@ -457,8 +464,8 @@ fn main() {
         .setup(move |app| {
             app.manage(AppState {
                 config: Mutex::new(config),
-                processes: Mutex::new(HashMap::new()),
-                child_pids: Mutex::new(HashMap::new()),
+                processes: Arc::new(Mutex::new(HashMap::new())),
+                child_pids: Arc::new(Mutex::new(HashMap::new())),
             });
             Ok(())
         })
