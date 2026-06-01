@@ -188,6 +188,12 @@ public class ModDevMcpMod implements ClientModInitializer {
             }
             int w = mc.getWindow().getScaledWidth();
             int h = mc.getWindow().getScaledHeight();
+            if (httpServer != null) {
+                int port = httpServer.getPort();
+                String portText = "MCP Port at " + port;
+                int y = h - 12 - mc.textRenderer.fontHeight * 2;
+                mc.textRenderer.drawStringWithShadow(portText, 2, y, 0xFFCCCCCC);
+                }
             int mx = (int) getMouseX(mc);
             int my = (int) getMouseY(mc);
             if (ReflectionHelper.isMcpControlMode()) {

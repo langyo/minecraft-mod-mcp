@@ -1,0 +1,16 @@
+[package]
+name = "_shared_mc_settings"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+license.workspace = true
+
+[dependencies]
+_shared_core = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+dirs.workspace = true
+tracing.workspace = true
+ts-rs.workspace = true

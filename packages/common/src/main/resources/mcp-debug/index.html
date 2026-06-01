@@ -52,6 +52,7 @@ body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',system-ui,sans-seri
   <h1>MCP Debug</h1>
   <span class="dot" id="dot"></span>
   <span class="info" id="st">Connecting...</span>
+  <span class="info" id="ver" style="color:#d2a8ff"></span>
   <a id="mcpUrl" class="info" style="color:#58a6ff;text-decoration:none;margin-left:4px" href=""></a>
 </div>
 <div class="main">
@@ -230,6 +231,24 @@ onSel();
 fetchSS();
 fetchCalls();
 connectSSE();
+fetchStatus();
+
+function fetchStatus(){
+  var x=new XMLHttpRequest();
+  x.open('GET',BASE+'/api/status',true);
+  x.responseType='json';
+  x.onload=function(){
+    if(x.status!==200)return;
+    var d=x.response;
+    if(!d)return;
+    var parts=[];
+    if(d.version)parts.push(d.version);
+    if(d.loader)parts.push(d.loader);
+    if(d.forgeVersion)parts.push(d.forgeVersion);
+    if(parts.length)$('ver').textContent=parts.join(' · ');
+  };
+  x.send();
+}
 </script>
 </body>
 </html>

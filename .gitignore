@@ -45,3 +45,7 @@ node_modules/
 *.swp
 *~
 dist/
+
+# Auto-generated TS bindings (ts-rs)
+/packages/launcher/shared/*/bindings/
+/packages/launcher/frontend/src/bindings/

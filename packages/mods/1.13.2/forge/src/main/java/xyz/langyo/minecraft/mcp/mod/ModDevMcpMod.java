@@ -58,6 +58,12 @@ public class ModDevMcpMod {
     private static void renderScreenButton(Minecraft mc, GuiScreen screen) {
         int w = mc.mainWindow.getScaledWidth();
         int h = mc.mainWindow.getScaledHeight();
+        if (INSTANCE.httpServer != null) {
+            int port = INSTANCE.httpServer.getPort();
+            String portText = "MCP Port at " + port;
+            int y = h - 12 - mc.fontRenderer.FONT_HEIGHT * 2;
+            mc.fontRenderer.drawStringWithShadow(portText, 2, y, 0xFFCCCCCC);
+            }
         double mx = getMouseX(mc);
         double my = getMouseY(mc);
         if (ReflectionHelper.isMcpControlMode()) {

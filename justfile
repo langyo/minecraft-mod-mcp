@@ -166,6 +166,44 @@ release tag *ARGS:
     python scripts/release.py {{ tag }} {{ ARGS }}
 
 # ============================================================
+# Launcher (Rust workspace)
+# ============================================================
+
+launcher := base / "packages" / "launcher"
+
+# Build the launcher CLI
+launcher-build *ARGS:
+    cargo build --manifest-path {{ launcher / "Cargo.toml" }} {{ ARGS }}
+
+# Check launcher workspace
+launcher-check:
+    cargo check --manifest-path {{ launcher / "Cargo.toml" }}
+
+# Run launcher CLI
+launcher-cli *ARGS:
+    cargo run --manifest-path {{ launcher / "Cargo.toml" }} -p mcp_launcher_cli -- {{ ARGS }}
+
+# Run Tauri dev (backend + frontend)
+launcher-dev:
+    cd {{ launcher }} && cargo tauri dev
+
+# Build Tauri release bundle
+launcher-release:
+    cd {{ launcher }} && cargo tauri build
+
+# Install frontend deps
+launcher-install:
+    cd {{ base }} && pnpm install
+
+# Typecheck frontend
+launcher-typecheck:
+    pnpm --filter @minecraft-mcp/frontend typecheck
+
+# Lint frontend
+launcher-lint:
+    pnpm --filter @minecraft-mcp/frontend lint
+
+# ============================================================
 # Cleanup
 # ============================================================
 

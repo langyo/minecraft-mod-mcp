@@ -222,6 +222,13 @@ public class ModDevMcpMod {
                 Minecraft mc = Minecraft.getInstance();
                 Screen screen = event.getScreen();
                 if (screen == null) return;
+                    if (INSTANCE.httpServer != null) {
+                        int port = INSTANCE.httpServer.getPort();
+                        String portText = "MCP Port at " + port;
+                        int screenH = mc.getWindow().getGuiScaledHeight();
+                        int y = screenH - 12 - mc.font.lineHeight * 2;
+                        mc.font.draw(event.getPoseStack(), portText, 2, y, 0xFFCCCCCC);
+                    }
                 if (ReflectionHelper.isMcpControlMode() && screen instanceof PauseScreen) {
                     mc.screen = null;
                     return;

@@ -1,0 +1,29 @@
+{
+  "name": "@minecraft-mcp/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.ts,.tsx --fix",
+    "typecheck": "vue-tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "lucide-vue-next": "^1.0.0",
+    "pinia": "^3.0",
+    "vue": "^3.5",
+    "vue-i18n": "^11.4.4",
+    "vue-router": "^4.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue-jsx": "^4.2",
+    "sass": "^1.83",
+    "typescript": "^5.7",
+    "vite": "^6.3",
+    "vue-tsc": "^2.2"
+  }
+}
