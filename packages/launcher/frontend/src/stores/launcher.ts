@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { listVersions, getMcpPort, fetchRemoteVersions, listInstalledVersions, listRunningProcesses } from '@/api/versions'
-import { getConfig } from '@/api/config'
 import type { VersionInfo, LauncherConfig, ManifestVersion, RunningProcess } from '@/types'
+import { getConfig } from '@/api/config'
+import { listVersions, getMcpPort, fetchRemoteVersions, listInstalledVersions, listRunningProcesses } from '@/api/versions'
 
 export const useLauncherStore = defineStore('launcher', () => {
   const versions = ref<VersionInfo[]>([])

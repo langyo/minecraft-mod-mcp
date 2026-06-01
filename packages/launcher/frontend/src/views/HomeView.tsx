@@ -1,15 +1,15 @@
 import { defineComponent, ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { Play, Square, RefreshCw, Clock, Cpu, Globe } from 'lucide-vue-next'
 
-import { useLauncherStore } from '@/stores'
-import { getLoaders } from '@/types'
+import { Play, Square, RefreshCw, Clock, Cpu, Globe } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+
+import type { RunningProcess } from '@/types'
+import styles from './HomeView.module.scss'
 import { launchGame } from '@/api/versions'
 import { killProcess } from '@/api/versions'
-import type { RunningProcess } from '@/types'
-
-import styles from './HomeView.module.scss'
+import { useLauncherStore } from '@/stores'
+import { getLoaders } from '@/types'
 
 function getDefaultLoader(v: import('@/types').VersionInfo): string | undefined {
   const loaders = getLoaders(v)

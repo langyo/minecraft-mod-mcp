@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tracing::debug;
+
 use ts_rs::TS;
 
 use crate::account::Account;
@@ -24,6 +25,14 @@ pub enum Language {
     EnUS,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum Theme {
+    Dark,
+    Light,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct LauncherConfig {
@@ -42,6 +51,12 @@ pub struct LauncherConfig {
     pub download_source: DownloadSource,
     pub mcp_port: Option<u16>,
     pub language: Language,
+    #[serde(default = "default_theme")]
+    pub theme: Theme,
+}
+
+fn default_theme() -> Theme {
+    Theme::Dark
 }
 
 impl Default for LauncherConfig {
@@ -62,6 +77,7 @@ impl Default for LauncherConfig {
             download_source: DownloadSource::Bmclapi,
             mcp_port: None,
             language: Language::ZhCN,
+            theme: Theme::Dark,
         }
     }
 }

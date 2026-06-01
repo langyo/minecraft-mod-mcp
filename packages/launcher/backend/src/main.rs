@@ -1,10 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::Serialize;
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
-use tauri::Manager;
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicU32, Ordering},
+};
 use tokio::sync::Mutex;
+
+use tauri::Manager;
 
 static NEXT_PID: AtomicU32 = AtomicU32::new(1);
 
@@ -57,13 +60,18 @@ fn ok_unit() -> CommandResult<()> {
 }
 
 #[tauri::command]
-async fn get_config(state: tauri::State<'_, AppState>) -> Result<CommandResult<_shared_mc_settings::LauncherConfig>, String> {
+async fn get_config(
+    state: tauri::State<'_, AppState>,
+) -> Result<CommandResult<_shared_mc_settings::LauncherConfig>, String> {
     let cfg = state.config.lock().await;
     Ok(CommandResult::ok(cfg.clone()))
 }
 
 #[tauri::command]
-async fn save_config(state: tauri::State<'_, AppState>, config: _shared_mc_settings::LauncherConfig) -> Result<CommandResult<()>, String> {
+async fn save_config(
+    state: tauri::State<'_, AppState>,
+    config: _shared_mc_settings::LauncherConfig,
+) -> Result<CommandResult<()>, String> {
     if let Err(e) = config.save() {
         return Ok(CommandResult::err(format!("failed to save config: {e}")));
     }
@@ -73,7 +81,10 @@ async fn save_config(state: tauri::State<'_, AppState>, config: _shared_mc_setti
 }
 
 #[tauri::command]
-async fn select_account(state: tauri::State<'_, AppState>, uuid: String) -> Result<CommandResult<()>, String> {
+async fn select_account(
+    state: tauri::State<'_, AppState>,
+    uuid: String,
+) -> Result<CommandResult<()>, String> {
     let mut cfg = state.config.lock().await;
     if cfg.select_account(&uuid) {
         let _ = cfg.save();
@@ -84,7 +95,10 @@ async fn select_account(state: tauri::State<'_, AppState>, uuid: String) -> Resu
 }
 
 #[tauri::command]
-async fn remove_account(state: tauri::State<'_, AppState>, uuid: String) -> Result<CommandResult<()>, String> {
+async fn remove_account(
+    state: tauri::State<'_, AppState>,
+    uuid: String,
+) -> Result<CommandResult<()>, String> {
     let mut cfg = state.config.lock().await;
     cfg.remove_account(&uuid);
     let _ = cfg.save();
@@ -107,7 +121,10 @@ async fn start_microsoft_auth() -> Result<CommandResult<_shared_mc_auth::DeviceC
 }
 
 #[tauri::command]
-async fn poll_microsoft_auth(state: tauri::State<'_, AppState>, device_code: String) -> Result<CommandResult<_shared_mc_auth::MicrosoftProfile>, String> {
+async fn poll_microsoft_auth(
+    state: tauri::State<'_, AppState>,
+    device_code: String,
+) -> Result<CommandResult<_shared_mc_auth::MicrosoftProfile>, String> {
     let auth = _shared_mc_auth::MicrosoftAuth::new();
     match auth.poll_device_auth(&device_code).await {
         Ok(profile) => {
@@ -131,9 +148,15 @@ async fn poll_microsoft_auth(state: tauri::State<'_, AppState>, device_code: Str
 }
 
 #[tauri::command]
-async fn add_offline_account(state: tauri::State<'_, AppState>, username: String, uuid: Option<String>) -> Result<CommandResult<()>, String> {
+async fn add_offline_account(
+    state: tauri::State<'_, AppState>,
+    username: String,
+    uuid: Option<String>,
+) -> Result<CommandResult<()>, String> {
     let account = match uuid {
-        Some(u) if !u.is_empty() => _shared_mc_settings::Account::new_offline_with_uuid(username, u),
+        Some(u) if !u.is_empty() => {
+            _shared_mc_settings::Account::new_offline_with_uuid(username, u)
+        }
         _ => _shared_mc_settings::Account::new_offline(username),
     };
     let mut cfg = state.config.lock().await;
@@ -146,7 +169,10 @@ async fn add_offline_account(state: tauri::State<'_, AppState>, username: String
 }
 
 #[tauri::command]
-async fn refresh_account(state: tauri::State<'_, AppState>, uuid: String) -> Result<CommandResult<()>, String> {
+async fn refresh_account(
+    state: tauri::State<'_, AppState>,
+    uuid: String,
+) -> Result<CommandResult<()>, String> {
     let auth = _shared_mc_auth::MicrosoftAuth::new();
     let mut cfg = state.config.lock().await;
 
@@ -194,7 +220,8 @@ async fn get_version(mc: String) -> Result<CommandResult<_shared_mc_version::Ver
 }
 
 #[tauri::command]
-async fn fetch_remote_versions() -> Result<CommandResult<_shared_mc_download::VersionManifest>, String> {
+async fn fetch_remote_versions()
+-> Result<CommandResult<_shared_mc_download::VersionManifest>, String> {
     match _shared_mc_download::fetch_version_manifest().await {
         Ok(manifest) => Ok(CommandResult::ok(manifest)),
         Err(e) => Ok(CommandResult::err(format!("failed to fetch manifest: {e}"))),
@@ -202,10 +229,17 @@ async fn fetch_remote_versions() -> Result<CommandResult<_shared_mc_download::Ve
 }
 
 #[tauri::command]
-async fn install_version(version_id: String, version_url: String) -> Result<CommandResult<()>, String> {
+async fn install_version(
+    version_id: String,
+    version_url: String,
+) -> Result<CommandResult<()>, String> {
     let vj = match _shared_mc_download::fetch_version_json(&version_url).await {
         Ok(vj) => vj,
-        Err(e) => return Ok(CommandResult::err(format!("failed to fetch version json: {e}"))),
+        Err(e) => {
+            return Ok(CommandResult::err(format!(
+                "failed to fetch version json: {e}"
+            )));
+        }
     };
 
     match _shared_mc_download::download_version(&vj, |_| {}).await {
@@ -238,12 +272,20 @@ async fn list_installed_versions() -> Result<CommandResult<Vec<String>>, String>
 }
 
 #[tauri::command]
-async fn launch_game(state: tauri::State<'_, AppState>, version_id: String, loader: Option<String>) -> Result<CommandResult<u32>, String> {
+async fn launch_game(
+    state: tauri::State<'_, AppState>,
+    version_id: String,
+    loader: Option<String>,
+) -> Result<CommandResult<u32>, String> {
     let cfg = state.config.lock().await;
 
     let vj = match _shared_mc_metadata::VersionJson::load_version(&version_id) {
         Ok(vj) => vj,
-        Err(e) => return Ok(CommandResult::err(format!("failed to load version json: {e}"))),
+        Err(e) => {
+            return Ok(CommandResult::err(format!(
+                "failed to load version json: {e}"
+            )));
+        }
     };
 
     let account = match cfg.selected_account() {
@@ -268,7 +310,9 @@ async fn launch_game(state: tauri::State<'_, AppState>, version_id: String, load
     let mcp_port = cfg.mcp_port;
 
     let resolved_loader = match loader.as_deref() {
-        Some(l) => l.parse::<_shared_mc_version::Loader>().unwrap_or(_shared_mc_version::Loader::Forge),
+        Some(l) => l
+            .parse::<_shared_mc_version::Loader>()
+            .unwrap_or(_shared_mc_version::Loader::Forge),
         None => _shared_mc_version::Loader::Forge,
     };
 
@@ -353,13 +397,18 @@ async fn launch_game(state: tauri::State<'_, AppState>, version_id: String, load
 }
 
 #[tauri::command]
-async fn get_mcp_port(state: tauri::State<'_, AppState>) -> Result<CommandResult<Option<u16>>, String> {
+async fn get_mcp_port(
+    state: tauri::State<'_, AppState>,
+) -> Result<CommandResult<Option<u16>>, String> {
     let cfg = state.config.lock().await;
     Ok(CommandResult::ok(cfg.mcp_port))
 }
 
 #[tauri::command]
-async fn set_mcp_port(state: tauri::State<'_, AppState>, port: u16) -> Result<CommandResult<()>, String> {
+async fn set_mcp_port(
+    state: tauri::State<'_, AppState>,
+    port: u16,
+) -> Result<CommandResult<()>, String> {
     let mut cfg = state.config.lock().await;
     cfg.mcp_port = Some(port);
     let _ = cfg.save();
@@ -367,19 +416,32 @@ async fn set_mcp_port(state: tauri::State<'_, AppState>, port: u16) -> Result<Co
 }
 
 #[tauri::command]
-async fn list_running_processes(state: tauri::State<'_, AppState>) -> Result<CommandResult<Vec<RunningProcess>>, String> {
+async fn list_running_processes(
+    state: tauri::State<'_, AppState>,
+) -> Result<CommandResult<Vec<RunningProcess>>, String> {
     let procs = state.processes.lock().await;
     Ok(CommandResult::ok(procs.values().cloned().collect()))
 }
 
 #[tauri::command]
-async fn kill_process(state: tauri::State<'_, AppState>, id: u32) -> Result<CommandResult<()>, String> {
+async fn kill_process(
+    state: tauri::State<'_, AppState>,
+    id: u32,
+) -> Result<CommandResult<()>, String> {
     let child_pids = state.child_pids.lock().await;
     if let Some(&os_pid) = child_pids.get(&id) {
         #[cfg(windows)]
-        { let _ = std::process::Command::new("taskkill").args(["/PID", &os_pid.to_string(), "/F"]).spawn(); }
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/PID", &os_pid.to_string(), "/F"])
+                .spawn();
+        }
         #[cfg(not(windows))]
-        { let _ = std::process::Command::new("kill").args(["-9", &os_pid.to_string()]).spawn(); }
+        {
+            let _ = std::process::Command::new("kill")
+                .args(["-9", &os_pid.to_string()])
+                .spawn();
+        }
     }
     drop(child_pids);
     state.processes.lock().await.remove(&id);

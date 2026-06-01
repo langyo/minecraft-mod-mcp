@@ -36,6 +36,7 @@ export interface Account {
 
 export type DownloadSource = 'mojang' | 'bmclapi'
 export type Language = 'zh-CN' | 'en-US'
+export type Theme = 'dark' | 'light'
 
 export interface LauncherConfig {
   java_dir: string | null
@@ -53,6 +54,7 @@ export interface LauncherConfig {
   download_source: DownloadSource
   mcp_port: number | null
   language: Language
+  theme: Theme
 }
 
 export interface ManifestVersion {

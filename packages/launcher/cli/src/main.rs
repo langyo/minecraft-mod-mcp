@@ -10,8 +10,14 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     List,
-    Show { mc: String },
-    Launch { mc: String, #[arg(long, default_value = "forge")] loader: String },
+    Show {
+        mc: String,
+    },
+    Launch {
+        mc: String,
+        #[arg(long, default_value = "forge")]
+        loader: String,
+    },
 }
 
 #[tokio::main]
@@ -23,11 +29,20 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::List => {
             let versions = _shared_mc_version::all_versions();
-            println!("{:<12} {:<8} {:<12} {}", "MC Version", "Java", "FG Era", "Loaders");
+            println!(
+                "{:<12} {:<8} {:<12} {}",
+                "MC Version", "Java", "FG Era", "Loaders"
+            );
             println!("{}", "-".repeat(60));
             for v in &versions {
                 let loaders: Vec<String> = v.loaders().iter().map(|l| l.to_string()).collect();
-                println!("{:<12} {:<8} {:<12} {}", v.mc_version, v.java, v.fg_era, loaders.join(", "));
+                println!(
+                    "{:<12} {:<8} {:<12} {}",
+                    v.mc_version,
+                    v.java,
+                    v.fg_era,
+                    loaders.join(", ")
+                );
             }
         }
         Commands::Show { mc } => {

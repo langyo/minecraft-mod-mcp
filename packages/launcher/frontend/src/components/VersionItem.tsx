@@ -1,11 +1,11 @@
 import { defineComponent, type PropType } from 'vue'
+
 import { Flame, Zap, Box } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
 import type { VersionInfo, Loader } from '@/types'
-import { getLoaders } from '@/types'
-
 import styles from './VersionItem.module.scss'
+import { getLoaders } from '@/types'
 
 const loaderIcons: Record<Loader, typeof Flame> = {
   forge: Flame,

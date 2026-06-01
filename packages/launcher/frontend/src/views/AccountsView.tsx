@@ -1,6 +1,7 @@
 import { defineComponent, ref, computed, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+
 import { Globe, User, Plus, Trash2, RefreshCw, X, Check, Copy, Shuffle } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 
 import { useLauncherStore } from '@/stores'
 import {

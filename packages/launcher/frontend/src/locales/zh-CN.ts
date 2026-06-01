@@ -145,6 +145,8 @@ export default {
     minimize: '最小化',
     maximize: '最大化',
     close: '关闭',
+    lightMode: '切换浅色模式',
+    darkMode: '切换深色模式',
   },
   versionItem: {
     neoforge: 'NF',

@@ -1,10 +1,10 @@
 import { defineComponent, ref, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { Activity, Wifi, WifiOff, RefreshCw, Plug, Server } from 'lucide-vue-next'
 
-import { useLauncherStore } from '@/stores'
+import { Activity, Wifi, WifiOff, RefreshCw, Plug, Server } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 
 import styles from './MCPMonitorView.module.scss'
+import { useLauncherStore } from '@/stores'
 
 export default defineComponent({
   setup() {

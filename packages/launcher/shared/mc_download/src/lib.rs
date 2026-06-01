@@ -1,5 +1,5 @@
-pub mod mojang;
 pub mod download;
+pub mod mojang;
 
-pub use mojang::*;
 pub use download::*;
+pub use mojang::*;

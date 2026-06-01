@@ -1,16 +1,16 @@
 import { defineComponent, ref, onMounted, onUnmounted, watch, type PropType } from 'vue'
 import { Transition } from 'vue'
 import { RouterView } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+
 import { X } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 
-import TitleBar from '@/components/TitleBar'
-import Sidebar from '@/components/Sidebar'
-import { useLauncherStore } from '@/stores'
 import type { VersionInfo } from '@/types'
-import { getLoaders } from '@/types'
-
 import styles from './App.module.scss'
+import Sidebar from '@/components/Sidebar'
+import TitleBar from '@/components/TitleBar'
+import { useLauncherStore } from '@/stores'
+import { getLoaders } from '@/types'
 
 export default defineComponent({
   setup() {
@@ -42,6 +42,21 @@ export default defineComponent({
       if (lang) locale.value = lang
     })
 
+    watch(() => store.config?.theme, (theme) => {
+      if (theme === 'light') {
+        document.documentElement.classList.add('light')
+      } else {
+        document.documentElement.classList.remove('light')
+      }
+    })
+
+    onMounted(() => {
+      const theme = store.config?.theme
+      if (theme === 'light') {
+        document.documentElement.classList.add('light')
+      }
+    })
+
     onUnmounted(() => {
       window.removeEventListener('resize', () => {})
     })
@@ -50,12 +65,7 @@ export default defineComponent({
       <div class={styles.root}>
         {!store.config && <div class={styles.initLoading}>{t('common.loading')}</div>}
         <TitleBar />
-        <div
-          class={[
-            styles.shell,
-            !rightPanelOpen.value && styles.rightCollapsed,
-          ].filter(Boolean).join(' ')}
-        >
+        <div class={styles.shell}>
           <aside class={styles.sidebar}>
             <Sidebar onSelect={handleSelectVersion} />
           </aside>

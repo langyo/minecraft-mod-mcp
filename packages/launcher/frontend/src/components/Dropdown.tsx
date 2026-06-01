@@ -1,7 +1,7 @@
 import { defineComponent, ref, type PropType } from 'vue'
-import { useClickOutside } from '@/composables/useClickOutside'
 
 import styles from './Dropdown.module.scss'
+import { useClickOutside } from '@/composables/useClickOutside'
 
 export interface DropdownOption {
   value: string

@@ -1,8 +1,9 @@
-use crate::fg_era::Loader;
-use crate::raw;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
+
 use ts_rs::TS;
+
+use crate::{fg_era::Loader, raw};
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -99,12 +100,8 @@ pub fn get_version_for_loader(mc: &str, loader: Loader) -> Option<String> {
     let info = get_version(mc)?;
     match loader {
         Loader::Forge => Some(info.version_id),
-        Loader::Neoforge => info
-            .neoforge
-            .map(|nf| format!("{mc}-neoforge-{nf}")),
-        Loader::Fabric => info
-            .fabric_yarn
-            .map(|_| format!("{mc}-fabric")),
+        Loader::Neoforge => info.neoforge.map(|nf| format!("{mc}-neoforge-{nf}")),
+        Loader::Fabric => info.fabric_yarn.map(|_| format!("{mc}-fabric")),
     }
 }
 

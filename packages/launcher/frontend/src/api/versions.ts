@@ -1,5 +1,5 @@
-import { invoke } from '@/api'
 import type { CommandResult, VersionInfo, ManifestVersion, RunningProcess } from '@/types'
+import { invoke } from '@/api'
 
 export async function listVersions(): Promise<VersionInfo[]> {
   const res = await invoke<CommandResult<VersionInfo[]>>('list_versions')

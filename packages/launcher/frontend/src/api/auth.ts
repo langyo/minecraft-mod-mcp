@@ -1,5 +1,5 @@
-import { invoke } from '@/api'
 import type { CommandResult, DeviceCodeInfo, MicrosoftProfile, JavaInfo } from '@/types'
+import { invoke } from '@/api'
 
 export async function startMicrosoftAuth(): Promise<DeviceCodeInfo> {
   const res = await invoke<CommandResult<DeviceCodeInfo>>('start_microsoft_auth')

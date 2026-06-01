@@ -1,7 +1,7 @@
-use std::path::{Path, PathBuf};
-
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use tracing::{debug, warn};
+
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -40,8 +40,8 @@ pub fn detect_javas() -> Vec<JavaInfo> {
 
         match parse_release_file(&home) {
             Some((version, vendor)) => {
-                let is_jdk = home.join("lib").join("tools.jar").exists()
-                    || home.join("include").is_dir();
+                let is_jdk =
+                    home.join("lib").join("tools.jar").exists() || home.join("include").is_dir();
 
                 debug!(
                     "Found Java {} ({}) at {:?}, is_jdk={}",
@@ -67,8 +67,14 @@ pub fn detect_javas() -> Vec<JavaInfo> {
 fn env_candidates() -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
-    for var in &["JAVA_HOME", "JDK_8_HOME", "JDK_16_HOME", "JDK_17_HOME", "JDK_21_HOME", "JDK_25_HOME"]
-    {
+    for var in &[
+        "JAVA_HOME",
+        "JDK_8_HOME",
+        "JDK_16_HOME",
+        "JDK_17_HOME",
+        "JDK_21_HOME",
+        "JDK_25_HOME",
+    ] {
         if let Ok(val) = std::env::var(var) {
             let p = PathBuf::from(&val);
             if p.is_dir() {
@@ -138,11 +144,17 @@ fn windows_candidates(paths: &mut Vec<PathBuf>) {
     scan_subdirs(&program_files, paths);
 
     if let Ok(user_profile) = std::env::var("USERPROFILE") {
-        let scoop_java = PathBuf::from(&user_profile).join("scoop").join("apps").join("java");
+        let scoop_java = PathBuf::from(&user_profile)
+            .join("scoop")
+            .join("apps")
+            .join("java");
         if scoop_java.is_dir() {
             scan_subdirs_direct(&scoop_java, paths);
         }
-        let scoop_jdks = PathBuf::from(user_profile).join("scoop").join("apps").join("openjdk");
+        let scoop_jdks = PathBuf::from(user_profile)
+            .join("scoop")
+            .join("apps")
+            .join("openjdk");
         if scoop_jdks.is_dir() {
             scan_subdirs_direct(&scoop_jdks, paths);
         }

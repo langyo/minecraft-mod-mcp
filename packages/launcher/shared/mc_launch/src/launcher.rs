@@ -1,9 +1,9 @@
-use _shared_core::platform;
-use _shared_mc_metadata::{resolve_classpath, VersionJson};
-use _shared_mc_version::Loader;
 use anyhow::Result;
-use std::io::Read;
-use std::path::PathBuf;
+use std::{io::Read, path::PathBuf};
+
+use _shared_core::platform;
+use _shared_mc_metadata::{VersionJson, resolve_classpath};
+use _shared_mc_version::Loader;
 
 pub struct LaunchConfig {
     pub version_id: String,
@@ -26,10 +26,7 @@ pub struct LaunchCommand {
 }
 
 pub fn build_launch_command(config: &LaunchConfig, vj: &VersionJson) -> Result<LaunchCommand> {
-    let mc_dir = config
-        .mc_dir
-        .clone()
-        .unwrap_or_else(platform::mc_dir);
+    let mc_dir = config.mc_dir.clone().unwrap_or_else(platform::mc_dir);
 
     let java = platform::java_exec(
         _shared_mc_version::get_version_by_id(&config.version_id)
@@ -76,7 +73,10 @@ pub fn build_launch_command(config: &LaunchConfig, vj: &VersionJson) -> Result<L
             .replace("${launcher_version}", "0.1.0")
             .replace("${classpath}", &classpath)
             .replace("${classpath_separator}", separator)
-            .replace("${library_directory}", &platform::libraries_dir().to_string_lossy())
+            .replace(
+                "${library_directory}",
+                &platform::libraries_dir().to_string_lossy(),
+            )
             .replace("${version_name}", &config.version_id)
             .replace("${game_directory}", &game_dir)
             .replace("${assets_root}", &assets_dir.to_string_lossy())
@@ -116,7 +116,10 @@ pub fn build_launch_command(config: &LaunchConfig, vj: &VersionJson) -> Result<L
             .replace("${launcher_version}", "0.1.0")
             .replace("${classpath}", &classpath)
             .replace("${classpath_separator}", separator)
-            .replace("${library_directory}", &platform::libraries_dir().to_string_lossy());
+            .replace(
+                "${library_directory}",
+                &platform::libraries_dir().to_string_lossy(),
+            );
         resolved_game.push(s);
     }
 

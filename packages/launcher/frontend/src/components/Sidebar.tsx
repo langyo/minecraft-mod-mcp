@@ -1,13 +1,13 @@
 import { defineComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+
 import { LayoutDashboard, Activity, Package, User, Cpu } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 
-import { useLauncherStore } from '@/stores'
-import VersionItem from '@/components/VersionItem'
 import type { VersionInfo } from '@/types'
-
 import styles from './Sidebar.module.scss'
+import VersionItem from '@/components/VersionItem'
+import { useLauncherStore } from '@/stores'
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, labelKey: 'nav.dashboard' },

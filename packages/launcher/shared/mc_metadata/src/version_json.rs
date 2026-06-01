@@ -145,7 +145,9 @@ impl VersionJson {
                             if should_apply(rules) {
                                 match value {
                                     ArgumentData::Single(s) => game_args.push(s.clone()),
-                                    ArgumentData::Multiple(v) => game_args.extend(v.iter().cloned()),
+                                    ArgumentData::Multiple(v) => {
+                                        game_args.extend(v.iter().cloned())
+                                    }
                                 }
                             }
                         }

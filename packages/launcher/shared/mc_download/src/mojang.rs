@@ -48,10 +48,8 @@ pub async fn fetch_version_json(url: &str) -> Result<_shared_mc_metadata::Versio
         .await
         .context("Failed to fetch version JSON")?;
 
-    let vj: _shared_mc_metadata::VersionJson = resp
-        .json()
-        .await
-        .context("Failed to parse version JSON")?;
+    let vj: _shared_mc_metadata::VersionJson =
+        resp.json().await.context("Failed to parse version JSON")?;
 
     Ok(vj)
 }

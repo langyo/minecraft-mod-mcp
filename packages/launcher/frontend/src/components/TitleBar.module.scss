@@ -31,17 +31,38 @@
   letter-spacing: 0.02em;
 }
 
+.titlebarRight {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+  margin-right: 4px;
+}
+
+.themeBtn {
+  width: 28px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: none;
+  border: 1px solid transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-border);
+    color: var(--color-text);
+  }
+}
+
 .titlebarControls {
   display: flex;
   height: 100%;
   -webkit-app-region: no-drag;
-}
-
-.titlebarCenter {
-  display: flex;
-  align-items: center;
-  -webkit-app-region: no-drag;
-  margin-right: 4px;
 }
 
 .titlebarBtn {
@@ -54,7 +75,6 @@
   border: none;
   color: var(--color-text-secondary);
   font-size: 10px;
-  font-family: 'Segoe MDL2 Assets', sans-serif;
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 
@@ -62,12 +82,6 @@
     background: var(--color-surface-hover);
     color: var(--color-text);
   }
-}
-
-.minimize {
-}
-
-.maximize {
 }
 
 .close {

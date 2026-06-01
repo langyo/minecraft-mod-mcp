@@ -145,6 +145,8 @@ export default {
     minimize: 'Minimize',
     maximize: 'Maximize',
     close: 'Close',
+    lightMode: 'Switch to light mode',
+    darkMode: 'Switch to dark mode',
   },
   versionItem: {
     neoforge: 'NF',

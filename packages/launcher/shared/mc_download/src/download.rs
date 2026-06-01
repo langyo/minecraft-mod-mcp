@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 use futures::StreamExt;
-use sha1::{Digest, Sha1};
 use std::path::Path;
 use tokio::io::AsyncWriteExt;
 use tracing::{debug, info, warn};
+
+use sha1::{Digest, Sha1};
 
 use _shared_core::platform;
 use _shared_mc_metadata::VersionJson;
@@ -15,11 +16,7 @@ pub struct DownloadProgress {
     pub total: Option<u64>,
 }
 
-pub async fn download_file(
-    url: &str,
-    path: &Path,
-    expected_sha1: Option<&str>,
-) -> Result<()> {
+pub async fn download_file(url: &str, path: &Path, expected_sha1: Option<&str>) -> Result<()> {
     if path.is_file() {
         if let Some(sha) = expected_sha1 {
             if let Ok(existing_hash) = sha1_file(path).await {
@@ -99,10 +96,7 @@ async fn sha1_file(path: &Path) -> Result<String> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-pub async fn download_version<F>(
-    version_json: &VersionJson,
-    on_progress: F,
-) -> Result<()>
+pub async fn download_version<F>(version_json: &VersionJson, on_progress: F) -> Result<()>
 where
     F: Fn(DownloadProgress),
 {
@@ -140,23 +134,19 @@ where
                 info!("Downloading {total_objects} assets...");
 
                 for (i, (name, obj)) in objects.iter().enumerate() {
-                    let hash = obj
-                        .get("hash")
-                        .and_then(|h| h.as_str())
-                        .unwrap_or("");
+                    let hash = obj.get("hash").and_then(|h| h.as_str()).unwrap_or("");
                     let size = obj.get("size").and_then(|s| s.as_u64()).unwrap_or(0);
 
                     let hash_prefix = &hash[..2.min(hash.len())];
-                    let asset_url = format!("https://resources.download.minecraft.net/{hash_prefix}/{hash}");
+                    let asset_url =
+                        format!("https://resources.download.minecraft.net/{hash_prefix}/{hash}");
                     let asset_path = platform::assets_dir()
                         .join("objects")
                         .join(hash_prefix)
                         .join(hash);
 
                     if !asset_path.is_file() {
-                        if let Err(e) =
-                            download_file(&asset_url, &asset_path, Some(hash)).await
-                        {
+                        if let Err(e) = download_file(&asset_url, &asset_path, Some(hash)).await {
                             warn!("Failed to download asset {name}: {e}");
                             continue;
                         }

@@ -2,14 +2,13 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, info};
+
 use ts_rs::TS;
 
 const CLIENT_ID: &str = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
 
-const DEVICE_CODE_URL: &str =
-    "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
-const TOKEN_URL: &str =
-    "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+const DEVICE_CODE_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
+const TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 const XBL_AUTH_URL: &str = "https://user.auth.xboxlive.com/user/authenticate";
 const XSTS_AUTH_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 const MC_LOGIN_URL: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
@@ -175,7 +174,10 @@ impl MicrosoftAuth {
             .and_then(|t| t.as_str())
             .context("Missing refresh_token")?
             .to_string();
-        let expires_in = body.get("expires_in").and_then(|t| t.as_u64()).unwrap_or(3600);
+        let expires_in = body
+            .get("expires_in")
+            .and_then(|t| t.as_u64())
+            .unwrap_or(3600);
 
         let expires_at = now_timestamp() + expires_in;
 
@@ -208,17 +210,11 @@ impl MicrosoftAuth {
     ) -> Result<MicrosoftProfile> {
         let client = reqwest::Client::new();
 
-        let (uhs, xsts_token) = self
-            .xbox_auth(&client, live_access_token)
-            .await?;
+        let (uhs, xsts_token) = self.xbox_auth(&client, live_access_token).await?;
 
-        let mc_token = self
-            .minecraft_login(&client, &uhs, &xsts_token)
-            .await?;
+        let mc_token = self.minecraft_login(&client, &uhs, &xsts_token).await?;
 
-        let (uuid, username) = self
-            .minecraft_profile(&client, &mc_token)
-            .await?;
+        let (uuid, username) = self.minecraft_profile(&client, &mc_token).await?;
 
         Ok(MicrosoftProfile {
             uuid,

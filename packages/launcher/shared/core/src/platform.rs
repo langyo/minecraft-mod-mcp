@@ -19,10 +19,7 @@ pub fn assets_dir() -> PathBuf {
 }
 
 pub fn natives_dir(version_id: &str) -> PathBuf {
-    mc_dir()
-        .join("versions")
-        .join(version_id)
-        .join("natives")
+    mc_dir().join("versions").join(version_id).join("natives")
 }
 
 pub fn launcher_dir() -> PathBuf {
@@ -36,7 +33,7 @@ pub fn mod_jar_path(mc_version: &str, loader: &str) -> PathBuf {
         .join("mods")
         .join(mc_version)
         .join(loader);
-    
+
     if loader == "fabric" {
         project_dir
             .join("build")
@@ -84,9 +81,8 @@ pub fn jdk_home(java_version: u32) -> Option<PathBuf> {
 }
 
 pub fn java_exec(java_version: u32) -> anyhow::Result<PathBuf> {
-    let home = jdk_home(java_version).ok_or_else(|| {
-        anyhow::anyhow!("Java not found: version {java_version}")
-    })?;
+    let home = jdk_home(java_version)
+        .ok_or_else(|| anyhow::anyhow!("Java not found: version {java_version}"))?;
 
     let exe = if cfg!(windows) {
         home.join("bin").join("java.exe")

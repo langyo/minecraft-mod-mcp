@@ -1,5 +1,5 @@
-import { invoke } from '@/api'
 import type { CommandResult, LauncherConfig } from '@/types'
+import { invoke } from '@/api'
 
 export async function getConfig(): Promise<LauncherConfig> {
   const res = await invoke<CommandResult<LauncherConfig>>('get_config')

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -14,10 +15,7 @@ pub enum Account {
         not_after: u64,
     },
     #[serde(rename = "offline")]
-    Offline {
-        uuid: String,
-        username: String,
-    },
+    Offline { uuid: String, username: String },
 }
 
 pub type AccountType = Account;

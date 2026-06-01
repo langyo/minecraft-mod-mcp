@@ -1,13 +1,13 @@
 import { defineComponent, ref, reactive, onMounted, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+
 import { Search, Save, Check } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 
-import { useLauncherStore } from '@/stores'
-import { saveConfig } from '@/api/config'
-import { detectJavas } from '@/api/auth'
-import type { JavaInfo, LauncherConfig, DownloadSource, Language } from '@/types'
-
+import type { JavaInfo, LauncherConfig, DownloadSource, Language, Theme } from '@/types'
 import styles from './SettingsView.module.scss'
+import { detectJavas } from '@/api/auth'
+import { saveConfig } from '@/api/config'
+import { useLauncherStore } from '@/stores'
 
 export default defineComponent({
   setup() {
@@ -107,6 +107,7 @@ export default defineComponent({
         download_source: form.download_source,
         mcp_port: store.config?.mcp_port ?? null,
         language: form.language,
+        theme: store.config?.theme ?? 'dark' as Theme,
       }
       try {
         await saveConfig(cfg)

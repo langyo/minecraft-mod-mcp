@@ -1,12 +1,12 @@
 import { defineComponent, ref, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+
 import { RefreshCw, Search, Download, CheckCircle, Tag, Zap } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 
-import { useLauncherStore } from '@/stores'
-import { fetchRemoteVersions, installVersion, listInstalledVersions } from '@/api/versions'
 import type { ManifestVersion } from '@/types'
-
 import styles from './InstallView.module.scss'
+import { fetchRemoteVersions, installVersion, listInstalledVersions } from '@/api/versions'
+import { useLauncherStore } from '@/stores'
 
 type FilterType = 'all' | 'release' | 'snapshot'
 

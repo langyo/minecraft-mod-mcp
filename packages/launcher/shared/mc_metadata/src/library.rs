@@ -1,7 +1,8 @@
-use crate::version_json::Library;
-use _shared_core::platform;
 use anyhow::Result;
 use std::path::PathBuf;
+
+use crate::version_json::Library;
+use _shared_core::platform;
 
 pub fn library_path(name: &str) -> PathBuf {
     let parts: Vec<&str> = name.split(':').collect();
@@ -19,7 +20,11 @@ pub fn library_path(name: &str) -> PathBuf {
         None => format!("{artifact}-{version}.jar"),
     };
 
-    platform::libraries_dir().join(&group).join(artifact).join(version).join(filename)
+    platform::libraries_dir()
+        .join(&group)
+        .join(artifact)
+        .join(version)
+        .join(filename)
 }
 
 pub fn library_maven_path(name: &str) -> String {
@@ -32,8 +37,14 @@ pub fn library_maven_path(name: &str) -> String {
     let version = parts[2];
     let classifier = parts.get(3);
     match classifier {
-        Some(c) => format!("{}/{}/{}/{}-{}-{}.jar", group, artifact, version, artifact, version, c),
-        None => format!("{}/{}/{}/{}-{}.jar", group, artifact, version, artifact, version),
+        Some(c) => format!(
+            "{}/{}/{}/{}-{}-{}.jar",
+            group, artifact, version, artifact, version, c
+        ),
+        None => format!(
+            "{}/{}/{}/{}-{}.jar",
+            group, artifact, version, artifact, version
+        ),
     }
 }
 
@@ -66,7 +77,10 @@ pub fn resolve_classpath(libraries: &[Library]) -> Result<Vec<PathBuf>> {
     Ok(classpath)
 }
 
-pub fn resolve_natives(libraries: &[Library], _natives_dir: &std::path::Path) -> Result<Vec<PathBuf>> {
+pub fn resolve_natives(
+    libraries: &[Library],
+    _natives_dir: &std::path::Path,
+) -> Result<Vec<PathBuf>> {
     let mut native_jars = Vec::new();
 
     for lib in libraries {
