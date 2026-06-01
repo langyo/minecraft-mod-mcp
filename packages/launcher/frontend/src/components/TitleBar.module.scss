@@ -37,6 +37,13 @@
   -webkit-app-region: no-drag;
 }
 
+.titlebarCenter {
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+  margin-right: 4px;
+}
+
 .titlebarBtn {
   width: 46px;
   height: 100%;

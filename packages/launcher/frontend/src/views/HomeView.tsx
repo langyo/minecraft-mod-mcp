@@ -83,8 +83,11 @@ export default defineComponent({
     return () => (
       <div class={styles.home}>
         <div class={styles.header}>
-          <h1 class={styles.pageTitle}>{t('dashboard.title')}</h1>
-          <p class={styles.pageSubtitle}>{t('dashboard.subtitle')}</p>
+          <img class={styles.logo} src="/logo.webp" alt="MMML" />
+          <div>
+            <h1 class={styles.pageTitle}>{t('dashboard.title')}</h1>
+            <p class={styles.pageSubtitle}>{t('dashboard.subtitle')}</p>
+          </div>
         </div>
 
         <div class={styles.summaryCards}>
