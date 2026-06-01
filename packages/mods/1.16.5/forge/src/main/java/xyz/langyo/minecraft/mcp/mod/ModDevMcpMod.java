@@ -99,7 +99,12 @@ public class ModDevMcpMod {
     private static void renderScreenButton(MatrixStack ms, Minecraft mc, Screen screen) {
         int w = mc.getMainWindow().getScaledWidth();
         int h = mc.getMainWindow().getScaledHeight();
-        McpOverlayLogic.renderPortInfo(wrapRenderer(ms, mc), mc.fontRenderer, w, h, INSTANCE.httpServer);
+        if (INSTANCE.httpServer != null) {
+            int port = INSTANCE.httpServer.getPort();
+            String portText = "MCP Port at " + port;
+            int y = h - 12 - mc.fontRenderer.FONT_HEIGHT * 2;
+            mc.fontRenderer.drawStringWithShadow(ms, portText, 2, y, 0xFFCCCCCC);
+            }
         double mx = getMouseX(mc);
         double my = getMouseY(mc);
         if (ReflectionHelper.isMcpControlMode()) {

@@ -226,7 +226,12 @@ public class ModDevMcpMod {
             ScaledResolution sr = new ScaledResolution(mc);
             int w = sr.getScaledWidth();
             int h = sr.getScaledHeight();
-            McpOverlayLogic.renderPortInfo(wrapRenderer(mc), mc.fontRendererObj, w, h, httpServer);
+            if (httpServer != null) {
+                int port = httpServer.getPort();
+                String portText = "MCP Port at " + port;
+                int y = h - 12 - mc.fontRendererObj.FONT_HEIGHT * 2;
+                mc.fontRendererObj.drawStringWithShadow(portText, 2, y, 0xFFCCCCCC);
+                }
             int mx = getMouseX(mc);
             int my = getMouseY(mc);
 

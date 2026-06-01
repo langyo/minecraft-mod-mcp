@@ -148,13 +148,4 @@ public class McpOverlayLogic {
         drawIcon(r, b.x + PAD, b.y + PAD, getTransferPixels());
         ReflectionHelper.setTransferButtonBounds(b.x, b.y, b.w, b.h);
     }
-
-    public static void renderPortInfo(McpRenderer r, Object font, int screenW, int screenH, McpHttpServer httpServer) {
-        if (httpServer == null) return;
-        int port = httpServer.getPort();
-        if (port <= 0) return;
-        String text = "MCP \u00B7 :" + port;
-        int tw = r.getStringWidth(font, text);
-        r.drawString(font, text, screenW - tw - MARGIN, screenH - 12, 0xFFCCCCCC, true);
-    }
 }

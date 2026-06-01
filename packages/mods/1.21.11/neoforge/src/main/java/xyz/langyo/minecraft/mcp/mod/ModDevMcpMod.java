@@ -62,7 +62,6 @@ public class ModDevMcpMod {
     private static void renderScreenButton(GuiGraphics g, Minecraft mc, Screen screen) {
         int w = mc.getWindow().getGuiScaledWidth();
         int h = mc.getWindow().getGuiScaledHeight();
-        McpOverlayLogic.renderPortInfo(wrapRenderer(g, mc), mc.font, w, h, INSTANCE.httpServer);
         double mx = mc.mouseHandler.xpos() * w / mc.getWindow().getScreenWidth();
         double my = mc.mouseHandler.ypos() * h / mc.getWindow().getScreenHeight();
         if (ReflectionHelper.isMcpControlMode()) {
@@ -128,6 +127,13 @@ public class ModDevMcpMod {
                 Minecraft mc = Minecraft.getInstance();
                 Screen screen = event.getScreen();
                 if (screen == null) return;
+                    if (INSTANCE.httpServer != null) {
+                        int port = INSTANCE.httpServer.getPort();
+                        String portText = "MCP Port at " + port;
+                        int screenH = mc.getWindow().getGuiScaledHeight();
+                        int y = screenH - 12 - mc.font.lineHeight * 2;
+                        event.getGuiGraphics().drawString(mc.font, portText, 2, y, 0xFFCCCCCC);
+                    }
                 if (mc.level != null) {
                     GuiGraphics sg = event.getGuiGraphics();
                     renderScreenButton(sg, mc, screen);
