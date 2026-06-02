@@ -115,7 +115,7 @@ export function loadVersionsData(): VersionsData {
 
 const EMBEDDED_VERSIONS: VersionsData = {
   fg_eras: {
-    fg21: { key: "fg21", fg_version: "2.1-SNAPSHOT", gradle: "2.14", plugin_id: "net.minecraftforge.gradle.forge", java: 8, min_mc: "1.8", max_mc: "1.8.9" },
+    fg21: { key: "fg21", fg_version: "2.1-SNAPSHOT", gradle: "2.14", plugin_id: "net.minecraftforge.gradle.forge", java: 8, min_mc: "1.7.2", max_mc: "1.8.9" },
     fg22: { key: "fg22", fg_version: "2.2-SNAPSHOT", gradle: "2.14", plugin_id: "net.minecraftforge.gradle.forge", java: 8, min_mc: "1.9", max_mc: "1.11.2" },
     fg23: { key: "fg23", fg_version: "2.3-SNAPSHOT", gradle: "4.10.3", plugin_id: "net.minecraftforge.gradle.forge", java: 8, min_mc: "1.12", max_mc: "1.12.2" },
     fg3: { key: "fg3", fg_version: "3.+", gradle: "4.10.3", plugin_id: "net.minecraftforge.gradle", java: 8, min_mc: "1.13.2", max_mc: "1.14.4" },
@@ -125,6 +125,8 @@ const EMBEDDED_VERSIONS: VersionsData = {
     fg7: { key: "fg7", fg_version: "[7.0.23,8)", gradle: "9.3.0", plugin_id: "net.minecraftforge.gradle", java: 21, min_mc: "1.21.4", max_mc: "99.99.99" },
   },
   versions: {
+    "1_7_2": { forge: "1.7.2-10.12.1.1109", fg_era: "fg21", java: 8, mappings: "snapshot_20140318", version_id: "1.7.2-forge10.12.1.1109-1.7.2" },
+    "1_7_10": { forge: "1.7.10-10.13.4.1614-1.7.10", fg_era: "fg21", java: 8, mappings: "snapshot_20141102", version_id: "1.7.10-Forge10.13.4.1614-1.7.10" },
     "1_8_9": { forge: "1.8.9-11.15.1.2318-1.8.9", fg_era: "fg21", java: 8, mappings: "snapshot_20160113", version_id: "1.8.9-forge1.8.9-11.15.1.2318-1.8.9" },
     "1_9_4": { forge: "1.9.4-12.17.0.2317-1.9.4", fg_era: "fg22", java: 8, mappings: "snapshot_20160518", version_id: "1.9.4-forge1.9.4-12.17.0.2317-1.9.4" },
     "1_10_2": { forge: "1.10.2-12.18.3.2511", fg_era: "fg22", java: 8, mappings: "snapshot_20160518", version_id: "1.10.2-forge1.10.2-12.18.3.2511" },
@@ -142,6 +144,7 @@ const EMBEDDED_VERSIONS: VersionsData = {
     "26_1_2": { forge: "26.1.2-64.0.8", fg_era: "fg7", java: 25, mappings: "official_26.1.2", version_id: "26.1.2-forge-64.0.8", neoforge: "26.1.2.36-beta", mdg: "2.0.141" },
   },
   api_groups: {
+    "1.7.2": "legacy", "1.7.10": "legacy",
     "1.8.9": "legacy", "1.9.4": "legacy", "1.10.2": "legacy", "1.11.2": "legacy", "1.12.2": "legacy",
     "1.13.2": "fg3", "1.14.4": "fg4", "1.15.2": "fg4", "1.16.5": "fg4",
     "1.17.1": "fg5", "1.18.2": "fg5", "1.19.4": "fg6", "1.20.6": "fg6",

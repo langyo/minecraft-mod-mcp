@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { serverDir } from "./settings.js";
 import { downloadFile } from "./download.js";
@@ -74,6 +74,42 @@ export interface ServerSetup {
   mcVersion: string;
 }
 
+const MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+
+interface ServerDownloadInfo {
+  url: string;
+  sha1?: string;
+}
+
+async function fetchServerUrl(mcVersion: string): Promise<ServerDownloadInfo> {
+  const manifest = await fetchJson(MANIFEST_URL);
+  const entry = manifest.versions?.find((v: { id: string }) => v.id === mcVersion);
+  if (!entry?.url) throw new Error(`MC ${mcVersion} not found in version manifest`);
+  const vj = await fetchJson(entry.url);
+  const server = vj?.downloads?.server;
+  if (!server?.url) throw new Error(`No server download for ${mcVersion}`);
+  return { url: server.url, sha1: server.sha1 };
+}
+
+async function fetchJson(url: string): Promise<any> {
+  const mod = await import("node:https");
+  return new Promise((resolve, reject) => {
+    mod.get(url, { headers: { "User-Agent": "minecraft-mcp" } }, (res) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        fetchJson(res.headers.location).then(resolve, reject);
+        return;
+      }
+      let data = "";
+      res.on("data", (c: Buffer) => (data += c));
+      res.on("end", () => {
+        try { resolve(JSON.parse(data)); }
+        catch { reject(new Error(`Invalid JSON from ${url}`)); }
+      });
+      res.on("error", reject);
+    }).on("error", reject);
+  });
+}
+
 export async function installServer(
   version: string,
   loader: Loader,
@@ -95,21 +131,22 @@ export async function installServer(
     mcVersion = version;
   }
 
-  let baseVj: VersionJson;
+  let serverUrl: string | undefined;
+  let serverSha: string | undefined;
+
   try {
-    baseVj = loadVersion(mcVersion);
+    const baseVj = loadVersion(mcVersion);
+    serverUrl = baseVj.downloads?.server?.url;
+    serverSha = baseVj.downloads?.server?.sha1;
   } catch {
-    const byId = getVersionById(data, version);
-    if (byId) {
-      mcVersion = byId.mc_version;
-      baseVj = loadVersion(mcVersion);
-    } else {
-      baseVj = loadVersion(versionId);
-      mcVersion = baseVj.inheritsFrom ?? baseVj.id;
-      if (mcVersion !== baseVj.id) {
-        try { baseVj = loadVersion(mcVersion); } catch { /* use what we have */ }
-      }
-    }
+    // vanilla version JSON not installed locally, fetch from Mojang API
+  }
+
+  if (!serverUrl) {
+    onProgress?.(`Fetching server info for ${mcVersion} from Mojang...`);
+    const info = await fetchServerUrl(mcVersion);
+    serverUrl = info.url;
+    serverSha = info.sha1;
   }
 
   const sDir = serverDir(versionId);
@@ -117,8 +154,6 @@ export async function installServer(
 
   const jarPath = join(sDir, `server-${mcVersion}.jar`);
   if (!existsSync(jarPath)) {
-    const serverUrl = baseVj.downloads?.server?.url;
-    const serverSha = baseVj.downloads?.server?.sha1;
     if (!serverUrl) throw new Error(`No server download available for ${mcVersion}`);
     onProgress?.(`Downloading server JAR for ${mcVersion}...`);
     await downloadFile(serverUrl, jarPath, serverSha);
