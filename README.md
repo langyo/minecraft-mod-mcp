@@ -7,7 +7,7 @@
 
 **AI-powered mod development toolkit — build, test, and debug Minecraft mods with AI**
 
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![License](https://img.shields.io/badge/license-MIT%20%7C%20Apache--2.0%20%7C%20CC0--1.0-blue.svg)](#license)
 [![Java](https://img.shields.io/badge/java-8--25-red.svg)](https://www.java.com/)
 [![Release](https://img.shields.io/github/v/release/langyo/minecraft-mod-mcp)](https://github.com/langyo/minecraft-mod-mcp/releases)
 [![npm](https://img.shields.io/npm/v/minecraft-mod-mcp)](https://www.npmjs.com/package/minecraft-mod-mcp)
@@ -148,9 +148,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, project structure,
 
 ## License
 
-Licensed under either of:
+Licensed under any of:
 
 - Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 - MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- CC0 1.0 Universal ([LICENSE-CC0](LICENSE-CC0) or http://creativecommons.org/publicdomain/zero/1.0/)
 
 at your option.
