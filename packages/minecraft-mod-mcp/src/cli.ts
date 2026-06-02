@@ -128,7 +128,11 @@ Options:
   let versionId: string | undefined;
   const vi = getVersion(data, versionArg);
   if (vi) {
-    versionId = getVersionForLoader(data, versionArg, loader) ?? vi.version_id;
+    versionId = getVersionForLoader(data, versionArg, loader) ?? undefined;
+    if (!versionId) {
+      console.error(`${loader} is not available for ${versionArg}`);
+      process.exit(1);
+    }
   } else {
     versionId = versionArg;
   }

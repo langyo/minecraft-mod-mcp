@@ -119,8 +119,8 @@ export function getVersionForLoader(data: VersionsData, mc: string, loader: Load
   const info = getVersion(data, mc);
   if (!info) return null;
   switch (loader) {
-    case "forge": return info.version_id;
-    case "neoforge": return discoverLoaderVersionId(mc, loader, info.neoforge);
+    case "forge": return discoverLoaderVersionId(mc, loader) ?? info.version_id;
+    case "neoforge": return info.neoforge ? discoverLoaderVersionId(mc, loader, info.neoforge) : null;
     case "fabric": return info.fabric_yarn ? discoverLoaderVersionId(mc, loader) : null;
   }
 }

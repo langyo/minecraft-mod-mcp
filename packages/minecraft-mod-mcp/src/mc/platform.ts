@@ -8,6 +8,9 @@ function homedir(): string {
 }
 
 export function mcDir(): string {
+  if (isWindows() && process.env.APPDATA) {
+    return join(process.env.APPDATA, ".minecraft");
+  }
   return join(homedir(), ".minecraft");
 }
 

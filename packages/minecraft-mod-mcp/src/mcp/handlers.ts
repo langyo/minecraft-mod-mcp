@@ -181,7 +181,8 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   let versionId: string | undefined;
   const vi = getVersion(data, version);
   if (vi) {
-    versionId = getVersionForLoader(data, version, loader) ?? vi.version_id;
+    versionId = getVersionForLoader(data, version, loader) ?? undefined;
+    if (!versionId) throw new Error(`${loader} is not available for ${version}`);
   } else {
     const byId = getVersionById(data, version);
     if (byId) versionId = byId.version_id;
