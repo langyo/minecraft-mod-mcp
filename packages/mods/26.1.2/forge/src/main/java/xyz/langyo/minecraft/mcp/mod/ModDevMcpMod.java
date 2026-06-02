@@ -270,7 +270,7 @@ public class ModDevMcpMod {
                         String portText = "MCP Port at " + port;
                         int screenH = mc.getWindow().getGuiScaledHeight();
                         int y = screenH - 12 - mc.font.lineHeight * 2;
-                        event.getGuiGraphics().drawString(mc.font, portText, 2, y, 0xFFCCCCCC, true);
+                        event.getGuiGraphics().text(mc.font, portText, 2, y, 0xFFCCCCCC);
                     }
                 if (ReflectionHelper.isMcpControlMode() && screen instanceof PauseScreen) {
                     mc.screen = null;
