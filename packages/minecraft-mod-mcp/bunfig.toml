@@ -1,6 +1,0 @@
-[install]
-peer = false
-
-[run]
-# Bun compat — just bun run src/cli.ts
-shell = "system"

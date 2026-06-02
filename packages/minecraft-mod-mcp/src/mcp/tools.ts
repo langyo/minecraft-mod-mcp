@@ -255,7 +255,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: "launch_minecraft",
-    description: "Launch a Minecraft instance with the specified version and mod loader. Calls the bundled launch_mc.py script.",
+    description: "Launch a Minecraft instance with the specified version and mod loader.",
     inputSchema: z.object({
       version: z.string().describe("Minecraft version, e.g. \"1.21.7\", \"26.1.2\"."),
       loader: zOpt(z.enum(["forge", "fabric", "neoforge"])).default("forge"),

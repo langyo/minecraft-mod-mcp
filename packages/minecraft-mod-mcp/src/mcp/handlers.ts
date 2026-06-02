@@ -2,9 +2,13 @@ import { TOOLS } from "./tools.js";
 import type { ModClient } from "../api/mod-client.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { spawn } from "node:child_process";
-import { resolve, join } from "node:path";
-import { existsSync } from "node:fs";
-import { PORT_START, PORT_END } from "../consts.js";
+import { join } from "node:path";
+import { loadVersionsData } from "../mc/versions-data.js";
+import { getVersion, getVersionForLoader, getVersionById, type Loader } from "../mc/versions.js";
+import { loadVersion } from "../mc/version-json.js";
+import { buildLaunchCommand } from "../mc/launch.js";
+import { loadConfig, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType } from "../mc/settings.js";
+import { findFreePort } from "../discovery/scanner.js";
 
 export function registerHandlers(server: McpServer, mod: ModClient) {
   for (const tool of TOOLS) {
@@ -103,15 +107,46 @@ async function handleTool(name: string, params: Record<string, unknown>, mod: Mo
     }
     case "launch_minecraft": {
       const version = String(params.version || "");
-      const loader = String(params.loader || "forge");
-      const scriptPath = findLaunchScript();
-      if (!scriptPath) throw new Error("launch_mc.py not found. Run from minecraft-mcp project root or set MINECRAFT_MCP_HOME.");
-      const proc = spawn("python", [scriptPath, `${version}-${loader}`, "--loader", loader], {
-        stdio: "pipe",
-        env: { ...process.env },
+      const loader = String(params.loader || "forge") as Loader;
+      const data = loadVersionsData();
+
+      let versionId = version;
+      const vi = getVersion(data, version);
+      if (vi) {
+        versionId = getVersionForLoader(data, version, loader) ?? vi.version_id;
+      }
+
+      if (!versionId) throw new Error(`Unknown version: ${version}`);
+
+      const vj = loadVersion(versionId);
+      const config = loadConfig();
+      const account = selectedAccount(config);
+      const mcpPort = config.mcp_port ?? await findFreePort();
+
+      const cmd = buildLaunchCommand({
+        versionId,
+        loader,
+        mcpPort,
+        maxMemoryMb: config.max_memory_mb,
+        minMemoryMb: config.min_memory_mb,
+        extraJvmArgs: config.java_args,
+        extraGameArgs: config.game_args,
+        javaPath: javaExecPath(config) ?? undefined,
+        playerName: account ? accountUsername(account) : "Player",
+        uuid: account ? accountUuid(account) : "0",
+        accessToken: account ? accountAccessToken(account) : "0",
+        userType: account ? accountUserType(account) : "legacy",
+      }, vj, data);
+
+      const mcDir_ = gameDirPath(config);
+      const child = spawn(cmd.java, cmd.args, {
+        cwd: mcDir_,
+        stdio: "ignore",
+        detached: process.platform !== "win32",
       });
-      mod.setMcProcess(proc);
-      return { launched: true, version, loader, pid: proc.pid };
+
+      mod.setMcProcess(child);
+      return { launched: true, version: versionId, loader, pid: child.pid, mcpPort };
     }
     case "kill_minecraft": {
       mod.killMc();
@@ -140,18 +175,4 @@ function formatResult(result: unknown): string {
   if (result === null || result === undefined) return "null";
   if (typeof result === "string") return result;
   return JSON.stringify(result, null, 2);
-}
-
-export function findLaunchScript(): string | null {
-  const candidates = [
-    resolve("scripts/launch_mc.py"),
-    resolve("..", "scripts/launch_mc.py"),
-    resolve("..", "..", "scripts/launch_mc.py"),
-  ];
-  const home = process.env.MINECRAFT_MCP_HOME;
-  if (home) candidates.push(join(home, "scripts/launch_mc.py"));
-  for (const p of candidates) {
-    if (existsSync(p)) return p;
-  }
-  return null;
 }

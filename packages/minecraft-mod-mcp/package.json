@@ -1,7 +1,7 @@
 {
   "name": "minecraft-mod-mcp",
-  "version": "0.1.1",
-  "description": "MCP server bridge for Minecraft — connect AI tools to Minecraft via Model Context Protocol",
+  "version": "0.2.0",
+  "description": "MCP server bridge & launcher CLI for Minecraft — connect AI tools to Minecraft via Model Context Protocol, launch and manage instances",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
@@ -35,7 +35,9 @@
     "automation",
     "forge",
     "fabric",
-    "neoforge"
+    "neoforge",
+    "launcher",
+    "cli"
   ],
   "license": "MIT OR Apache-2.0",
   "repository": {
