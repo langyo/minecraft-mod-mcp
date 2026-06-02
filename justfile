@@ -55,13 +55,13 @@ generate *ARGS:
 # Forge installation
 # ============================================================
 
-# Install Forge for all versions
+# Install Forge/NeoForge/Fabric for all supported versions
 install-forge *ARGS:
-    python scripts/install_forge.py {{ ARGS }}
+    node {{ mcp }}/dist/cli.js install {{ ARGS }}
 
-# Install Forge for a specific MC version
-install-forge-version mc:
-    python scripts/install_forge.py --mc {{ mc }}
+# Install Forge/NeoForge/Fabric for a specific MC version
+install-forge-version mc loader="forge":
+    node {{ mcp }}/dist/cli.js install {{ mc }} --loader {{ loader }}
 
 # Build + install mod for a version
 install-mod mc loader="forge":
@@ -140,15 +140,15 @@ local-smoke mc loader="forge":
 # Direct MC launch (no daemon — blocks until MC exits)
 # ============================================================
 
-# Launch MC directly from version JSON (blocking)
-# Usage: just run 1.12.2-forge1.12.2-14.23.5.2847
-#        just run 1.21.7-forge-57.0.2 --mc-dir "C:\custom\.minecraft"
-run version *ARGS:
-    python scripts/launch_mc.py {{ version }} {{ ARGS }}
+# Launch MC directly (non-blocking, via MCP CLI)
+# Usage: just run 1.12.2 forge
+#        just run 1.21.7 neoforge --mc-dir "C:\custom\.minecraft"
+run version loader="forge" *ARGS:
+    node {{ mcp }}/dist/cli.js launch {{ version }} --loader {{ loader }} {{ ARGS }}
 
 # Dry-run: print the launch command without executing
-dry-run version:
-    python scripts/launch_mc.py {{ version }} --dry-run
+dry-run version loader="forge":
+    node {{ mcp }}/dist/cli.js launch {{ version }} --loader {{ loader }} --dry-run
 
 # ============================================================
 # Utilities

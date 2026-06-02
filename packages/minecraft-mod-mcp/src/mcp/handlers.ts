@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { loadVersionsData } from "../mc/versions-data.js";
-import { getVersion, getVersionForLoader, getVersionById, getVersions, loaders, type Loader } from "../mc/versions.js";
+import { getVersion, getVersionForLoader, getVersionById, getVersions, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "../mc/versions.js";
 import { loadVersion } from "../mc/version-json.js";
 import { buildLaunchCommand } from "../mc/launch.js";
 import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "../mc/settings.js";
@@ -185,6 +185,7 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   } else {
     const byId = getVersionById(data, version);
     if (byId) versionId = byId.version_id;
+    else versionId = version;
   }
 
   if (!versionId) {
@@ -239,14 +240,6 @@ async function installVersion(params: Record<string, unknown>): Promise<unknown>
     throw new Error(`Unknown version: "${version}". Available: ${available}`);
   }
 
-  const versionId = getVersionForLoader(data, version, loader) ?? vi.version_id;
-
-  const versionDir = join(versionsDir(), versionId);
-  const jsonPath = join(versionDir, `${versionId}.json`);
-  if (existsSync(jsonPath)) {
-    return { installed: true, versionId, message: `Version ${versionId} is already installed.` };
-  }
-
   const mcVersion = vi.mc_version;
   const baseVersionDir = join(versionsDir(), mcVersion);
   const baseJsonPath = join(baseVersionDir, `${mcVersion}.json`);
@@ -267,12 +260,14 @@ async function installVersion(params: Record<string, unknown>): Promise<unknown>
   let loaderVersion: string | undefined;
   if (loader === "forge" && vi.forge) loaderVersion = vi.forge;
   else if (loader === "neoforge" && vi.neoforge) loaderVersion = vi.neoforge;
-  else if (loader === "fabric") loaderVersion = "0.16.14";
+  else if (loader === "fabric") loaderVersion = DEFAULT_FABRIC_LOADER_VERSION;
 
   if (loaderVersion) {
     logs.push(`Installing ${loader} ${loaderVersion}...`);
     await downloadLoaderVersion(mcVersion, loader, loaderVersion, (msg) => logs.push(msg));
   }
+
+  const versionId = getVersionForLoader(data, version, loader) ?? vi.version_id;
 
   return { installed: true, versionId, loader, loaderVersion, logs };
 }

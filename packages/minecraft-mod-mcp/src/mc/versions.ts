@@ -1,4 +1,11 @@
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { versionsDir } from "./platform.js";
+import type { VersionJson } from "./version-json.js";
+
 export type Loader = "forge" | "neoforge" | "fabric";
+
+export const DEFAULT_FABRIC_LOADER_VERSION = "0.16.14";
 
 export interface FgEra {
   key: string;
@@ -113,9 +120,41 @@ export function getVersionForLoader(data: VersionsData, mc: string, loader: Load
   if (!info) return null;
   switch (loader) {
     case "forge": return info.version_id;
-    case "neoforge": return info.neoforge ? `${mc}-neoforge-${info.neoforge}` : null;
-    case "fabric": return info.fabric_yarn ? `${mc}-fabric` : null;
+    case "neoforge": return discoverLoaderVersionId(mc, loader, info.neoforge);
+    case "fabric": return info.fabric_yarn ? discoverLoaderVersionId(mc, loader) : null;
   }
+}
+
+function discoverLoaderVersionId(mcVersion: string, loader: Loader, loaderVer?: string | null): string | null {
+  const vDir = versionsDir();
+  if (!existsSync(vDir)) return null;
+
+  try {
+    for (const entry of readdirSync(vDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const dirName = entry.name;
+      const jsonPath = join(vDir, dirName, `${dirName}.json`);
+      if (!existsSync(jsonPath)) continue;
+
+      try {
+        const raw = readFileSync(jsonPath, "utf-8");
+        const vj = JSON.parse(raw) as VersionJson;
+        const inherits = vj.inheritsFrom ?? vj.id;
+        if (inherits !== mcVersion) continue;
+
+        const mc = vj.mainClass?.toLowerCase() ?? "";
+        if (loader === "neoforge" && mc.includes("neoforged")) return dirName;
+        if (loader === "fabric" && mc.includes("fabricmc")) return dirName;
+        if (loader === "forge" && (mc.includes("minecraftforge") || mc.includes("forgebootstrap"))) return dirName;
+      } catch {
+        continue;
+      }
+    }
+  } catch {}
+
+  if (loader === "neoforge" && loaderVer) return `${mcVersion}-neoforge-${loaderVer}`;
+  if (loader === "fabric") return `fabric-loader-${DEFAULT_FABRIC_LOADER_VERSION}-${mcVersion}`;
+  return null;
 }
 
 export function getFgEra(data: VersionsData, key: string): FgEra | null {

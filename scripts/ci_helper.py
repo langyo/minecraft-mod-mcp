@@ -53,38 +53,26 @@ def setup_mc_version(mc_ver, loader, mc_dir=None):
         launcher_profiles.write_text('{"profiles":{}}')
 
     if loader in ("forge", "neoforge"):
-        install_script = str(SCRIPTS / "install_forge.py")
-        _log(f"Running {install_script} --mc {mc_ver} ...")
+        mcp_cli = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
+        _log(f"Running MCP CLI install for {mc_ver} ({loader})...")
         env_clean = {k: v for k, v in os.environ.items()
                       if not k.lower().endswith("proxy") and k.lower() != "all_proxy"}
         env_clean["HOME"] = str(Path(mc).parent)
         env_clean["JAVA_HOME"] = os.environ.get("JAVA_HOME", "")
-        cmd = [sys.executable, install_script, "--mc", mc_ver]
-        if loader in ("forge", "neoforge"):
-            cmd += ["--loader", loader]
+        cmd = ["node", mcp_cli, "install", mc_ver, "--loader", loader]
         result = subprocess.run(
             cmd,
             env=env_clean,
             capture_output=True, text=True, timeout=600,
         )
         if result.returncode != 0:
-            _log(f"install_forge stderr: {result.stderr[-500:]}")
-        name = None
-        for line in result.stdout.splitlines():
-            if "OK:" in line and "OK (new):" not in line:
-                candidate = line.split("OK:")[-1].strip()
-                if "/" not in candidate and not candidate.endswith(".json"):
-                    name = candidate
-        if name:
-            _log(f"Forge installed: {name}")
-            return name
-
-        from install_forge import _find_installed
-        installed = _find_installed(mc_ver, loader)
+            _log(f"MCP install stderr: {result.stderr[-500:]}")
+        
+        installed = _find_installed(mc_ver, loader, mc)
         if installed:
-            _log(f"Found installed: {installed}")
+            _log(f"Installed: {installed}")
             return installed
-        _log(f"Forge install failed for {mc_ver}/{loader}")
+        _log(f"Install failed for {mc_ver}/{loader}")
         return None
 
     elif loader == "fabric":
@@ -120,6 +108,37 @@ def _install_fabric_json(mc_ver, mc):
 
     _log(f"Fabric version JSON: {version_name}")
     return version_name
+
+
+def _find_installed(mc_ver: str, loader: str, mc_dir: str | None = None) -> str | None:
+    """Find an installed Forge/NeoForge/Fabric version directory by scanning .minecraft/versions/."""
+    base = Path(mc_dir) if mc_dir else Path.home() / ".minecraft"
+    versions = base / "versions"
+    if not versions.is_dir():
+        return None
+    loader_lower = loader.lower()
+    for d in sorted(versions.iterdir()):
+        if not d.is_dir():
+            continue
+        json_path = d / f"{d.name}.json"
+        if not json_path.exists():
+            continue
+        try:
+            data = json.loads(json_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        inherits = data.get("inheritsFrom", data.get("id", ""))
+        if inherits != mc_ver:
+            continue
+        mc_cls = (data.get("mainClass") or "").lower()
+        if loader_lower == "neoforge" and "neoforged" in mc_cls:
+            return d.name
+        if loader_lower == "forge" and ("minecraftforge" in mc_cls or "forgebootstrap" in mc_cls):
+            return d.name
+        if loader_lower == "fabric" and "fabricmc" in mc_cls:
+            return d.name
+    return None
+
 
 sys.path.insert(0, str(SCRIPTS))
 
@@ -585,12 +604,11 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     if world_name:
         extra_jvm += f" -Dmcp.test.world={world_name}"
 
-    launcher = str(SCRIPTS / "launch_mc.py")
+    launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
     try:
         mc_proc = subprocess.Popen(
-            [sys.executable, launcher, version_name, "--headless",
-             "--jvm-args", "-Xmx512M -Xms256M",
-             "--width", "640", "--height", "360",
+            ["node", launcher, "launch", version_name, "--headless",
+             "--memory", "512",
              "--extra-jvm", extra_jvm,
              "--no-mod-sync"],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -712,14 +730,11 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
         return {"setup": {"passed": False, "detail": "Version setup failed"}}
 
     env = os.environ.copy()
-    launcher = str(SCRIPTS / "launch_mc.py")
+    launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
 
     mc_proc = subprocess.Popen(
-        [sys.executable, launcher, version_name,
-         "--jvm-args", "-Xmx512M -Xms256M",
-         "--width", "1280", "--height", "720",
-         "--world", world_name,
-         "--no-mod-sync"],
+        ["node", launcher, "launch", version_name,
+         "--memory", "512"],
         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1,
     )
@@ -861,13 +876,10 @@ def main():
             _log("ERROR: Failed to setup MC version")
             sys.exit(1)
 
-        launcher = str(SCRIPTS / "launch_mc.py")
+        launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
         mc_proc = subprocess.Popen(
-            [sys.executable, launcher, version_name,
-             "--jvm-args", "-Xmx512M -Xms256M",
-             "--width", "1280", "--height", "720",
-             "--world", args.world,
-             "--no-mod-sync"],
+            ["node", launcher, "launch", version_name,
+             "--memory", "512"],
             env=os.environ.copy(),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,

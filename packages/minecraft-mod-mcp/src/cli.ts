@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import { startServer } from "./server.js";
 import { loadVersionsData } from "./mc/versions-data.js";
-import { getVersions, getVersion, getVersionById, getVersionForLoader, loaders, type Loader } from "./mc/versions.js";
+import { getVersions, getVersion, getVersionById, getVersionForLoader, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
 import { loadVersion } from "./mc/version-json.js";
 import { buildLaunchCommand, type LaunchConfig } from "./mc/launch.js";
 import { loadConfig, saveConfig, addAccount, removeAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "./mc/settings.js";
@@ -242,23 +242,15 @@ async function runInstall(args: string[]) {
 
   const vi = getVersion(data, versionArg);
   if (vi) {
-    const versionId = getVersionForLoader(data, versionArg, loader) ?? vi.version_id;
-    console.log(`Resolved ${versionArg} (${loader}) -> ${versionId}`);
+    const mcVersion = vi.mc_version;
+    console.log(`Resolved ${versionArg} (${loader})`);
 
-    const versionDir = join(versionsDir(), versionId);
-    const jsonPath = join(versionDir, `${versionId}.json`);
-    if (existsSync(jsonPath)) {
-      console.log(`Version ${versionId} is already installed.`);
-      return;
-    }
-
-    const baseVersionDir = join(versionsDir(), vi.mc_version);
-    const baseJsonPath = join(baseVersionDir, `${vi.mc_version}.json`);
+    const baseVersionDir = join(versionsDir(), mcVersion);
+    const baseJsonPath = join(baseVersionDir, `${mcVersion}.json`);
     if (!existsSync(baseJsonPath)) {
       console.log(`Fetching version manifest...`);
       const manifest = await fetchVersionManifest();
 
-      const mcVersion = vi.mc_version;
       const mv = manifest.versions.find((v) => v.id === mcVersion);
       if (!mv) {
         console.error(`Base MC version ${mcVersion} not found in manifest.`);
@@ -272,7 +264,7 @@ async function runInstall(args: string[]) {
         console.error(`  ${msg}`);
       });
     } else {
-      console.log(`Base MC ${vi.mc_version} already installed.`);
+      console.log(`Base MC ${mcVersion} already installed.`);
     }
 
     let loaderVersion: string | undefined;
@@ -281,20 +273,21 @@ async function runInstall(args: string[]) {
     } else if (loader === "neoforge" && vi.neoforge) {
       loaderVersion = vi.neoforge;
     } else if (loader === "fabric" && vi.fabric_yarn) {
-      loaderVersion = "0.16.14";
+      loaderVersion = DEFAULT_FABRIC_LOADER_VERSION;
     }
 
     if (loaderVersion) {
       console.log(`\nInstalling ${loader} ${loaderVersion}...`);
-      await downloadLoaderVersion(vi.mc_version, loader, loaderVersion, (msg) => {
+      await downloadLoaderVersion(mcVersion, loader, loaderVersion, (msg) => {
         console.error(`  ${msg}`);
       });
     } else {
       console.log(`\nNote: ${loader} is not available for ${versionArg}.`);
-      console.log(`Only base MC ${vi.mc_version} was installed.`);
+      console.log(`Only base MC ${mcVersion} was installed.`);
     }
 
-    console.log(`\nDone.`);
+    const versionId = getVersionForLoader(data, versionArg, loader) ?? vi.version_id;
+    console.log(`\nDone. Installed version: ${versionId}`);
   } else {
     console.log(`Fetching version manifest...`);
     const manifest = await fetchVersionManifest();
