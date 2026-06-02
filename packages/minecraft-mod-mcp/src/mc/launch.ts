@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { crossHomedir } from "../runtime/detector.js";
 import type { VersionJson } from "./version-json.js";
 import { collectAllArgs, resolveClasspath } from "./version-json.js";
-import { javaExec, nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator } from "./platform.js";
+import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion } from "./platform.js";
 import { loadVersionsData, type VersionsData } from "./versions-data.js";
 import { getVersionById, type Loader } from "./versions.js";
 
@@ -30,20 +30,35 @@ export interface LaunchCommand {
   args: string[];
   classpath: string;
   mainClass: string;
+  javaVersion: number;
 }
+
+const LEGACY_JVM_ARGS = [
+  "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+  "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
+  "--add-opens", "java.base/java.util.jar=ALL-UNNAMED",
+  "--add-opens", "java.base/java.util.zip=ALL-UNNAMED",
+  "--add-opens", "java.base/jdk.internal.loader=ALL-UNNAMED",
+  "--add-opens", "java.base/java.io=ALL-UNNAMED",
+  "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+];
 
 export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?: VersionsData): LaunchCommand {
   const vd = data ?? loadVersionsData();
   const mcDir = config.mcDir ?? join(crossHomedir(), ".minecraft");
 
   const versionInfo = getVersionById(vd, config.versionId);
-  const javaVersion = versionInfo?.java ?? 17;
-  const java = config.javaPath || javaExec(javaVersion);
+  const targetJavaVersion = versionInfo?.java ?? 17;
+  const java = config.javaPath || findJavaForVersion(targetJavaVersion);
 
   const classpathPaths = resolveClasspath(vj.libraries);
 
+  const inheritsFrom = vj.inheritsFrom ?? config.versionId;
+  const baseJar = join(versionsDir(), inheritsFrom, `${inheritsFrom}.jar`);
+  if (existsSync(baseJar)) classpathPaths.push(baseJar);
+
   const versionJar = join(versionsDir(), config.versionId, `${config.versionId}.jar`);
-  if (existsSync(versionJar)) classpathPaths.push(versionJar);
+  if (existsSync(versionJar) && versionJar !== baseJar) classpathPaths.push(versionJar);
 
   if (config.modJar && existsSync(config.modJar)) {
     classpathPaths.push(config.modJar);
@@ -56,10 +71,29 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
 
   const ndir = nativesDir(config.versionId);
   const aDir = assetsDir();
-  const assetsIndex = vj.assets ?? config.versionId;
+  const assetsIndex = vj.assets ?? inheritsFrom;
   const libDir = librariesDir();
 
   const allArgs: string[] = [];
+
+  if (config.maxMemoryMb) allArgs.push(`-Xmx${config.maxMemoryMb}m`);
+  if (config.minMemoryMb) allArgs.push(`-Xms${config.minMemoryMb}m`);
+
+  if (config.mcpPort) {
+    allArgs.push(`-Dmcp.port=${config.mcpPort}`);
+  }
+
+  if (targetJavaVersion < 17) {
+    allArgs.push(...LEGACY_JVM_ARGS);
+  }
+
+  if (config.extraJvmArgs) {
+    for (const arg of config.extraJvmArgs.split(/\s+/)) {
+      if (arg) allArgs.push(arg);
+    }
+  }
+
+  const hasCpInJvm = jvmArgs.some((a) => a.includes("${classpath}"));
 
   const resolvedJvm = jvmArgs.map((arg) =>
     arg
@@ -76,12 +110,8 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   );
   allArgs.push(...resolvedJvm);
 
-  if (config.maxMemoryMb) allArgs.push(`-Xmx${config.maxMemoryMb}m`);
-  if (config.minMemoryMb) allArgs.push(`-Xms${config.minMemoryMb}m`);
-  if (config.extraJvmArgs) {
-    for (const arg of config.extraJvmArgs.split(/\s+/)) {
-      if (arg) allArgs.push(arg);
-    }
+  if (!hasCpInJvm && classpath) {
+    allArgs.push("-cp", classpath);
   }
 
   const playerName = config.playerName ?? "Player";
@@ -115,11 +145,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     }
   }
 
-  if (config.mcpPort) {
-    allArgs.push(`-Dmcp.port=${config.mcpPort}`);
-  }
-
   allArgs.push(vj.mainClass);
 
-  return { java, args: allArgs, classpath, mainClass: vj.mainClass };
+  return { java, args: allArgs, classpath, mainClass: vj.mainClass, javaVersion: targetJavaVersion };
 }

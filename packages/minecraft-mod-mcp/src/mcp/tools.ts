@@ -271,4 +271,39 @@ export const TOOLS: ToolDef[] = [
     description: "Get Minecraft process and mod connection status.",
     inputSchema: z.object({}),
   },
+  {
+    name: "install_version",
+    description: "Download and install a Minecraft version with the specified mod loader. Downloads base MC + loader (Forge/Fabric/NeoForge).",
+    inputSchema: z.object({
+      version: z.string().describe("Minecraft version, e.g. \"1.21.7\", \"26.1.2\". Use list_supported_versions to see available versions."),
+      loader: zOpt(z.enum(["forge", "fabric", "neoforge"])).default("forge"),
+    }),
+  },
+  {
+    name: "list_supported_versions",
+    description: "List all supported Minecraft versions with their Java requirements, available loaders, and version IDs.",
+    inputSchema: z.object({}),
+  },
+  {
+    name: "list_installed_versions",
+    description: "List all locally installed Minecraft versions.",
+    inputSchema: z.object({}),
+  },
+  {
+    name: "detect_java",
+    description: "Detect all Java installations on the system. Returns version, vendor, and path for each.",
+    inputSchema: z.object({}),
+  },
+  {
+    name: "create_offline_account",
+    description: "Create an offline Minecraft account for launching without authentication.",
+    inputSchema: z.object({
+      username: z.string().describe("Player username for the offline account."),
+    }),
+  },
+  {
+    name: "list_accounts",
+    description: "List all configured Minecraft accounts (offline and Microsoft).",
+    inputSchema: z.object({}),
+  },
 ];

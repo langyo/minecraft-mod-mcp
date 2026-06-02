@@ -4,6 +4,20 @@ import { dirname, join } from "node:path";
 import { versionsDir, assetsDir, librariesDir } from "./platform.js";
 import { libraryMavenPath } from "./version-json.js";
 import type { VersionJson } from "./version-json.js";
+import type { Loader } from "./versions.js";
+
+export interface ForgeInstallProfile {
+  install: {
+    profileName: string;
+    target: string;
+    path: string;
+    version: string;
+    filePath: string;
+    minecraft: string;
+    mirrorList?: string;
+  };
+  versionInfo: VersionJson;
+}
 
 export interface VersionManifest {
   latest: { release: string; snapshot: string };
@@ -42,6 +56,8 @@ export async function downloadFile(
     if (expectedSha1) {
       const existing = await sha1File(path);
       if (existing.toLowerCase() === expectedSha1.toLowerCase()) return;
+    } else {
+      return;
     }
   }
 
@@ -76,6 +92,15 @@ export async function downloadVersion(
   writeFileSync(jsonPath, JSON.stringify(versionJson, null, 2), "utf-8");
   onProgress?.(`Saved version JSON for ${versionId}`);
 
+  if (versionJson.downloads?.client?.url) {
+    const jarPath = join(vDir, `${versionId}.jar`);
+    if (!existsSync(jarPath)) {
+      onProgress?.(`Downloading client JAR for ${versionId}...`);
+      await downloadFile(versionJson.downloads.client.url, jarPath, versionJson.downloads.client.sha1);
+      onProgress?.(`Client JAR downloaded.`);
+    }
+  }
+
   if (versionJson.assetIndex?.url) {
     const idxDir = join(assetsDir(), "indexes");
     if (!existsSync(idxDir)) mkdirSync(idxDir, { recursive: true });
@@ -91,26 +116,21 @@ export async function downloadVersion(
       const entries = Object.entries(objects);
       onProgress?.(`Downloading ${entries.length} assets...`);
 
-      for (let i = 0; i < entries.length; i++) {
-        const [, obj] = entries[i];
-        const hash = obj.hash;
-        const prefix = hash.slice(0, 2);
-        const assetUrl = `https://resources.download.minecraft.net/${prefix}/${hash}`;
-        const objDir = join(assetsDir(), "objects", prefix);
-        if (!existsSync(objDir)) mkdirSync(objDir, { recursive: true });
-        const assetPath = join(objDir, hash);
-
-        if (!existsSync(assetPath)) {
-          try {
-            await downloadFile(assetUrl, assetPath, hash);
-          } catch {
-            continue;
+      const BATCH = 50;
+      for (let i = 0; i < entries.length; i += BATCH) {
+        const batch = entries.slice(i, i + BATCH);
+        await Promise.all(batch.map(async ([, obj]) => {
+          const hash = obj.hash;
+          const prefix = hash.slice(0, 2);
+          const assetUrl = `https://resources.download.minecraft.net/${prefix}/${hash}`;
+          const objDir = join(assetsDir(), "objects", prefix);
+          if (!existsSync(objDir)) mkdirSync(objDir, { recursive: true });
+          const assetPath = join(objDir, hash);
+          if (!existsSync(assetPath)) {
+            try { await downloadFile(assetUrl, assetPath, hash); } catch { /* skip */ }
           }
-        }
-
-        if (i % 200 === 0) {
-          onProgress?.(`Assets: ${i + 1}/${entries.length}`);
-        }
+        }));
+        onProgress?.(`Assets: ${Math.min(i + BATCH, entries.length)}/${entries.length}`);
       }
     }
   }
@@ -130,13 +150,6 @@ export async function downloadVersion(
     }
   }
 
-  if (versionJson.downloads?.client?.url) {
-    const jarPath = join(versionsDir(), versionId, `${versionId}.jar`);
-    if (!existsSync(jarPath)) {
-      await downloadFile(versionJson.downloads.client.url, jarPath, versionJson.downloads.client.sha1);
-    }
-  }
-
   onProgress?.(`Version ${versionId} download complete`);
 }
 
@@ -147,7 +160,7 @@ export function listInstalledVersions(): string[] {
   const installed: string[] = [];
   try {
     for (const entry of readdirSync(vDir, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
+      if (entry.isDirectory() && entry.name !== ".tmp") {
         const jsonPath = join(vDir, entry.name, `${entry.name}.json`);
         if (existsSync(jsonPath)) installed.push(entry.name);
       }
@@ -155,4 +168,216 @@ export function listInstalledVersions(): string[] {
   } catch {}
 
   return installed.sort();
+}
+
+export async function downloadLoaderVersion(
+  mcVersion: string,
+  loader: Loader,
+  loaderVersion: string,
+  onProgress?: (msg: string) => void,
+): Promise<void> {
+  switch (loader) {
+    case "forge":
+      await downloadForgeInstaller(loaderVersion, onProgress);
+      break;
+    case "fabric":
+      await downloadFabricLoader(mcVersion, loaderVersion, onProgress);
+      break;
+    case "neoforge":
+      await downloadNeoforgeInstaller(loaderVersion, onProgress);
+      break;
+  }
+}
+
+export async function downloadForgeInstaller(
+  forgeVersion: string,
+  onProgress?: (msg: string) => void,
+): Promise<void> {
+  const mavenUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${forgeVersion}/forge-${forgeVersion}-installer.jar`;
+  const tmpDir = join(versionsDir(), ".tmp");
+  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+  const installerPath = join(tmpDir, `forge-${forgeVersion}-installer.jar`);
+
+  onProgress?.(`Downloading Forge installer for ${forgeVersion}...`);
+  await downloadFile(mavenUrl, installerPath);
+
+  onProgress?.(`Extracting install profile...`);
+  const profile = await extractJarJson<ForgeInstallProfile>(installerPath, "install_profile.json");
+  if (!profile?.versionInfo) throw new Error("Invalid Forge installer: missing versionInfo");
+
+  const versionId = profile.versionInfo.id;
+  const vDir = join(versionsDir(), versionId);
+  if (!existsSync(vDir)) mkdirSync(vDir, { recursive: true });
+
+  const jsonPath = join(vDir, `${versionId}.json`);
+  writeFileSync(jsonPath, JSON.stringify(profile.versionInfo, null, 2), "utf-8");
+  onProgress?.(`Saved version JSON for ${versionId}`);
+
+  const universalFileName = profile.install.filePath;
+  const universalUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${forgeVersion}/${universalFileName}`;
+  const forgeLibName = `net.minecraftforge:forge:${forgeVersion}`;
+  const forgeLibPath = join(librariesDir(), libraryMavenPath(forgeLibName));
+  const forgeLibDir = dirname(forgeLibPath);
+  if (!existsSync(forgeLibDir)) mkdirSync(forgeLibDir, { recursive: true });
+  if (!existsSync(forgeLibPath)) {
+    onProgress?.(`Downloading Forge universal JAR...`);
+    await downloadFile(universalUrl, forgeLibPath);
+  }
+
+  await downloadLibraries(profile.versionInfo.libraries, onProgress);
+
+  onProgress?.(`Forge ${versionId} install complete`);
+}
+
+export async function downloadFabricLoader(
+  mcVersion: string,
+  loaderVersion: string,
+  onProgress?: (msg: string) => void,
+): Promise<void> {
+  const versionId = `fabric-loader-${loaderVersion}-${mcVersion}`;
+  const vDir = join(versionsDir(), versionId);
+  if (!existsSync(vDir)) mkdirSync(vDir, { recursive: true });
+
+  const jsonPath = join(vDir, `${versionId}.json`);
+  if (existsSync(jsonPath)) {
+    onProgress?.(`Fabric loader ${versionId} already installed.`);
+    return;
+  }
+
+  const profileUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
+  onProgress?.(`Fetching Fabric profile for ${mcVersion} loader ${loaderVersion}...`);
+  const resp = await fetch(profileUrl);
+  if (!resp.ok) throw new Error(`Failed to fetch Fabric profile: HTTP ${resp.status}`);
+  const profileJson = await resp.json() as VersionJson;
+
+  writeFileSync(jsonPath, JSON.stringify(profileJson, null, 2), "utf-8");
+  onProgress?.(`Saved version JSON for ${versionId}`);
+
+  await downloadLibraries(profileJson.libraries, onProgress);
+
+  onProgress?.(`Fabric ${versionId} install complete`);
+}
+
+export async function downloadNeoforgeInstaller(
+  neoforgeVersion: string,
+  onProgress?: (msg: string) => void,
+): Promise<void> {
+  const mavenUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeVersion}/neoforge-${neoforgeVersion}-installer.jar`;
+  const tmpDir = join(versionsDir(), ".tmp");
+  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+  const installerPath = join(tmpDir, `neoforge-${neoforgeVersion}-installer.jar`);
+
+  onProgress?.(`Downloading NeoForge installer for ${neoforgeVersion}...`);
+  await downloadFile(mavenUrl, installerPath);
+
+  onProgress?.(`Extracting install profile...`);
+  const profile = await extractJarJson<ForgeInstallProfile>(installerPath, "install_profile.json");
+  if (!profile?.versionInfo) throw new Error("Invalid NeoForge installer: missing versionInfo");
+
+  const versionId = profile.versionInfo.id;
+  const vDir = join(versionsDir(), versionId);
+  if (!existsSync(vDir)) mkdirSync(vDir, { recursive: true });
+
+  const jsonPath = join(vDir, `${versionId}.json`);
+  writeFileSync(jsonPath, JSON.stringify(profile.versionInfo, null, 2), "utf-8");
+  onProgress?.(`Saved version JSON for ${versionId}`);
+
+  const universalFileName = profile.install.filePath;
+  const universalUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeVersion}/${universalFileName}`;
+  const nfLibName = `net.neoforged:neoforge:${neoforgeVersion}`;
+  const nfLibPath = join(librariesDir(), libraryMavenPath(nfLibName));
+  const nfLibDir = dirname(nfLibPath);
+  if (!existsSync(nfLibDir)) mkdirSync(nfLibDir, { recursive: true });
+  if (!existsSync(nfLibPath)) {
+    onProgress?.(`Downloading NeoForge JAR...`);
+    await downloadFile(universalUrl, nfLibPath);
+  }
+
+  await downloadLibraries(profile.versionInfo.libraries, onProgress);
+
+  onProgress?.(`NeoForge ${versionId} install complete`);
+}
+
+async function downloadLibraries(
+  libraries: VersionJson["libraries"],
+  onProgress?: (msg: string) => void,
+): Promise<void> {
+  for (const lib of libraries) {
+    if (lib.downloads?.artifact?.url) {
+      const libPath = join(librariesDir(), lib.downloads.artifact.path);
+      try {
+        await downloadFile(lib.downloads.artifact.url, libPath, lib.downloads.artifact.sha1);
+      } catch {
+        onProgress?.(`  Warning: could not download ${lib.name}`);
+      }
+    } else if (lib.name) {
+      const repoUrl = (lib as any).url as string | undefined;
+      const mvnPath = libraryMavenPath(lib.name);
+      const filePath = join(librariesDir(), mvnPath);
+      if (!existsSync(filePath)) {
+        const baseUrls = repoUrl
+          ? [`${repoUrl.replace(/\/$/, "")}/${mvnPath}`]
+          : [];
+        baseUrls.push(
+          `https://libraries.minecraft.net/${mvnPath}`,
+          `https://maven.minecraftforge.net/${mvnPath}`,
+          `https://maven.neoforged.net/releases/${mvnPath}`,
+        );
+        let downloaded = false;
+        for (const url of baseUrls) {
+          try {
+            await downloadFile(url, filePath);
+            downloaded = true;
+            break;
+          } catch { /* try next */ }
+        }
+        if (!downloaded) {
+          onProgress?.(`  Warning: could not download ${lib.name}`);
+        }
+      }
+    }
+  }
+}
+
+async function extractJarJson<T>(jarPath: string, entryName: string): Promise<T | null> {
+  const { inflateRawSync } = await import("node:zlib");
+  const data = readFileSync(jarPath);
+
+  let eocdOffset = -1;
+  for (let i = data.length - 22; i >= 0; i--) {
+    if (data[i] === 0x50 && data[i + 1] === 0x4b && data[i + 2] === 0x05 && data[i + 3] === 0x06) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset < 0) return null;
+
+  const cdOffset = data.readUInt32LE(eocdOffset + 16);
+  const cdEntries = data.readUInt16LE(eocdOffset + 10);
+
+  let offset = cdOffset;
+  for (let i = 0; i < cdEntries; i++) {
+    if (data.readUInt32LE(offset) !== 0x02014b50) break;
+    const fnameLen = data.readUInt16LE(offset + 28);
+    const extraLen = data.readUInt16LE(offset + 30);
+    const commentLen = data.readUInt16LE(offset + 32);
+    const localHeaderOffset = data.readUInt32LE(offset + 42);
+    const fname = data.subarray(offset + 46, offset + 46 + fnameLen).toString("utf-8");
+
+    if (fname === entryName) {
+      const compMethod = data.readUInt16LE(localHeaderOffset + 8);
+      const lhFnameLen = data.readUInt16LE(localHeaderOffset + 26);
+      const lhExtraLen = data.readUInt16LE(localHeaderOffset + 28);
+      const compSize = data.readUInt32LE(offset + 20);
+      const contentStart = localHeaderOffset + 30 + lhFnameLen + lhExtraLen;
+
+      const compressed = data.subarray(contentStart, contentStart + compSize);
+      const jsonBytes = compMethod === 0 ? compressed : inflateRawSync(compressed);
+      return JSON.parse(jsonBytes.toString("utf-8")) as T;
+    }
+
+    offset = offset + 46 + fnameLen + extraLen + commentLen;
+  }
+
+  return null;
 }

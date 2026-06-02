@@ -7,8 +7,8 @@ import { buildLaunchCommand, type LaunchConfig } from "./mc/launch.js";
 import { loadConfig, saveConfig, addAccount, removeAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "./mc/settings.js";
 import { detectJavas } from "./mc/java-detect.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
-import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions } from "./mc/download.js";
-import { javaExec, mcDir } from "./mc/platform.js";
+import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion } from "./mc/download.js";
+import { mcDir, versionsDir, classpathSeparator, findJavaForVersion } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
 import { PORT_START, PORT_END } from "./consts.js";
 import { spawn } from "node:child_process";
@@ -165,6 +165,8 @@ Options:
   if (launchConfig.dryRun) {
     console.log(`Java: ${cmd.java}`);
     console.log(`MainClass: ${cmd.mainClass}`);
+    console.log(`Classpath (${cmd.classpath.split(classpathSeparator()).length} entries):`);
+    for (const cp of cmd.classpath.split(classpathSeparator())) console.log(`  ${cp}`);
     console.log(`Args:`);
     for (const arg of cmd.args) console.log(`  ${arg}`);
     return;
@@ -219,28 +221,100 @@ async function runInstalled() {
 
 async function runInstall(args: string[]) {
   if (args.length === 0) {
-    console.error("Usage: minecraft-mod-mcp install <version>");
+    console.error("Usage: minecraft-mod-mcp install <version> [options]");
+    console.error("\nOptions:");
+    console.error("  --loader <forge|fabric|neoforge>  Mod loader (default: forge)");
+    console.error("\nUse 'minecraft-mod-mcp list' to see supported versions.");
     process.exit(1);
   }
 
-  const versionArg = args[0];
-  console.log(`Fetching version manifest...`);
-  const manifest = await fetchVersionManifest();
-
-  const mv = manifest.versions.find((v) => v.id === versionArg);
-  if (!mv) {
-    console.error(`Version ${versionArg} not found in manifest.`);
-    process.exit(1);
-  }
-
-  console.log(`Downloading version JSON for ${mv.id}...`);
-  const vj = await fetchVersionJson(mv.url);
-
-  await downloadVersion(vj, (msg) => {
-    console.error(`  ${msg}`);
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      loader: { type: "string", default: "forge" },
+    },
+    strict: false,
   });
 
-  console.log(`Done. Version ${mv.id} installed.`);
+  const versionArg = positionals[0];
+  const loader = (values.loader ?? "forge") as Loader;
+  const data = loadVersionsData();
+
+  const vi = getVersion(data, versionArg);
+  if (vi) {
+    const versionId = getVersionForLoader(data, versionArg, loader) ?? vi.version_id;
+    console.log(`Resolved ${versionArg} (${loader}) -> ${versionId}`);
+
+    const versionDir = join(versionsDir(), versionId);
+    const jsonPath = join(versionDir, `${versionId}.json`);
+    if (existsSync(jsonPath)) {
+      console.log(`Version ${versionId} is already installed.`);
+      return;
+    }
+
+    const baseVersionDir = join(versionsDir(), vi.mc_version);
+    const baseJsonPath = join(baseVersionDir, `${vi.mc_version}.json`);
+    if (!existsSync(baseJsonPath)) {
+      console.log(`Fetching version manifest...`);
+      const manifest = await fetchVersionManifest();
+
+      const mcVersion = vi.mc_version;
+      const mv = manifest.versions.find((v) => v.id === mcVersion);
+      if (!mv) {
+        console.error(`Base MC version ${mcVersion} not found in manifest.`);
+        process.exit(1);
+      }
+
+      console.log(`Downloading base version JSON for ${mcVersion}...`);
+      const baseVj = await fetchVersionJson(mv.url);
+
+      await downloadVersion(baseVj, (msg) => {
+        console.error(`  ${msg}`);
+      });
+    } else {
+      console.log(`Base MC ${vi.mc_version} already installed.`);
+    }
+
+    let loaderVersion: string | undefined;
+    if (loader === "forge" && vi.forge) {
+      loaderVersion = vi.forge;
+    } else if (loader === "neoforge" && vi.neoforge) {
+      loaderVersion = vi.neoforge;
+    } else if (loader === "fabric" && vi.fabric_yarn) {
+      loaderVersion = "0.16.14";
+    }
+
+    if (loaderVersion) {
+      console.log(`\nInstalling ${loader} ${loaderVersion}...`);
+      await downloadLoaderVersion(vi.mc_version, loader, loaderVersion, (msg) => {
+        console.error(`  ${msg}`);
+      });
+    } else {
+      console.log(`\nNote: ${loader} is not available for ${versionArg}.`);
+      console.log(`Only base MC ${vi.mc_version} was installed.`);
+    }
+
+    console.log(`\nDone.`);
+  } else {
+    console.log(`Fetching version manifest...`);
+    const manifest = await fetchVersionManifest();
+
+    const mv = manifest.versions.find((v) => v.id === versionArg);
+    if (!mv) {
+      console.error(`Version ${versionArg} not found in manifest.`);
+      console.error(`Use 'minecraft-mod-mcp list' to see supported versions.`);
+      process.exit(1);
+    }
+
+    console.log(`Downloading version JSON for ${mv.id}...`);
+    const vj = await fetchVersionJson(mv.url);
+
+    await downloadVersion(vj, (msg) => {
+      console.error(`  ${msg}`);
+    });
+
+    console.log(`Done. Version ${mv.id} installed.`);
+  }
 }
 
 async function runAuth(args: string[]) {

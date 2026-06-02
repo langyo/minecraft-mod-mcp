@@ -91,7 +91,15 @@ export function loadVersionJson(path: string): VersionJson {
 }
 
 export function loadVersion(versionId: string): VersionJson {
-  const path = join(versionsDir(), versionId, `${versionId}.json`);
+  const dir = versionsDir();
+  const path = join(dir, versionId, `${versionId}.json`);
+  if (!existsSync(path)) {
+    throw new Error(
+      `Version "${versionId}" is not installed.\n` +
+      `  Missing: ${path}\n` +
+      `  Run: minecraft-mod-mcp install ${versionId}`
+    );
+  }
   return loadVersionJson(path);
 }
 

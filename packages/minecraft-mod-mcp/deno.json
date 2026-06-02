@@ -1,10 +1,11 @@
 {
   "tasks": {
-    "dev": "deno run --allow-all --allow-run --node-modules-dir src/cli.ts",
-    "build": "deno run --allow-all --allow-run --node-modules-dir npm:tsup src/index.ts",
-    "mcp": "deno run --allow-all --allow-run --node-modules-dir src/cli.ts"
+    "dev": "deno run -A dist/cli.js",
+    "mcp": "deno run -A dist/cli.js",
+    "list": "deno run -A dist/cli.js list",
+    "java": "deno run -A dist/cli.js java",
+    "status": "deno run -A dist/cli.js status"
   },
-  "nodeModulesDir": "auto",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -14,8 +15,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true
-  },
-  "unstable": [
-    "node-globals"
-  ]
+  }
 }

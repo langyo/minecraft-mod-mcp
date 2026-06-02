@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
 import { crossHomedir, isWindows, isMacos, classpathSeparator as cpSep } from "../runtime/detector.js";
+import { detectJavas } from "./java-detect.js";
 
 function homedir(): string {
   return crossHomedir();
@@ -85,6 +86,26 @@ export function javaExec(javaVersion: number): string {
 export function findJavaOnPath(): string | null {
   const exe = isWindows() ? "java.exe" : "java";
   return exe;
+}
+
+export function findJavaForVersion(targetVersion: number): string {
+  const home = jdkHome(targetVersion);
+  if (home) {
+    const exe = isWindows() ? join(home, "bin", "java.exe") : join(home, "bin", "java");
+    if (existsSync(exe)) return exe;
+  }
+
+  const all = detectJavas();
+  const sorted = [...all].sort((a, b) => a.version - b.version);
+  const exact = sorted.find((j) => j.version === targetVersion);
+  if (exact) return exact.path;
+
+  const higher = sorted.find((j) => j.version >= targetVersion);
+  if (higher) return higher.path;
+
+  if (sorted.length > 0) return sorted[sorted.length - 1].path;
+
+  return isWindows() ? "java.exe" : "java";
 }
 
 export function classpathSeparator(): string {
