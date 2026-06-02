@@ -1,0 +1,25 @@
+plugins {
+    id "fabric-loom" version "1.0-SNAPSHOT"
+}
+
+version = "0.1.1-SNAPSHOT"
+group = "xyz.langyo"
+
+sourceCompatibility = "17"
+targetCompatibility = "17"
+
+repositories {
+    mavenCentral()
+    maven {
+        url = "../../../.maven-local"
+    }
+}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+
+dependencies {
+    minecraft "com.mojang:minecraft:1.18"
+    mappings "net.fabricmc:yarn:1.18+build.1:v2"
+    modImplementation "net.fabricmc:fabric-loader:0.14.9"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+}

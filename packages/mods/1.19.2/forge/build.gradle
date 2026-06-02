@@ -1,0 +1,51 @@
+buildscript {
+    repositories {
+        maven { url = "https://maven.minecraftforge.net/" }
+        mavenCentral()
+    }
+    dependencies {
+        classpath "net.minecraftforge.gradle:ForgeGradle:5.1.+"
+    }
+}
+
+apply plugin: "net.minecraftforge.gradle"
+
+version = "0.1.1-SNAPSHOT"
+group = "xyz.langyo"
+archivesBaseName = "minecraft-moddev-mcp-mod"
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: "official", version: "1.19.2"
+    runs {
+        client {
+            workingDirectory = file("run")
+            property "forge.logging.markers", "REGISTRIES"
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = "../../../.maven-local"
+    }
+}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+
+dependencies {
+    minecraft "net.minecraftforge:forge:1.19.2-43.5.0"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
+
+jar {
+    manifest {
+        attributes "FMLCorePluginContainsFMLMod": "true"
+    }
+}

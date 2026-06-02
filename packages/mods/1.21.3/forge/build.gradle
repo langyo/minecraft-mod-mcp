@@ -1,0 +1,49 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+version = '0.1.1-SNAPSHOT'
+group = 'xyz.langyo'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'official', version: '1.21.3'
+    runs {
+        configureEach {
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+        }
+        client {
+            workingDirectory = file('run')
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
+        allowInsecureProtocol = false
+    }
+}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+
+dependencies {
+    minecraft "net.minecraftforge:forge:1.21.3-53.1.0"
+    implementation 'org.java-websocket:Java-WebSocket:1.5.4'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    manifest {
+        attributes 'Automatic-Module': 'xyz.langyo.minecraft.mcp.mod'
+    }
+}

@@ -5,31 +5,21 @@ plugins {
 version = "0.1.1-SNAPSHOT"
 group = "xyz.langyo"
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
+sourceCompatibility = "21"
+targetCompatibility = "21"
 
 repositories {
     mavenCentral()
     maven {
-        url = "../../../../.maven-local"
+        url = "../../../.maven-local"
     }
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
-sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
     minecraft "com.mojang:minecraft:1.21.11"
     mappings "net.fabricmc:yarn:1.21.11+build.6:v2"
-    modImplementation "net.fabricmc:fabric-loader:0.18.1"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:0.141.4+1.21.11"
+    modImplementation "net.fabricmc:fabric-loader:0.16.0"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
-    implementation "net.java.dev.jna:jna:5.15.0"
-    implementation "net.java.dev.jna:jna-platform:5.15.0"
-}
-
-tasks.withType(ProcessResources).configureEach {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

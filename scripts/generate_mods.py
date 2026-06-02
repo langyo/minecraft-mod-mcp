@@ -141,6 +141,12 @@ def copy_wrapper(path, gradle_ver):
         f.write("validateDistributionUrl=true\n")
         f.write("zipStoreBase=GRADLE_USER_HOME\n")
         f.write("zipStorePath=wrapper/dists\n")
+    for name in ("gradlew", "gradlew.bat"):
+        src = os.path.join(os.path.dirname(__file__), "..", "packages", "mods", "1.8.9", "forge", name)
+        if os.path.isfile(src):
+            dst_gw = os.path.join(path, name)
+            if not os.path.isfile(dst_gw):
+                shutil.copy2(src, dst_gw)
 
 
 # ============================================================
