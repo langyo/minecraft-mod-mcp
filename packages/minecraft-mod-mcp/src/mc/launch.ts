@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { crossHomedir } from "../runtime/detector.js";
 import type { VersionJson } from "./version-json.js";
 import { collectAllArgs, resolveClasspath } from "./version-json.js";
 import { javaExec, nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator } from "./platform.js";
@@ -34,7 +34,7 @@ export interface LaunchCommand {
 
 export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?: VersionsData): LaunchCommand {
   const vd = data ?? loadVersionsData();
-  const mcDir = config.mcDir ?? join(homedir(), ".minecraft");
+  const mcDir = config.mcDir ?? join(crossHomedir(), ".minecraft");
 
   const versionInfo = getVersionById(vd, config.versionId);
   const javaVersion = versionInfo?.java ?? 17;

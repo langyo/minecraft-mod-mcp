@@ -3,6 +3,7 @@ export { ModClient } from "./api/mod-client.js";
 export { findMod, findFreePort, waitForMod } from "./discovery/scanner.js";
 export { TOOLS } from "./mcp/tools.js";
 export { PORT_START, PORT_END } from "./consts.js";
+export { detectRuntime, crossHomedir, isWindows, isMacos, classpathSeparator as runtimeCpSep, type Runtime } from "./runtime/detector.js";
 
 export { mcDir, versionsDir, librariesDir, assetsDir, javaExec, classpathSeparator, getNativeClassifier } from "./mc/platform.js";
 export { loadVersionsData } from "./mc/versions-data.js";

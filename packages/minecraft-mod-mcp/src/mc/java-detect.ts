@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { crossHomedir, isWindows, isMacos } from "../runtime/detector.js";
 
 export interface JavaInfo {
   path: string;
@@ -26,7 +26,7 @@ export function detectJavas(): JavaInfo[] {
       seen.add(canonical);
     } catch { continue; }
 
-    const javaBin = process.platform === "win32"
+    const javaBin = isWindows()
       ? join(home, "bin", "java.exe")
       : join(home, "bin", "java");
 
@@ -54,7 +54,7 @@ function envCandidates(): string[] {
 
 function gradleCandidates(): string[] {
   const paths: string[] = [];
-  const jdksDir = join(homedir(), ".gradle", "jdks");
+  const jdksDir = join(crossHomedir(), ".gradle", "jdks");
   if (!existsSync(jdksDir)) return paths;
 
   try {
@@ -70,8 +70,8 @@ function gradleCandidates(): string[] {
 }
 
 function platformCandidates(): string[] {
-  if (process.platform === "win32") return windowsCandidates();
-  if (process.platform === "darwin") return macosCandidates();
+  if (isWindows()) return windowsCandidates();
+  if (isMacos()) return macosCandidates();
   return linuxCandidates();
 }
 

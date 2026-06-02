@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { versionsDir, librariesDir, getNativeClassifier } from "./platform.js";
+import { isWindows, isMacos } from "../runtime/detector.js";
+import { versionsDir, librariesDir } from "./platform.js";
 
 export interface VersionJson {
   id: string;
@@ -149,9 +150,9 @@ function matchOs(os: OsRule): boolean {
   if (os.name) {
     const nameOk = (() => {
       switch (os.name) {
-        case "windows": return process.platform === "win32";
-        case "linux": return process.platform === "linux";
-        case "osx": return process.platform === "darwin";
+        case "windows": return isWindows();
+        case "linux": return !isWindows() && !isMacos();
+        case "osx": return isMacos();
         default: return true;
       }
     })();

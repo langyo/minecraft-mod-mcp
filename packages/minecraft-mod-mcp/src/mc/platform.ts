@@ -1,7 +1,10 @@
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { existsSync } from "node:fs";
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
+import { crossHomedir, isWindows, isMacos, classpathSeparator as cpSep } from "../runtime/detector.js";
+
+function homedir(): string {
+  return crossHomedir();
+}
 
 export function mcDir(): string {
   return join(homedir(), ".minecraft");
@@ -71,7 +74,7 @@ export function javaExec(javaVersion: number): string {
   const home = jdkHome(javaVersion);
   if (!home) throw new Error(`Java not found: version ${javaVersion}`);
 
-  const exe = process.platform === "win32"
+  const exe = isWindows()
     ? join(home, "bin", "java.exe")
     : join(home, "bin", "java");
 
@@ -80,21 +83,20 @@ export function javaExec(javaVersion: number): string {
 }
 
 export function findJavaOnPath(): string | null {
-  const exe = process.platform === "win32" ? "java.exe" : "java";
+  const exe = isWindows() ? "java.exe" : "java";
   return exe;
 }
 
 export function classpathSeparator(): string {
-  return process.platform === "win32" ? ";" : ":";
+  return cpSep();
 }
 
 export function getNativeClassifier(): string {
-  switch (process.platform) {
-    case "win32":
-      return process.arch === "arm64" ? "natives-windows-arm64" : "natives-windows";
-    case "darwin":
-      return process.arch === "arm64" ? "natives-macos-arm64" : "natives-macos";
-    default:
-      return "natives-linux";
+  if (isWindows()) {
+    return process.arch === "arm64" ? "natives-windows-arm64" : "natives-windows";
   }
+  if (isMacos()) {
+    return process.arch === "arm64" ? "natives-macos-arm64" : "natives-macos";
+  }
+  return "natives-linux";
 }
