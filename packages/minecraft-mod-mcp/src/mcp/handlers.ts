@@ -19,6 +19,7 @@ const MANAGEMENT_TOOLS = new Set([
   "launch_minecraft", "kill_minecraft", "get_minecraft_status",
   "install_version", "list_supported_versions", "list_installed_versions",
   "detect_java", "create_offline_account", "list_accounts", "wait",
+  "install_server", "launch_server", "serve",
 ]);
 
 export function registerHandlers(server: McpServer, mod: ModClient) {
@@ -166,6 +167,15 @@ async function handleTool(name: string, params: Record<string, unknown>, mod: Mo
         selected: accountUuid(a) === config.selected_account,
       }));
     }
+    case "install_server": {
+      return await installServerTool(params);
+    }
+    case "launch_server": {
+      return await launchServerTool(params, mod);
+    }
+    case "serve": {
+      return await serveTool(params, mod);
+    }
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -298,4 +308,78 @@ function formatResult(result: unknown): string {
   if (result === null || result === undefined) return "null";
   if (typeof result === "string") return result;
   return JSON.stringify(result, null, 2);
+}
+
+async function installServerTool(params: Record<string, unknown>): Promise<unknown> {
+  const { installServer } = await import("../mc/server.js");
+  const version = String(params.version || "");
+  const loader = String(params.loader || "forge") as Loader;
+  if (!version) throw new Error("Parameter 'version' is required.");
+
+  const logs: string[] = [];
+  const setup = await installServer(version, loader, (msg) => logs.push(msg));
+  return { installed: true, serverDir: setup.serverDir, jarPath: setup.jarPath, versionId: setup.versionId, logs };
+}
+
+async function launchServerTool(params: Record<string, unknown>, mod: ModClient): Promise<unknown> {
+  const { installServer, launchServer } = await import("../mc/server.js");
+  const version = String(params.version || "");
+  const loader = String(params.loader || "forge") as Loader;
+  const memory = Number(params.memory) || 1024;
+  if (!version) throw new Error("Parameter 'version' is required.");
+
+  const setup = await installServer(version, loader);
+  const srv = launchServer(setup, { maxMemoryMb: memory });
+  return { launched: true, pid: srv.process.pid, port: srv.port, dir: srv.dir };
+}
+
+async function serveTool(params: Record<string, unknown>, mod: ModClient): Promise<unknown> {
+  const { installServer, launchServer } = await import("../mc/server.js");
+  const version = String(params.version || "");
+  const loader = String(params.loader || "forge") as Loader;
+  const clientMem = Number(params.memory) || 2048;
+  const serverMem = Number(params.server_memory) || 1024;
+  if (!version) throw new Error("Parameter 'version' is required.");
+
+  const setup = await installServer(version, loader);
+  const srv = launchServer(setup, { maxMemoryMb: serverMem });
+
+  await new Promise((r) => setTimeout(r, 15000));
+
+  const data = loadVersionsData();
+  let versionId = getVersionForLoader(data, version, loader) ?? undefined;
+  if (!versionId) throw new Error(`${loader} not available for ${version}`);
+
+  const vj = loadVersion(versionId);
+  const config = loadConfig();
+  const account = selectedAccount(config);
+  const mcpPort = config.mcp_port ?? await findFreePort();
+
+  const cmd = buildLaunchCommand({
+    versionId,
+    loader,
+    mcpPort,
+    maxMemoryMb: clientMem,
+    minMemoryMb: config.min_memory_mb,
+    extraJvmArgs: config.java_args,
+    extraGameArgs: `--server localhost --port ${srv.port}`,
+    javaPath: javaExecPath(config) ?? undefined,
+    playerName: account ? accountUsername(account) : "Player",
+    uuid: account ? accountUuid(account) : "0",
+    accessToken: account ? accountAccessToken(account) : "0",
+    userType: account ? accountUserType(account) : "legacy",
+  }, vj, data);
+
+  const mcDir_ = gameDirPath(config);
+  const child = spawn(cmd.java, cmd.args, {
+    cwd: mcDir_,
+    stdio: "ignore",
+    detached: process.platform !== "win32",
+  });
+
+  mod.setMcProcess(child);
+  return {
+    server: { pid: srv.process.pid, port: srv.port, dir: srv.dir },
+    client: { pid: child.pid, version: versionId, mcpPort, connectingTo: `localhost:${srv.port}` },
+  };
 }

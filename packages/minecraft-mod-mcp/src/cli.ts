@@ -20,7 +20,8 @@ const HELP = `minecraft-mod-mcp — Minecraft MCP Bridge + Launcher CLI
 Usage:
   minecraft-mod-mcp                          Start MCP stdio server (for AI tools)
   minecraft-mod-mcp mcp [options]            Start MCP stdio server
-  minecraft-mod-mcp launch <version> [opts]  Launch Minecraft
+  minecraft-mod-mcp launch <version> [opts]  Launch Minecraft client
+  minecraft-mod-mcp serve <version> [opts]   Install + launch server + client
   minecraft-mod-mcp list                     List supported MC versions
   minecraft-mod-mcp installed                List installed versions
   minecraft-mod-mcp install <version>        Download a MC version
@@ -52,6 +53,7 @@ async function main() {
 
   switch (cmd) {
     case "launch": await runLaunch(rest); break;
+    case "serve": await runServe(rest); break;
     case "list": await runList(); break;
     case "installed": await runInstalled(); break;
     case "install": await runInstall(rest); break;
@@ -98,10 +100,12 @@ async function runLaunch(args: string[]) {
 
 Options:
   --loader <forge|fabric|neoforge>  Mod loader (default: forge)
-  --mc-dir <path>                   Minecraft directory
+  --mc-dir <path>                   Game directory (default: isolated MCP dir)
   --java <path>                     Java executable path
   --memory <mb>                     Max memory in MB (default: 2048)
   --port <port>                     MCP port
+  --server <host>                   Auto-connect to server on launch
+  --server-port <port>              Server port (default: 25565)
   --dry-run                         Print command without executing
   --mod-jar <path>                  Path to mod JAR to inject`);
     return;
@@ -115,6 +119,8 @@ Options:
       java: { type: "string" },
       memory: { type: "string", default: "2048" },
       port: { type: "string" },
+      server: { type: "string" },
+      "server-port": { type: "string", default: "25565" },
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
     },
@@ -156,7 +162,7 @@ Options:
     maxMemoryMb: parseInt(typeof values.memory === "string" ? values.memory : String(config.max_memory_mb), 10),
     minMemoryMb: config.min_memory_mb,
     extraJvmArgs: config.java_args,
-    extraGameArgs: config.game_args,
+    extraGameArgs: buildExtraGameArgs(config.game_args, values.server, values["server-port"]),
     javaPath: typeof values.java === "string" ? values.java : javaExecPath(config) ?? undefined,
     playerName: account ? accountUsername(account) : "Player",
     uuid: account ? accountUuid(account) : "0",
@@ -448,6 +454,93 @@ async function runTui() {
   console.error("TUI mode is not yet implemented. Use CLI subcommands instead.");
   console.error("Run `minecraft-mod-mcp --help` for available commands.");
   process.exit(1);
+}
+
+function buildExtraGameArgs(
+  base: string | undefined,
+  server?: string | boolean,
+  serverPort?: string | boolean,
+): string | undefined {
+  const parts: string[] = [];
+  if (base) parts.push(base);
+  if (typeof server === "string") {
+    parts.push(`--server`, server);
+    const port = typeof serverPort === "string" ? serverPort : "25565";
+    parts.push(`--port`, port);
+  }
+  return parts.length > 0 ? parts.join(" ") : undefined;
+}
+
+async function runServe(args: string[]) {
+  if (args.length === 0 || args[0] === "-h" || args[0] === "--help") {
+    console.log(`Usage: minecraft-mod-mcp serve <version> [options]
+
+One-command: install server + install client + launch both.
+
+Options:
+  --loader <forge|fabric|neoforge>  Mod loader (default: forge)
+  --java <path>                     Java executable path
+  --memory <mb>                     Client max memory (default: 2048)
+  --server-memory <mb>              Server max memory (default: 1024)
+  --port <port>                     MCP port
+  --dry-run                         Show plan without executing
+  --mod-jar <path>                  Mod JAR to inject into both sides`);
+    return;
+  }
+
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      loader: { type: "string", default: "forge" },
+      java: { type: "string" },
+      memory: { type: "string", default: "2048" },
+      "server-memory": { type: "string", default: "1024" },
+      port: { type: "string" },
+      "dry-run": { type: "boolean", default: false },
+      "mod-jar": { type: "string" },
+    },
+    strict: false,
+  });
+
+  const versionArg = positionals[0];
+  const loader = (values.loader ?? "forge") as Loader;
+  const { installServer, launchServer } = await import("./mc/server.js");
+  const { serverDir } = await import("./mc/settings.js");
+
+  console.log(`=== Setting up ${versionArg} (${loader}) ===\n`);
+
+  console.log(`[1/3] Installing server...`);
+  const setup = await installServer(versionArg, loader, (msg) => console.error(`  ${msg}`));
+  console.log(`  Server dir: ${setup.serverDir}`);
+
+  if (values["dry-run"]) {
+    console.log(`\n[dry-run] Would launch server: java -Xmx${values["server-memory"]}m -jar ${setup.jarPath} --nogui`);
+    console.log(`[dry-run] Would launch client connecting to localhost:25565`);
+    return;
+  }
+
+  console.log(`\n[2/3] Starting server...`);
+  const srv = launchServer(setup, {
+    javaPath: typeof values.java === "string" ? values.java : undefined,
+    maxMemoryMb: parseInt(values["server-memory"] as string, 10),
+  });
+  console.log(`  Server PID: ${srv.process.pid}, port: ${srv.port}`);
+  console.log(`  Waiting 15s for server startup...`);
+  await new Promise((r) => setTimeout(r, 15000));
+
+  console.log(`\n[3/3] Launching client (auto-connect to localhost:${srv.port})...`);
+  const launchArgs = [
+    versionArg,
+    "--loader", loader,
+    "--server", "localhost",
+    "--server-port", String(srv.port),
+    "--memory", String(values.memory),
+  ];
+  if (typeof values.java === "string") launchArgs.push("--java", values.java);
+  if (typeof values["mod-jar"] === "string") launchArgs.push("--mod-jar", values["mod-jar"]);
+  if (values.port) launchArgs.push("--port", values.port as string);
+
+  await runLaunch(launchArgs);
 }
 
 main().catch((err) => {
