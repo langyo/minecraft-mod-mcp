@@ -3,7 +3,7 @@
 All version/era data comes from version_config.py — nothing is hardcoded here.
 
 FG Era build.gradle templates:
-  FG 1.2    (1.7.x)         → buildscript + apply "forge", Gradle 2.14
+  FG 1.2 GTNH (1.7.x)       → buildscript + apply "forge", GTNH FG 1.2.11, Gradle 4.4.1
   FG 2.1/2.2/2.3 (1.8-1.12) → buildscript + apply "net.minecraftforge.gradle.forge"
   FG 3.x    (1.13-1.14)     → buildscript + apply "net.minecraftforge.gradle", Gradle 4.10
   FG 4.1    (1.15-1.16)     → buildscript + apply "net.minecraftforge.gradle", Gradle 6.9
@@ -144,8 +144,55 @@ def copy_wrapper(path, gradle_ver):
 
 
 # ============================================================
-# FORGE BUILD.GRADL — FG 1.2
+# FORGE BUILD.GRADLE — FG 1.2 (GTNH fork)
 # ============================================================
+
+
+def write_forge_build_fg12(mc, info, path):
+    forge_ver = info.get("forge", "")
+    depth = maven_local_depth()
+    content = f"""buildscript {{
+    repositories {{
+        mavenCentral()
+        maven {{ url = "https://maven.minecraftforge.net/" }}
+        maven {{ url = "https://jitpack.io" }}
+    }}
+    dependencies {{
+        classpath "com.github.GTNewHorizons:ForgeGradle:1.2.11"
+    }}
+}}
+
+apply plugin: "forge"
+
+version = "0.1.1-SNAPSHOT"
+group = "xyz.langyo"
+archivesBaseName = "minecraft-moddev-mcp-mod"
+
+sourceCompatibility = targetCompatibility = "1.8"
+
+minecraft {{
+    version = "{forge_ver}"
+    runDir = "run"
+}}
+
+repositories {{
+    mavenCentral()
+    maven {{
+        url = "{depth}.maven-local"
+    }}
+}}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+sourceSets.main.resources.srcDir '../../../common/src/main/resources'
+
+dependencies {{
+    compile "org.java-websocket:Java-WebSocket:1.5.4"
+    compile 'net.java.dev.jna:jna:5.15.0'
+    compile 'net.java.dev.jna:jna-platform:5.15.0'
+}}
+"""
+    with open(os.path.join(path, "build.gradle"), "w", encoding="utf-8") as f:
+        f.write(content)
 
 
 
@@ -836,6 +883,7 @@ def write_fabric_mod_json(mc, info, path):
 # ============================================================
 
 _FORGE_BUILD_FNS = {
+    "fg12_gtnh": write_forge_build_fg12,
     "fg21": write_forge_build_fg2,
     "fg22": write_forge_build_fg2,
     "fg23": write_forge_build_fg2,
@@ -846,7 +894,7 @@ _FORGE_BUILD_FNS = {
     "fg7":  write_forge_build_fg7,
 }
 
-_FORGE_SETTINGS_LEGACY_ERAS = {"fg21", "fg22", "fg23", "fg3", "fg41"}
+_FORGE_SETTINGS_LEGACY_ERAS = {"fg12_gtnh", "fg21", "fg22", "fg23", "fg3", "fg41"}
 
 
 def _get_gradle_ver(mc, loader, info):

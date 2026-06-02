@@ -117,9 +117,9 @@ FG_ERAS = {
 ALL_VERSIONS = {
     # --- FG 1.2 GTNH (MC 1.7.x) ---
     "1.7.2":  {"forge": "1.7.2-10.12.1.1109",           "fg_era": "fg12_gtnh", "java": 8,
-               "version_id": "1.7.2-forge-10.12.1.1109"},
+               "version_id": "1.7.2-Forge10.12.1.1109"},
     "1.7.10": {"forge": "1.7.10-10.13.4.1614-1.7.10",   "fg_era": "fg12_gtnh", "java": 8,
-               "version_id": "1.7.10-forge-10.13.4.1614-1.7.10"},
+               "version_id": "1.7.10-Forge10.13.4.1614-1.7.10"},
 
     # --- FG 2.1 (MC 1.8.x) ---
     "1.8.9": {"forge": "1.8.9-11.15.1.2318-1.8.9",  "fg_era": "fg21", "java": 8, "mappings": "snapshot_20160113",

@@ -264,7 +264,7 @@ def main():
     # ================================================================
     # Phase 2: ForgeGradle plugin jars (ALL eras)
     # ================================================================
-    print("\n[Phase 3] ForgeGradle plugin artifacts")
+    print("\n[Phase 2] ForgeGradle plugin artifacts")
     fg_plugins = [
         ("net.minecraftforge.gradle", "ForgeGradle", "1.2-SNAPSHOT"),
         ("net.minecraftforge.gradle", "ForgeGradle", "2.1-SNAPSHOT"),
@@ -284,6 +284,25 @@ def main():
                 ok += 1
             else:
                 fail += 1
+
+    print("\n[Phase 2b] GTNH ForgeGradle (JitPack) + 1.7.x cache")
+    gtnh_group = "com.github.GTNewHorizons"
+    gtnh_artifact = "ForgeGradle"
+    gtnh_version = "1.2.11"
+    for ext in ("jar", "pom"):
+        filename = f"{gtnh_artifact}-{gtnh_version}.{ext}"
+        rel_path = f"{gtnh_group.replace('.', '/')}/{gtnh_artifact}/{gtnh_version}/{filename}"
+        url = f"https://jitpack.io/{rel_path}"
+        dest = os.path.join(MODULES_CACHE, rel_path)
+        if not os.path.isfile(dest):
+            print(f"  GTNH FG {gtnh_version}: {ext}")
+            if download_and_cache(rel_path, gtnh_group, gtnh_artifact, gtnh_version, filename, url):
+                ok += 1
+            else:
+                fail += 1
+        else:
+            print(f"  GTNH FG {gtnh_version}: {ext} (cached)")
+    print("  1.7.x decompiled cache: use 'node scripts/ensure-1.7x-cache.mjs' or 'just prepare-cache-1.7x'")
 
     # ================================================================
     # Phase 4: MCP snapshot mappings (FG 3/4.1) → FG's own mcp_repo

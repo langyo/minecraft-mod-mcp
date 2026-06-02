@@ -456,10 +456,23 @@ def write_java(path, filename, content):
     with open(os.path.join(pkg_dir, filename), "w", encoding="utf-8") as f:
         f.write(content)
 
+def _read_ref_source(mc):
+    ref = os.path.join(MODS_DIR, mc, "forge", "src", "main", "java", PKG, "ModDevMcpMod.java")
+    if os.path.isfile(ref):
+        with open(ref, encoding="utf-8") as f:
+            return f.read()
+    return None
+
+
 def get_forge_mod_template(mc):
     g = get_api_group(mc)
+    if g == "legacy17":
+        src = _read_ref_source(mc)
+        if src:
+            return src
     return {
         "legacy": forge_mod_legacy,
+        "legacy17": forge_mod_legacy,
         "fg3": forge_mod_fg3,
         "fg4": forge_mod_fg4,
         "fg5": forge_mod_fg5,
@@ -487,7 +500,7 @@ if __name__ == "__main__":
                     os.makedirs(meta_dir, exist_ok=True)
                     with open(os.path.join(meta_dir, "mods.toml"), "w") as f:
                         f.write(MODS_TOML)
-                elif g in ("legacy",):
+                elif g in ("legacy", "legacy17"):
                     with open(os.path.join(res_dir, "mcmod.info"), "w") as f:
                         f.write(MCMOD_INFO)
                 with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:

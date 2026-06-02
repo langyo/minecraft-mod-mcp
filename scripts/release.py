@@ -66,7 +66,7 @@ def strip_v(version):
 def resolve_java_home(mc, info, loader="forge"):
     fg_era = info.get("fg_era", "")
 
-    needs_jdk8 = loader == "forge" and fg_era in ("fg21", "fg22", "fg23", "fg3")
+    needs_jdk8 = loader == "forge" and fg_era in ("fg12_gtnh", "fg21", "fg22", "fg23", "fg3")
     needs_jdk21_for_mc = info.get("java", 8) >= 21
     needs_jdk21_for_loom = loader == "fabric" and mc in ("1.20.6", "1.21.11")
 
