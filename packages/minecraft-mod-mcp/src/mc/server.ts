@@ -81,25 +81,47 @@ export async function installServer(
 ): Promise<ServerSetup> {
   const data = loadVersionsData();
   const vi = getVersion(data, version);
-  if (!vi) throw new Error(`Unknown version: ${version}`);
 
-  const versionId = getVersionForLoader(data, version, loader);
-  if (!versionId) throw new Error(`${loader} not available for ${version}`);
+  let versionId: string;
+  let mcVersion: string;
 
-  const mcVersion = vi.mc_version;
+  if (vi) {
+    const resolved = getVersionForLoader(data, version, loader);
+    if (!resolved) throw new Error(`${loader} not available for ${version}`);
+    versionId = resolved;
+    mcVersion = vi.mc_version;
+  } else {
+    versionId = version;
+    mcVersion = version;
+  }
 
-  const baseVj = loadVersion(mcVersion);
+  let baseVj: VersionJson;
+  try {
+    baseVj = loadVersion(mcVersion);
+  } catch {
+    const byId = getVersionById(data, version);
+    if (byId) {
+      mcVersion = byId.mc_version;
+      baseVj = loadVersion(mcVersion);
+    } else {
+      baseVj = loadVersion(versionId);
+      mcVersion = baseVj.inheritsFrom ?? baseVj.id;
+      if (mcVersion !== baseVj.id) {
+        try { baseVj = loadVersion(mcVersion); } catch { /* use what we have */ }
+      }
+    }
+  }
 
   const sDir = serverDir(versionId);
   if (!existsSync(sDir)) mkdirSync(sDir, { recursive: true });
 
   const jarPath = join(sDir, `server-${mcVersion}.jar`);
   if (!existsSync(jarPath)) {
-    if (!baseVj.downloads?.server?.url) {
-      throw new Error(`No server download available for ${mcVersion}`);
-    }
+    const serverUrl = baseVj.downloads?.server?.url;
+    const serverSha = baseVj.downloads?.server?.sha1;
+    if (!serverUrl) throw new Error(`No server download available for ${mcVersion}`);
     onProgress?.(`Downloading server JAR for ${mcVersion}...`);
-    await downloadFile(baseVj.downloads.server.url, jarPath, baseVj.downloads.server.sha1);
+    await downloadFile(serverUrl, jarPath, serverSha);
   } else {
     onProgress?.(`Server JAR already exists.`);
   }
