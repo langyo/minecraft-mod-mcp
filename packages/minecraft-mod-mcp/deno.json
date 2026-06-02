@@ -1,0 +1,19 @@
+{
+  "tasks": {
+    "dev": "deno run -A dist/cli.js",
+    "mcp": "deno run -A dist/cli.js",
+    "list": "deno run -A dist/cli.js list",
+    "java": "deno run -A dist/cli.js java",
+    "status": "deno run -A dist/cli.js status"
+  },
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true
+  }
+}

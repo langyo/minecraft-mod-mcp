@@ -166,42 +166,34 @@ release tag *ARGS:
     python scripts/release.py {{ tag }} {{ ARGS }}
 
 # ============================================================
-# Launcher (Rust workspace)
+# MCP Bridge (TypeScript npm package)
 # ============================================================
 
-launcher := base / "packages" / "launcher"
+mcp := base / "packages" / "minecraft-mod-mcp"
 
-# Build the launcher CLI
-launcher-build *ARGS:
-    cargo build --manifest-path {{ launcher / "Cargo.toml" }} {{ ARGS }}
+# Build the MCP bridge npm package
+mcp-build:
+    cd {{ mcp }} && npm run build
 
-# Check launcher workspace
-launcher-check:
-    cargo check --manifest-path {{ launcher / "Cargo.toml" }}
+# Typecheck the MCP bridge
+mcp-lint:
+    cd {{ mcp }} && npm run lint
 
-# Run launcher CLI
-launcher-cli *ARGS:
-    cargo run --manifest-path {{ launcher / "Cargo.toml" }} -p mcp_launcher_cli -- {{ ARGS }}
+# Run MCP bridge CLI
+mcp-cli *ARGS:
+    node {{ mcp }}/dist/cli.js {{ ARGS }}
 
-# Run Tauri dev (backend + frontend)
-launcher-dev:
-    cd {{ launcher }} && cargo tauri dev
+# List versions via CLI
+mcp-list:
+    node {{ mcp }}/dist/cli.js list
 
-# Build Tauri release bundle
-launcher-release:
-    cd {{ launcher }} && cargo tauri build
+# Show status
+mcp-status:
+    node {{ mcp }}/dist/cli.js status
 
-# Install frontend deps
-launcher-install:
-    cd {{ base }} && pnpm install
-
-# Typecheck frontend
-launcher-typecheck:
-    pnpm --filter @minecraft-mcp/frontend typecheck
-
-# Lint frontend
-launcher-lint:
-    pnpm --filter @minecraft-mcp/frontend lint
+# Detect Java installations
+mcp-java:
+    node {{ mcp }}/dist/cli.js java
 
 # ============================================================
 # Cleanup
