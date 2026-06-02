@@ -337,17 +337,60 @@ public class ModDevMcpMod {
 # ============================================================
 
 def fabric_mod(mc):
+    from version_config import get_api_group
+    group = get_api_group(mc)
+    
+    if group == "fg3":
+        extra_methods = """
+    public void onInGameHudRender(Object hud, float tickDelta) {}
+    public void onScreenRender(Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    elif group == "fg4" and mc < "1.16":
+        extra_methods = """
+    public void onInGameHudRender(Object hud, float tickDelta) {}
+    public void onScreenRender(Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    elif group == "fg4" and mc >= "1.16":
+        extra_methods = """
+    public void onInGameHudRender(Object matrices, float tickDelta) {}
+    public void onScreenRender(Object matrices, Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    elif group in ("fg5", "fg6") and mc < "1.20.6":
+        extra_methods = """
+    public void onInGameHudRender(Object matrices, float tickDelta) {}
+    public void onScreenRender(Object matrices, Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    elif mc >= "1.21.11":
+        extra_methods = """
+    public void onInGameHudRender(Object ctx, float tickDelta) {}
+    public void onScreenRender(Object ctx, Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseClicked(double mx, double my, int button) { return false; }
+"""
+    else:
+        extra_methods = """
+    public void onInGameHudRender(Object ctx, float tickDelta) {}
+    public void onScreenRender(Object ctx, Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    
     return """package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.fabricmc.api.ClientModInitializer;
 
 public class ModDevMcpMod implements ClientModInitializer {
+    public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;
+    private ReflectedInputHandler handler;
 
     @Override
     public void onInitializeClient() {
-        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        INSTANCE = this;
+        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         int port = McpConfig.getServerPort();
         httpServer = new McpHttpServer(handler, port);
         new Thread(() -> {
@@ -359,8 +402,9 @@ public class ModDevMcpMod implements ClientModInitializer {
             }
         }, "MCP-HTTP").start();
     }
-}
-"""
+
+    public void onClientTick() {}
+""" + extra_methods + "}\n"
 
 
 # ============================================================

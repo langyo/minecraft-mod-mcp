@@ -111,6 +111,8 @@ def _gradle_ver_for_fabric(mc):
     loom = get_fabric_loom(mc)
     if loom.startswith("0."):
         return "7.6.4"
+    if loom.startswith("1.14"):
+        return "9.3.0"
     return "8.10"
 
 
@@ -794,6 +796,17 @@ def write_fabric_build(mc, info, path):
         mod_cfg = "modImplementation"
         yarn_suffix = ":v2"
     java_str = f"1.{java}" if java <= 11 else str(java)
+    gradle_ver = _gradle_ver_for_fabric(mc)
+    if gradle_ver.startswith("9."):
+        java_block = f"""java {{
+    toolchain {{
+        languageVersion = JavaLanguageVersion.of({java})
+    }}
+}}"""
+    else:
+        java_block = f"""sourceCompatibility = "{java_str}"
+targetCompatibility = "{java_str}" """
+
     content = f"""plugins {{
     id "fabric-loom" version "{loom_ver}"
 }}
@@ -801,8 +814,7 @@ def write_fabric_build(mc, info, path):
 version = "0.1.1-SNAPSHOT"
 group = "xyz.langyo"
 
-sourceCompatibility = "{java_str}"
-targetCompatibility = "{java_str}"
+{java_block}
 
 repositories {{
     mavenCentral()

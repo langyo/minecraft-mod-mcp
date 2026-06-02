@@ -5,8 +5,11 @@ plugins {
 version = "0.1.1-SNAPSHOT"
 group = "xyz.langyo"
 
-sourceCompatibility = "21"
-targetCompatibility = "21"
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
 
 repositories {
     mavenCentral()

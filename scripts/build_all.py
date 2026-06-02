@@ -93,10 +93,7 @@ def resolve_java_home(mc, info, loader="forge"):
         if jdk21:
             return jdk21
     if loader == "forge" and fg_era == "fg41":
-        jdk21 = get_jdk_home(21)
-        if jdk21:
-            return jdk21
-        return find_jdk17() or get_jdk_home(17) or get_jdk_home(8)
+        return get_jdk_home(8)
     if loader == "neoforge":
         java_ver = info.get("java", 17)
         jdk = get_jdk_home(java_ver)

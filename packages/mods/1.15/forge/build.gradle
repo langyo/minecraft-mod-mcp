@@ -17,7 +17,7 @@ archivesBaseName = "minecraft-moddev-mcp-mod"
 sourceCompatibility = targetCompatibility = "1.8"
 
 minecraft {
-    mappings channel: "snapshot", version: "20191220-1.15"
+    mappings channel: "snapshot", version: "20200119-1.15"
     runs {
         client {
             workingDirectory = file("run")

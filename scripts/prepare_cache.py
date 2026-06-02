@@ -204,7 +204,7 @@ def place_in_fg_mcp_repo(channel, full_ver, src_file):
     if os.path.exists(dest) and os.path.getsize(dest) > 0:
         return True
     shutil.copy2(src_file, dest)
-    url_src = f"{MAVEN_FORGE}/de/oceanlabs/mcp/mcp_{channel}/{full_ver}/{filename}"
+    url_src = f"{get_url('maven_forge')}/de/oceanlabs/mcp/mcp_{channel}/{full_ver}/{filename}"
     with open(dest + ".input", "w") as f:
         f.write(url_src)
     with open(dest + ".sha1", "w") as f:
