@@ -39,6 +39,22 @@ build-common:
 prepare-cache:
     python scripts/prepare_cache.py
 
+# Download 1.7.x Gradle cache from GitHub Release (skips setupDecompWorkspace)
+prepare-cache-1.7x:
+    node scripts/ensure-1.7x-cache.mjs
+
+# Ensure JDK 8 is available (needed for 1.7.x - 1.12.2 builds)
+ensure-jdk8:
+    node scripts/ensure-jdk.mjs 8 --print-home
+
+# Ensure JDK 17 is available (needed for 1.17.x - 1.19.x builds)
+ensure-jdk17:
+    node scripts/ensure-jdk.mjs 17 --print-home
+
+# Ensure JDK 21 is available (needed for 1.20.6+ builds)
+ensure-jdk21:
+    node scripts/ensure-jdk.mjs 21 --print-home
+
 # Full pipeline: generate + cache + build
 full *ARGS:
     python scripts/generate_mods.py {{ ARGS }}

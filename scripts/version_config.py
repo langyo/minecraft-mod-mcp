@@ -24,6 +24,16 @@ MODS_DIR = os.path.join(BASE_DIR, "packages", "mods")
 # ============================================================
 
 FG_ERAS = {
+    "fg12_gtnh": {
+        "fg_version": "1.2.11",
+        "gradle": "4.4.1",
+        "plugin_id": "forge",
+        "apply_method": "buildscript_gtnh",
+        "java": 8,
+        "min_mc": "1.7.2",
+        "max_mc": "1.7.10",
+        "extra_repo": "https://jitpack.io",
+    },
     "fg21": {
         "fg_version": "2.1-SNAPSHOT",
         "gradle": "2.14",
@@ -105,6 +115,12 @@ FG_ERAS = {
 #                              neoforge?, mdg?, fabric_yarn?}
 
 ALL_VERSIONS = {
+    # --- FG 1.2 GTNH (MC 1.7.x) ---
+    "1.7.2":  {"forge": "1.7.2-10.12.1.1109",           "fg_era": "fg12_gtnh", "java": 8,
+               "version_id": "1.7.2-forge-10.12.1.1109"},
+    "1.7.10": {"forge": "1.7.10-10.13.4.1614-1.7.10",   "fg_era": "fg12_gtnh", "java": 8,
+               "version_id": "1.7.10-forge-10.13.4.1614-1.7.10"},
+
     # --- FG 2.1 (MC 1.8.x) ---
     "1.8.9": {"forge": "1.8.9-11.15.1.2318-1.8.9",  "fg_era": "fg21", "java": 8, "mappings": "snapshot_20160113",
               "version_id": "1.8.9-forge1.8.9-11.15.1.2318-1.8.9"},
@@ -175,6 +191,7 @@ ALL_VERSIONS = {
 def get_api_group(mc):
     """Return the API group for source code generation."""
     _MAP = {
+        "1.7.2": "legacy17", "1.7.10": "legacy17",
         "1.8.9": "legacy",
         "1.9.4": "legacy", "1.10.2": "legacy", "1.11.2": "legacy",
         "1.12.2": "legacy",
@@ -259,22 +276,70 @@ def get_fg_era(mc):
 # HELPER: JDK paths
 # ============================================================
 
+_PROJECT_JDKS = os.path.join(BASE_DIR, ".jdks")
+_GRADLE_JDKS = os.path.join(os.path.expanduser("~"), ".gradle", "jdks")
+
+
+def _scan_jdk_dir(jdks_dir):
+    """Scan a directory for JDK installations, return {major_version: path}."""
+    found = {}
+    if not os.path.isdir(jdks_dir):
+        return found
+    for d in os.listdir(jdks_dir):
+        full = os.path.join(jdks_dir, d)
+        if not os.path.isdir(full):
+            continue
+        release = os.path.join(full, "release")
+        if not os.path.isfile(release):
+            continue
+        try:
+            with open(release, encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.startswith("JAVA_VERSION="):
+                        ver_str = line.split("=", 1)[1].strip().strip('"')
+                        parts = ver_str.split(".")
+                        major = int(parts[0])
+                        if major == 1 and len(parts) > 1:
+                            major = int(parts[1])
+                        if major not in found:
+                            found[major] = full
+                        break
+        except Exception:
+            pass
+    return found
+
+
+def _discover_jdks():
+    """Auto-discover JDKs from .jdks/ and Gradle cache."""
+    paths = {}
+    paths.update(_scan_jdk_dir(_PROJECT_JDKS))
+    for major, path in _scan_jdk_dir(_GRADLE_JDKS).items():
+        if major not in paths:
+            paths[major] = path
+    return paths
+
+
+_DISCOVERED_JDKS = _discover_jdks()
+
 JDK_PATHS = {
-    8:  None,
-    16: None,
-    17: None,
-    21: None,
-    24: None,
-    25: None,
+    8:  _DISCOVERED_JDKS.get(8),
+    16: _DISCOVERED_JDKS.get(16),
+    17: _DISCOVERED_JDKS.get(17),
+    21: _DISCOVERED_JDKS.get(21),
+    24: _DISCOVERED_JDKS.get(24),
+    25: _DISCOVERED_JDKS.get(25),
 }
 
+
 def get_jdk_home(java_version):
-    """Return JDK home path, or None if auto-download."""
+    """Return JDK home path for a given major version, auto-discovered from .jdks/."""
     return JDK_PATHS.get(java_version)
 
 
 def find_jdk17():
-    """Find auto-downloaded JDK 17 in Gradle cache."""
+    """Find JDK 17 — checks .jdks/ first, then Gradle cache."""
+    if JDK_PATHS.get(17):
+        return JDK_PATHS[17]
     jdks_dir = os.path.join(os.path.expanduser("~"), ".gradle", "jdks")
     if not os.path.isdir(jdks_dir):
         return None
@@ -290,7 +355,7 @@ def find_jdk17():
 # LEGACY BUILD ERAS (need pre-cache due to Cloudflare TLS)
 # ============================================================
 
-LEGACY_ERAS = {"fg21", "fg22", "fg23", "fg3", "fg41"}
+LEGACY_ERAS = {"fg12_gtnh", "fg21", "fg22", "fg23", "fg3", "fg41"}
 
 
 def is_legacy(mc):
