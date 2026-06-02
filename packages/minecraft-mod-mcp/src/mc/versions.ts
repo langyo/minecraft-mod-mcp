@@ -15,6 +15,7 @@ export interface FgEra {
   java: number;
   min_mc: string;
   max_mc: string;
+  extra_repo?: string;
 }
 
 export interface VersionInfo {
@@ -22,7 +23,7 @@ export interface VersionInfo {
   forge: string;
   fg_era: string;
   java: number;
-  mappings: string;
+  mappings?: string;
   version_id: string;
   neoforge: string | null;
   mdg: string | null;
@@ -33,7 +34,7 @@ export interface VersionRaw {
   forge: string;
   fg_era: string;
   java: number;
-  mappings: string;
+  mappings?: string;
   version_id: string;
   neoforge?: string;
   mdg?: string;

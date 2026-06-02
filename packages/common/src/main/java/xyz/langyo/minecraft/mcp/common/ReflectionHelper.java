@@ -23,7 +23,7 @@ public final class ReflectionHelper {
             };
             Method execMethod = null;
             for (Method m : mc.getClass().getMethods()) {
-                if (m.getName().equals("execute") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) {
+                if ((m.getName().equals("execute") || m.getName().equals("addScheduledTask")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) {
                     execMethod = m; break;
                 }
             }
