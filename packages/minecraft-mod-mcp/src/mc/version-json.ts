@@ -276,7 +276,12 @@ export function resolveClasspath(libraries: Library[]): string[] {
     }
 
     const path = libraryPath(lib.name);
-    if (existsSync(path)) classpath.push(path);
+    if (existsSync(path)) {
+      classpath.push(path);
+    } else {
+      const universalPath = path.replace(/\.jar$/, "-universal.jar");
+      if (existsSync(universalPath)) classpath.push(universalPath);
+    }
   }
 
   return classpath;

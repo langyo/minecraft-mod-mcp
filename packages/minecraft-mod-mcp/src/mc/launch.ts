@@ -238,11 +238,15 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   if (config.maxMemoryMb) allArgs.push(`-Xmx${config.maxMemoryMb}m`);
   if (config.minMemoryMb) allArgs.push(`-Xms${config.minMemoryMb}m`);
 
+  if (existsSync(ndir)) {
+    allArgs.push(`-Djava.library.path=${ndir}`);
+  }
+
   if (config.mcpPort) {
     allArgs.push(`-Dmcp.port=${config.mcpPort}`);
   }
 
-  if (targetJavaVersion < 17) {
+  if (targetJavaVersion >= 9 && targetJavaVersion < 17) {
     allArgs.push(...LEGACY_JVM_ARGS);
   }
 
