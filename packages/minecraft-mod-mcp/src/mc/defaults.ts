@@ -128,3 +128,21 @@ export const MOD = {
 export const FABRIC = {
   defaultLoaderVersion: "0.16.14",
 } as const;
+
+export const CACHE = {
+  repo: "anomalyco/minecraft-mcp",
+  githubProxyUrls: [
+    "",
+    "https://gh-proxy.com/",
+    "https://ghfast.top/",
+  ],
+  assets: {
+    "1.7.x": {
+      tag: "cache-1.7x-gradle",
+      file: "mc-17x-gradle-cache.zip",
+      versionPrefixes: ["1.7.2", "1.7.10"],
+    },
+  },
+} as const;
+
+export type CacheEntry = (typeof CACHE)["assets"][keyof (typeof CACHE)["assets"]];
