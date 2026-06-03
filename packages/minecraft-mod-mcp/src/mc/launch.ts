@@ -4,9 +4,11 @@ import { inflateRawSync } from "node:zlib";
 import { crossHomedir, isWindows, isMacos } from "../runtime/detector.js";
 import type { Library, VersionJson } from "./version-json.js";
 import { collectAllArgs, resolveClasspath, shouldApply, libraryPath } from "./version-json.js";
-import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion, getNativeClassifier } from "./platform.js";
+import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion, getNativeClassifier, jdkHome } from "./platform.js";
 import { loadVersionsData, type VersionsData } from "./versions-data.js";
 import { getVersionById, type Loader } from "./versions.js";
+import { installedJavaHome, ensureJavaInstalled } from "./java-download.js";
+import { detectJavas } from "./java-detect.js";
 
 const NATIVE_EXTS = new Set([".dll", ".so", ".dylib", ".jnilib"]);
 
@@ -147,7 +149,53 @@ function inferJavaFromVersion(vj: VersionJson): number {
   const minor = parseInt(m[1]);
   if (minor >= 20) return 21;
   if (minor >= 17) return 17;
-  return 17;
+  if (minor >= 13) return 8;
+  return 8;
+}
+
+function findExactJava(targetVersion: number): string | null {
+  const home = jdkHome(targetVersion);
+  if (home) {
+    const exe = isWindows() ? join(home, "bin", "java.exe") : join(home, "bin", "java");
+    if (existsSync(exe)) return exe;
+  }
+
+  const all = detectJavas();
+  const match = all.find(j => j.version === targetVersion);
+  if (match) {
+    const exe = isWindows() ? join(match.path, "bin", "java.exe") : join(match.path, "bin", "java");
+    if (existsSync(exe)) return exe;
+  }
+
+  return null;
+}
+
+export async function ensureJavaForLaunch(
+  config: LaunchConfig,
+  vj: VersionJson,
+  data?: VersionsData,
+  onProgress?: (msg: string) => void,
+): Promise<string> {
+  if (config.javaPath && existsSync(config.javaPath)) return config.javaPath;
+
+  const vd = data ?? loadVersionsData();
+  let versionInfo = getVersionById(vd, config.versionId);
+  if (!versionInfo) {
+    const mcVer = vj.inheritsFrom ?? vj.id ?? config.versionId;
+    versionInfo = getVersionById(vd, mcVer);
+  }
+  const targetJava = versionInfo?.java ?? inferJavaFromVersion(vj);
+
+  const cached = installedJavaHome(targetJava);
+  if (cached) {
+    return isWindows() ? join(cached, "bin", "java.exe") : join(cached, "bin", "java");
+  }
+
+  const exact = findExactJava(targetJava);
+  if (exact) return exact;
+
+  const home = await ensureJavaInstalled(targetJava, onProgress);
+  return isWindows() ? join(home, "bin", "java.exe") : join(home, "bin", "java");
 }
 
 export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?: VersionsData): LaunchCommand {

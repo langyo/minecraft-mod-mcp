@@ -3,7 +3,7 @@ import { startServer } from "./server.js";
 import { loadVersionsData } from "./mc/versions-data.js";
 import { getVersions, getVersion, getVersionById, getVersionForLoader, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
 import { loadVersionMerged } from "./mc/version-json.js";
-import { buildLaunchCommand, type LaunchConfig } from "./mc/launch.js";
+import { buildLaunchCommand, ensureJavaForLaunch, type LaunchConfig } from "./mc/launch.js";
 import { loadConfig, saveConfig, addAccount, removeAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "./mc/settings.js";
 import { detectJavas } from "./mc/java-detect.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
@@ -157,6 +157,12 @@ Options:
     accessToken: account ? accountAccessToken(account) : "0",
     userType: account ? accountUserType(account) : "legacy",
   };
+
+  if (!launchConfig.javaPath) {
+    launchConfig.javaPath = await ensureJavaForLaunch(launchConfig, vj, data, (msg) => {
+      console.error(`  ${msg}`);
+    });
+  }
 
   const cmd = buildLaunchCommand(launchConfig, vj, data);
 
