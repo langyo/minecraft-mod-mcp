@@ -194,13 +194,22 @@ export function collectAllArgs(vj: VersionJson): { jvmArgs: string[]; gameArgs: 
   return { jvmArgs, gameArgs };
 }
 
-export function shouldApply(rules: Rule[]): boolean {
+export function shouldApply(rules: Rule[], features?: Record<string, boolean>): boolean {
   if (rules.length === 0) return true;
+  const feats = features ?? {};
 
   let allow = false;
   let deny = false;
 
   for (const rule of rules) {
+    if (rule.features) {
+      const featMatch = Object.entries(rule.features).every(([k, v]) => {
+        if (typeof v === "boolean") return feats[k] === v;
+        return feats[k] != null;
+      });
+      if (!featMatch) continue;
+    }
+
     const osMatch = rule.os ? matchOs(rule.os) : true;
     if (osMatch) {
       if (rule.action === "allow") allow = true;

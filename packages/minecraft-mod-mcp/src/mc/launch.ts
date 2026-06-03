@@ -144,10 +144,6 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
       .replace(/\$\{resolution_height\}/g, String(config.height ?? 480))
       .replace(/\$\{clientid\}/g, "")
       .replace(/\$\{auth_xuid\}/g, "")
-      .replace(/\$\{quickPlayPath\}/g, "")
-      .replace(/\$\{quickPlaySingleplayer\}/g, "")
-      .replace(/\$\{quickPlayMultiplayer\}/g, "")
-      .replace(/\$\{quickPlayRealms\}/g, "")
       .replace(/\$\{user_properties\}/g, "{}")
   );
   allArgs.push(...resolvedGame);
