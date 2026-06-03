@@ -1,6 +1,7 @@
 import { TOOLS } from "./tools.js";
 import type { ModClient } from "../api/mod-client.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { GAME, PLAYER, LAUNCHER, SERVER, MCP } from "../mc/defaults.js";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { loadVersionsData } from "../mc/versions-data.js";
@@ -202,10 +203,10 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
     extraJvmArgs: config.java_args,
     extraGameArgs: config.game_args,
     javaPath: javaExecPath(config) ?? undefined,
-    playerName: account ? accountUsername(account) : "Player",
-    uuid: account ? accountUuid(account) : "0",
-    accessToken: account ? accountAccessToken(account) : "0",
-    userType: account ? accountUserType(account) : "legacy",
+    playerName: account ? accountUsername(account) : PLAYER.defaultName,
+    uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
+    accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
+    userType: account ? accountUserType(account) : PLAYER.defaultUserType,
   }, vj, loadVersionsData());
 
   const mcDir_ = gameDirPath(config);
@@ -311,7 +312,7 @@ async function launchServerTool(params: Record<string, unknown>, mod: ModClient)
   const { installServer, launchServer } = await import("../mc/server.js");
   const version = String(params.version || "");
   const loader = String(params.loader || "forge") as Loader;
-  const memory = Number(params.memory) || 1024;
+  const memory = Number(params.memory) || GAME.defaultServerMemoryMb;
   if (!version) throw new Error("Parameter 'version' is required.");
 
   const setup = await installServer(version, loader);
@@ -323,14 +324,14 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   const { installServer, launchServer } = await import("../mc/server.js");
   const version = String(params.version || "");
   const loader = String(params.loader || "forge") as Loader;
-  const clientMem = Number(params.memory) || 2048;
-  const serverMem = Number(params.server_memory) || 1024;
+  const clientMem = Number(params.memory) || GAME.defaultMaxMemoryMb;
+  const serverMem = Number(params.server_memory) || GAME.defaultServerMemoryMb;
   if (!version) throw new Error("Parameter 'version' is required.");
 
   const setup = await installServer(version, loader);
   const srv = launchServer(setup, { maxMemoryMb: serverMem });
 
-  await new Promise((r) => setTimeout(r, 15000));
+  await new Promise((r) => setTimeout(r, GAME.serverStartupWaitMs));
 
   const versionId = await ensureVersionInstalled(version, loader);
   const vj = loadVersionMerged(versionId);
@@ -345,12 +346,12 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
     maxMemoryMb: clientMem,
     minMemoryMb: config.min_memory_mb,
     extraJvmArgs: config.java_args,
-    extraGameArgs: `--server localhost --port ${srv.port}`,
+    extraGameArgs: `--server ${SERVER.connectHost} --port ${srv.port}`,
     javaPath: javaExecPath(config) ?? undefined,
-    playerName: account ? accountUsername(account) : "Player",
-    uuid: account ? accountUuid(account) : "0",
-    accessToken: account ? accountAccessToken(account) : "0",
-    userType: account ? accountUserType(account) : "legacy",
+    playerName: account ? accountUsername(account) : PLAYER.defaultName,
+    uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
+    accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
+    userType: account ? accountUserType(account) : PLAYER.defaultUserType,
   }, vj, loadVersionsData());
 
   const mcDir_ = gameDirPath(config);
@@ -365,6 +366,6 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   mod.setMcProcess(child);
   return {
     server: { pid: srv.process.pid, port: srv.port, dir: srv.dir },
-    client: { pid: child.pid, version: versionId, mcpPort, connectingTo: `localhost:${srv.port}` },
+    client: { pid: child.pid, version: versionId, mcpPort, connectingTo: `${SERVER.connectHost}:${srv.port}` },
   };
 }

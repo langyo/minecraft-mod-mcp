@@ -2,6 +2,7 @@ import { join, resolve } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
 import { crossHomedir, isWindows, isMacos, classpathSeparator as cpSep } from "../runtime/detector.js";
 import { detectJavas } from "./java-detect.js";
+import { PATHS, JAVA } from "./defaults.js";
 
 function homedir(): string {
   return crossHomedir();
@@ -9,9 +10,9 @@ function homedir(): string {
 
 export function mcDir(): string {
   if (isWindows() && process.env.APPDATA) {
-    return join(process.env.APPDATA, ".minecraft");
+    return join(process.env.APPDATA, PATHS.mcDirName);
   }
-  return join(homedir(), ".minecraft");
+  return join(homedir(), PATHS.mcDirName);
 }
 
 export function versionsDir(): string {
@@ -31,7 +32,7 @@ export function nativesDir(versionId: string): string {
 }
 
 export function launcherDir(): string {
-  return join(mcDir(), "mcp_launcher");
+  return join(mcDir(), PATHS.launcherDirName);
 }
 
 export function modJarPath(mcVersion: string, loader: string): string {
@@ -47,14 +48,10 @@ export function jdkHome(javaVersion: number): string | null {
   const envVal = process.env[envVar];
   if (envVal && existsSync(envVal)) return envVal;
 
-  const jdksDir = join(homedir(), ".gradle", "jdks");
+  const jdksDir = join(homedir(), PATHS.gradleJdksSubdir);
   if (!existsSync(jdksDir)) return null;
 
-  const prefixes: Record<number, string> = {
-    8: "eclipse_adoptium-8",
-    17: "eclipse_adoptium-17",
-    21: "eclipse_adoptium-21",
-  };
+  const prefixes = JAVA.jdkDirPrefixes;
 
   const prefix = prefixes[javaVersion];
   if (!prefix) return null;

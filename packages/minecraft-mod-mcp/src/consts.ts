@@ -1,6 +1,8 @@
-export const PORT_START = 9876;
-export const PORT_END = 9000;
-export const HEARTBEAT_TIMEOUT_MS = 2000;
+import { MCP, MOD } from "./mc/defaults.js";
+
+export const PORT_START = MCP.portStart;
+export const PORT_END = MCP.portEnd;
+export const HEARTBEAT_TIMEOUT_MS = MCP.heartbeatTimeoutMs;
 
 export interface ModStatus {
   ok: boolean;
@@ -16,7 +18,7 @@ export interface ModStatus {
 export function isModStatus(obj: unknown): obj is ModStatus {
   if (typeof obj !== "object" || obj === null) return false;
   const o = obj as Record<string, unknown>;
-  return o.ok === true && o.type === "minecraft-mod" && typeof o.port === "number";
+  return o.ok === true && o.type === MOD.statusType && typeof o.port === "number";
 }
 
 export interface ServerPorts {

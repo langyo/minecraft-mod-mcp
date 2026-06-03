@@ -2,10 +2,11 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { versionsDir } from "./platform.js";
 import type { VersionJson } from "./version-json.js";
+import { FABRIC } from "./defaults.js";
 
 export type Loader = "forge" | "neoforge" | "fabric";
 
-export const DEFAULT_FABRIC_LOADER_VERSION = "0.16.14";
+export const DEFAULT_FABRIC_LOADER_VERSION = FABRIC.defaultLoaderVersion;
 
 export interface FgEra {
   key: string;

@@ -14,6 +14,7 @@ import { PORT_START, PORT_END } from "./consts.js";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { GAME, MCP, LAUNCHER } from "./mc/defaults.js";
 
 const HELP = `minecraft-mod-mcp — Minecraft MCP Bridge + Launcher CLI
 
@@ -36,7 +37,7 @@ Usage:
 
 MCP Server Options:
   --no-discover              Don't scan for running Minecraft mod
-  --discover-timeout <ms>    Timeout for mod discovery (default: 300000)
+  --discover-timeout <ms>    Timeout for mod discovery (default: ${MCP.discoverTimeoutMs})
   -h, --help                 Show this help
 `;
 
@@ -102,10 +103,10 @@ Options:
   --loader <forge|fabric|neoforge>  Mod loader (default: forge)
   --mc-dir <path>                   Game directory (default: isolated MCP dir)
   --java <path>                     Java executable path
-  --memory <mb>                     Max memory in MB (default: 2048)
+  --memory <mb>                     Max memory in MB (default: ${GAME.defaultMaxMemoryMb})
   --port <port>                     MCP port
   --server <host>                   Auto-connect to server on launch
-  --server-port <port>              Server port (default: 25565)
+  --server-port <port>              Server port (default: ${GAME.defaultServerPort})
   --dry-run                         Print command without executing
   --mod-jar <path>                  Path to mod JAR to inject`);
     return;
@@ -117,10 +118,10 @@ Options:
       loader: { type: "string", default: "forge" },
       "mc-dir": { type: "string" },
       java: { type: "string" },
-      memory: { type: "string", default: "2048" },
+      memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
       port: { type: "string" },
       server: { type: "string" },
-      "server-port": { type: "string", default: "25565" },
+      "server-port": { type: "string", default: String(GAME.defaultServerPort) },
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
     },
@@ -460,7 +461,7 @@ function buildExtraGameArgs(
   if (base) parts.push(base);
   if (typeof server === "string") {
     parts.push(`--server`, server);
-    const port = typeof serverPort === "string" ? serverPort : "25565";
+    const port = typeof serverPort === "string" ? serverPort : String(GAME.defaultServerPort);
     parts.push(`--port`, port);
   }
   return parts.length > 0 ? parts.join(" ") : undefined;
@@ -475,8 +476,8 @@ One-command: install server + install client + launch both.
 Options:
   --loader <forge|fabric|neoforge>  Mod loader (default: forge)
   --java <path>                     Java executable path
-  --memory <mb>                     Client max memory (default: 2048)
-  --server-memory <mb>              Server max memory (default: 1024)
+  --memory <mb>                     Client max memory (default: ${GAME.defaultMaxMemoryMb})
+  --server-memory <mb>              Server max memory (default: ${GAME.defaultServerMemoryMb})
   --port <port>                     MCP port
   --dry-run                         Show plan without executing
   --mod-jar <path>                  Mod JAR to inject into both sides`);
@@ -488,8 +489,8 @@ Options:
     options: {
       loader: { type: "string", default: "forge" },
       java: { type: "string" },
-      memory: { type: "string", default: "2048" },
-      "server-memory": { type: "string", default: "1024" },
+      memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
+      "server-memory": { type: "string", default: String(GAME.defaultServerMemoryMb) },
       port: { type: "string" },
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
@@ -521,7 +522,7 @@ Options:
   });
   console.log(`  Server PID: ${srv.process.pid}, port: ${srv.port}`);
   console.log(`  Waiting 15s for server startup...`);
-  await new Promise((r) => setTimeout(r, 15000));
+  await new Promise((r) => setTimeout(r, GAME.serverStartupWaitMs));
 
   console.log(`\n[3/3] Launching client (auto-connect to localhost:${srv.port})...`);
   const launchArgs = [

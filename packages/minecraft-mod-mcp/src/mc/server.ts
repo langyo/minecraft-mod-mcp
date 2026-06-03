@@ -7,12 +7,13 @@ import { spawn } from "node:child_process";
 import { findJavaForVersion } from "./platform.js";
 import { loadVersionsData } from "./versions-data.js";
 import { getVersion, getVersionById, getVersionForLoader, type Loader } from "./versions.js";
+import { DOWNLOAD, SERVER, GAME } from "./defaults.js";
 import type { ChildProcess } from "node:child_process";
 import type { VersionJson } from "./version-json.js";
 
 const SERVER_PROPERTIES = `# MCP auto-generated server.properties
 enable-jmx-monitoring=false
-rcon.port=25575
+rcon.port=${SERVER.rconPort}
 level-seed=
 gamemode=survival
 enable-command-block=true
@@ -20,27 +21,27 @@ enable-query=false
 generator-settings={"layers":[{"block":"bedrock","height":1},{"block":"dirt","height":2},{"block":"grass_block","height":1}],"biome":"plains"}
 level-name=world
 motd=MCP Server
-query.port=25565
+query.port=${GAME.defaultServerPort}
 pvp=true
 generate-structures=false
 max-chained-neighbor-updates=1000000
 difficulty=easy
-network-compression-threshold=256
-max-tick-time=60000
+network-compression-threshold=${SERVER.networkCompressionThreshold}
+max-tick-time=${SERVER.maxTickTime}
 require-resource-pack=false
 use-native-transport=true
-max-players=20
+max-players=${SERVER.maxPlayers}
 online-mode=false
 enable-status=true
 allow-flight=true
 initial-disabled-packs=
 broadcast-rcon-to-ops=true
-view-distance=10
+view-distance=${SERVER.viewDistance}
 resource-pack=
 server-ip=0.0.0.0
 resource-pack-prompt=
 allow-nether=true
-server-port=25565
+server-port=${GAME.defaultServerPort}
 enable-rcon=false
 sync-chunk-writes=true
 op-permission-level=4
@@ -48,7 +49,7 @@ prevent-proxy-connections=false
 hide-online-players=false
 resource-pack-sha1=
 entity-broadcast-range-percentage=100
-simulation-distance=10
+simulation-distance=${SERVER.simulationDistance}
 rcon.password=
 player-idle-timeout=0
 force-gamemode=false
@@ -64,7 +65,7 @@ level-type=flat
 text-filtering-config=
 spawn-monsters=true
 enforce-whitelist=false
-max-world-size=29999984
+max-world-size=${SERVER.maxWorldSize}
 `;
 
 export interface ServerSetup {
@@ -74,7 +75,7 @@ export interface ServerSetup {
   mcVersion: string;
 }
 
-const MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+const MANIFEST_URL = DOWNLOAD.versionManifestV2Url;
 
 interface ServerDownloadInfo {
   url: string;
@@ -94,7 +95,7 @@ async function fetchServerUrl(mcVersion: string): Promise<ServerDownloadInfo> {
 async function fetchJson(url: string): Promise<any> {
   const mod = await import("node:https");
   return new Promise((resolve, reject) => {
-    mod.get(url, { headers: { "User-Agent": "minecraft-mcp" } }, (res) => {
+    mod.get(url, { headers: { "User-Agent": SERVER.userAgent } }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         fetchJson(res.headers.location).then(resolve, reject);
         return;
@@ -188,9 +189,9 @@ export function launchServer(
   setup: ServerSetup,
   opts?: { javaPath?: string; maxMemoryMb?: number },
 ): LaunchedServer {
-  const port = 25565;
-  const java = opts?.javaPath || findJavaForVersion(17);
-  const maxMem = opts?.maxMemoryMb ?? 1024;
+  const port = GAME.defaultServerPort;
+  const java = opts?.javaPath || findJavaForVersion(SERVER.defaultJavaVersion);
+  const maxMem = opts?.maxMemoryMb ?? GAME.defaultServerMemoryMb;
 
   const args = [
     `-Xmx${maxMem}m`,

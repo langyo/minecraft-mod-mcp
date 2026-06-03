@@ -1,0 +1,105 @@
+export const LAUNCHER = {
+  name: "MMML",
+  nameGame: "MCP-Launcher",
+  version: "0.1.0",
+  versionType: "release",
+  mcpServerName: "minecraft-mod-mcp",
+} as const;
+
+export const PLAYER = {
+  defaultName: "Player",
+  defaultUuid: "0",
+  defaultAccessToken: "0",
+  defaultUserType: "legacy",
+} as const;
+
+export const GAME = {
+  defaultWidth: 854,
+  defaultHeight: 480,
+  defaultMaxMemoryMb: 2048,
+  defaultMinMemoryMb: 512,
+  defaultServerMemoryMb: 1024,
+  defaultServerPort: 25565,
+  serverStartupWaitMs: 15000,
+} as const;
+
+export const MCP = {
+  portStart: 9876,
+  portEnd: 9000,
+  heartbeatTimeoutMs: 2000,
+  discoverTimeoutMs: 300000,
+  bindAddress: "127.0.0.1",
+  waitTimeoutMs: 120_000,
+  pollIntervalMs: 3_000,
+} as const;
+
+export const PATHS = {
+  mcDirName: ".minecraft",
+  launcherDirName: "mcp_launcher",
+  gradleJdksSubdir: ".gradle/jdks",
+} as const;
+
+export const JAVA = {
+  jdkDirPrefixes: {
+    8: "eclipse_adoptium-8",
+    17: "eclipse_adoptium-17",
+    21: "eclipse_adoptium-21",
+  } as Record<number, string>,
+  adoptiumApiUrl: "https://api.adoptium.net/v3/assets/latest",
+  extractTimeoutMs: 120_000,
+} as const;
+
+export const DOWNLOAD = {
+  versionManifestUrl: "https://piston-meta.mojang.com/mc/game/version_manifest.json",
+  versionManifestV2Url: "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+  assetBaseUrl: "https://resources.download.minecraft.net/",
+  assetBatchSize: 50,
+  mavenLibrariesUrl: "https://libraries.minecraft.net/",
+  forgeMavenUrl: "https://maven.minecraftforge.net/",
+  neoforgeMavenUrl: "https://maven.neoforged.net/releases/",
+  fabricMetaUrl: "https://meta.fabricmc.net/v2/versions/loader",
+  jitpackUrl: "https://jitpack.io",
+  fallbackRepoUrls: [
+    "https://libraries.minecraft.net/",
+    "https://maven.minecraftforge.net/",
+    "https://maven.neoforged.net/releases/",
+  ],
+} as const;
+
+export const AUTH = {
+  microsoftClientId: "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb",
+  deviceCodeUrl: "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode",
+  tokenUrl: "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
+  xblAuthUrl: "https://user.auth.xboxlive.com/user/authenticate",
+  xstsAuthUrl: "https://xsts.auth.xboxlive.com/xsts/authorize",
+  mcLoginUrl: "https://api.minecraftservices.com/authentication/login_with_xbox",
+  mcProfileUrl: "https://api.minecraftservices.com/minecraft/profile",
+  oauthScope: "XboxLive.signin offline_access",
+  defaultExpiresIn: 3600,
+  pollIntervalMs: 5000,
+  slowDownIntervalMs: 10000,
+} as const;
+
+export const SERVER = {
+  rconPort: 25575,
+  networkCompressionThreshold: 256,
+  maxTickTime: 60000,
+  maxPlayers: 20,
+  viewDistance: 10,
+  simulationDistance: 10,
+  maxWorldSize: 29999984,
+  connectHost: "localhost",
+  defaultJavaVersion: 17,
+  userAgent: "minecraft-mcp",
+} as const;
+
+export const MOD = {
+  cmdEndpoint: "/api/cmd",
+  screenshotEndpoint: "/api/screenshot",
+  statusEndpoint: "/api/status",
+  statusType: "minecraft-mod",
+} as const;
+
+export const FABRIC = {
+  defaultLoaderVersion: "0.16.14",
+} as const;

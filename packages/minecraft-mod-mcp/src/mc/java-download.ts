@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, createWriteStream, readdirSync, rmSync } from "n
 import { join, basename } from "node:path";
 import { crossHomedir, isWindows, isMacos } from "../runtime/detector.js";
 import { launcherDir } from "./platform.js";
+import { JAVA } from "./defaults.js";
 
 function javaCacheDir(): string {
   return join(launcherDir(), "java");
@@ -57,8 +58,7 @@ async function fetchJdkUrl(javaVersion: number): Promise<{ url: string; name: st
   const arch = getArch();
   const ext = getExt();
 
-  const apiUrl = `https://api.adoptium.net/v3/assets/latest/${javaVersion}/hotspot` +
-    `?architecture=${arch}&image_type=jdk&os=${platform}&vendor=eclipse`;
+  const apiUrl = `${JAVA.adoptiumApiUrl}/${javaVersion}/hotspot?architecture=${arch}&image_type=jdk&os=${platform}&vendor=eclipse`;
 
   const res = await fetch(apiUrl);
   if (!res.ok) throw new Error(`Adoptium API error: ${res.status} ${res.statusText}`);
@@ -110,11 +110,11 @@ async function extractArchive(archive: string, outDir: string): Promise<void> {
     const { execSync } = await import("node:child_process");
     execSync(`powershell -Command "Expand-Archive -LiteralPath '${archive}' -DestinationPath '${outDir}' -Force"`, {
       stdio: "pipe",
-      timeout: 120000,
+      timeout: JAVA.extractTimeoutMs,
     });
   } else {
     const { execSync } = await import("node:child_process");
-    execSync(`tar -xzf "${archive}" -C "${outDir}"`, { stdio: "pipe", timeout: 120000 });
+    execSync(`tar -xzf "${archive}" -C "${outDir}"`, { stdio: "pipe", timeout: JAVA.extractTimeoutMs });
   }
 }
 

@@ -15,3 +15,4 @@ export { detectJavas, type JavaInfo } from "./mc/java-detect.js";
 export { startDeviceAuth, pollDeviceAuth, refreshToken, createOfflineUuid, type DeviceCodeInfo, type MicrosoftProfile } from "./mc/auth.js";
 export { fetchVersionManifest, fetchVersionJson, downloadVersion, downloadFile, listInstalledVersions, ensureVersionInstalled, type VersionManifest } from "./mc/download.js";
 export { ensureJavaInstalled, installedJavaHome } from "./mc/java-download.js";
+export * as DEFAULTS from "./mc/defaults.js";

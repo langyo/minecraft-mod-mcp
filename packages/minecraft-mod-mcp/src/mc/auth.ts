@@ -1,11 +1,4 @@
-const CLIENT_ID = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
-
-const DEVICE_CODE_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
-const TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
-const XBL_AUTH_URL = "https://user.auth.xboxlive.com/user/authenticate";
-const XSTS_AUTH_URL = "https://xsts.auth.xboxlive.com/xsts/authorize";
-const MC_LOGIN_URL = "https://api.minecraftservices.com/authentication/login_with_xbox";
-const MC_PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile";
+import { AUTH } from "./defaults.js";
 
 export interface DeviceCodeInfo {
   user_code: string;
@@ -25,12 +18,12 @@ export interface MicrosoftProfile {
 }
 
 export async function startDeviceAuth(): Promise<DeviceCodeInfo> {
-  const resp = await fetch(DEVICE_CODE_URL, {
+  const resp = await fetch(AUTH.deviceCodeUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      scope: "XboxLive.signin offline_access",
+      client_id: AUTH.microsoftClientId,
+      scope: AUTH.oauthScope,
     }),
   });
 
@@ -47,21 +40,21 @@ export async function pollDeviceAuth(deviceCode: string): Promise<MicrosoftProfi
 
   const accessToken = oauthTokens.access_token as string;
   const refreshToken = oauthTokens.refresh_token as string;
-  const expiresIn = (oauthTokens.expires_in as number) || 3600;
+  const expiresIn = (oauthTokens.expires_in as number) || AUTH.defaultExpiresIn;
   const expiresAt = nowTimestamp() + expiresIn;
 
   return authChain(accessToken, refreshToken, expiresAt);
 }
 
 export async function refreshToken(refreshToken: string): Promise<MicrosoftProfile> {
-  const resp = await fetch(TOKEN_URL, {
+  const resp = await fetch(AUTH.tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      client_id: CLIENT_ID,
+      client_id: AUTH.microsoftClientId,
       refresh_token: refreshToken,
-      scope: "XboxLive.signin offline_access",
+      scope: AUTH.oauthScope,
     }),
   });
 
@@ -73,7 +66,7 @@ export async function refreshToken(refreshToken: string): Promise<MicrosoftProfi
   const body = (await resp.json()) as Record<string, unknown>;
   const accessToken = body.access_token as string;
   const newRefreshToken = body.refresh_token as string;
-  const expiresIn = (body.expires_in as number) || 3600;
+  const expiresIn = (body.expires_in as number) || AUTH.defaultExpiresIn;
   const expiresAt = nowTimestamp() + expiresIn;
 
   return authChain(accessToken, newRefreshToken, expiresAt);
@@ -81,12 +74,12 @@ export async function refreshToken(refreshToken: string): Promise<MicrosoftProfi
 
 async function pollForTokens(deviceCode: string): Promise<Record<string, unknown>> {
   while (true) {
-    const resp = await fetch(TOKEN_URL, {
+    const resp = await fetch(AUTH.tokenUrl, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-        client_id: CLIENT_ID,
+        client_id: AUTH.microsoftClientId,
         device_code: deviceCode,
       }),
     });
@@ -97,10 +90,10 @@ async function pollForTokens(deviceCode: string): Promise<Record<string, unknown
     if (error) {
       switch (error) {
         case "authorization_pending":
-          await sleep(5000);
+          await sleep(AUTH.pollIntervalMs);
           continue;
         case "slow_down":
-          await sleep(10000);
+          await sleep(AUTH.slowDownIntervalMs);
           continue;
         case "expired_token":
           throw new Error("Device code expired. Please try again.");
@@ -128,7 +121,7 @@ async function authChain(
 }
 
 async function xboxAuth(liveAccessToken: string): Promise<[string, string]> {
-  const xblResp = await postJson(XBL_AUTH_URL, {
+  const xblResp = await postJson(AUTH.xblAuthUrl, {
     Properties: {
       AuthMethod: "RPS",
       SiteName: "user.auth.xboxlive.com",
@@ -142,7 +135,7 @@ async function xboxAuth(liveAccessToken: string): Promise<[string, string]> {
   const displayClaims = xblResp.DisplayClaims as Record<string, Array<Record<string, string>>>;
   const uhsValue = displayClaims.xui[0].uhs;
 
-  const xstsResp = await postJson(XSTS_AUTH_URL, {
+  const xstsResp = await postJson(AUTH.xstsAuthUrl, {
     Properties: { SandboxId: "RETAIL", UserTokens: [xblToken] },
     RelyingParty: "rp://api.minecraftservices.com/",
     TokenType: "JWT",
@@ -153,14 +146,14 @@ async function xboxAuth(liveAccessToken: string): Promise<[string, string]> {
 }
 
 async function minecraftLogin(uhs: string, xstsToken: string): Promise<string> {
-  const resp = await postJson(MC_LOGIN_URL, {
+  const resp = await postJson(AUTH.mcLoginUrl, {
     identityToken: `XBL3.0 x=${uhs};${xstsToken}`,
   });
   return resp.access_token as string;
 }
 
 async function minecraftProfile(mcAccessToken: string): Promise<[string, string]> {
-  const resp = await fetch(MC_PROFILE_URL, {
+  const resp = await fetch(AUTH.mcProfileUrl, {
     headers: { Authorization: `Bearer ${mcAccessToken}` },
   });
   const body = (await resp.json()) as Record<string, unknown>;

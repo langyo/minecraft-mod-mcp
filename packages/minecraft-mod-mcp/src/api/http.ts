@@ -1,5 +1,6 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { ModClient } from "./mod-client.js";
+import { PLAYER } from "../mc/defaults.js";
 
 export function createApiApp(mod: ModClient): Server {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -62,10 +63,10 @@ export function createApiApp(mod: ModClient): Server {
             extraJvmArgs: config.java_args,
             extraGameArgs: config.game_args,
             javaPath: javaExecPath(config) ?? undefined,
-            playerName: account ? accountUsername(account) : "Player",
-            uuid: account ? accountUuid(account) : "0",
-            accessToken: account ? accountAccessToken(account) : "0",
-            userType: account ? accountUserType(account) : "legacy",
+            playerName: account ? accountUsername(account) : PLAYER.defaultName,
+            uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
+            accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
+            userType: account ? accountUserType(account) : PLAYER.defaultUserType,
           }, vj, loadVersionsData());
 
           const mcDir_ = gameDirPath(config);

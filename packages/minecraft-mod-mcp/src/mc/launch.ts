@@ -9,6 +9,7 @@ import { loadVersionsData, type VersionsData } from "./versions-data.js";
 import { getVersionById, type Loader } from "./versions.js";
 import { installedJavaHome, ensureJavaInstalled } from "./java-download.js";
 import { detectJavas } from "./java-detect.js";
+import { LAUNCHER, PLAYER, GAME } from "./defaults.js";
 
 const NATIVE_EXTS = new Set([".dll", ".so", ".dylib", ".jnilib"]);
 
@@ -258,8 +259,8 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   const resolvedJvm = jvmArgs.map((arg) =>
     arg
       .replace(/\$\{natives_directory\}/g, ndir)
-      .replace(/\$\{launcher_name\}/g, "MMML")
-      .replace(/\$\{launcher_version\}/g, "0.1.0")
+      .replace(/\$\{launcher_name\}/g, LAUNCHER.name)
+      .replace(/\$\{launcher_version\}/g, LAUNCHER.version)
       .replace(/\$\{classpath\}/g, classpath)
       .replace(/\$\{classpath_separator\}/g, sep)
       .replace(/\$\{library_directory\}/g, libDir)
@@ -276,10 +277,10 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
 
   allArgs.push(vj.mainClass);
 
-  const playerName = config.playerName ?? "Player";
-  const uuid = config.uuid ?? "0";
-  const accessToken = config.accessToken ?? "0";
-  const userType = config.userType ?? "legacy";
+  const playerName = config.playerName ?? PLAYER.defaultName;
+  const uuid = config.uuid ?? PLAYER.defaultUuid;
+  const accessToken = config.accessToken ?? PLAYER.defaultAccessToken;
+  const userType = config.userType ?? PLAYER.defaultUserType;
 
   const resolvedGame = gameArgs.map((arg) =>
     arg
@@ -291,15 +292,15 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
       .replace(/\$\{auth_uuid\}/g, uuid)
       .replace(/\$\{auth_access_token\}/g, accessToken)
       .replace(/\$\{user_type\}/g, userType)
-      .replace(/\$\{version_type\}/g, "release")
+      .replace(/\$\{version_type\}/g, LAUNCHER.versionType)
       .replace(/\$\{natives_directory\}/g, ndir)
-      .replace(/\$\{launcher_name\}/g, "MCP-Launcher")
-      .replace(/\$\{launcher_version\}/g, "0.1.0")
+      .replace(/\$\{launcher_name\}/g, LAUNCHER.nameGame)
+      .replace(/\$\{launcher_version\}/g, LAUNCHER.version)
       .replace(/\$\{classpath\}/g, classpath)
       .replace(/\$\{classpath_separator\}/g, sep)
       .replace(/\$\{library_directory\}/g, libDir)
-      .replace(/\$\{resolution_width\}/g, String(config.width ?? 854))
-      .replace(/\$\{resolution_height\}/g, String(config.height ?? 480))
+      .replace(/\$\{resolution_width\}/g, String(config.width ?? GAME.defaultWidth))
+      .replace(/\$\{resolution_height\}/g, String(config.height ?? GAME.defaultHeight))
       .replace(/\$\{clientid\}/g, "")
       .replace(/\$\{auth_xuid\}/g, "")
       .replace(/\$\{user_properties\}/g, "{}")

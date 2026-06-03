@@ -6,6 +6,7 @@ import { libraryMavenPath, loadVersionMerged } from "./version-json.js";
 import type { VersionJson } from "./version-json.js";
 import { loadVersionsData } from "./versions-data.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
+import { DOWNLOAD } from "./defaults.js";
 
 export interface ForgeInstallProfileLegacy {
   install: {
@@ -57,7 +58,7 @@ export interface VersionManifest {
 }
 
 export async function fetchVersionManifest(): Promise<VersionManifest> {
-  const resp = await fetch("https://piston-meta.mojang.com/mc/game/version_manifest.json");
+  const resp = await fetch(DOWNLOAD.versionManifestUrl);
   if (!resp.ok) throw new Error(`Failed to fetch version manifest: ${resp.status}`);
   return (await resp.json()) as VersionManifest;
 }
@@ -142,13 +143,13 @@ export async function downloadVersion(
       const entries = Object.entries(objects);
       onProgress?.(`Downloading ${entries.length} assets...`);
 
-      const BATCH = 50;
+      const BATCH = DOWNLOAD.assetBatchSize;
       for (let i = 0; i < entries.length; i += BATCH) {
         const batch = entries.slice(i, i + BATCH);
         await Promise.all(batch.map(async ([, obj]) => {
           const hash = obj.hash;
           const prefix = hash.slice(0, 2);
-          const assetUrl = `https://resources.download.minecraft.net/${prefix}/${hash}`;
+          const assetUrl = `${DOWNLOAD.assetBaseUrl}${prefix}/${hash}`;
           const objDir = join(assetsDir(), "objects", prefix);
           if (!existsSync(objDir)) mkdirSync(objDir, { recursive: true });
           const assetPath = join(objDir, hash);
@@ -168,7 +169,7 @@ export async function downloadVersion(
       await downloadFile(lib.downloads.artifact.url, libPath, lib.downloads.artifact.sha1);
     } else if (lib.name) {
       const mvnPath = libraryMavenPath(lib.name);
-      const url = `https://libraries.minecraft.net/${mvnPath}`;
+      const url = `${DOWNLOAD.mavenLibrariesUrl}${mvnPath}`;
       const filePath = join(librariesDir(), mvnPath);
       if (!existsSync(filePath)) {
         await downloadFile(url, filePath);
@@ -219,7 +220,7 @@ export async function downloadForgeInstaller(
   forgeVersion: string,
   onProgress?: (msg: string) => void,
 ): Promise<void> {
-  const mavenUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${forgeVersion}/forge-${forgeVersion}-installer.jar`;
+  const mavenUrl = `${DOWNLOAD.forgeMavenUrl}net/minecraftforge/forge/${forgeVersion}/forge-${forgeVersion}-installer.jar`;
   const tmpDir = join(versionsDir(), ".tmp");
   if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
   const installerPath = join(tmpDir, `forge-${forgeVersion}-installer.jar`);
@@ -257,7 +258,7 @@ export async function downloadForgeInstaller(
 
   const universalFileName = profile.install?.filePath
     ?? `forge-${forgeVersion}-universal.jar`;
-  const universalUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${forgeVersion}/${universalFileName}`;
+  const universalUrl = `${DOWNLOAD.forgeMavenUrl}net/minecraftforge/forge/${forgeVersion}/${universalFileName}`;
   const forgeLibName = `net.minecraftforge:forge:${forgeVersion}`;
   const forgeLibPath = join(librariesDir(), libraryMavenPath(forgeLibName));
   const forgeLibDir = dirname(forgeLibPath);
@@ -279,7 +280,7 @@ export async function downloadFabricLoader(
   loaderVersion: string,
   onProgress?: (msg: string) => void,
 ): Promise<void> {
-  const profileUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
+  const profileUrl = `${DOWNLOAD.fabricMetaUrl}/${mcVersion}/${loaderVersion}/profile/json`;
   onProgress?.(`Fetching Fabric profile for ${mcVersion} loader ${loaderVersion}...`);
   const resp = await fetch(profileUrl);
   if (!resp.ok) throw new Error(`Failed to fetch Fabric profile: HTTP ${resp.status}`);
@@ -307,7 +308,7 @@ export async function downloadNeoforgeInstaller(
   neoforgeVersion: string,
   onProgress?: (msg: string) => void,
 ): Promise<void> {
-  const mavenUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeVersion}/neoforge-${neoforgeVersion}-installer.jar`;
+  const mavenUrl = `${DOWNLOAD.neoforgeMavenUrl}net/neoforged/neoforge/${neoforgeVersion}/neoforge-${neoforgeVersion}-installer.jar`;
   const tmpDir = join(versionsDir(), ".tmp");
   if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
   const installerPath = join(tmpDir, `neoforge-${neoforgeVersion}-installer.jar`);
@@ -345,7 +346,7 @@ export async function downloadNeoforgeInstaller(
 
   const universalFileName = profile.install?.filePath
     ?? `neoforge-${neoforgeVersion}-universal.jar`;
-  const universalUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeVersion}/${universalFileName}`;
+  const universalUrl = `${DOWNLOAD.neoforgeMavenUrl}net/neoforged/neoforge/${neoforgeVersion}/${universalFileName}`;
   const nfLibName = `net.neoforged:neoforge:${neoforgeVersion}`;
   const nfLibPath = join(librariesDir(), libraryMavenPath(nfLibName));
   const nfLibDir = dirname(nfLibPath);
@@ -382,11 +383,7 @@ async function downloadLibraries(
         const baseUrls = repoUrl
           ? [`${repoUrl.replace(/\/$/, "")}/${mvnPath}`]
           : [];
-        baseUrls.push(
-          `https://libraries.minecraft.net/${mvnPath}`,
-          `https://maven.minecraftforge.net/${mvnPath}`,
-          `https://maven.neoforged.net/releases/${mvnPath}`,
-        );
+        baseUrls.push(...DOWNLOAD.fallbackRepoUrls.map(u => `${u}${mvnPath}`));
         let downloaded = false;
         for (const url of baseUrls) {
           try {

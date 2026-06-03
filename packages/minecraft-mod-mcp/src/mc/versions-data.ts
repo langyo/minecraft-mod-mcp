@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import type { FgEra, VersionRaw } from "./versions.js";
+import { DOWNLOAD } from "./defaults.js";
 
 export interface VersionsData {
   fg_eras: Record<string, FgEra>;
@@ -115,7 +116,7 @@ export function loadVersionsData(): VersionsData {
 
 const EMBEDDED_VERSIONS: VersionsData = {
   fg_eras: {
-    fg12_gtnh: { key: "fg12_gtnh", fg_version: "1.2.11", gradle: "4.4.1", plugin_id: "forge", java: 8, min_mc: "1.7.2", max_mc: "1.7.10", extra_repo: "https://jitpack.io" },
+    fg12_gtnh: { key: "fg12_gtnh", fg_version: "1.2.11", gradle: "4.4.1", plugin_id: "forge", java: 8, min_mc: "1.7.2", max_mc: "1.7.10", extra_repo: DOWNLOAD.jitpackUrl },
     fg21: { key: "fg21", fg_version: "2.1-SNAPSHOT", gradle: "2.14", plugin_id: "net.minecraftforge.gradle.forge", java: 8, min_mc: "1.8", max_mc: "1.8.9" },
     fg22: { key: "fg22", fg_version: "2.2-SNAPSHOT", gradle: "2.14", plugin_id: "net.minecraftforge.gradle.forge", java: 8, min_mc: "1.9", max_mc: "1.11.2" },
     fg23: { key: "fg23", fg_version: "2.3-SNAPSHOT", gradle: "4.10.3", plugin_id: "net.minecraftforge.gradle.forge", java: 8, min_mc: "1.12", max_mc: "1.12.2" },

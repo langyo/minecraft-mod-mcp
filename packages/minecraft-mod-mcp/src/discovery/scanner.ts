@@ -1,10 +1,11 @@
 import { PORT_START, PORT_END, HEARTBEAT_TIMEOUT_MS, isModStatus, type ModStatus } from "../consts.js";
+import { MCP, MOD } from "../mc/defaults.js";
 
 export async function probePort(port: number): Promise<ModStatus | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEARTBEAT_TIMEOUT_MS);
   try {
-    const resp = await fetch(`http://127.0.0.1:${port}/api/status`, {
+    const resp = await fetch(`http://${MCP.bindAddress}:${port}${MOD.statusEndpoint}`, {
       signal: controller.signal,
     });
     clearTimeout(timer);
@@ -28,8 +29,8 @@ export async function findMod(startPort = PORT_START, endPort = PORT_END): Promi
 export async function waitForMod(
   startPort = PORT_START,
   endPort = PORT_END,
-  timeoutMs = 120_000,
-  pollIntervalMs = 3_000,
+  timeoutMs: number = MCP.waitTimeoutMs,
+  pollIntervalMs: number = MCP.pollIntervalMs,
 ): Promise<ModStatus | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -46,7 +47,7 @@ export async function findFreePort(startPort = PORT_START, endPort = PORT_END): 
     const ok = await new Promise<boolean>((resolve) => {
       const srv = createServer();
       srv.once("error", () => { resolve(false); srv.close(); });
-      srv.listen(port, "127.0.0.1", () => { srv.close(); resolve(true); });
+      srv.listen(port, MCP.bindAddress, () => { srv.close(); resolve(true); });
     });
     if (ok) return port;
   }
