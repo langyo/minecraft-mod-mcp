@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 
 import { dirname, join } from "node:path";
 import { versionsDir, assetsDir, librariesDir } from "./platform.js";
 import { libraryMavenPath, loadVersionMerged } from "./version-json.js";
-import { ensureCacheExtracted } from "./cache-download.js";
 import type { VersionJson } from "./version-json.js";
 import { loadVersionsData } from "./versions-data.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
@@ -511,8 +510,6 @@ export async function ensureVersionInstalled(
     const baseVj = await fetchVersionJson(mv.url);
     await downloadVersion(baseVj, onProgress);
   }
-
-  await ensureCacheExtracted(mcVersion, onProgress);
 
   let loaderVersion: string | undefined;
   if (loader === "forge" && vi.forge) loaderVersion = vi.forge;
