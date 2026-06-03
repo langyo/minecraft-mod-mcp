@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, createWriteStream, readdirSync, rmSync } from "node:fs";
 import { join, basename } from "node:path";
 import { isWindows, isMacos } from "../runtime/detector.js";
-import { launcherDir } from "./platform.js";
+import { launcherDir, jdkHome } from "./platform.js";
 import { JAVA, PATHS } from "./defaults.js";
 
 function javaCacheDir(): string {
@@ -127,6 +127,12 @@ export async function ensureJavaInstalled(
 ): Promise<string> {
   const existing = installedJavaHome(javaVersion);
   if (existing) return existing;
+
+  const fromGradle = jdkHome(javaVersion);
+  if (fromGradle) {
+    onProgress?.(`Java ${javaVersion} found at ${fromGradle}`);
+    return fromGradle;
+  }
 
   const cacheDir = join(javaCacheDir(), `jdk-${javaVersion}`);
   const tmpDir = join(javaCacheDir(), "tmp");

@@ -6,13 +6,14 @@ import { loadVersionMerged } from "./mc/version-json.js";
 import { buildLaunchCommand, ensureJavaForLaunch, type LaunchConfig } from "./mc/launch.js";
 import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, type Account } from "./mc/settings.js";
 import { detectJavas } from "./mc/java-detect.js";
+import { ensureJavaInstalled } from "./mc/java-download.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "./mc/download.js";
 import { versionsDir, classpathSeparator } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { GAME, MCP, PLAYER, SERVER } from "./mc/defaults.js";
 
 const HELP = `minecraft-mod-mcp — Minecraft MCP Bridge + Launcher CLI
@@ -33,6 +34,12 @@ Usage:
   minecraft-mod-mcp java                     Detect installed Java versions
   minecraft-mod-mcp status                   Show connection status
   minecraft-mod-mcp tui                      Interactive TUI launcher
+  minecraft-mod-mcp sdk <version> [opts]     Build mod SDK for a version
+
+SDK Options:
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
+  --java <path>                     Java executable override
+  --no-build                        Only ensure Java/dependencies, don't build
 
 MCP Server Options:
   --no-discover              Don't scan for running Minecraft mod
@@ -61,6 +68,7 @@ async function main() {
     case "java": await runJava(); break;
     case "status": await runStatus(); break;
     case "tui": await runTui(); break;
+    case "sdk": await runSdk(rest); break;
     case "-h":
     case "--help":
       console.log(HELP);
@@ -445,6 +453,114 @@ async function runStatus() {
   }
 }
 
+async function runSdk(args: string[]) {
+  if (args.length === 0 || args[0] === "-h" || args[0] === "--help") {
+    console.log(`Usage: minecraft-mod-mcp sdk <version> [options]
+
+Prepare mod build environment and build.
+
+Options:
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
+  --java <path>                     Java executable override
+  --no-build                        Only ensure Java, don't run gradle build
+`);
+    return;
+  }
+
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: {
+      loader: { type: "string", default: GAME.defaultLoader },
+      java: { type: "string" },
+      "no-build": { type: "boolean", default: false },
+    },
+    strict: true,
+  });
+
+  const versionArg = positionals[0] ?? "";
+  if (!versionArg) {
+    console.error("Version is required.");
+    process.exit(1);
+  }
+  const loader = (values.loader ?? GAME.defaultLoader) as Loader;
+
+  const data = loadVersionsData();
+  const info = getVersion(data, versionArg);
+  if (!info) {
+    console.error(`Unknown version: ${versionArg}`);
+    console.error(`Use 'minecraft-mod-mcp list' to see supported versions.`);
+    process.exit(1);
+  }
+
+  const availableLoaders = loaders(info);
+  if (!availableLoaders.includes(loader)) {
+    console.error(`Loader '${loader}' not available for ${versionArg}. Available: ${availableLoaders.join(", ")}`);
+    process.exit(1);
+  }
+
+  const modProjectDir = resolve("packages", "mods", versionArg, loader);
+  if (!existsSync(modProjectDir)) {
+    console.error(`Mod project directory not found: ${modProjectDir}`);
+    console.error(`Make sure you are running from the repository root.`);
+    process.exit(1);
+  }
+
+  const gradlew = isWin() ? "gradlew.bat" : "gradlew";
+  const gradlewPath = join(modProjectDir, gradlew);
+  if (!existsSync(gradlewPath)) {
+    console.error(`Gradle wrapper not found: ${gradlewPath}`);
+    process.exit(1);
+  }
+
+  console.log(`=== SDK: ${versionArg} (${loader}) ===\n`);
+  console.log(`Project dir: ${modProjectDir}`);
+
+  const javaVersion = info.java;
+  let javaExe: string;
+
+  if (typeof values.java === "string") {
+    javaExe = values.java;
+    console.log(`Using specified Java: ${javaExe}`);
+  } else {
+    console.log(`\n[1/2] Ensuring Java ${javaVersion}...`);
+    const home = await ensureJavaInstalled(javaVersion, (msg) => console.error(`  ${msg}`));
+    javaExe = isWin() ? join(home, "bin", "java.exe") : join(home, "bin", "java");
+    console.log(`  Java ${javaVersion}: ${home}`);
+  }
+
+  if (values["no-build"]) {
+    console.log(`\n--no-build specified, skipping build.`);
+    console.log(`\nReady. Run: cd ${modProjectDir} && ${gradlew} build`);
+    return;
+  }
+
+  console.log(`\n[2/2] Building mod...`);
+  console.log(`  Running: ${gradlew} build`);
+
+  const buildResult = await runGradle(modProjectDir, gradlew, ["build"], javaExe);
+
+  if (buildResult.code !== 0) {
+    console.error(`\nBuild FAILED (exit code ${buildResult.code}).`);
+    console.error(`\nstdout:\n${buildResult.stdout}`);
+    console.error(`\nstderr:\n${buildResult.stderr}`);
+    process.exit(1);
+  }
+
+  const jars = findJars(modProjectDir);
+  if (jars.length > 0) {
+    console.log(`\nBuild succeeded! Output:`);
+    for (const j of jars) {
+      const sizeKB = Math.round(j.size / 1024);
+      console.log(`  ${j.path} (${sizeKB} KB)`);
+    }
+  } else {
+    console.log(`\nBuild succeeded (no JAR found in build/libs/).`);
+  }
+
+  console.log(`\nProject ready: cd ${modProjectDir} && ${gradlew} build`);
+}
+
 async function runTui() {
   console.error("TUI mode is not yet implemented. Use CLI subcommands instead.");
   console.error("Run `minecraft-mod-mcp --help` for available commands.");
@@ -542,3 +658,55 @@ main().catch((err) => {
   console.error("Fatal:", err);
   process.exit(1);
 });
+
+function isWin(): boolean {
+  return process.platform === "win32";
+}
+
+function runGradle(
+  cwd: string,
+  gradlew: string,
+  args: string[],
+  javaExe: string,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolve_) => {
+    const env = { ...process.env, JAVA_HOME: resolve(javaExe, "..", "..") };
+    const proc = spawn(join(cwd, gradlew), args, {
+      cwd,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: isWin(),
+    });
+
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    proc.stdout?.on("data", (c: Buffer) => stdoutChunks.push(c));
+    proc.stderr?.on("data", (c: Buffer) => {
+      stderrChunks.push(c);
+      process.stderr.write(c);
+    });
+
+    proc.on("close", (code) => {
+      resolve_({
+        code: code ?? 1,
+        stdout: Buffer.concat(stdoutChunks).toString("utf-8"),
+        stderr: Buffer.concat(stderrChunks).toString("utf-8"),
+      });
+    });
+  });
+}
+
+function findJars(projectDir: string): { path: string; size: number }[] {
+  const libsDir = join(projectDir, "build", "libs");
+  if (!existsSync(libsDir)) return [];
+  const results: { path: string; size: number }[] = [];
+  try {
+    for (const f of readdirSync(libsDir)) {
+      if (f.endsWith(".jar")) {
+        const full = join(libsDir, f);
+        results.push({ path: full, size: statSync(full).size });
+      }
+    }
+  } catch {}
+  return results;
+}
