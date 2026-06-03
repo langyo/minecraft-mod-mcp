@@ -4,7 +4,7 @@ import { inflateRawSync } from "node:zlib";
 import { crossHomedir, isWindows, isMacos } from "../runtime/detector.js";
 import type { Library, VersionJson } from "./version-json.js";
 import { collectAllArgs, resolveClasspath, shouldApply, libraryPath } from "./version-json.js";
-import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion, jdkHome } from "./platform.js";
+import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion, jdkHome, launcherDir } from "./platform.js";
 import { loadVersionsData, type VersionsData } from "./versions-data.js";
 import { getVersionById, type Loader } from "./versions.js";
 import { installedJavaHome, ensureJavaInstalled } from "./java-download.js";
@@ -222,6 +222,14 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     classpathPaths.push(config.modJar);
   }
 
+  const needsSortFix = needsLegacySortFix(config.versionId, targetJavaVersion);
+  if (needsSortFix) {
+    const sortFixJar = join(launcherDir(), "legacyfix", "sortfix-tweaker.jar");
+    if (existsSync(sortFixJar)) {
+      classpathPaths.unshift(sortFixJar);
+    }
+  }
+
   const sep = classpathSeparator();
   const classpath = classpathPaths.join(sep);
 
@@ -280,6 +288,10 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
 
   allArgs.push(vj.mainClass);
 
+  if (needsSortFix) {
+    allArgs.push("--tweakClass", "mcp.fix.SortFixTweaker");
+  }
+
   const playerName = config.playerName ?? PLAYER.defaultName;
   const uuid = config.uuid ?? PLAYER.defaultUuid;
   const accessToken = config.accessToken ?? PLAYER.defaultAccessToken;
@@ -318,4 +330,11 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   }
 
   return { java, args: allArgs, classpath, mainClass: vj.mainClass, javaVersion: targetJavaVersion };
+}
+
+const SORT_FIX_PREFIXES = ["1.7.2", "1.7.10", "1.6", "1.5"];
+
+function needsLegacySortFix(versionId: string, javaVersion: number): boolean {
+  if (javaVersion !== 8) return false;
+  return SORT_FIX_PREFIXES.some(p => versionId.startsWith(p));
 }
