@@ -306,4 +306,31 @@ export const TOOLS: ToolDef[] = [
     description: "List all configured Minecraft accounts (offline and Microsoft).",
     inputSchema: z.object({}),
   },
+  {
+    name: "install_server",
+    description: "Download and set up a Minecraft server (superflat, offline mode, EULA accepted). Server JAR + eula.txt + server.properties are placed in an isolated directory.",
+    inputSchema: z.object({
+      version: z.string().describe("Minecraft version, e.g. \"1.21.11\", \"26.1.2\"."),
+      loader: zOpt(z.enum(["forge", "fabric", "neoforge"])).default("forge"),
+    }),
+  },
+  {
+    name: "launch_server",
+    description: "Launch a previously installed Minecraft server. Returns PID and port.",
+    inputSchema: z.object({
+      version: z.string().describe("Minecraft version."),
+      loader: zOpt(z.enum(["forge", "fabric", "neoforge"])).default("forge"),
+      memory: zOpt(z.number()).describe("Server max memory in MB (default: 1024)"),
+    }),
+  },
+  {
+    name: "serve",
+    description: "One-command: install server + launch server + launch client auto-connected. Client connects to localhost:25565.",
+    inputSchema: z.object({
+      version: z.string().describe("Minecraft version."),
+      loader: zOpt(z.enum(["forge", "fabric", "neoforge"])).default("forge"),
+      memory: zOpt(z.number()).describe("Client max memory in MB (default: 2048)"),
+      server_memory: zOpt(z.number()).describe("Server max memory in MB (default: 1024)"),
+    }),
+  },
 ];

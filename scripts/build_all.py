@@ -78,13 +78,8 @@ def ensure_mcp_stable_in_fg_cache(mc, info):
 
 def resolve_java_home(mc, info, loader="forge"):
     fg_era = info.get("fg_era", "")
-    if loader == "forge" and fg_era in ("fg21", "fg22", "fg23", "fg3"):
+    if loader == "forge" and fg_era in ("fg12_gtnh", "fg21", "fg22", "fg23", "fg3"):
         return get_jdk_home(8)
-    if fg_era == "fg41":
-        jdk21 = get_jdk_home(21)
-        if jdk21:
-            return jdk21
-        return find_jdk17() or get_jdk_home(17) or get_jdk_home(8)
     if loader == "fabric":
         java_ver = info.get("java", 17)
         if java_ver in (21, 25):
@@ -97,6 +92,16 @@ def resolve_java_home(mc, info, loader="forge"):
         jdk21 = get_jdk_home(21)
         if jdk21:
             return jdk21
+    if loader == "forge" and fg_era == "fg41":
+        return get_jdk_home(8)
+    if loader == "neoforge":
+        java_ver = info.get("java", 17)
+        jdk = get_jdk_home(java_ver)
+        if jdk:
+            return jdk
+        if java_ver in (21, 25):
+            return get_jdk_home(21) or find_jdk17()
+        return find_jdk17()
     java_ver = info.get("java", 8)
     jdk = get_jdk_home(java_ver)
     if jdk:
@@ -166,6 +171,42 @@ def _build_one(task_info):
         return key, "fail", {"key": key, "error": str(e)}
 
 
+def _ensure_jdks(tasks):
+    """Auto-download any missing JDKs via ensure-jdk.mjs."""
+    from version_config import get_jdk_home
+    needed = set()
+    for mc, loader, info in tasks:
+        needed.add(info.get("java", 8))
+    missing = [v for v in sorted(needed) if not get_jdk_home(v)]
+    if not missing:
+        return True
+    script = os.path.join(BASE, "scripts", "ensure-jdk.mjs")
+    if not os.path.isfile(script):
+        print(f"WARNING: {script} not found, skipping JDK auto-provision")
+        return False
+    for ver in missing:
+        print(f"  Auto-provisioning JDK {ver}...")
+        try:
+            ret = subprocess.run(
+                [sys.executable, "-m", "subprocess"],
+                capture_output=True, text=True, timeout=300,
+            )
+            ret = subprocess.run(
+                ["node", script, str(ver)],
+                cwd=BASE, capture_output=True, text=True, timeout=300,
+            )
+            if ret.returncode == 0:
+                print(f"    JDK {ver} installed: {ret.stdout.strip()}")
+            else:
+                print(f"    JDK {ver} FAILED: {ret.stderr.strip()[:200]}")
+        except Exception as e:
+            print(f"    JDK {ver} error: {e}")
+    import importlib
+    import version_config as _vc
+    importlib.reload(_vc)
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="Batch build all mod projects")
     parser.add_argument("--era", help="Only build specific FG era (e.g. fg51, fg6)")
@@ -206,6 +247,8 @@ def main():
             continue
         for loader in loaders:
             tasks.append((mc, loader, info))
+
+    _ensure_jdks(tasks)
 
     total = len(tasks)
 

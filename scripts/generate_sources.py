@@ -337,17 +337,60 @@ public class ModDevMcpMod {
 # ============================================================
 
 def fabric_mod(mc):
+    from version_config import get_api_group
+    group = get_api_group(mc)
+    
+    if group == "fg3":
+        extra_methods = """
+    public void onInGameHudRender(Object hud, float tickDelta) {}
+    public void onScreenRender(Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    elif group == "fg4" and mc < "1.16":
+        extra_methods = """
+    public void onInGameHudRender(Object hud, float tickDelta) {}
+    public void onScreenRender(Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    elif group == "fg4" and mc >= "1.16":
+        extra_methods = """
+    public void onInGameHudRender(Object matrices, float tickDelta) {}
+    public void onScreenRender(Object matrices, Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    elif group in ("fg5", "fg6") and mc < "1.20.6":
+        extra_methods = """
+    public void onInGameHudRender(Object matrices, float tickDelta) {}
+    public void onScreenRender(Object matrices, Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    elif mc >= "1.21.11":
+        extra_methods = """
+    public void onInGameHudRender(Object ctx, float tickDelta) {}
+    public void onScreenRender(Object ctx, Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseClicked(double mx, double my, int button) { return false; }
+"""
+    else:
+        extra_methods = """
+    public void onInGameHudRender(Object ctx, float tickDelta) {}
+    public void onScreenRender(Object ctx, Object screen, int mouseX, int mouseY, float tickDelta) {}
+    public boolean onMouseButtonEvent(Object mc, double mx, double my, int button) { return false; }
+"""
+    
     return """package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.fabricmc.api.ClientModInitializer;
 
 public class ModDevMcpMod implements ClientModInitializer {
+    public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;
+    private ReflectedInputHandler handler;
 
     @Override
     public void onInitializeClient() {
-        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+        INSTANCE = this;
+        handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         int port = McpConfig.getServerPort();
         httpServer = new McpHttpServer(handler, port);
         new Thread(() -> {
@@ -359,8 +402,9 @@ public class ModDevMcpMod implements ClientModInitializer {
             }
         }, "MCP-HTTP").start();
     }
-}
-"""
+
+    public void onClientTick() {}
+""" + extra_methods + "}\n"
 
 
 # ============================================================
@@ -456,10 +500,23 @@ def write_java(path, filename, content):
     with open(os.path.join(pkg_dir, filename), "w", encoding="utf-8") as f:
         f.write(content)
 
+def _read_ref_source(mc):
+    ref = os.path.join(MODS_DIR, mc, "forge", "src", "main", "java", PKG, "ModDevMcpMod.java")
+    if os.path.isfile(ref):
+        with open(ref, encoding="utf-8") as f:
+            return f.read()
+    return None
+
+
 def get_forge_mod_template(mc):
     g = get_api_group(mc)
+    if g == "legacy17":
+        src = _read_ref_source(mc)
+        if src:
+            return src
     return {
         "legacy": forge_mod_legacy,
+        "legacy17": forge_mod_legacy,
         "fg3": forge_mod_fg3,
         "fg4": forge_mod_fg4,
         "fg5": forge_mod_fg5,
@@ -487,7 +544,7 @@ if __name__ == "__main__":
                     os.makedirs(meta_dir, exist_ok=True)
                     with open(os.path.join(meta_dir, "mods.toml"), "w") as f:
                         f.write(MODS_TOML)
-                elif g in ("legacy",):
+                elif g in ("legacy", "legacy17"):
                     with open(os.path.join(res_dir, "mcmod.info"), "w") as f:
                         f.write(MCMOD_INFO)
                 with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:

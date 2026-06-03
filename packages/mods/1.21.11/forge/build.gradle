@@ -27,34 +27,26 @@ repositories {
     maven fg.minecraftLibsMaven
     mavenCentral()
     maven {
-        url = rootProject.projectDir.toPath().resolve('../../../../.maven-local').toUri()
+        url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
         allowInsecureProtocol = false
     }
-    mavenLocal()
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
-sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
     implementation minecraft.dependency('net.minecraftforge:forge:1.21.11-61.1.5')
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
-    implementation 'net.java.dev.jna:jna:5.15.0'
-    implementation 'net.java.dev.jna:jna-platform:5.15.0'
-}
-
-jar {
-    manifest {
-        attributes 'ModSide' : 'BOTH'
-        attributes 'Automatic-Module-Name': 'mcpmod'
-        attributes 'Implementation-Version' : project.version
-    }
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-tasks.withType(ProcessResources).configureEach {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+jar {
+    manifest {
+        attributes 'ModSide' : 'BOTH'
+        attributes 'Automatic-Module' : 'xyz.langyo.minecraft.mcp.mod'
+        attributes 'Implementation-Version' : project.version
+    }
 }

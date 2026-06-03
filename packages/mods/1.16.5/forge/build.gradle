@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath "net.minecraftforge.gradle:ForgeGradle:6.0.+"
+        classpath "net.minecraftforge.gradle:ForgeGradle:[4.1,4.2)"
     }
 }
 
@@ -14,11 +14,7 @@ version = "0.1.1-SNAPSHOT"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-
-compileJava {
-    options.release.set(8)
-}
+sourceCompatibility = targetCompatibility = "1.8"
 
 minecraft {
     mappings channel: "snapshot", version: "20210309-1.16.5"
@@ -32,20 +28,13 @@ minecraft {
 repositories {
     mavenCentral()
     maven {
-        url = "../../../../.maven-local"
+        url = "../../../.maven-local"
     }
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
-sourceSets.main.resources.srcDir '../../../common/src/main/resources'
-
-tasks.withType(ProcessResources).configureEach {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
 
 dependencies {
     minecraft "net.minecraftforge:forge:1.16.5-36.2.42"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
-    implementation 'net.java.dev.jna:jna:5.15.0'
-    implementation 'net.java.dev.jna:jna-platform:5.15.0'
 }
