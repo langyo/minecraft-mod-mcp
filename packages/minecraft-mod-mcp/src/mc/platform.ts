@@ -48,6 +48,19 @@ export function jdkHome(javaVersion: number): string | null {
   const envVal = process.env[envVar];
   if (envVal && existsSync(envVal)) return envVal;
 
+  const mcJavaDir = join(launcherDir(), PATHS.javaDirName, `jdk-${javaVersion}`);
+  if (existsSync(mcJavaDir)) {
+    try {
+      const jdk = readdirSync(mcJavaDir, { withFileTypes: true })
+        .find(e => e.isDirectory() && !e.name.startsWith("."));
+      if (jdk) {
+        const home = join(mcJavaDir, jdk.name);
+        const exe = isWindows() ? join(home, "bin", "java.exe") : join(home, "bin", "java");
+        if (existsSync(exe)) return home;
+      }
+    } catch {}
+  }
+
   const jdksDir = join(homedir(), PATHS.gradleJdksSubdir);
   if (!existsSync(jdksDir)) return null;
 

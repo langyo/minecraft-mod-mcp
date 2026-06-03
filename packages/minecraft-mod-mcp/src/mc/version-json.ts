@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isWindows, isMacos } from "../runtime/detector.js";
 import { versionsDir, librariesDir } from "./platform.js";
+import { loadVersionsData } from "./versions-data.js";
+import { getVersionById } from "./versions.js";
 
 export interface VersionJson {
   id: string;
@@ -103,9 +105,39 @@ export function loadVersion(versionId: string): VersionJson {
   return loadVersionJson(path);
 }
 
+function inferMcVersion(versionId: string): string | null {
+  const data = loadVersionsData();
+  const info = getVersionById(data, versionId);
+  return info?.mc_version ?? null;
+}
+
 export function loadVersionMerged(versionId: string): VersionJson {
-  const primary = loadVersion(versionId);
-  return mergeWithParents(primary);
+  let primary = loadVersion(versionId);
+  primary = mergeWithParents(primary);
+  if (!primary.assets && !primary.inheritsFrom) {
+    const mcVer = inferMcVersion(versionId);
+    if (mcVer && mcVer !== versionId) {
+      try {
+        const parent = loadVersion(mcVer);
+        const merged = mergeWithParents(parent);
+        return {
+          id: primary.id,
+          type: primary.type || merged.type,
+          mainClass: primary.mainClass || merged.mainClass,
+          inheritsFrom: mcVer,
+          libraries: mergeLibraries(merged.libraries ?? [], primary.libraries ?? []),
+          arguments: mergeArguments(merged.arguments, primary.arguments),
+          minecraftArguments: primary.minecraftArguments || merged.minecraftArguments,
+          assetIndex: primary.assetIndex || merged.assetIndex,
+          assets: primary.assets || merged.assets,
+          downloads: primary.downloads || merged.downloads,
+          jar: primary.jar || merged.jar,
+          releaseTime: primary.releaseTime || merged.releaseTime,
+        };
+      } catch {}
+    }
+  }
+  return primary;
 }
 
 function mergeWithParents(vj: VersionJson): VersionJson {
@@ -141,15 +173,45 @@ function libBaseKey(name: string): string {
   return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : name;
 }
 
+function libRuleKey(lib: Library): string {
+  if (!lib.rules || lib.rules.length === 0) return libBaseKey(lib.name!) + ":all";
+  const oses = lib.rules.filter(r => r.os?.name).map(r => `${r.action}:${r.os!.name}`).sort().join(",");
+  return libBaseKey(lib.name!) + ":" + oses;
+}
+
 function mergeLibraries(parent: Library[], child: Library[]): Library[] {
-  const map = new Map<string, Library>();
+  const parentByName = new Map<string, Library>();
   for (const lib of parent) {
-    if (lib.name) map.set(libBaseKey(lib.name), lib);
+    if (lib.name) parentByName.set(lib.name, lib);
   }
+
+  const result: Library[] = [];
+  const childFullKeys = new Set<string>();
+  const childBaseKeys = new Set<string>();
   for (const lib of child) {
-    if (lib.name) map.set(libBaseKey(lib.name), lib);
+    if (lib.name) {
+      childFullKeys.add(libRuleKey(lib));
+      childBaseKeys.add(libBaseKey(lib.name));
+      if (!lib.downloads) {
+        const parentLib = parentByName.get(lib.name);
+        if (parentLib?.downloads) {
+          result.push({ ...lib, downloads: parentLib.downloads });
+          continue;
+        }
+      }
+      result.push(lib);
+    }
   }
-  return [...map.values()];
+  for (const lib of parent) {
+    if (!lib.name) continue;
+    if (childFullKeys.has(libRuleKey(lib))) continue;
+    if (!childBaseKeys.has(libBaseKey(lib.name))) {
+      result.push(lib);
+    } else if (lib.rules && lib.rules.length > 0) {
+      result.push(lib);
+    }
+  }
+  return result;
 }
 
 function mergeArguments(

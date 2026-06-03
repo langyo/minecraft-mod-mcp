@@ -211,7 +211,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
 
   const classpathPaths = resolveClasspath(vj.libraries);
 
-  const inheritsFrom = vj.inheritsFrom ?? config.versionId;
+  const inheritsFrom = vj.inheritsFrom ?? versionInfo?.mc_version ?? config.versionId;
   const baseJar = join(versionsDir(), inheritsFrom, `${inheritsFrom}.jar`);
   if (existsSync(baseJar)) classpathPaths.push(baseJar);
 
@@ -258,6 +258,10 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     allArgs.push(...LEGACY_JVM_ARGS);
   }
 
+  if (versionInfo && isLegacyForge(config.versionId, versionInfo)) {
+    allArgs.push("-Dfml.ignoreInvalidMinecraftCertificates=true");
+  }
+
   if (config.extraJvmArgs) {
     for (const arg of config.extraJvmArgs.split(/\s+/)) {
       if (arg) allArgs.push(arg);
@@ -288,12 +292,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
 
   allArgs.push(vj.mainClass);
 
-  if (needsSortFix) {
-    allArgs.push("--tweakClass", "mcp.fix.SortFixTweaker");
-  }
-
-  const playerName = config.playerName ?? PLAYER.defaultName;
-  const uuid = config.uuid ?? PLAYER.defaultUuid;
+  const playerName = config.playerName ?? PLAYER.defaultName;  const uuid = config.uuid ?? PLAYER.defaultUuid;
   const accessToken = config.accessToken ?? PLAYER.defaultAccessToken;
   const userType = config.userType ?? PLAYER.defaultUserType;
 
@@ -323,6 +322,10 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   );
   allArgs.push(...resolvedGame);
 
+  if (needsSortFix) {
+    allArgs.push("--tweakClass", "mcp.fix.SortFixTweaker");
+  }
+
   if (config.extraGameArgs) {
     for (const arg of config.extraGameArgs.split(/\s+/)) {
       if (arg) allArgs.push(arg);
@@ -337,4 +340,12 @@ const SORT_FIX_PREFIXES = ["1.7.2", "1.7.10", "1.6", "1.5"];
 function needsLegacySortFix(versionId: string, javaVersion: number): boolean {
   if (javaVersion !== 8) return false;
   return SORT_FIX_PREFIXES.some(p => versionId.startsWith(p));
+}
+
+function isLegacyForge(versionId: string, info: { mc_version: string; forge?: string | null }): boolean {
+  if (!info.forge) return false;
+  const mc = info.mc_version;
+  const parts = mc.split(".").map(Number);
+  if (parts.length < 2) return false;
+  return parts[0] === 1 && parts[1] <= 12;
 }
