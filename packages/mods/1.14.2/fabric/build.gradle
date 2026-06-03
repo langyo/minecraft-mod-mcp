@@ -19,7 +19,7 @@ sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {
     minecraft "com.mojang:minecraft:1.14.2"
-    mappings "net.fabricmc:yarn:1.14.2+build.7:v2"
+    mappings "net.fabricmc:yarn:1.14.2+build.1"
     modImplementation "net.fabricmc:fabric-loader:0.16.0"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }
