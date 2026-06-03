@@ -23,6 +23,8 @@ export interface LaunchConfig {
   uuid?: string;
   accessToken?: string;
   userType?: string;
+  width?: number;
+  height?: number;
 }
 
 export interface LaunchCommand {
@@ -114,6 +116,8 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     allArgs.push("-cp", classpath);
   }
 
+  allArgs.push(vj.mainClass);
+
   const playerName = config.playerName ?? "Player";
   const uuid = config.uuid ?? "0";
   const accessToken = config.accessToken ?? "0";
@@ -136,6 +140,15 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
       .replace(/\$\{classpath\}/g, classpath)
       .replace(/\$\{classpath_separator\}/g, sep)
       .replace(/\$\{library_directory\}/g, libDir)
+      .replace(/\$\{resolution_width\}/g, String(config.width ?? 854))
+      .replace(/\$\{resolution_height\}/g, String(config.height ?? 480))
+      .replace(/\$\{clientid\}/g, "")
+      .replace(/\$\{auth_xuid\}/g, "")
+      .replace(/\$\{quickPlayPath\}/g, "")
+      .replace(/\$\{quickPlaySingleplayer\}/g, "")
+      .replace(/\$\{quickPlayMultiplayer\}/g, "")
+      .replace(/\$\{quickPlayRealms\}/g, "")
+      .replace(/\$\{user_properties\}/g, "{}")
   );
   allArgs.push(...resolvedGame);
 
@@ -144,8 +157,6 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
       if (arg) allArgs.push(arg);
     }
   }
-
-  allArgs.push(vj.mainClass);
 
   return { java, args: allArgs, classpath, mainClass: vj.mainClass, javaVersion: targetJavaVersion };
 }

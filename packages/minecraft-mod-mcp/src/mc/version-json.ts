@@ -139,17 +139,12 @@ function mergeWithParents(vj: VersionJson): VersionJson {
 function mergeLibraries(parent: Library[], child: Library[]): Library[] {
   const map = new Map<string, Library>();
   for (const lib of parent) {
-    map.set(libGroupArtifact(lib.name), lib);
+    map.set(lib.name, lib);
   }
   for (const lib of child) {
-    map.set(libGroupArtifact(lib.name), lib);
+    map.set(lib.name, lib);
   }
   return [...map.values()];
-}
-
-function libGroupArtifact(name: string): string {
-  const parts = name.split(":");
-  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : name;
 }
 
 function mergeArguments(
