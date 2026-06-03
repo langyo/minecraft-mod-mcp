@@ -38,6 +38,29 @@ _JDK_CACHE = {}
 def _find_jdk_home(target_ver):
     if target_ver in _JDK_CACHE:
         return _JDK_CACHE[target_ver]
+    # Check .jdks/ first (auto-provisioned)
+    project_jdks = os.path.join(BASE, ".jdks")
+    if os.path.isdir(project_jdks):
+        for d in sorted(os.listdir(project_jdks), reverse=True):
+            full = os.path.join(project_jdks, d)
+            release = os.path.join(full, "release")
+            if not os.path.isfile(release):
+                continue
+            try:
+                with open(release, encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if line.startswith("JAVA_VERSION="):
+                            ver_str = line.split("=", 1)[1].strip().strip('"')
+                            parts = ver_str.split(".")
+                            major = int(parts[0])
+                            if major == 1 and len(parts) > 1:
+                                major = int(parts[1])
+                            if major == target_ver:
+                                _JDK_CACHE[target_ver] = full
+                                return full
+                            break
+            except Exception:
+                pass
     if sys.platform == "win32":
         for base in [r"C:\Program Files\Amazon Corretto", r"C:\Program Files\Eclipse Adoptium"]:
             if os.path.isdir(base):
@@ -65,27 +88,31 @@ def strip_v(version):
 
 def resolve_java_home(mc, info, loader="forge"):
     fg_era = info.get("fg_era", "")
-
-    needs_jdk8 = loader == "forge" and fg_era in ("fg12_gtnh", "fg21", "fg22", "fg23", "fg3")
-    needs_jdk21_for_mc = info.get("java", 8) >= 21
-    needs_jdk21_for_loom = loader == "fabric" and mc in ("1.20.6", "1.21.11")
-
-    if needs_jdk8:
-        return _find_jdk_home(8)
-
-    if fg_era == "fg41" and loader == "forge":
-        return _find_jdk_home(17) or _find_jdk_home(21)
-
-    if loader == "fabric":
-        if needs_jdk21_for_mc or needs_jdk21_for_loom:
-            return _find_jdk_home(21)
-        return _find_jdk_home(17) or _find_jdk_home(21)
-
-    if loader == "neoforge":
-        return _find_jdk_home(21)
-
     java_ver = info.get("java", 8)
-    return _find_jdk_home(java_ver) or _find_jdk_home(17) or _find_jdk_home(21)
+
+    if loader == "forge" and fg_era in ("fg12_gtnh", "fg21", "fg22", "fg23", "fg3"):
+        return _find_jdk_home(8)
+    if loader == "forge" and fg_era == "fg41":
+        return _find_jdk_home(8)
+    if loader == "fabric":
+        if java_ver >= 21:
+            jdk21 = _find_jdk_home(21)
+            if jdk21:
+                return jdk21
+        return _find_jdk_home(17) or _find_jdk_home(21)
+    if loader == "neoforge":
+        jdk = _find_jdk_home(java_ver)
+        if jdk:
+            return jdk
+        return _find_jdk_home(21) or _find_jdk_home(17)
+    jdk = _find_jdk_home(java_ver)
+    if jdk:
+        return jdk
+    if java_ver in (16, 17):
+        return _find_jdk_home(17)
+    if java_ver >= 21:
+        return _find_jdk_home(21)
+    return None
 
 
 _print_lock = threading.Lock()
@@ -138,7 +165,7 @@ def _build_one(task_info):
     env.pop("JAVA_TOOL_OPTIONS", None)
     env["GRADLE_OPTS"] = "-Xmx3G"
     if loader == "neoforge":
-        env["GRADLE_OPTS"] += " -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7890 -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7890"
+        env["GRADLE_OPTS"] += " -Dsun.net.client.defaultConnectTimeout=30000 -Dsun.net.client.defaultReadTimeout=30000"
 
     start = time.time()
     if loader == "fabric":
