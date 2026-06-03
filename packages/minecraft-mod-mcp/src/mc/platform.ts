@@ -100,13 +100,18 @@ export function findJavaForVersion(targetVersion: number): string {
 
   const all = detectJavas();
   const sorted = [...all].sort((a, b) => a.version - b.version);
-  const exact = sorted.find((j) => j.version === targetVersion);
-  if (exact) return exact.path;
 
-  const higher = sorted.find((j) => j.version >= targetVersion);
-  if (higher) return higher.path;
+  const pick =
+    sorted.find((j) => j.version === targetVersion) ??
+    sorted.find((j) => j.version >= targetVersion) ??
+    (sorted.length > 0 ? sorted[sorted.length - 1] : null);
 
-  if (sorted.length > 0) return sorted[sorted.length - 1].path;
+  if (pick) {
+    const exe = isWindows()
+      ? join(pick.path, "bin", "java.exe")
+      : join(pick.path, "bin", "java");
+    if (existsSync(exe)) return exe;
+  }
 
   return isWindows() ? "java.exe" : "java";
 }

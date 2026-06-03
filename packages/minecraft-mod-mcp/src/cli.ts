@@ -2,17 +2,17 @@ import { parseArgs } from "node:util";
 import { startServer } from "./server.js";
 import { loadVersionsData } from "./mc/versions-data.js";
 import { getVersions, getVersion, getVersionById, getVersionForLoader, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
-import { loadVersion } from "./mc/version-json.js";
+import { loadVersionMerged } from "./mc/version-json.js";
 import { buildLaunchCommand, type LaunchConfig } from "./mc/launch.js";
 import { loadConfig, saveConfig, addAccount, removeAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "./mc/settings.js";
 import { detectJavas } from "./mc/java-detect.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
-import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion } from "./mc/download.js";
+import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "./mc/download.js";
 import { mcDir, versionsDir, classpathSeparator, findJavaForVersion } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
 import { PORT_START, PORT_END } from "./consts.js";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 const HELP = `minecraft-mod-mcp — Minecraft MCP Bridge + Launcher CLI
@@ -129,26 +129,14 @@ Options:
 
   const versionArg = positionals[0];
   const loader = (values.loader ?? "forge") as Loader;
+
+  console.log(`Resolving version ${versionArg} (${loader})...`);
+  const versionId = await ensureVersionInstalled(versionArg, loader, (msg) => {
+    console.error(`  ${msg}`);
+  });
+
+  const vj = loadVersionMerged(versionId);
   const data = loadVersionsData();
-
-  let versionId: string | undefined;
-  const vi = getVersion(data, versionArg);
-  if (vi) {
-    versionId = getVersionForLoader(data, versionArg, loader) ?? undefined;
-    if (!versionId) {
-      console.error(`${loader} is not available for ${versionArg}`);
-      process.exit(1);
-    }
-  } else {
-    versionId = versionArg;
-  }
-
-  if (!versionId) {
-    console.error(`Unknown version: ${versionArg}`);
-    process.exit(1);
-  }
-
-  const vj = loadVersion(versionId);
   const config = loadConfig();
   const account = selectedAccount(config);
 
@@ -183,6 +171,7 @@ Options:
   }
 
   const mcDir_ = launchConfig.mcDir!;
+  if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
   console.error(`Launching ${versionId} (${loader})...`);
   console.error(`  Java: ${cmd.java}`);
   console.error(`  MCP Port: ${launchConfig.mcpPort}`);

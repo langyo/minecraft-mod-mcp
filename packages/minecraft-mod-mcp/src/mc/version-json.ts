@@ -103,6 +103,68 @@ export function loadVersion(versionId: string): VersionJson {
   return loadVersionJson(path);
 }
 
+export function loadVersionMerged(versionId: string): VersionJson {
+  const primary = loadVersion(versionId);
+  return mergeWithParents(primary);
+}
+
+function mergeWithParents(vj: VersionJson): VersionJson {
+  if (!vj.inheritsFrom) return vj;
+
+  let parent: VersionJson;
+  try {
+    parent = loadVersion(vj.inheritsFrom);
+  } catch {
+    return vj;
+  }
+
+  parent = mergeWithParents(parent);
+
+  return {
+    id: vj.id,
+    type: vj.type || parent.type,
+    mainClass: vj.mainClass || parent.mainClass,
+    inheritsFrom: vj.inheritsFrom,
+    libraries: mergeLibraries(parent.libraries ?? [], vj.libraries ?? []),
+    arguments: mergeArguments(parent.arguments, vj.arguments),
+    minecraftArguments: vj.minecraftArguments || parent.minecraftArguments,
+    assetIndex: vj.assetIndex || parent.assetIndex,
+    assets: vj.assets || parent.assets,
+    downloads: vj.downloads || parent.downloads,
+    jar: vj.jar || parent.jar,
+    releaseTime: vj.releaseTime || parent.releaseTime,
+  };
+}
+
+function mergeLibraries(parent: Library[], child: Library[]): Library[] {
+  const map = new Map<string, Library>();
+  for (const lib of parent) {
+    map.set(libGroupArtifact(lib.name), lib);
+  }
+  for (const lib of child) {
+    map.set(libGroupArtifact(lib.name), lib);
+  }
+  return [...map.values()];
+}
+
+function libGroupArtifact(name: string): string {
+  const parts = name.split(":");
+  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : name;
+}
+
+function mergeArguments(
+  parent: VersionJson["arguments"],
+  child: VersionJson["arguments"],
+): VersionJson["arguments"] {
+  if (!parent && !child) return undefined;
+  if (!parent) return child;
+  if (!child) return parent;
+  return {
+    game: [...(parent.game ?? []), ...(child.game ?? [])],
+    jvm: [...(parent.jvm ?? []), ...(child.jvm ?? [])],
+  };
+}
+
 export function collectAllArgs(vj: VersionJson): { jvmArgs: string[]; gameArgs: string[] } {
   const gameArgs: string[] = [];
   const jvmArgs: string[] = [];

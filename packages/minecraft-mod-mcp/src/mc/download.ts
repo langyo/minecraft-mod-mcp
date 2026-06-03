@@ -2,9 +2,10 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { versionsDir, assetsDir, librariesDir } from "./platform.js";
-import { libraryMavenPath } from "./version-json.js";
+import { libraryMavenPath, loadVersionMerged } from "./version-json.js";
 import type { VersionJson } from "./version-json.js";
-import type { Loader } from "./versions.js";
+import { loadVersionsData } from "./versions-data.js";
+import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 
 export interface ForgeInstallProfileLegacy {
   install: {
@@ -443,4 +444,60 @@ async function extractJarJson<T>(jarPath: string, entryName: string): Promise<T 
   }
 
   return null;
+}
+
+export async function ensureVersionInstalled(
+  version: string,
+  loader: Loader,
+  onProgress?: (msg: string) => void,
+): Promise<string> {
+  const data = loadVersionsData();
+  const vi = getVersion(data, version);
+
+  if (!vi) {
+    try {
+      loadVersionMerged(version);
+      return version;
+    } catch {
+      throw new Error(
+        `Unknown version: "${version}". Use list_supported_versions to see available versions.`,
+      );
+    }
+  }
+
+  const mcVersion = vi.mc_version;
+  let versionId = getVersionForLoader(data, version, loader) ?? vi.version_id;
+
+  try {
+    loadVersionMerged(versionId);
+    return versionId;
+  } catch {}
+
+  onProgress?.(`Auto-installing ${mcVersion} (${loader})...`);
+
+  const baseJsonPath = join(versionsDir(), mcVersion, `${mcVersion}.json`);
+  if (!existsSync(baseJsonPath)) {
+    onProgress?.(`Downloading base MC ${mcVersion}...`);
+    const manifest = await fetchVersionManifest();
+    const mv = manifest.versions.find((v) => v.id === mcVersion);
+    if (!mv) throw new Error(`Base MC version ${mcVersion} not found in manifest.`);
+    const baseVj = await fetchVersionJson(mv.url);
+    await downloadVersion(baseVj, onProgress);
+  }
+
+  let loaderVersion: string | undefined;
+  if (loader === "forge" && vi.forge) loaderVersion = vi.forge;
+  else if (loader === "neoforge" && vi.neoforge) loaderVersion = vi.neoforge;
+  else if (loader === "fabric") loaderVersion = DEFAULT_FABRIC_LOADER_VERSION;
+
+  if (loaderVersion) {
+    onProgress?.(`Installing ${loader} ${loaderVersion}...`);
+    await downloadLoaderVersion(mcVersion, loader, loaderVersion, onProgress);
+  }
+
+  const resolved = getVersionForLoader(data, version, loader);
+  if (resolved) versionId = resolved;
+
+  onProgress?.(`Installation complete: ${versionId}`);
+  return versionId;
 }
