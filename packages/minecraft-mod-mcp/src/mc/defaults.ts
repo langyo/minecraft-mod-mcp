@@ -58,8 +58,10 @@ export const PATHS = {
 export const JAVA = {
   jdkDirPrefixes: {
     8: "eclipse_adoptium-8",
+    16: "eclipse_foundation-16",
     17: "eclipse_adoptium-17",
     21: "eclipse_adoptium-21",
+    25: "eclipse_adoptium-25",
   } as Record<number, string>,
   adoptiumApiUrl: "https://api.adoptium.net/v3/assets/latest",
   extractTimeoutMs: 120_000,

@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import { startServer } from "./server.js";
 import { loadVersionsData } from "./mc/versionsData.js";
-import { getVersions, getVersion, getVersionForLoader, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
+import { getVersions, getVersion, getVersionForLoader, loaders, getFgEra, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
 import { loadVersionMerged } from "./mc/versionJson.js";
 import { buildLaunchCommand, ensureJavaForLaunch, type LaunchConfig } from "./mc/launch.js";
 import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, type Account } from "./mc/settings.js";
@@ -516,7 +516,14 @@ Options:
   console.log(`=== SDK: ${versionArg} (${loader}) ===\n`);
   console.log(`Project dir: ${modProjectDir}`);
 
-  const javaVersion = info.java;
+  let javaVersion = info.java;
+  const era = getFgEra(data, info.fg_era);
+  if (era && (loader === "forge" || loader === "neoforge")) {
+    javaVersion = era.java;
+  }
+  if (loader === "fabric") {
+    javaVersion = Math.max(javaVersion, 17);
+  }
   let javaExe: string;
 
   if (typeof values.java === "string") {
