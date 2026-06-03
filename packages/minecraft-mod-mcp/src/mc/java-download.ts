@@ -63,7 +63,7 @@ async function fetchJdkUrl(javaVersion: number): Promise<{ url: string; name: st
   return { url: pkg.link, name: pkg.name };
 }
 
-async function downloadFile(url: string, dest: string, onProgress?: (msg: string) => void): Promise<void> {
+async function downloadFile(url: string, dest: string, expectedSize: number, onProgress?: (msg: string) => void): Promise<void> {
   onProgress?.(`Downloading ${basename(dest)}...`);
   const res = await fetch(url, { redirect: "follow" });
   if (!res.ok) throw new Error(`Download failed: ${res.status}`);
@@ -94,14 +94,24 @@ async function downloadFile(url: string, dest: string, onProgress?: (msg: string
     fileStream.on("finish", resolve);
     fileStream.on("error", reject);
   });
+
+  if (expectedSize > 0 && downloaded < expectedSize * 0.95) {
+    const { unlinkSync } = await import("node:fs");
+    try { unlinkSync(dest); } catch {}
+    throw new Error(`Download incomplete: got ${downloaded} bytes, expected ~${expectedSize}`);
+  }
 }
 
 async function extractArchive(archive: string, outDir: string): Promise<void> {
   mkdirSync(outDir, { recursive: true });
 
   if (isWindows()) {
-    const { execSync } = await import("node:child_process");
-    execSync(`powershell -Command "Expand-Archive -LiteralPath '${archive}' -DestinationPath '${outDir}' -Force"`, {
+    const { execFileSync } = await import("node:child_process");
+    const psScript = `
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::ExtractToDirectory('${archive}', '${outDir}')
+`.trim();
+    execFileSync("powershell", ["-NoProfile", "-Command", psScript], {
       stdio: "pipe",
       timeout: JAVA.extractTimeoutMs,
     });
@@ -126,9 +136,16 @@ export async function ensureJavaInstalled(
   const { url, name } = await fetchJdkUrl(javaVersion);
 
   const archivePath = join(tmpDir, name);
+  if (existsSync(archivePath)) {
+    const { statSync } = await import("node:fs");
+    if (statSync(archivePath).size < 10_000_000) {
+      const { unlinkSync } = await import("node:fs");
+      try { unlinkSync(archivePath); } catch {}
+    }
+  }
   if (!existsSync(archivePath)) {
     mkdirSync(tmpDir, { recursive: true });
-    await downloadFile(url, archivePath, onProgress);
+    await downloadFile(url, archivePath, 0, onProgress);
   }
 
   onProgress?.(`Extracting JDK ${javaVersion}...`);

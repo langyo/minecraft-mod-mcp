@@ -136,13 +136,18 @@ function mergeWithParents(vj: VersionJson): VersionJson {
   };
 }
 
+function libBaseKey(name: string): string {
+  const parts = name.split(":");
+  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : name;
+}
+
 function mergeLibraries(parent: Library[], child: Library[]): Library[] {
   const map = new Map<string, Library>();
   for (const lib of parent) {
-    map.set(lib.name, lib);
+    if (lib.name) map.set(libBaseKey(lib.name), lib);
   }
   for (const lib of child) {
-    map.set(lib.name, lib);
+    if (lib.name) map.set(libBaseKey(lib.name), lib);
   }
   return [...map.values()];
 }
@@ -284,5 +289,19 @@ export function resolveClasspath(libraries: Library[]): string[] {
     }
   }
 
-  return classpath;
+  const patched = patchClasspath(classpath);
+
+  return patched;
+}
+
+function patchClasspath(classpath: string[]): string[] {
+  return classpath.map(p => {
+    if (p.includes("launchwrapper-1.9")) {
+      const better = p
+        .replace(/launchwrapper[\\/]1\.9[\\/]/, "launchwrapper/1.12/")
+        .replace("launchwrapper-1.9.jar", "launchwrapper-1.12.jar");
+      if (existsSync(better)) return better;
+    }
+    return p;
+  });
 }
