@@ -77,15 +77,20 @@ public final class ScreenshotHelper {
                 break;
             }
         }
+        if (!isSameThread) {
+            isSameThread = Thread.currentThread().getName().contains("Render") || Thread.currentThread().getName().contains("Client");
+        }
         if (isSameThread) {
             task.run();
         } else {
+            boolean scheduled = false;
             for (Method m : mc.getClass().getMethods()) {
-                if (m.getName().equals("execute") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) {
-                    try { m.setAccessible(true); m.invoke(mc, task); } catch (Exception e) { ReflectionHelper.dbg("takeScreenshot0: execute failed: " + e.getMessage()); return null; }
+                if ((m.getName().equals("execute") || m.getName().equals("addScheduledTask")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) {
+                    try { m.setAccessible(true); m.invoke(mc, task); scheduled = true; } catch (Exception e) { ReflectionHelper.dbg("takeScreenshot0: schedule failed: " + e.getMessage()); }
                     break;
                 }
             }
+            if (!scheduled) task.run();
         }
         try { latch.await(10, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
         return resultHolder[0];
@@ -172,14 +177,17 @@ public final class ScreenshotHelper {
             }
         }
         ReflectionHelper.dbg("takeScreenshotOnMainThread: isSameThread=" + isSameThread);
+        if (!isSameThread) {
+            isSameThread = Thread.currentThread().getName().contains("Render") || Thread.currentThread().getName().contains("Client");
+        }
         if (isSameThread) {
             ReflectionHelper.dbg("takeScreenshotOnMainThread: already on main thread, running directly");
             capturer.run();
         } else {
-            for (Method m : mc.getClass().getMethods()) { if (m.getName().equals("execute") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) { execMethod = m; break; } }
+            for (Method m : mc.getClass().getMethods()) { if ((m.getName().equals("execute") || m.getName().equals("addScheduledTask")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) { execMethod = m; break; } }
             if (execMethod == null) {
                 for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
-                    if (m.getName().equals("execute") && m.getParameterCount() == 1) {
+                    if ((m.getName().equals("execute") || m.getName().equals("addScheduledTask")) && m.getParameterCount() == 1) {
                         Class<?> pt = m.getParameterTypes()[0];
                         if (pt == Runnable.class || pt.getName().equals("java.lang.Runnable")) { execMethod = m; break; }
                     }

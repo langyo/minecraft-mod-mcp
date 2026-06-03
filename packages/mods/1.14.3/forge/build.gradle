@@ -1,0 +1,40 @@
+buildscript {
+    repositories {
+        maven { url = "https://maven.minecraftforge.net/" }
+        mavenCentral()
+    }
+    dependencies {
+        classpath "net.minecraftforge.gradle:ForgeGradle:3.+"
+    }
+}
+
+apply plugin: "net.minecraftforge.gradle"
+
+version = "0.1.1-SNAPSHOT"
+group = "xyz.langyo"
+archivesBaseName = "minecraft-moddev-mcp-mod"
+
+sourceCompatibility = targetCompatibility = "1.8"
+
+minecraft {
+    mappings channel: "snapshot", version: "20190716-1.14.3"
+    runs {
+        client {
+            workingDirectory = file("run")
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = "../../../.maven-local"
+    }
+}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+
+dependencies {
+    minecraft "net.minecraftforge:forge:1.14.3-27.0.60"
+    compile "org.java-websocket:Java-WebSocket:1.5.4"
+}

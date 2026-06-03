@@ -625,6 +625,14 @@ public final class ScreenInteractionHelper {
                             return "{\"keyPressed\":true,\"result\":" + result + "}";
                         } catch (Exception ignored) {}
                     }
+                    if ((n.equals("keyTyped") || n.equals("func_73869_a")) && m.getParameterCount() == 2
+                            && m.getParameterTypes()[0] == char.class && m.getParameterTypes()[1] == int.class) {
+                        try {
+                            m.setAccessible(true);
+                            Object result = m.invoke(screen, (char) keyCode, keyCode);
+                            return "{\"keyPressed\":true,\"result\":" + result + ",\"method\":\"keyTyped\"}";
+                        } catch (Exception ignored) {}
+                    }
                 }
             }
             Object kbHandler = null;

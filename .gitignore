@@ -1,4 +1,5 @@
 .gradle/
+.jdks/
 .kotlin/
 build/
 out/

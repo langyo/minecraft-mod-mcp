@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { crossHomedir, isWindows } from "../runtime/detector.js";
-import { launcherDir } from "./platform.js";
+import { launcherDir, mcDir } from "./platform.js";
 
 export interface MicrosoftAccount {
   type: "microsoft";
@@ -117,7 +117,13 @@ export function accountUserType(a: Account): string {
 }
 
 export function gameDirPath(config: LauncherConfig): string {
-  return config.game_dir ?? join(crossHomedir(), ".minecraft");
+  if (config.game_dir) return config.game_dir;
+  return join(launcherDir(), "game");
+}
+
+export function serverDir(versionId?: string): string {
+  const base = join(launcherDir(), "server");
+  return versionId ? join(base, versionId) : base;
 }
 
 export function javaExecPath(config: LauncherConfig): string | undefined {

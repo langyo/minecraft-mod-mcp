@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { loadVersionsData } from "../mc/versions-data.js";
-import { getVersion, getVersionForLoader, getVersionById, getVersions, loaders, type Loader } from "../mc/versions.js";
+import { getVersion, getVersionForLoader, getVersionById, getVersions, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "../mc/versions.js";
 import { loadVersion } from "../mc/version-json.js";
 import { buildLaunchCommand } from "../mc/launch.js";
 import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "../mc/settings.js";
@@ -19,6 +19,7 @@ const MANAGEMENT_TOOLS = new Set([
   "launch_minecraft", "kill_minecraft", "get_minecraft_status",
   "install_version", "list_supported_versions", "list_installed_versions",
   "detect_java", "create_offline_account", "list_accounts", "wait",
+  "install_server", "launch_server", "serve",
 ]);
 
 export function registerHandlers(server: McpServer, mod: ModClient) {
@@ -166,6 +167,15 @@ async function handleTool(name: string, params: Record<string, unknown>, mod: Mo
         selected: accountUuid(a) === config.selected_account,
       }));
     }
+    case "install_server": {
+      return await installServerTool(params);
+    }
+    case "launch_server": {
+      return await launchServerTool(params, mod);
+    }
+    case "serve": {
+      return await serveTool(params, mod);
+    }
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -181,10 +191,12 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   let versionId: string | undefined;
   const vi = getVersion(data, version);
   if (vi) {
-    versionId = getVersionForLoader(data, version, loader) ?? vi.version_id;
+    versionId = getVersionForLoader(data, version, loader) ?? undefined;
+    if (!versionId) throw new Error(`${loader} is not available for ${version}`);
   } else {
     const byId = getVersionById(data, version);
     if (byId) versionId = byId.version_id;
+    else versionId = version;
   }
 
   if (!versionId) {
@@ -239,14 +251,6 @@ async function installVersion(params: Record<string, unknown>): Promise<unknown>
     throw new Error(`Unknown version: "${version}". Available: ${available}`);
   }
 
-  const versionId = getVersionForLoader(data, version, loader) ?? vi.version_id;
-
-  const versionDir = join(versionsDir(), versionId);
-  const jsonPath = join(versionDir, `${versionId}.json`);
-  if (existsSync(jsonPath)) {
-    return { installed: true, versionId, message: `Version ${versionId} is already installed.` };
-  }
-
   const mcVersion = vi.mc_version;
   const baseVersionDir = join(versionsDir(), mcVersion);
   const baseJsonPath = join(baseVersionDir, `${mcVersion}.json`);
@@ -267,12 +271,14 @@ async function installVersion(params: Record<string, unknown>): Promise<unknown>
   let loaderVersion: string | undefined;
   if (loader === "forge" && vi.forge) loaderVersion = vi.forge;
   else if (loader === "neoforge" && vi.neoforge) loaderVersion = vi.neoforge;
-  else if (loader === "fabric") loaderVersion = "0.16.14";
+  else if (loader === "fabric") loaderVersion = DEFAULT_FABRIC_LOADER_VERSION;
 
   if (loaderVersion) {
     logs.push(`Installing ${loader} ${loaderVersion}...`);
     await downloadLoaderVersion(mcVersion, loader, loaderVersion, (msg) => logs.push(msg));
   }
+
+  const versionId = getVersionForLoader(data, version, loader) ?? vi.version_id;
 
   return { installed: true, versionId, loader, loaderVersion, logs };
 }
@@ -302,4 +308,78 @@ function formatResult(result: unknown): string {
   if (result === null || result === undefined) return "null";
   if (typeof result === "string") return result;
   return JSON.stringify(result, null, 2);
+}
+
+async function installServerTool(params: Record<string, unknown>): Promise<unknown> {
+  const { installServer } = await import("../mc/server.js");
+  const version = String(params.version || "");
+  const loader = String(params.loader || "forge") as Loader;
+  if (!version) throw new Error("Parameter 'version' is required.");
+
+  const logs: string[] = [];
+  const setup = await installServer(version, loader, (msg) => logs.push(msg));
+  return { installed: true, serverDir: setup.serverDir, jarPath: setup.jarPath, versionId: setup.versionId, logs };
+}
+
+async function launchServerTool(params: Record<string, unknown>, mod: ModClient): Promise<unknown> {
+  const { installServer, launchServer } = await import("../mc/server.js");
+  const version = String(params.version || "");
+  const loader = String(params.loader || "forge") as Loader;
+  const memory = Number(params.memory) || 1024;
+  if (!version) throw new Error("Parameter 'version' is required.");
+
+  const setup = await installServer(version, loader);
+  const srv = launchServer(setup, { maxMemoryMb: memory });
+  return { launched: true, pid: srv.process.pid, port: srv.port, dir: srv.dir };
+}
+
+async function serveTool(params: Record<string, unknown>, mod: ModClient): Promise<unknown> {
+  const { installServer, launchServer } = await import("../mc/server.js");
+  const version = String(params.version || "");
+  const loader = String(params.loader || "forge") as Loader;
+  const clientMem = Number(params.memory) || 2048;
+  const serverMem = Number(params.server_memory) || 1024;
+  if (!version) throw new Error("Parameter 'version' is required.");
+
+  const setup = await installServer(version, loader);
+  const srv = launchServer(setup, { maxMemoryMb: serverMem });
+
+  await new Promise((r) => setTimeout(r, 15000));
+
+  const data = loadVersionsData();
+  let versionId = getVersionForLoader(data, version, loader) ?? undefined;
+  if (!versionId) throw new Error(`${loader} not available for ${version}`);
+
+  const vj = loadVersion(versionId);
+  const config = loadConfig();
+  const account = selectedAccount(config);
+  const mcpPort = config.mcp_port ?? await findFreePort();
+
+  const cmd = buildLaunchCommand({
+    versionId,
+    loader,
+    mcpPort,
+    maxMemoryMb: clientMem,
+    minMemoryMb: config.min_memory_mb,
+    extraJvmArgs: config.java_args,
+    extraGameArgs: `--server localhost --port ${srv.port}`,
+    javaPath: javaExecPath(config) ?? undefined,
+    playerName: account ? accountUsername(account) : "Player",
+    uuid: account ? accountUuid(account) : "0",
+    accessToken: account ? accountAccessToken(account) : "0",
+    userType: account ? accountUserType(account) : "legacy",
+  }, vj, data);
+
+  const mcDir_ = gameDirPath(config);
+  const child = spawn(cmd.java, cmd.args, {
+    cwd: mcDir_,
+    stdio: "ignore",
+    detached: process.platform !== "win32",
+  });
+
+  mod.setMcProcess(child);
+  return {
+    server: { pid: srv.process.pid, port: srv.port, dir: srv.dir },
+    client: { pid: child.pid, version: versionId, mcpPort, connectingTo: `localhost:${srv.port}` },
+  };
 }

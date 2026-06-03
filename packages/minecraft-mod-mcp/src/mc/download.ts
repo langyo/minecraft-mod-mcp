@@ -6,7 +6,7 @@ import { libraryMavenPath } from "./version-json.js";
 import type { VersionJson } from "./version-json.js";
 import type { Loader } from "./versions.js";
 
-export interface ForgeInstallProfile {
+export interface ForgeInstallProfileLegacy {
   install: {
     profileName: string;
     target: string;
@@ -17,6 +17,31 @@ export interface ForgeInstallProfile {
     mirrorList?: string;
   };
   versionInfo: VersionJson;
+}
+
+export interface ForgeInstallProfileModern {
+  spec?: number;
+  profile?: string;
+  version?: string;
+  minecraft?: string;
+  json?: string;
+  path?: string;
+  logo?: string;
+  mirrorList?: string;
+  libraries?: VersionJson["libraries"];
+  processors?: unknown[];
+  data?: Record<string, Record<string, string>>;
+  install?: {
+    profileName?: string;
+    target?: string;
+    path?: string;
+    version?: string;
+    filePath?: string;
+    minecraft?: string;
+    json?: string;
+    mirrorList?: string;
+  };
+  versionInfo?: VersionJson | string;
 }
 
 export interface VersionManifest {
@@ -202,18 +227,35 @@ export async function downloadForgeInstaller(
   await downloadFile(mavenUrl, installerPath);
 
   onProgress?.(`Extracting install profile...`);
-  const profile = await extractJarJson<ForgeInstallProfile>(installerPath, "install_profile.json");
-  if (!profile?.versionInfo) throw new Error("Invalid Forge installer: missing versionInfo");
+  const profile = await extractJarJson<ForgeInstallProfileModern>(installerPath, "install_profile.json");
+  if (!profile) throw new Error("Invalid Forge installer: missing install_profile.json");
 
-  const versionId = profile.versionInfo.id;
+  let versionJson: VersionJson;
+  let versionId: string;
+
+  if (profile.versionInfo && typeof profile.versionInfo === "object" && "id" in profile.versionInfo) {
+    versionJson = profile.versionInfo as VersionJson;
+    versionId = versionJson.id;
+    onProgress?.(`Found embedded versionInfo (legacy format)`);
+  } else {
+    const jsonPath = (profile as any).json || (profile.install as any)?.json || "/version.json";
+    const entryName = jsonPath.replace(/^\//, "");
+    onProgress?.(`Extracting version JSON from ${entryName} (modern format)...`);
+    const vj = await extractJarJson<VersionJson>(installerPath, entryName);
+    if (!vj || !vj.id) throw new Error(`Invalid Forge installer: missing ${entryName}`);
+    versionJson = vj;
+    versionId = vj.id;
+  }
+
   const vDir = join(versionsDir(), versionId);
   if (!existsSync(vDir)) mkdirSync(vDir, { recursive: true });
 
-  const jsonPath = join(vDir, `${versionId}.json`);
-  writeFileSync(jsonPath, JSON.stringify(profile.versionInfo, null, 2), "utf-8");
+  const jsonFilePath = join(vDir, `${versionId}.json`);
+  writeFileSync(jsonFilePath, JSON.stringify(versionJson, null, 2), "utf-8");
   onProgress?.(`Saved version JSON for ${versionId}`);
 
-  const universalFileName = profile.install.filePath;
+  const universalFileName = profile.install?.filePath
+    ?? `forge-${forgeVersion}-universal.jar`;
   const universalUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${forgeVersion}/${universalFileName}`;
   const forgeLibName = `net.minecraftforge:forge:${forgeVersion}`;
   const forgeLibPath = join(librariesDir(), libraryMavenPath(forgeLibName));
@@ -224,7 +266,9 @@ export async function downloadForgeInstaller(
     await downloadFile(universalUrl, forgeLibPath);
   }
 
-  await downloadLibraries(profile.versionInfo.libraries, onProgress);
+  const allLibs = [...(versionJson.libraries ?? [])];
+  if (profile.libraries) allLibs.push(...profile.libraries);
+  await downloadLibraries(allLibs, onProgress);
 
   onProgress?.(`Forge ${versionId} install complete`);
 }
@@ -234,7 +278,13 @@ export async function downloadFabricLoader(
   loaderVersion: string,
   onProgress?: (msg: string) => void,
 ): Promise<void> {
-  const versionId = `fabric-loader-${loaderVersion}-${mcVersion}`;
+  const profileUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
+  onProgress?.(`Fetching Fabric profile for ${mcVersion} loader ${loaderVersion}...`);
+  const resp = await fetch(profileUrl);
+  if (!resp.ok) throw new Error(`Failed to fetch Fabric profile: HTTP ${resp.status}`);
+  const profileJson = await resp.json() as VersionJson;
+
+  const versionId = profileJson.id;
   const vDir = join(versionsDir(), versionId);
   if (!existsSync(vDir)) mkdirSync(vDir, { recursive: true });
 
@@ -243,12 +293,6 @@ export async function downloadFabricLoader(
     onProgress?.(`Fabric loader ${versionId} already installed.`);
     return;
   }
-
-  const profileUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
-  onProgress?.(`Fetching Fabric profile for ${mcVersion} loader ${loaderVersion}...`);
-  const resp = await fetch(profileUrl);
-  if (!resp.ok) throw new Error(`Failed to fetch Fabric profile: HTTP ${resp.status}`);
-  const profileJson = await resp.json() as VersionJson;
 
   writeFileSync(jsonPath, JSON.stringify(profileJson, null, 2), "utf-8");
   onProgress?.(`Saved version JSON for ${versionId}`);
@@ -271,18 +315,35 @@ export async function downloadNeoforgeInstaller(
   await downloadFile(mavenUrl, installerPath);
 
   onProgress?.(`Extracting install profile...`);
-  const profile = await extractJarJson<ForgeInstallProfile>(installerPath, "install_profile.json");
-  if (!profile?.versionInfo) throw new Error("Invalid NeoForge installer: missing versionInfo");
+  const profile = await extractJarJson<ForgeInstallProfileModern>(installerPath, "install_profile.json");
+  if (!profile) throw new Error("Invalid NeoForge installer: missing install_profile.json");
 
-  const versionId = profile.versionInfo.id;
+  let versionJson: VersionJson;
+  let versionId: string;
+
+  if (profile.versionInfo && typeof profile.versionInfo === "object" && "id" in profile.versionInfo) {
+    versionJson = profile.versionInfo as VersionJson;
+    versionId = versionJson.id;
+    onProgress?.(`Found embedded versionInfo (legacy format)`);
+  } else {
+    const jsonPath = (profile as any).json || (profile.install as any)?.json || "/version.json";
+    const entryName = jsonPath.replace(/^\//, "");
+    onProgress?.(`Extracting version JSON from ${entryName} (modern format)...`);
+    const vj = await extractJarJson<VersionJson>(installerPath, entryName);
+    if (!vj || !vj.id) throw new Error(`Invalid NeoForge installer: missing ${entryName}`);
+    versionJson = vj;
+    versionId = vj.id;
+  }
+
   const vDir = join(versionsDir(), versionId);
   if (!existsSync(vDir)) mkdirSync(vDir, { recursive: true });
 
-  const jsonPath = join(vDir, `${versionId}.json`);
-  writeFileSync(jsonPath, JSON.stringify(profile.versionInfo, null, 2), "utf-8");
+  const jsonFilePath = join(vDir, `${versionId}.json`);
+  writeFileSync(jsonFilePath, JSON.stringify(versionJson, null, 2), "utf-8");
   onProgress?.(`Saved version JSON for ${versionId}`);
 
-  const universalFileName = profile.install.filePath;
+  const universalFileName = profile.install?.filePath
+    ?? `neoforge-${neoforgeVersion}-universal.jar`;
   const universalUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeVersion}/${universalFileName}`;
   const nfLibName = `net.neoforged:neoforge:${neoforgeVersion}`;
   const nfLibPath = join(librariesDir(), libraryMavenPath(nfLibName));
@@ -293,7 +354,9 @@ export async function downloadNeoforgeInstaller(
     await downloadFile(universalUrl, nfLibPath);
   }
 
-  await downloadLibraries(profile.versionInfo.libraries, onProgress);
+  const allLibs = [...(versionJson.libraries ?? [])];
+  if (profile.libraries) allLibs.push(...profile.libraries);
+  await downloadLibraries(allLibs, onProgress);
 
   onProgress?.(`NeoForge ${versionId} install complete`);
 }

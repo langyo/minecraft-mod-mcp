@@ -11,25 +11,16 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 repositories {
     maven {
-        url = rootProject.projectDir.toPath().resolve('../../../../.maven-local').toUri()
+        url = rootProject.projectDir.toPath().resolve('../../../.maven-local').toUri()
         allowInsecureProtocol = false
     }
     mavenCentral()
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
-sourceSets.main.resources.srcDir '../../../common/src/main/resources'
-
-afterEvaluate {
-    tasks.withType(ProcessResources).configureEach {
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    }
-}
 
 dependencies {
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
-    implementation 'net.java.dev.jna:jna:5.15.0'
-    implementation 'net.java.dev.jna:jna-platform:5.15.0'
 }
 
 neoForge {
@@ -56,7 +47,7 @@ tasks.withType(JavaCompile).configureEach {
 jar {
     manifest {
         attributes 'ModSide' : 'CLIENT'
-        attributes 'Automatic-Module-Name': 'mcpmod'
+        attributes 'Automatic-Module' : 'xyz.langyo.minecraft.mcp.mod'
         attributes 'Implementation-Version' : project.version
     }
 }

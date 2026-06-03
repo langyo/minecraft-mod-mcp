@@ -94,6 +94,9 @@ public final class PlayerWorldHelper {
                     try { server = mc.getClass().getMethod("getServer").invoke(mc); } catch (Exception ignored) {}
                 }
                 if (server == null) {
+                    try { server = mc.getClass().getMethod("getIntegratedServer").invoke(mc); } catch (Exception ignored) {}
+                }
+                if (server == null) {
                     Object f = fieldOrNull(mc, "singleplayerServer");
                     if (f != null) server = f;
                 }
@@ -235,6 +238,7 @@ public final class PlayerWorldHelper {
                             for (String pktName : new String[]{
                                 "net.minecraft.network.play.client.CPacketChatMessage",
                                 "net.minecraft.network.protocol.game.ServerboundChatPacket",
+                                "net.minecraft.network.play.client.C01PacketChatMessage",
                             }) {
                                 try {
                                     Class<?> pktClass = Class.forName(pktName);
@@ -297,6 +301,10 @@ public final class PlayerWorldHelper {
             setRotField(player, "yRotO", yaw);
             setRotField(player, "oYRot", yaw);
             setRotField(player, "oXRot", pitch);
+            setRotField(player, "rotationYaw", yaw);
+            setRotField(player, "rotationPitch", pitch);
+            setRotField(player, "prevRotationYaw", yaw);
+            setRotField(player, "prevRotationPitch", pitch);
             return "{\"rot_set\":true,\"yaw\":" + yaw + ",\"pitch\":" + pitch + "}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
@@ -307,8 +315,8 @@ public final class PlayerWorldHelper {
         try {
             Object player = getPlayer(mc);
             if (player == null) return "{\"error\":\"no player\"}";
-            float currentYaw = getRotField(player, "yRot");
-            float currentPitch = getRotField(player, "xRot");
+            float currentYaw = getRotField(player, "yRot", "rotationYaw");
+            float currentPitch = getRotField(player, "xRot", "rotationPitch");
             float newYaw = currentYaw + deltaYaw;
             float newPitch = Math.max(-90f, Math.min(90f, currentPitch + deltaPitch));
             setPlayerRotation(mc, newYaw, newPitch);
@@ -417,7 +425,7 @@ public final class PlayerWorldHelper {
             if (gameMode == null) {
                 for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
                     String fn = f.getName().toLowerCase();
-                    if (fn.contains("gamemode") || fn.contains("interaction") || fn.contains("multiplayer")) {
+                    if (fn.contains("gamemode") || fn.contains("interaction") || fn.contains("multiplayer") || fn.contains("playercontroller") || fn.contains("field_71442_b")) {
                         try { f.setAccessible(true); gameMode = f.get(mc); ReflectionHelper.dbg("doPlaceBlock: found gameMode via field " + f.getName()); break; } catch (Exception ignored) {}
                     }
                 }
@@ -523,7 +531,8 @@ public final class PlayerWorldHelper {
             for (String cn : new String[]{
                 "net.minecraft.client.gui.screens.ChatScreen",
                 "net.minecraft.client.gui.screen.ChatScreen",
-                "net.minecraft.client.gui.screen.inventory.ChatScreen"
+                "net.minecraft.client.gui.screen.inventory.ChatScreen",
+                "net.minecraft.client.gui.GuiChat"
             }) {
                 try { chatScreenClass = Class.forName(cn); break; } catch (ClassNotFoundException ignored) {}
             }
@@ -536,7 +545,8 @@ public final class PlayerWorldHelper {
             }
             if (chatScreen == null) return "{\"error\":\"ChatScreen instantiation failed\"}";
             for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
-                if (m.getName().equals("setScreen") && m.getParameterCount() == 1) {
+                String mn = m.getName();
+                if ((mn.equals("setScreen") || mn.equals("displayGuiScreen") || mn.equals("func_147108_a")) && m.getParameterCount() == 1) {
                     m.setAccessible(true);
                     m.invoke(mc, chatScreen);
                     return "{\"chat_opened\":true,\"screen\":\"" + chatScreenClass.getSimpleName() + "\"}";
@@ -656,10 +666,18 @@ public final class PlayerWorldHelper {
     public static String setGameMode(Object mc, String gameMode) {
         try {
             Object server = null;
-            for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
-                String n = f.getName();
-                if (n.equals("singleplayerServer") || n.contains("integratedServer")) {
-                    try { f.setAccessible(true); server = f.get(mc); } catch (Exception ignored) {}
+            for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
+                String mn = m.getName();
+                if ((mn.equals("getSingleplayerServer") || mn.equals("getServer") || mn.equals("getIntegratedServer")) && m.getParameterCount() == 0) {
+                    try { server = m.invoke(mc); if (server != null) break; } catch (Exception ignored) {}
+                }
+            }
+            if (server == null) {
+                for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
+                    String n = f.getName();
+                    if (n.equals("singleplayerServer") || n.contains("integratedServer")) {
+                        try { f.setAccessible(true); server = f.get(mc); if (server != null) break; } catch (Exception ignored) {}
+                    }
                 }
             }
             if (server == null) return "{\"error\":\"no singleplayer server\"}";
@@ -679,7 +697,8 @@ public final class PlayerWorldHelper {
                                             for (String gtClass : new String[]{
                                                 "net.minecraft.world.level.GameType",
                                                 "net.minecraft.world.GameType",
-                                                "net.minecraft.server.level.GameType"
+                                                "net.minecraft.server.level.GameType",
+                                                "net.minecraft.world.WorldSettings$GameType"
                                             }) {
                                                 try {
                                                     Class<?> gc = Class.forName(gtClass);
@@ -775,7 +794,8 @@ public final class PlayerWorldHelper {
             for (String cn : new String[]{
                 "net.minecraft.client.gui.screens.PauseScreen",
                 "net.minecraft.client.gui.screens.GameMenuScreen",
-                "net.minecraft.client.gui.screen.IngameMenuScreen"
+                "net.minecraft.client.gui.screen.IngameMenuScreen",
+                "net.minecraft.client.gui.GuiIngameMenu"
             }) {
                 try { screenClass = Class.forName(cn); break; } catch (ClassNotFoundException ignored) {}
             }
@@ -788,7 +808,8 @@ public final class PlayerWorldHelper {
                 }
             if (screen != null) {
                 for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
-                        if (m.getName().equals("setScreen") && m.getParameterCount() == 1) {
+                        String mn = m.getName();
+                        if ((mn.equals("setScreen") || mn.equals("displayGuiScreen") || mn.equals("func_147108_a")) && m.getParameterCount() == 1) {
                             try {
                                 m.setAccessible(true);
                                 m.invoke(mc, screen);
@@ -907,13 +928,15 @@ public final class PlayerWorldHelper {
         }
     }
 
-    private static float getRotField(Object player, String fieldName) throws Exception {
-        for (Field f : ReflectionCache.getAllFields(player.getClass())) {
-            if (f.getName().equals(fieldName) || f.getName().contains(srgSafe(fieldName))) {
-                if (f.getType() == float.class || f.getType() == double.class) {
-                    f.setAccessible(true);
-                    if (f.getType() == double.class) return (float)f.getDouble(player);
-                    return f.getFloat(player);
+    private static float getRotField(Object player, String... fieldNames) throws Exception {
+        for (String fieldName : fieldNames) {
+            for (Field f : ReflectionCache.getAllFields(player.getClass())) {
+                if (f.getName().equals(fieldName) || f.getName().contains(srgSafe(fieldName))) {
+                    if (f.getType() == float.class || f.getType() == double.class) {
+                        f.setAccessible(true);
+                        if (f.getType() == double.class) return (float)f.getDouble(player);
+                        return f.getFloat(player);
+                    }
                 }
             }
         }
@@ -929,6 +952,10 @@ public final class PlayerWorldHelper {
             case "yawRot": return "36076";
             case "oYRot": return "36080";
             case "oXRot": return "36081";
+            case "rotationYaw": return "779";
+            case "rotationPitch": return "781";
+            case "prevRotationYaw": return "780";
+            case "prevRotationPitch": return "782";
             default: return name;
         }
     }
