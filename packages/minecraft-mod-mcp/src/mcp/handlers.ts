@@ -1,14 +1,14 @@
 import { TOOLS } from "./tools.js";
 import type { ModClient } from "../api/mod-client.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { GAME, PLAYER, LAUNCHER, SERVER, MCP } from "../mc/defaults.js";
+import { GAME, PLAYER, SERVER } from "../mc/defaults.js";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { loadVersionsData } from "../mc/versions-data.js";
-import { getVersion, getVersionForLoader, getVersionById, getVersions, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "../mc/versions.js";
+import { getVersion, getVersionForLoader, getVersions, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "../mc/versions.js";
 import { loadVersionMerged } from "../mc/version-json.js";
 import { buildLaunchCommand } from "../mc/launch.js";
-import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "../mc/settings.js";
+import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, type Account } from "../mc/settings.js";
 import { findFreePort } from "../discovery/scanner.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "../mc/download.js";
 import { detectJavas } from "../mc/java-detect.js";
@@ -308,7 +308,7 @@ async function installServerTool(params: Record<string, unknown>): Promise<unkno
   return { installed: true, serverDir: setup.serverDir, jarPath: setup.jarPath, versionId: setup.versionId, logs };
 }
 
-async function launchServerTool(params: Record<string, unknown>, mod: ModClient): Promise<unknown> {
+async function launchServerTool(params: Record<string, unknown>, _mod: ModClient): Promise<unknown> {
   const { installServer, launchServer } = await import("../mc/server.js");
   const version = String(params.version || "");
   const loader = String(params.loader || "forge") as Loader;

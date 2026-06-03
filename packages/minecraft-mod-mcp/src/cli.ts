@@ -1,20 +1,19 @@
 import { parseArgs } from "node:util";
 import { startServer } from "./server.js";
 import { loadVersionsData } from "./mc/versions-data.js";
-import { getVersions, getVersion, getVersionById, getVersionForLoader, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
+import { getVersions, getVersion, getVersionForLoader, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
 import { loadVersionMerged } from "./mc/version-json.js";
 import { buildLaunchCommand, ensureJavaForLaunch, type LaunchConfig } from "./mc/launch.js";
-import { loadConfig, saveConfig, addAccount, removeAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "./mc/settings.js";
+import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, type Account } from "./mc/settings.js";
 import { detectJavas } from "./mc/java-detect.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "./mc/download.js";
-import { mcDir, versionsDir, classpathSeparator, findJavaForVersion } from "./mc/platform.js";
+import { versionsDir, classpathSeparator } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
-import { PORT_START, PORT_END } from "./consts.js";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { GAME, MCP, LAUNCHER } from "./mc/defaults.js";
+import { GAME, MCP, PLAYER, SERVER } from "./mc/defaults.js";
 
 const HELP = `minecraft-mod-mcp — Minecraft MCP Bridge + Launcher CLI
 
@@ -100,7 +99,7 @@ async function runLaunch(args: string[]) {
     console.log(`Usage: minecraft-mod-mcp launch <version> [options]
 
 Options:
-  --loader <forge|fabric|neoforge>  Mod loader (default: forge)
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
   --mc-dir <path>                   Game directory (default: isolated MCP dir)
   --java <path>                     Java executable path
   --memory <mb>                     Max memory in MB (default: ${GAME.defaultMaxMemoryMb})
@@ -115,7 +114,7 @@ Options:
   const { values, positionals } = parseArgs({
     args,
     options: {
-      loader: { type: "string", default: "forge" },
+      loader: { type: "string", default: GAME.defaultLoader },
       "mc-dir": { type: "string" },
       java: { type: "string" },
       memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
@@ -129,7 +128,7 @@ Options:
   });
 
   const versionArg = positionals[0];
-  const loader = (values.loader ?? "forge") as Loader;
+  const loader = (values.loader ?? GAME.defaultLoader) as Loader;
 
   console.log(`Resolving version ${versionArg} (${loader})...`);
   const versionId = await ensureVersionInstalled(versionArg, loader, (msg) => {
@@ -153,10 +152,10 @@ Options:
     extraJvmArgs: config.java_args,
     extraGameArgs: buildExtraGameArgs(config.game_args, values.server, values["server-port"]),
     javaPath: typeof values.java === "string" ? values.java : javaExecPath(config) ?? undefined,
-    playerName: account ? accountUsername(account) : "Player",
-    uuid: account ? accountUuid(account) : "0",
-    accessToken: account ? accountAccessToken(account) : "0",
-    userType: account ? accountUserType(account) : "legacy",
+    playerName: account ? accountUsername(account) : PLAYER.defaultName,
+    uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
+    accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
+    userType: account ? accountUserType(account) : PLAYER.defaultUserType,
   };
 
   if (!launchConfig.javaPath) {
@@ -229,7 +228,7 @@ async function runInstall(args: string[]) {
   if (args.length === 0) {
     console.error("Usage: minecraft-mod-mcp install <version> [options]");
     console.error("\nOptions:");
-    console.error("  --loader <forge|fabric|neoforge>  Mod loader (default: forge)");
+    console.error("  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})");
     console.error("\nUse 'minecraft-mod-mcp list' to see supported versions.");
     process.exit(1);
   }
@@ -237,13 +236,13 @@ async function runInstall(args: string[]) {
   const { values, positionals } = parseArgs({
     args,
     options: {
-      loader: { type: "string", default: "forge" },
+      loader: { type: "string", default: GAME.defaultLoader },
     },
     strict: false,
   });
 
   const versionArg = positionals[0];
-  const loader = (values.loader ?? "forge") as Loader;
+  const loader = (values.loader ?? GAME.defaultLoader) as Loader;
   const data = loadVersionsData();
 
   const vi = getVersion(data, versionArg);
@@ -474,7 +473,7 @@ async function runServe(args: string[]) {
 One-command: install server + install client + launch both.
 
 Options:
-  --loader <forge|fabric|neoforge>  Mod loader (default: forge)
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
   --java <path>                     Java executable path
   --memory <mb>                     Client max memory (default: ${GAME.defaultMaxMemoryMb})
   --server-memory <mb>              Server max memory (default: ${GAME.defaultServerMemoryMb})
@@ -487,7 +486,7 @@ Options:
   const { values, positionals } = parseArgs({
     args,
     options: {
-      loader: { type: "string", default: "forge" },
+      loader: { type: "string", default: GAME.defaultLoader },
       java: { type: "string" },
       memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
       "server-memory": { type: "string", default: String(GAME.defaultServerMemoryMb) },
@@ -499,9 +498,9 @@ Options:
   });
 
   const versionArg = positionals[0];
-  const loader = (values.loader ?? "forge") as Loader;
+  const loader = (values.loader ?? GAME.defaultLoader) as Loader;
   const { installServer, launchServer } = await import("./mc/server.js");
-  const { serverDir } = await import("./mc/settings.js");
+  await import("./mc/settings.js");
 
   console.log(`=== Setting up ${versionArg} (${loader}) ===\n`);
 
@@ -511,7 +510,7 @@ Options:
 
   if (values["dry-run"]) {
     console.log(`\n[dry-run] Would launch server: java -Xmx${values["server-memory"]}m -jar ${setup.jarPath} --nogui`);
-    console.log(`[dry-run] Would launch client connecting to localhost:25565`);
+    console.log(`[dry-run] Would launch client connecting to ${SERVER.connectHost}:${GAME.defaultServerPort}`);
     return;
   }
 

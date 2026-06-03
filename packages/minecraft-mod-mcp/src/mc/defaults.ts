@@ -21,6 +21,12 @@ export const GAME = {
   defaultServerMemoryMb: 1024,
   defaultServerPort: 25565,
   serverStartupWaitMs: 15000,
+  defaultVersion: "1.21.7",
+  defaultLoader: "forge",
+  defaultLanguage: "zh-CN",
+  defaultDownloadSource: "bmclapi",
+  javaVersionFallback: 17,
+  javaVersionThresholds: { mc117: 17, mc116: 16, mc113: 13 } as Record<string, number>,
 } as const;
 
 export const MCP = {
@@ -37,6 +43,16 @@ export const PATHS = {
   mcDirName: ".minecraft",
   launcherDirName: "mcp_launcher",
   gradleJdksSubdir: ".gradle/jdks",
+  versionsDirName: "versions",
+  librariesDirName: "libraries",
+  assetsDirName: "assets",
+  nativesDirName: "natives",
+  assetIndexesDirName: "indexes",
+  assetObjectsDirName: "objects",
+  tmpSuffix: ".tmp",
+  javaDirName: "java",
+  gameDirName: "game",
+  serverDirName: "server",
 } as const;
 
 export const JAVA = {
@@ -72,6 +88,10 @@ export const AUTH = {
   tokenUrl: "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
   xblAuthUrl: "https://user.auth.xboxlive.com/user/authenticate",
   xstsAuthUrl: "https://xsts.auth.xboxlive.com/xsts/authorize",
+  xblRelyingParty: "http://auth.xboxlive.com",
+  xblSiteName: "user.auth.xboxlive.com",
+  xstsSandboxId: "RETAIL",
+  xstsRelyingParty: "rp://api.minecraftservices.com/",
   mcLoginUrl: "https://api.minecraftservices.com/authentication/login_with_xbox",
   mcProfileUrl: "https://api.minecraftservices.com/minecraft/profile",
   oauthScope: "XboxLive.signin offline_access",
@@ -91,6 +111,10 @@ export const SERVER = {
   connectHost: "localhost",
   defaultJavaVersion: 17,
   userAgent: "minecraft-mcp",
+  bindAddress: "0.0.0.0",
+  eulaFileName: "eula.txt",
+  propertiesFileName: "server.properties",
+  modsDirName: "mods",
 } as const;
 
 export const MOD = {
@@ -98,6 +122,7 @@ export const MOD = {
   screenshotEndpoint: "/api/screenshot",
   statusEndpoint: "/api/status",
   statusType: "minecraft-mod",
+  httpServerName: "minecraft-mod-mcp-server",
 } as const;
 
 export const FABRIC = {

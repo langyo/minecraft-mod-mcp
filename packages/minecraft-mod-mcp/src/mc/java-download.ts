@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, createWriteStream, readdirSync, rmSync } from "node:fs";
 import { join, basename } from "node:path";
-import { crossHomedir, isWindows, isMacos } from "../runtime/detector.js";
+import { isWindows, isMacos } from "../runtime/detector.js";
 import { launcherDir } from "./platform.js";
-import { JAVA } from "./defaults.js";
+import { JAVA, PATHS } from "./defaults.js";
 
 function javaCacheDir(): string {
-  return join(launcherDir(), "java");
+  return join(launcherDir(), PATHS.javaDirName);
 }
 
 function getPlatform(): string {
@@ -18,12 +18,6 @@ function getArch(): string {
   const arch = process.arch;
   if (arch === "arm64") return "aarch64";
   return "x64";
-}
-
-function getExt(): string {
-  if (isWindows()) return ".zip";
-  if (isMacos()) return ".tar.gz";
-  return ".tar.gz";
 }
 
 export function installedJavaHome(javaVersion: number): string | null {
@@ -56,7 +50,6 @@ interface AdoptiumAsset {
 async function fetchJdkUrl(javaVersion: number): Promise<{ url: string; name: string }> {
   const platform = getPlatform();
   const arch = getArch();
-  const ext = getExt();
 
   const apiUrl = `${JAVA.adoptiumApiUrl}/${javaVersion}/hotspot?architecture=${arch}&image_type=jdk&os=${platform}&vendor=eclipse`;
 

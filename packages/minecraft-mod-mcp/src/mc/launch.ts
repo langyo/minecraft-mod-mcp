@@ -4,7 +4,7 @@ import { inflateRawSync } from "node:zlib";
 import { crossHomedir, isWindows, isMacos } from "../runtime/detector.js";
 import type { Library, VersionJson } from "./version-json.js";
 import { collectAllArgs, resolveClasspath, shouldApply, libraryPath } from "./version-json.js";
-import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion, getNativeClassifier, jdkHome } from "./platform.js";
+import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion, jdkHome } from "./platform.js";
 import { loadVersionsData, type VersionsData } from "./versions-data.js";
 import { getVersionById, type Loader } from "./versions.js";
 import { installedJavaHome, ensureJavaInstalled } from "./java-download.js";
@@ -54,7 +54,6 @@ function extractNatives(libraries: Library[], nDir: string): void {
 function extractNativeJar(jarPath: string, outDir: string): void {
   const buf = readFileSync(jarPath);
 
-  const endSig = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
   let endPos = -1;
   for (let i = buf.length - 22; i >= 0; i--) {
     if (buf[i] === 0x50 && buf[i + 1] === 0x4b && buf[i + 2] === 0x05 && buf[i + 3] === 0x06) {
@@ -71,9 +70,9 @@ function extractNativeJar(jarPath: string, outDir: string): void {
   let pos = cdOffset;
   while (pos + 46 <= cdEnd) {
     if (buf.readUInt32LE(pos) !== 0x02014b50) break;
-    const cMethod = buf.readUInt16LE(pos + 10);
-    const cSize = buf.readUInt32LE(pos + 20);
-    const uSize = buf.readUInt32LE(pos + 24);
+    buf.readUInt16LE(pos + 10);
+    buf.readUInt32LE(pos + 20);
+    buf.readUInt32LE(pos + 24);
     const nameLen = buf.readUInt16LE(pos + 28);
     const extraLen = buf.readUInt16LE(pos + 30);
     const commentLen = buf.readUInt16LE(pos + 32);
@@ -146,11 +145,10 @@ const LEGACY_JVM_ARGS = [
 function inferJavaFromVersion(vj: VersionJson): number {
   const id = (vj.inheritsFrom ?? vj.id ?? "").replace(/-/g, ".");
   const m = id.match(/1\.(\d+)/);
-  if (!m) return 17;
+  if (!m) return GAME.javaVersionFallback;
   const minor = parseInt(m[1]);
   if (minor >= 20) return 21;
   if (minor >= 17) return 17;
-  if (minor >= 13) return 8;
   return 8;
 }
 

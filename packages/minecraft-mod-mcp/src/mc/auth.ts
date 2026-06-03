@@ -124,10 +124,10 @@ async function xboxAuth(liveAccessToken: string): Promise<[string, string]> {
   const xblResp = await postJson(AUTH.xblAuthUrl, {
     Properties: {
       AuthMethod: "RPS",
-      SiteName: "user.auth.xboxlive.com",
+      SiteName: AUTH.xblSiteName,
       RpsTicket: `d=${liveAccessToken}`,
     },
-    RelyingParty: "http://auth.xboxlive.com",
+    RelyingParty: AUTH.xblRelyingParty,
     TokenType: "JWT",
   });
 
@@ -136,8 +136,8 @@ async function xboxAuth(liveAccessToken: string): Promise<[string, string]> {
   const uhsValue = displayClaims.xui[0].uhs;
 
   const xstsResp = await postJson(AUTH.xstsAuthUrl, {
-    Properties: { SandboxId: "RETAIL", UserTokens: [xblToken] },
-    RelyingParty: "rp://api.minecraftservices.com/",
+    Properties: { SandboxId: AUTH.xstsSandboxId, UserTokens: [xblToken] },
+    RelyingParty: AUTH.xstsRelyingParty,
     TokenType: "JWT",
   });
 

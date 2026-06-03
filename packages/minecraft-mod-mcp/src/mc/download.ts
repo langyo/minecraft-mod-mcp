@@ -6,7 +6,7 @@ import { libraryMavenPath, loadVersionMerged } from "./version-json.js";
 import type { VersionJson } from "./version-json.js";
 import { loadVersionsData } from "./versions-data.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
-import { DOWNLOAD } from "./defaults.js";
+import { DOWNLOAD, PATHS } from "./defaults.js";
 
 export interface ForgeInstallProfileLegacy {
   install: {
@@ -129,7 +129,7 @@ export async function downloadVersion(
   }
 
   if (versionJson.assetIndex?.url) {
-    const idxDir = join(assetsDir(), "indexes");
+    const idxDir = join(assetsDir(), PATHS.assetIndexesDirName);
     if (!existsSync(idxDir)) mkdirSync(idxDir, { recursive: true });
     const idxPath = join(idxDir, `${versionJson.assetIndex.id}.json`);
 
@@ -150,7 +150,7 @@ export async function downloadVersion(
           const hash = obj.hash;
           const prefix = hash.slice(0, 2);
           const assetUrl = `${DOWNLOAD.assetBaseUrl}${prefix}/${hash}`;
-          const objDir = join(assetsDir(), "objects", prefix);
+          const objDir = join(assetsDir(), PATHS.assetObjectsDirName, prefix);
           if (!existsSync(objDir)) mkdirSync(objDir, { recursive: true });
           const assetPath = join(objDir, hash);
           if (!existsSync(assetPath)) {
@@ -187,7 +187,7 @@ export function listInstalledVersions(): string[] {
   const installed: string[] = [];
   try {
     for (const entry of readdirSync(vDir, { withFileTypes: true })) {
-      if (entry.isDirectory() && entry.name !== ".tmp") {
+      if (entry.isDirectory() && entry.name !== PATHS.tmpSuffix) {
         const jsonPath = join(vDir, entry.name, `${entry.name}.json`);
         if (existsSync(jsonPath)) installed.push(entry.name);
       }
@@ -221,7 +221,7 @@ export async function downloadForgeInstaller(
   onProgress?: (msg: string) => void,
 ): Promise<void> {
   const mavenUrl = `${DOWNLOAD.forgeMavenUrl}net/minecraftforge/forge/${forgeVersion}/forge-${forgeVersion}-installer.jar`;
-  const tmpDir = join(versionsDir(), ".tmp");
+  const tmpDir = join(versionsDir(), PATHS.tmpSuffix);
   if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
   const installerPath = join(tmpDir, `forge-${forgeVersion}-installer.jar`);
 
@@ -309,7 +309,7 @@ export async function downloadNeoforgeInstaller(
   onProgress?: (msg: string) => void,
 ): Promise<void> {
   const mavenUrl = `${DOWNLOAD.neoforgeMavenUrl}net/neoforged/neoforge/${neoforgeVersion}/neoforge-${neoforgeVersion}-installer.jar`;
-  const tmpDir = join(versionsDir(), ".tmp");
+  const tmpDir = join(versionsDir(), PATHS.tmpSuffix);
   if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
   const installerPath = join(tmpDir, `neoforge-${neoforgeVersion}-installer.jar`);
 

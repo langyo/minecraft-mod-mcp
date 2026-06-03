@@ -16,19 +16,19 @@ export function mcDir(): string {
 }
 
 export function versionsDir(): string {
-  return join(mcDir(), "versions");
+  return join(mcDir(), PATHS.versionsDirName);
 }
 
 export function librariesDir(): string {
-  return join(mcDir(), "libraries");
+  return join(mcDir(), PATHS.librariesDirName);
 }
 
 export function assetsDir(): string {
-  return join(mcDir(), "assets");
+  return join(mcDir(), PATHS.assetsDirName);
 }
 
 export function nativesDir(versionId: string): string {
-  return join(mcDir(), "versions", versionId, "natives");
+  return join(mcDir(), PATHS.versionsDirName, versionId, PATHS.nativesDirName);
 }
 
 export function launcherDir(): string {

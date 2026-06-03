@@ -23,7 +23,7 @@ export class ModClient {
     const status = await findMod(startPort, endPort);
     if (status) {
       this.modPort = status.port;
-      this.baseUrl = `http://127.0.0.1:${status.port}`;
+      this.baseUrl = `http://${MCP.bindAddress}:${status.port}`;
     }
     return status;
   }
@@ -32,7 +32,7 @@ export class ModClient {
     const status = await waitForMod(PORT_START, PORT_END, timeoutMs);
     if (status) {
       this.modPort = status.port;
-      this.baseUrl = `http://127.0.0.1:${status.port}`;
+      this.baseUrl = `http://${MCP.bindAddress}:${status.port}`;
     }
     return status;
   }

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { serverDir } from "./settings.js";
 import { downloadFile } from "./download.js";
@@ -6,10 +6,9 @@ import { loadVersion } from "./version-json.js";
 import { spawn } from "node:child_process";
 import { findJavaForVersion } from "./platform.js";
 import { loadVersionsData } from "./versions-data.js";
-import { getVersion, getVersionById, getVersionForLoader, type Loader } from "./versions.js";
+import { getVersion, getVersionForLoader, type Loader } from "./versions.js";
 import { DOWNLOAD, SERVER, GAME } from "./defaults.js";
 import type { ChildProcess } from "node:child_process";
-import type { VersionJson } from "./version-json.js";
 
 const SERVER_PROPERTIES = `# MCP auto-generated server.properties
 enable-jmx-monitoring=false
@@ -38,7 +37,7 @@ initial-disabled-packs=
 broadcast-rcon-to-ops=true
 view-distance=${SERVER.viewDistance}
 resource-pack=
-server-ip=0.0.0.0
+server-ip=${SERVER.bindAddress}
 resource-pack-prompt=
 allow-nether=true
 server-port=${GAME.defaultServerPort}
@@ -162,17 +161,17 @@ export async function installServer(
     onProgress?.(`Server JAR already exists.`);
   }
 
-  const eulaPath = join(sDir, "eula.txt");
+  const eulaPath = join(sDir, SERVER.eulaFileName);
   if (!existsSync(eulaPath)) {
     writeFileSync(eulaPath, "eula=true\n", "utf-8");
   }
 
-  const propsPath = join(sDir, "server.properties");
+  const propsPath = join(sDir, SERVER.propertiesFileName);
   if (!existsSync(propsPath)) {
     writeFileSync(propsPath, SERVER_PROPERTIES, "utf-8");
   }
 
-  const modsDir = join(sDir, "mods");
+  const modsDir = join(sDir, SERVER.modsDirName);
   if (!existsSync(modsDir)) mkdirSync(modsDir, { recursive: true });
 
   onProgress?.(`Server installed at ${sDir}`);
@@ -207,7 +206,7 @@ export function launchServer(
   });
 
   child.on("error", (err) => {
-    console.error(`[minecraft-mod-mcp] Server launch failed: ${err.message}`);
+    console.error(`[${SERVER.userAgent}] Server launch failed: ${err.message}`);
   });
 
   return { process: child, port, dir: setup.serverDir };

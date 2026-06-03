@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { crossHomedir, isWindows } from "../runtime/detector.js";
-import { launcherDir, mcDir } from "./platform.js";
+import { isWindows } from "../runtime/detector.js";
+import { launcherDir } from "./platform.js";
+import { GAME, PATHS } from "./defaults.js";
 
 export interface MicrosoftAccount {
   type: "microsoft";
@@ -42,14 +43,14 @@ export interface LauncherConfig {
 
 export function defaultConfig(): LauncherConfig {
   return {
-    max_memory_mb: 2048,
-    min_memory_mb: 512,
-    width: 854,
-    height: 480,
+    max_memory_mb: GAME.defaultMaxMemoryMb,
+    min_memory_mb: GAME.defaultMinMemoryMb,
+    width: GAME.defaultWidth,
+    height: GAME.defaultHeight,
     fullscreen: false,
     accounts: [],
-    download_source: "bmclapi",
-    language: "zh-CN",
+    download_source: GAME.defaultDownloadSource,
+    language: GAME.defaultLanguage,
   };
 }
 
@@ -118,11 +119,11 @@ export function accountUserType(a: Account): string {
 
 export function gameDirPath(config: LauncherConfig): string {
   if (config.game_dir) return config.game_dir;
-  return join(launcherDir(), "game");
+  return join(launcherDir(), PATHS.gameDirName);
 }
 
 export function serverDir(versionId?: string): string {
-  const base = join(launcherDir(), "server");
+  const base = join(launcherDir(), PATHS.serverDirName);
   return versionId ? join(base, versionId) : base;
 }
 

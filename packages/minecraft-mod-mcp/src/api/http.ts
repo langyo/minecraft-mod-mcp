@@ -1,10 +1,10 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { ModClient } from "./mod-client.js";
-import { PLAYER } from "../mc/defaults.js";
+import { PLAYER, GAME, MOD, MCP } from "../mc/defaults.js";
 
 export function createApiApp(mod: ModClient): Server {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    const url = new URL(req.url ?? "/", `http://127.0.0.1`);
+    const url = new URL(req.url ?? "/", `http://${MCP.bindAddress}`);
     const path = url.pathname;
 
     res.setHeader("Content-Type", "application/json");
@@ -14,7 +14,7 @@ export function createApiApp(mod: ModClient): Server {
         const rt = typeof (globalThis as any).Deno !== "undefined" ? "deno" : typeof (globalThis as any).Bun !== "undefined" ? "bun" : "node";
         res.end(JSON.stringify({
           ok: true,
-          type: "minecraft-mod-mcp-server",
+          type: MOD.httpServerName,
           runtime: rt,
           mod: mod.getStatus(),
         }));
@@ -37,8 +37,8 @@ export function createApiApp(mod: ModClient): Server {
         const body = await readBody(req);
 
         if (path === "/api/launch") {
-          const version = (body && typeof body === "object" && "version" in body) ? String((body as any).version) : "1.21.7";
-          const loader = (body && typeof body === "object" && "loader" in body) ? String((body as any).loader) : "forge";
+          const version = (body && typeof body === "object" && "version" in body) ? String((body as any).version) : GAME.defaultVersion;
+          const loader = (body && typeof body === "object" && "loader" in body) ? String((body as any).loader) : GAME.defaultLoader;
           const { buildLaunchCommand } = await import("../mc/launch.js");
           const { loadVersionMerged } = await import("../mc/version-json.js");
           const { loadConfig, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType } = await import("../mc/settings.js");
