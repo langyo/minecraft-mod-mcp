@@ -265,6 +265,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
       .replace(/\$\{version_name\}/g, config.versionId)
       .replace(/\$\{game_directory\}/g, mcDir)
       .replace(/\$\{assets_root\}/g, aDir)
+      .replace(/\$\{game_assets\}/g, aDir)
       .replace(/\$\{assets_index_name\}/g, assetsIndex)
   );
   allArgs.push(...resolvedJvm);
@@ -286,6 +287,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
       .replace(/\$\{version_name\}/g, config.versionId)
       .replace(/\$\{game_directory\}/g, mcDir)
       .replace(/\$\{assets_root\}/g, aDir)
+      .replace(/\$\{game_assets\}/g, aDir)
       .replace(/\$\{assets_index_name\}/g, assetsIndex)
       .replace(/\$\{auth_uuid\}/g, uuid)
       .replace(/\$\{auth_access_token\}/g, accessToken)

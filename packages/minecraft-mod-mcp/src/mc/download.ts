@@ -166,13 +166,42 @@ export async function downloadVersion(
   for (const lib of versionJson.libraries) {
     if (lib.downloads?.artifact?.url) {
       const libPath = join(librariesDir(), lib.downloads.artifact.path);
-      await downloadFile(lib.downloads.artifact.url, libPath, lib.downloads.artifact.sha1);
+      if (!existsSync(libPath)) {
+        try {
+          await downloadFile(lib.downloads.artifact.url, libPath, lib.downloads.artifact.sha1);
+        } catch {
+          const mvnPath = libraryMavenPath(lib.name);
+          let ok = false;
+          for (const repo of DOWNLOAD.fallbackRepoUrls) {
+            try {
+              await downloadFile(`${repo}${mvnPath}`, libPath);
+              ok = true;
+              break;
+            } catch { /* try next */ }
+          }
+          if (!ok) onProgress?.(`  Warning: could not download ${lib.name}`);
+        }
+      }
     } else if (lib.name) {
       const mvnPath = libraryMavenPath(lib.name);
       const url = `${DOWNLOAD.mavenLibrariesUrl}${mvnPath}`;
       const filePath = join(librariesDir(), mvnPath);
       if (!existsSync(filePath)) {
-        await downloadFile(url, filePath);
+        let ok = false;
+        try {
+          await downloadFile(url, filePath);
+          ok = true;
+        } catch { /* try fallback */ }
+        if (!ok) {
+          for (const repo of DOWNLOAD.fallbackRepoUrls) {
+            try {
+              await downloadFile(`${repo}${mvnPath}`, filePath);
+              ok = true;
+              break;
+            } catch { /* try next */ }
+          }
+        }
+        if (!ok) onProgress?.(`  Warning: could not download ${lib.name}`);
       }
     }
   }
