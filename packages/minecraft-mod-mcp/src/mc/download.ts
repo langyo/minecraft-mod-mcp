@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { versionsDir, assetsDir, librariesDir } from "./platform.js";
-import { libraryMavenPath, loadVersionMerged } from "./version-json.js";
-import type { VersionJson } from "./version-json.js";
-import { loadVersionsData } from "./versions-data.js";
+import { libraryMavenPath, loadVersionMerged } from "./versionJson.js";
+import type { VersionJson } from "./versionJson.js";
+import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 import { DOWNLOAD, PATHS } from "./defaults.js";
 

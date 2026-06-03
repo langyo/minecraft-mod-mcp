@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
 import { crossHomedir, isWindows, isMacos, classpathSeparator as cpSep } from "../runtime/detector.js";
-import { detectJavas } from "./java-detect.js";
+import { detectJavas } from "./javaDetect.js";
 import { PATHS, JAVA } from "./defaults.js";
 
 function homedir(): string {

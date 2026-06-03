@@ -1,4 +1,4 @@
-import { ModClient } from "./api/mod-client.js";
+import { ModClient } from "./api/modClient.js";
 import { createMcpServer, connectStdio } from "./mcp/transport.js";
 import { findMod } from "./discovery/scanner.js";
 import { PORT_START, PORT_END } from "./consts.js";

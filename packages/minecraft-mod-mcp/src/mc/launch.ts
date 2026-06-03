@@ -2,13 +2,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 
 import { join, extname, basename } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { crossHomedir, isWindows, isMacos } from "../runtime/detector.js";
-import type { Library, VersionJson } from "./version-json.js";
-import { collectAllArgs, resolveClasspath, shouldApply, libraryPath } from "./version-json.js";
+import type { Library, VersionJson } from "./versionJson.js";
+import { collectAllArgs, resolveClasspath, shouldApply, libraryPath } from "./versionJson.js";
 import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion, jdkHome, launcherDir } from "./platform.js";
-import { loadVersionsData, type VersionsData } from "./versions-data.js";
+import { loadVersionsData, type VersionsData } from "./versionsData.js";
 import { getVersionById, type Loader } from "./versions.js";
-import { installedJavaHome, ensureJavaInstalled } from "./java-download.js";
-import { detectJavas } from "./java-detect.js";
+import { installedJavaHome, ensureJavaInstalled } from "./javaDownload.js";
+import { detectJavas } from "./javaDetect.js";
 import { LAUNCHER, PLAYER, GAME } from "./defaults.js";
 
 const NATIVE_EXTS = new Set([".dll", ".so", ".dylib", ".jnilib"]);

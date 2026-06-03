@@ -1,12 +1,12 @@
 import { parseArgs } from "node:util";
 import { startServer } from "./server.js";
-import { loadVersionsData } from "./mc/versions-data.js";
+import { loadVersionsData } from "./mc/versionsData.js";
 import { getVersions, getVersion, getVersionForLoader, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
-import { loadVersionMerged } from "./mc/version-json.js";
+import { loadVersionMerged } from "./mc/versionJson.js";
 import { buildLaunchCommand, ensureJavaForLaunch, type LaunchConfig } from "./mc/launch.js";
 import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, type Account } from "./mc/settings.js";
-import { detectJavas } from "./mc/java-detect.js";
-import { ensureJavaInstalled } from "./mc/java-download.js";
+import { detectJavas } from "./mc/javaDetect.js";
+import { ensureJavaInstalled } from "./mc/javaDownload.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "./mc/download.js";
 import { versionsDir, classpathSeparator } from "./mc/platform.js";

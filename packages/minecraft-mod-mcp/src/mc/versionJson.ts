@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isWindows, isMacos } from "../runtime/detector.js";
 import { versionsDir, librariesDir } from "./platform.js";
-import { loadVersionsData } from "./versions-data.js";
+import { loadVersionsData } from "./versionsData.js";
 import { getVersionById } from "./versions.js";
 
 export interface VersionJson {

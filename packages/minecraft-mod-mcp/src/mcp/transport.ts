@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { ModClient } from "../api/mod-client.js";
+import type { ModClient } from "../api/modClient.js";
 import { registerHandlers } from "./handlers.js";
 import { LAUNCHER } from "../mc/defaults.js";
 

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { versionsDir } from "./platform.js";
-import type { VersionJson } from "./version-json.js";
+import type { VersionJson } from "./versionJson.js";
 import { FABRIC } from "./defaults.js";
 
 export type Loader = "forge" | "neoforge" | "fabric";

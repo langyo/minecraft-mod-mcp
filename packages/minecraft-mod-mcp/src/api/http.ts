@@ -1,5 +1,5 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import type { ModClient } from "./mod-client.js";
+import type { ModClient } from "./modClient.js";
 import { PLAYER, GAME, MOD, MCP } from "../mc/defaults.js";
 
 export function createApiApp(mod: ModClient): Server {
@@ -40,10 +40,10 @@ export function createApiApp(mod: ModClient): Server {
           const version = (body && typeof body === "object" && "version" in body) ? String((body as any).version) : GAME.defaultVersion;
           const loader = (body && typeof body === "object" && "loader" in body) ? String((body as any).loader) : GAME.defaultLoader;
           const { buildLaunchCommand } = await import("../mc/launch.js");
-          const { loadVersionMerged } = await import("../mc/version-json.js");
+          const { loadVersionMerged } = await import("../mc/versionJson.js");
           const { loadConfig, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType } = await import("../mc/settings.js");
           const { findFreePort } = await import("../discovery/scanner.js");
-          const { loadVersionsData } = await import("../mc/versions-data.js");
+          const { loadVersionsData } = await import("../mc/versionsData.js");
           const { ensureVersionInstalled } = await import("../mc/download.js");
           const { spawn } = await import("node:child_process");
           const { existsSync, mkdirSync } = await import("node:fs");
