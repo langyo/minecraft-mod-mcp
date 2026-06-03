@@ -372,8 +372,7 @@ public final class ScreenshotHelper {
         int skyR = (sc >> 16) & 0xFF, skyG = (sc >> 8) & 0xFF, skyB = sc & 0xFF;
         for (int i = 0; i < raw.length; i++) {
             int r = bb.get() & 0xFF, g = bb.get() & 0xFF, b = bb.get() & 0xFF, a = bb.get() & 0xFF;
-            int row = i / w;
-            if (a < 16 || (r + g + b < 24 && row > h / 2)) { r = skyR; g = skyG; b = skyB; a = 255; }
+            if (a < 16) { r = skyR; g = skyG; b = skyB; a = 255; }
             raw[i] = (a << 24) | (r << 16) | (g << 8) | b;
         }
         int[] flipped = new int[w * h];
@@ -798,7 +797,7 @@ public final class ScreenshotHelper {
                     int g = bb.get() & 0xFF;
                     int b = bb.get() & 0xFF;
                     int a = bb.get() & 0xFF;
-                    if (a < 16 || (r + g + b < 24 && y < h / 2)) {
+                    if (a < 16) {
                         r = skyR; g = skyG; b = skyB;
                         replaced++;
                     }
