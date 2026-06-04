@@ -90,6 +90,10 @@ npx minecraft-mod-mcp
 https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/zhs/AI-TOOLS.md
 ```
 
+### 5. 使用 CLI
+
+**[→ CLI 使用指南](./CLI.md)** —— 启动客户端、服务端，管理版本和账户，构建模组 SDK，一切尽在命令行。
+
 ---
 
 ## 使用技巧
