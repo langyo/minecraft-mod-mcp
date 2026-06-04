@@ -188,6 +188,8 @@ jobs:
 
       - name: Build mods
         shell: pwsh
+        env:
+          GRADLE_OPTS: "-Xmx8G"
         run: |
           $ErrorActionPreference = "Stop"
           $failedMods = @()
@@ -203,10 +205,13 @@ jobs:
 
             Push-Location $modPath
             try {
+              $gradleVer = if (Test-Path "gradle/wrapper/gradle-wrapper.properties") { (Get-Content "gradle/wrapper/gradle-wrapper.properties" | Select-String "distributionUrl" | Select-Object -First 1) -replace '.*gradle-', '' -replace '-bin.*', '' } else { "8.0" }
+              $majorVer = $gradleVer.Split('.')[0]
+              $extraArgs = if ([int]$majorVer -ge 5) { "--warning-mode=summary" } else { "" }
               if ($mod -match "/fabric$") {
-                $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" 2>&1
+                $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
               } else {
-                $result = .\gradlew.bat clean jar --no-daemon --console=plain --warning-mode=summary 2>&1
+                $result = .\gradlew.bat clean jar --no-daemon --console=plain $extraArgs 2>&1
               }
               if ($LASTEXITCODE -ne 0) {
                 $errFile = "build-error.log"
