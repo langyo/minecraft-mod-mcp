@@ -102,6 +102,10 @@ export const AUTH = {
   slowDownIntervalMs: 10000,
 } as const;
 
+export type ServerType = "vanilla" | "spigot" | "craftbukkit" | "paper" | "forge" | "fabric" | "neoforge";
+
+export const SERVER_TYPES: readonly ServerType[] = ["vanilla", "spigot", "craftbukkit", "paper", "forge", "fabric", "neoforge"] as const;
+
 export const SERVER = {
   rconPort: 25575,
   networkCompressionThreshold: 256,
@@ -111,12 +115,15 @@ export const SERVER = {
   simulationDistance: 10,
   maxWorldSize: 29999984,
   connectHost: "localhost",
-  defaultJavaVersion: 17,
+  defaultJavaVersion: 21,
   userAgent: "minecraft-mcp",
   bindAddress: "0.0.0.0",
   eulaFileName: "eula.txt",
   propertiesFileName: "server.properties",
   modsDirName: "mods",
+  defaultType: "vanilla" as ServerType,
+  buildToolsUrl: "https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar",
+  paperApiUrl: "https://api.papermc.io/v2/projects/paper",
 } as const;
 
 export const MOD = {

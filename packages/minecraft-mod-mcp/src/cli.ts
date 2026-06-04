@@ -15,7 +15,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { gradleProxyEnv, setupGlobalProxy } from "./mc/proxy.js";
 import { join, resolve } from "node:path";
-import { GAME, MCP, PLAYER, SERVER } from "./mc/defaults.js";
+import { GAME, MCP, PLAYER, SERVER, SERVER_TYPES, type ServerType } from "./mc/defaults.js";
 
 const HELP = `minecraft-mod-mcp — Minecraft MCP Bridge + Launcher CLI
 
@@ -35,6 +35,7 @@ Usage:
   minecraft-mod-mcp auth remove <uuid>       Remove an account
   minecraft-mod-mcp java                     Detect installed Java versions
   minecraft-mod-mcp status                   Show connection status
+  minecraft-mod-mcp test-matrix <version>    Test all valid server/client combos
   minecraft-mod-mcp tui                      Interactive TUI launcher
   minecraft-mod-mcp sdk <version> [opts]     Build mod SDK for a version
 
@@ -53,9 +54,22 @@ Common Launch Options (for launch/serve):
   --mod-jar <path>                  Mod JAR to inject
 
 Server Options (for server/serve):
+  --type <vanilla|spigot|paper|...>  Server framework (default: vanilla)
   --server-memory <mb>              Server max memory (default: ${GAME.defaultServerMemoryMb})
   --server-min-memory <mb>          Server min memory in MB
   --server-game-args <args>         Extra server-side arguments
+  --port <port>                     Server port (default: ${GAME.defaultServerPort})
+  --motd <text>                     Server MOTD message
+  --max-players <n>                 Max players (default: ${SERVER.maxPlayers})
+  --gamemode <mode>                 Default gamemode (default: survival)
+  --difficulty <diff>               Difficulty (default: easy)
+  --online-mode                     Enable online authentication
+  --pvp                             Enable PVP (default: true)
+  --level-seed <seed>               World seed
+  --level-name <name>               World name (default: world)
+  --level-type <type>               World type (default: flat)
+  --white-list                      Enable whitelist
+  --view-distance <n>               View distance (default: ${SERVER.viewDistance})
 
 SDK Options:
   --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
@@ -85,6 +99,7 @@ async function main() {
     case "launch": await runLaunch(rest); break;
     case "serve": await runServe(rest); break;
     case "server": await runServer(rest); break;
+    case "test-matrix": await runTestMatrix(rest); break;
     case "list": await runList(); break;
     case "installed": await runInstalled(); break;
     case "install": await runInstall(rest); break;
@@ -650,8 +665,25 @@ async function runServer(args: string[]) {
 
 Launch a standalone Minecraft server.
 
-Options:
-  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
+Server Framework:
+  --type <vanilla|spigot|craftbukkit|paper|forge|fabric|neoforge>  Server framework (default: ${SERVER.defaultType})
+  --loader <forge|fabric|neoforge>  Mod loader (for modded servers)
+
+Server Configuration:
+  --port <port>                     Server port (default: ${GAME.defaultServerPort})
+  --motd <text>                     Server MOTD message
+  --max-players <n>                 Max players (default: ${SERVER.maxPlayers})
+  --gamemode <mode>                 Default gamemode (default: survival)
+  --difficulty <diff>               Difficulty (default: easy)
+  --online-mode                     Enable online authentication
+  --pvp                             Enable PVP (default: true)
+  --level-seed <seed>               World seed
+  --level-name <name>               World name (default: world)
+  --level-type <type>               World type (default: flat)
+  --white-list                      Enable whitelist
+  --view-distance <n>               View distance (default: ${SERVER.viewDistance})
+
+Resources:
   --java <path>                     Java executable path
   --memory <mb>                     Max memory in MB (default: ${GAME.defaultServerMemoryMb})
   --min-memory <mb>                 Min memory in MB
@@ -665,12 +697,25 @@ Options:
   const { values, positionals } = parseArgs({
     args,
     options: {
+      type: { type: "string", default: SERVER.defaultType },
       loader: { type: "string", default: GAME.defaultLoader },
       java: { type: "string" },
       memory: { type: "string", default: String(GAME.defaultServerMemoryMb) },
       "min-memory": { type: "string" },
       "jvm-args": { type: "string" },
       "game-args": { type: "string" },
+      port: { type: "string", default: String(GAME.defaultServerPort) },
+      motd: { type: "string" },
+      "max-players": { type: "string" },
+      gamemode: { type: "string" },
+      difficulty: { type: "string" },
+      "online-mode": { type: "boolean", default: false },
+      pvp: { type: "boolean", default: true },
+      "level-seed": { type: "string" },
+      "level-name": { type: "string" },
+      "level-type": { type: "string" },
+      "white-list": { type: "boolean", default: false },
+      "view-distance": { type: "string" },
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
     },
@@ -679,15 +724,25 @@ Options:
 
   const versionArg = positionals[0];
   const loader = (values.loader ?? GAME.defaultLoader) as Loader;
+  const serverType = (values.type ?? SERVER.defaultType) as ServerType;
+  if (!SERVER_TYPES.includes(serverType)) {
+    console.error(`Unknown server type: ${serverType}. Available: ${SERVER_TYPES.join(", ")}`);
+    process.exit(1);
+  }
+
   const { installServer: installServerFn, launchServer: launchServerFn } = await import("./mc/server.js");
   const { copyFileSync } = await import("node:fs");
 
-  console.log(`=== Setting up server ${versionArg} (${loader}) ===\n`);
+  console.log(`=== Setting up server ${versionArg} (${serverType}) ===\n`);
+
+  const serverProps = buildServerProperties(values);
+  const serverPort = parseInt(values.port as string, 10);
 
   console.log(`[1/2] Installing server...`);
-  const setup = await installServerFn(versionArg, loader, (msg) => console.error(`  ${msg}`));
+  const setup = await installServerFn(versionArg, loader, (msg) => console.error(`  ${msg}`), serverType, serverProps);
   console.log(`  Server dir: ${setup.serverDir}`);
   console.log(`  Server JAR: ${setup.jarPath}`);
+  console.log(`  Server type: ${setup.serverType}`);
 
   if (typeof values["mod-jar"] === "string") {
     const modJarSrc = values["mod-jar"] as string;
@@ -712,16 +767,25 @@ Options:
     if (typeof values["game-args"] === "string") parts.push(...(values["game-args"] as string).split(/\s+/).filter(Boolean));
     console.log(`\n[dry-run] Command:`);
     console.log(`  ${parts.join(" ")}`);
+    console.log(`\n[dry-run] Server properties:`);
+    console.log(`  server-port=${serverPort}`);
+    if (values.motd) console.log(`  motd=${values.motd}`);
+    if (values["max-players"]) console.log(`  max-players=${values["max-players"]}`);
+    if (values.gamemode) console.log(`  gamemode=${values.gamemode}`);
+    if (values.difficulty) console.log(`  difficulty=${values.difficulty}`);
+    console.log(`  online-mode=${values["online-mode"]}`);
     return;
   }
 
   console.log(`\n[2/2] Starting server...`);
   const srv = launchServerFn(setup, {
     javaPath: typeof values.java === "string" ? values.java : undefined,
+    javaVersion: setup.javaVersion,
     maxMemoryMb: maxMem,
     minMemoryMb: minMem,
     extraJvmArgs: typeof values["jvm-args"] === "string" ? (values["jvm-args"] as string) : undefined,
     extraGameArgs: typeof values["game-args"] === "string" ? (values["game-args"] as string) : undefined,
+    port: serverPort,
   });
 
   srv.process.on("error", (err) => {
@@ -731,8 +795,170 @@ Options:
 
   console.error(`  Server PID: ${srv.process.pid}`);
   console.error(`  Port: ${srv.port}`);
+  console.error(`  Type: ${setup.serverType}`);
   console.error(`  Dir: ${srv.dir}`);
   console.error(`Server launched successfully.`);
+}
+
+function buildServerProperties(values: Record<string, unknown>): import("./mc/server.js").ServerProperties {
+  const props: Record<string, unknown> = {};
+  if (values.port) props.serverPort = parseInt(values.port as string, 10);
+  if (values.motd) props.motd = values.motd as string;
+  if (values["max-players"]) props.maxPlayers = parseInt(values["max-players"] as string, 10);
+  if (values.gamemode) props.gamemode = values.gamemode as string;
+  if (values.difficulty) props.difficulty = values.difficulty as string;
+  if (values["online-mode"] !== undefined) props.onlineMode = values["online-mode"] === true;
+  if (values.pvp !== undefined) props.pvp = values.pvp !== false;
+  if (values["level-seed"]) props.levelSeed = values["level-seed"] as string;
+  if (values["level-name"]) props.levelName = values["level-name"] as string;
+  if (values["level-type"]) props.levelType = values["level-type"] as string;
+  if (values["white-list"] !== undefined) props.whiteList = values["white-list"] === true;
+  if (values["view-distance"]) props.viewDistance = parseInt(values["view-distance"] as string, 10);
+  return props as import("./mc/server.js").ServerProperties;
+}
+
+async function runTestMatrix(args: string[]) {
+  if (args.length === 0 || args[0] === "-h" || args[0] === "--help") {
+    console.log(`Usage: minecraft-mod-mcp test-matrix <version> [options]
+
+Test all valid client/server combinations for a Minecraft version.
+
+Options:
+  --server-types <types>   Comma-separated server types to test (default: all valid)
+  --client-loaders <types> Comma-separated client loaders (default: all available)
+  --timeout <seconds>      Timeout per server startup (default: 120)
+  --memory <mb>            Server memory in MB (default: ${GAME.defaultServerMemoryMb})
+  --json                   Output results as JSON (for CI)
+  --list                   Only list valid pairs, don't run tests
+  --skip-install           Skip server install, assume already installed`);
+    return;
+  }
+
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      "server-types": { type: "string" },
+      "client-loaders": { type: "string" },
+      timeout: { type: "string", default: "120" },
+      memory: { type: "string", default: String(GAME.defaultServerMemoryMb) },
+      json: { type: "boolean", default: false },
+      list: { type: "boolean", default: false },
+      "skip-install": { type: "boolean", default: false },
+    },
+    strict: false,
+  });
+
+  const versionArg = positionals[0];
+  const { getCompatPairs, installServer: installServerFn, launchServer: launchServerFn, waitForServer } = await import("./mc/server.js");
+
+  const allPairs = getCompatPairs(versionArg);
+  if (allPairs.length === 0) {
+    console.error(`No valid pairs for ${versionArg}. Check 'minecraft-mod-mcp list' for available versions.`);
+    process.exit(1);
+  }
+
+  const filterST = values["server-types"] ? (values["server-types"] as string).split(",") : null;
+  const filterCL = values["client-loaders"] ? (values["client-loaders"] as string).split(",") : null;
+  const pairs = allPairs.filter(p => p.valid && (!filterST || filterST.includes(p.serverType)) && (!filterCL || filterCL.includes(p.clientLoader)));
+
+  if (values.list) {
+    console.log(`\nValid combinations for ${versionArg} (${pairs.length} pairs):\n`);
+    console.log("  Client      | Server       | Reason");
+    console.log("  -------------|------------- |-------------------------------------------");
+    for (const p of pairs) {
+      console.log(`  ${p.clientLoader.padEnd(12)} | ${p.serverType.padEnd(12)} | ${p.reason}`);
+    }
+    console.log(`\n  Invalid pairs (${allPairs.filter(p => !p.valid).length}):`);
+    for (const p of allPairs.filter(p => !p.valid)) {
+      console.log(`  ${p.clientLoader} + ${p.serverType}: ${p.reason}`);
+    }
+    return;
+  }
+
+  const timeoutMs = parseInt(values.timeout as string, 10) * 1000;
+  const mem = parseInt(values.memory as string, 10);
+  const jsonOutput = values.json === true;
+  const results: Array<{
+    clientLoader: string;
+    serverType: string;
+    status: "pass" | "fail" | "skip";
+    duration_ms: number;
+    error?: string;
+    serverPid?: number;
+    port?: number;
+  }> = [];
+
+  if (!jsonOutput) {
+    console.log(`\n=== Test Matrix: ${versionArg} (${pairs.length} valid pairs) ===\n`);
+  }
+
+  let passCount = 0;
+  let failCount = 0;
+
+  for (let i = 0; i < pairs.length; i++) {
+    const pair = pairs[i];
+    const tag = `[${i + 1}/${pairs.length}] ${pair.clientLoader} → ${pair.serverType}`;
+    if (!jsonOutput) console.log(`\n${tag}`);
+
+    const start = Date.now();
+    try {
+      const loader = pair.clientLoader;
+      let setup: import("./mc/server.js").ServerSetup;
+
+      if (!values["skip-install"]) {
+        if (!jsonOutput) console.log(`  Installing ${pair.serverType} server...`);
+        setup = await installServerFn(versionArg, loader, (msg) => { if (!jsonOutput) console.error(`    ${msg}`); }, pair.serverType);
+      } else {
+        const data = loadVersionsData();
+        const vi = getVersion(data, versionArg);
+        if (!vi) throw new Error(`Version ${versionArg} not found`);
+        const versionId = getVersionForLoader(data, versionArg, loader) ?? vi.version_id;
+        const { serverDir: sDirFn } = await import("./mc/settings.js");
+        const sDir = sDirFn(`${versionId}-${pair.serverType}`);
+        setup = {
+          serverDir: sDir,
+          jarPath: join(sDir, `server-${vi.mc_version}.jar`),
+          versionId,
+          mcVersion: vi.mc_version,
+          serverType: pair.serverType,
+          javaVersion: vi.java,
+        };
+      }
+
+      if (!jsonOutput) console.log(`  Starting server...`);
+      const srv = launchServerFn(setup, { maxMemoryMb: mem, port: GAME.defaultServerPort + i });
+
+      if (!jsonOutput) console.log(`  Waiting for server (timeout ${timeoutMs / 1000}s)...`);
+      const ok = await waitForServer(setup.serverDir, timeoutMs);
+      const duration = Date.now() - start;
+
+      if (ok) {
+        passCount++;
+        if (!jsonOutput) console.log(`  PASS (${(duration / 1000).toFixed(1)}s)`);
+        results.push({ clientLoader: pair.clientLoader, serverType: pair.serverType, status: "pass", duration_ms: duration, serverPid: srv.process.pid, port: srv.port });
+      } else {
+        failCount++;
+        if (!jsonOutput) console.log(`  FAIL: server did not start within timeout`);
+        results.push({ clientLoader: pair.clientLoader, serverType: pair.serverType, status: "fail", duration_ms: duration, error: "Server did not start within timeout" });
+      }
+
+      try { srv.process.kill(); } catch {}
+      await new Promise(r => setTimeout(r, 3000));
+    } catch (err: any) {
+      failCount++;
+      const duration = Date.now() - start;
+      if (!jsonOutput) console.log(`  FAIL: ${err.message}`);
+      results.push({ clientLoader: pair.clientLoader, serverType: pair.serverType, status: "fail", duration_ms: duration, error: err.message });
+    }
+  }
+
+  if (jsonOutput) {
+    console.log(JSON.stringify({ version: versionArg, total: pairs.length, passed: passCount, failed: failCount, results }, null, 2));
+  } else {
+    console.log(`\n=== Results: ${passCount} passed, ${failCount} failed, ${pairs.length} total ===`);
+  }
+
+  if (failCount > 0) process.exit(1);
 }
 
 async function runServe(args: string[]) {
@@ -741,7 +967,22 @@ async function runServe(args: string[]) {
 
 One-command: install server + install client + launch both.
 
-Options:
+Server Framework:
+  --type <vanilla|spigot|craftbukkit|paper|forge|fabric|neoforge>  Server framework (default: ${SERVER.defaultType})
+
+Server Configuration:
+  --port <port>                     Server port (default: ${GAME.defaultServerPort})
+  --motd <text>                     Server MOTD message
+  --max-players <n>                 Max players (default: ${SERVER.maxPlayers})
+  --gamemode <mode>                 Default gamemode (default: survival)
+  --difficulty <diff>               Difficulty (default: easy)
+  --online-mode                     Enable online authentication
+  --level-seed <seed>               World seed
+  --level-name <name>               World name (default: world)
+  --level-type <type>               World type (default: flat)
+  --view-distance <n>               View distance (default: ${SERVER.viewDistance})
+
+Client Options:
   --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
   --java <path>                     Java executable path
   --memory <mb>                     Client max memory (default: ${GAME.defaultMaxMemoryMb})
@@ -754,7 +995,6 @@ Options:
   --fullscreen                      Launch client in fullscreen
   --width <px>                      Client window width
   --height <px>                     Client window height
-  --port <port>                     MCP port
   --dry-run                         Show plan without executing
   --mod-jar <path>                  Mod JAR to inject into both sides`);
     return;
@@ -763,6 +1003,7 @@ Options:
   const { values, positionals } = parseArgs({
     args,
     options: {
+      type: { type: "string", default: SERVER.defaultType },
       loader: { type: "string", default: GAME.defaultLoader },
       java: { type: "string" },
       memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
@@ -775,7 +1016,16 @@ Options:
       fullscreen: { type: "boolean", default: false },
       width: { type: "string" },
       height: { type: "string" },
-      port: { type: "string" },
+      port: { type: "string", default: String(GAME.defaultServerPort) },
+      motd: { type: "string" },
+      "max-players": { type: "string" },
+      gamemode: { type: "string" },
+      difficulty: { type: "string" },
+      "online-mode": { type: "boolean", default: false },
+      "level-seed": { type: "string" },
+      "level-name": { type: "string" },
+      "level-type": { type: "string" },
+      "view-distance": { type: "string" },
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
     },
@@ -784,14 +1034,19 @@ Options:
 
   const versionArg = positionals[0];
   const loader = (values.loader ?? GAME.defaultLoader) as Loader;
+  const serverType = (values.type ?? SERVER.defaultType) as ServerType;
   const { installServer, launchServer } = await import("./mc/server.js");
   await import("./mc/settings.js");
 
-  console.log(`=== Setting up ${versionArg} (${loader}) ===\n`);
+  console.log(`=== Setting up ${versionArg} (${serverType}) ===\n`);
 
-  console.log(`[1/3] Installing server...`);
-  const setup = await installServer(versionArg, loader, (msg) => console.error(`  ${msg}`));
+  const serverProps = buildServerProperties(values);
+  const serverPort = parseInt(values.port as string, 10);
+
+  console.log(`[1/3] Installing server (${serverType})...`);
+  const setup = await installServer(versionArg, loader, (msg) => console.error(`  ${msg}`), serverType, serverProps);
   console.log(`  Server dir: ${setup.serverDir}`);
+  console.log(`  Server type: ${setup.serverType}`);
 
   if (values["dry-run"]) {
     const serverMem = values["server-memory"] as string;
@@ -802,17 +1057,23 @@ Options:
     if (typeof values["server-game-args"] === "string") dryCmd.push(...(values["server-game-args"] as string).split(/\s+/).filter(Boolean));
     console.log(`\n[dry-run] Server command:`);
     console.log(`  ${dryCmd.join(" ")}`);
-    console.log(`[dry-run] Would launch client connecting to ${SERVER.connectHost}:${GAME.defaultServerPort}`);
+    console.log(`\n[dry-run] Server properties:`);
+    console.log(`  server-port=${serverPort}`);
+    if (values.motd) console.log(`  motd=${values.motd}`);
+    if (values.gamemode) console.log(`  gamemode=${values.gamemode}`);
+    console.log(`[dry-run] Would launch client connecting to ${SERVER.connectHost}:${serverPort}`);
     return;
   }
 
   console.log(`\n[2/3] Starting server...`);
   const srv = launchServer(setup, {
     javaPath: typeof values.java === "string" ? values.java : undefined,
+    javaVersion: setup.javaVersion,
     maxMemoryMb: parseInt(values["server-memory"] as string, 10),
     minMemoryMb: typeof values["server-min-memory"] === "string" ? parseInt(values["server-min-memory"] as string, 10) : undefined,
     extraJvmArgs: typeof values["jvm-args"] === "string" ? (values["jvm-args"] as string) : undefined,
     extraGameArgs: typeof values["server-game-args"] === "string" ? (values["server-game-args"] as string) : undefined,
+    port: serverPort,
   });
   console.log(`  Server PID: ${srv.process.pid}, port: ${srv.port}`);
   console.log(`  Waiting 15s for server startup...`);
