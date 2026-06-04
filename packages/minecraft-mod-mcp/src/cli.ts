@@ -13,6 +13,7 @@ import { versionsDir, classpathSeparator } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { gradleProxyEnv, setupGlobalProxy } from "./mc/proxy.js";
 import { join, resolve } from "node:path";
 import { GAME, MCP, PLAYER, SERVER } from "./mc/defaults.js";
 
@@ -48,6 +49,8 @@ MCP Server Options:
 `;
 
 async function main() {
+  await setupGlobalProxy();
+
   const args = process.argv.slice(2);
 
   if (args.length === 0 || args[0] === "mcp") {
@@ -677,7 +680,8 @@ function runGradle(
   javaExe: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve_) => {
-    const env = { ...process.env, JAVA_HOME: resolve(javaExe, "..", "..") };
+    const proxyEnv = gradleProxyEnv();
+    const env = { ...process.env, ...proxyEnv, JAVA_HOME: resolve(javaExe, "..", "..") };
     const proc = spawn(join(cwd, gradlew), args, {
       cwd,
       env,
