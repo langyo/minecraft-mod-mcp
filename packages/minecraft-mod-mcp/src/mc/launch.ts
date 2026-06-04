@@ -223,10 +223,12 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   }
 
   const needsSortFix = needsLegacySortFix(config.versionId, targetJavaVersion);
+  let sortFixApplied = false;
   if (needsSortFix) {
     const sortFixJar = join(launcherDir(), "legacyfix", "sortfix-tweaker.jar");
     if (existsSync(sortFixJar)) {
       classpathPaths.unshift(sortFixJar);
+      sortFixApplied = true;
     }
   }
 
@@ -254,7 +256,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     allArgs.push(`-Dmcp.port=${config.mcpPort}`);
   }
 
-  if (targetJavaVersion >= 9 && targetJavaVersion < 17) {
+  if (targetJavaVersion >= 9) {
     allArgs.push(...LEGACY_JVM_ARGS);
   }
 
@@ -322,7 +324,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   );
   allArgs.push(...resolvedGame);
 
-  if (needsSortFix) {
+  if (sortFixApplied) {
     allArgs.push("--tweakClass", "mcp.fix.SortFixTweaker");
   }
 
