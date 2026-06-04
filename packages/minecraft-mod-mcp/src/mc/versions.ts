@@ -147,7 +147,7 @@ function discoverLoaderVersionId(mcVersion: string, loader: Loader, loaderVer?: 
         const mc = vj.mainClass?.toLowerCase() ?? "";
         if (loader === "neoforge" && mc.includes("neoforged")) return dirName;
         if (loader === "fabric" && mc.includes("fabricmc")) return dirName;
-        if (loader === "forge" && (mc.includes("minecraftforge") || mc.includes("forgebootstrap") || mc.includes("modlauncher"))) return dirName;
+        if (loader === "forge" && (mc.includes("minecraftforge") || mc.includes("forgebootstrap") || mc.includes("modlauncher") || mc.includes("launchwrapper"))) return dirName;
       } catch {
         continue;
       }
