@@ -7,10 +7,10 @@ export interface ProxySettings {
 
 let cachedProxy: ProxySettings | null | undefined;
 let proxySetup = false;
+let proxyActive = false;
 
 export function detectSystemProxy(): ProxySettings | null {
   if (cachedProxy !== undefined) return cachedProxy;
-
   cachedProxy = detectFromEnv() ?? detectFromWindowsRegistry() ?? detectFromMacos() ?? null;
   return cachedProxy;
 }
@@ -21,19 +21,52 @@ export function proxyUrl(): string | null {
   return `http://${p.host}:${p.port}`;
 }
 
+export function isProxyActive(): boolean {
+  return proxyActive;
+}
+
 export async function setupGlobalProxy(): Promise<void> {
   if (proxySetup) return;
   proxySetup = true;
   const url = proxyUrl();
   if (!url) return;
   try {
-    // @ts-ignore undici is bundled in Node >= 18
     const undici = await import("undici");
     if (undici.ProxyAgent && undici.setGlobalDispatcher) {
       const agent = new undici.ProxyAgent(url);
       undici.setGlobalDispatcher(agent);
+      proxyActive = true;
+      console.warn(`[WARN] Using system proxy: ${url}`);
     }
   } catch {}
+}
+
+export async function fetchWithFallback(url: string, init?: RequestInit): Promise<Response> {
+  const proxyTimeout = 15_000;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), proxyTimeout);
+    const resp = await fetch(url, { ...init, signal: controller.signal });
+    clearTimeout(timer);
+    return resp;
+  } catch (proxyErr: any) {
+    if (!proxyActive) throw proxyErr;
+
+    console.warn(`[WARN] Proxy request failed (${proxyErr.message}), retrying direct...`);
+    try {
+      const undici = await import("undici");
+      if (undici.setGlobalDispatcher) {
+        undici.setGlobalDispatcher(new undici.Agent());
+      }
+    } catch {}
+
+    const resp = await fetch(url, init);
+    if (resp.ok) {
+      console.warn(`[WARN] Direct connection succeeded — proxy bypassed for remaining requests.`);
+      proxyActive = false;
+    }
+    return resp;
+  }
 }
 
 function detectFromEnv(): ProxySettings | null {

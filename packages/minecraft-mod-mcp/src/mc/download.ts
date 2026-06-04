@@ -6,7 +6,8 @@ import { libraryMavenPath, loadVersionMerged } from "./versionJson.js";
 import type { VersionJson } from "./versionJson.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
-import { DOWNLOAD, PATHS } from "./defaults.js";
+import { GAME, MCP, PATHS, DOWNLOAD } from "./defaults.js";
+import { fetchWithFallback } from "./proxy.js";
 
 export interface ForgeInstallProfileLegacy {
   install: {
@@ -58,13 +59,13 @@ export interface VersionManifest {
 }
 
 export async function fetchVersionManifest(): Promise<VersionManifest> {
-  const resp = await fetch(DOWNLOAD.versionManifestUrl);
+  const resp = await fetchWithFallback(DOWNLOAD.versionManifestUrl);
   if (!resp.ok) throw new Error(`Failed to fetch version manifest: ${resp.status}`);
   return (await resp.json()) as VersionManifest;
 }
 
 export async function fetchVersionJson(url: string): Promise<VersionJson> {
-  const resp = await fetch(url);
+  const resp = await fetchWithFallback(url);
   if (!resp.ok) throw new Error(`Failed to fetch version JSON: ${resp.status}`);
   return (await resp.json()) as VersionJson;
 }
@@ -91,7 +92,7 @@ export async function downloadFile(
   const dir = dirname(path);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
-  const resp = await fetch(url);
+  const resp = await fetchWithFallback(url);
   if (!resp.ok) throw new Error(`Download failed for ${url}: HTTP ${resp.status}`);
 
   const arrayBuf = await resp.arrayBuffer();
@@ -311,7 +312,7 @@ export async function downloadFabricLoader(
 ): Promise<void> {
   const profileUrl = `${DOWNLOAD.fabricMetaUrl}/${mcVersion}/${loaderVersion}/profile/json`;
   onProgress?.(`Fetching Fabric profile for ${mcVersion} loader ${loaderVersion}...`);
-  const resp = await fetch(profileUrl);
+  const resp = await fetchWithFallback(profileUrl);
   if (!resp.ok) throw new Error(`Failed to fetch Fabric profile: HTTP ${resp.status}`);
   const profileJson = await resp.json() as VersionJson;
 

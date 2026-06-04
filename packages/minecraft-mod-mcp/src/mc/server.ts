@@ -8,6 +8,7 @@ import { findJavaForVersion, librariesDir, versionsDir } from "./platform.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 import { DOWNLOAD, GAME, SERVER, type ServerType, SERVER_TYPES } from "./defaults.js";
+import { fetchWithFallback } from "./proxy.js";
 
 export interface ServerProperties {
   serverPort?: number;
@@ -342,26 +343,50 @@ async function installForgeServer(mcVersion: string, forgeVersion: string, sDir:
   return serverJarPath;
 }
 
-async function installFabricServer(mcVersion: string, sDir: string, onProgress?: (msg: string) => void): Promise<string> {
+async function installFabricServer(mcVersion: string, sDir: string, javaPath: string, onProgress?: (msg: string) => void): Promise<string> {
   const vanillaJar = await ensureVanillaServerJar(mcVersion, sDir, onProgress);
-  const loaderVer = DEFAULT_FABRIC_LOADER_VERSION;
-  const jarName = `fabric-server-launch-${mcVersion}.jar`;
-  const jarPath = join(sDir, jarName);
 
-  if (existsSync(jarPath)) {
-    onProgress?.(`Fabric server JAR already exists.`);
-    return jarPath;
+  for (const name of ["fabric-server-launch.jar", `fabric-server-launch-${mcVersion}.jar`]) {
+    if (existsSync(join(sDir, name))) {
+      onProgress?.(`Fabric server JAR already exists.`);
+      return join(sDir, name);
+    }
   }
 
-  onProgress?.(`Downloading Fabric server launcher for ${mcVersion}...`);
-  const launcherUrl = `${DOWNLOAD.fabricMetaUrl}/${mcVersion}/${loaderVer}/server/json`;
-  const resp = await fetch(launcherUrl);
-  if (!resp.ok) throw new Error(`Failed to fetch Fabric server info: HTTP ${resp.status}`);
+  const metaResp = await fetchWithFallback(`${DOWNLOAD.fabricMetaUrl}/${mcVersion}`);
+  if (!metaResp.ok) throw new Error(`Failed to fetch Fabric loaders for ${mcVersion}: HTTP ${metaResp.status}`);
+  const loaders = await metaResp.json() as Array<{ loader: { version: string; stable: boolean } }>;
+  const stableLoader = loaders.find(l => l.loader.stable);
+  const loaderVer = stableLoader?.loader.version ?? loaders[0]?.loader.version;
+  if (!loaderVer) throw new Error(`No Fabric loader found for ${mcVersion}`);
 
-  const fabricServerJarUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}/${loaderVer}/server/jar`;
-  await downloadFile(fabricServerJarUrl, jarPath);
+  const installerUrl = `https://maven.fabricmc.net/net/fabricmc/fabric-installer/0.11.2/fabric-installer-0.11.2.jar`;
+  const installerPath = join(sDir, "fabric-installer.jar");
+  if (!existsSync(installerPath)) {
+    onProgress?.(`Downloading Fabric installer...`);
+    await downloadFile(installerUrl, installerPath);
+  }
 
-  return jarPath;
+  onProgress?.(`Running Fabric server installer (loader ${loaderVer})...`);
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(javaPath, [
+      "-jar", installerPath, "server",
+      "-mcversion", mcVersion,
+      "-loader", loaderVer,
+      "-dir", sDir,
+      "-downloadMinecraft",
+    ], { cwd: sDir, stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    child.stdout?.on("data", (c: Buffer) => { const msg = c.toString().trim(); if (msg) onProgress?.(msg); });
+    child.stderr?.on("data", (c: Buffer) => { stderr += c.toString(); });
+    child.on("close", (code) => {
+      if (existsSync(join(sDir, "fabric-server-launch.jar"))) resolve();
+      else reject(new Error(`Fabric installer failed (exit ${code}): ${stderr.slice(-500)}`));
+    });
+    child.on("error", reject);
+  });
+
+  return join(sDir, "fabric-server-launch.jar");
 }
 
 async function installNeoForgeServer(neoforgeVersion: string, mcVersion: string, sDir: string, javaPath: string, onProgress?: (msg: string) => void): Promise<string> {
@@ -469,7 +494,7 @@ export async function installServer(
     case "fabric": {
       const loaderVer = DEFAULT_FABRIC_LOADER_VERSION;
       await downloadFabricLoader(mcVersion, loaderVer, onProgress);
-      jarPath = await installFabricServer(mcVersion, sDir, onProgress);
+      jarPath = await installFabricServer(mcVersion, sDir, javaPath, onProgress);
       break;
     }
     case "neoforge": {
