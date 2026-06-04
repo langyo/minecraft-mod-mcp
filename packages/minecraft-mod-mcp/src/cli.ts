@@ -23,6 +23,7 @@ Usage:
   minecraft-mod-mcp                          Start MCP stdio server (for AI tools)
   minecraft-mod-mcp mcp [options]            Start MCP stdio server
   minecraft-mod-mcp launch <version> [opts]  Launch Minecraft client
+  minecraft-mod-mcp server <version> [opts]  Launch standalone server
   minecraft-mod-mcp serve <version> [opts]   Install + launch server + client
   minecraft-mod-mcp list                     List supported MC versions
   minecraft-mod-mcp installed                List installed versions
@@ -36,6 +37,25 @@ Usage:
   minecraft-mod-mcp status                   Show connection status
   minecraft-mod-mcp tui                      Interactive TUI launcher
   minecraft-mod-mcp sdk <version> [opts]     Build mod SDK for a version
+
+Common Launch Options (for launch/serve):
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
+  --java <path>                     Java executable path
+  --memory <mb>                     Max memory pool in MB
+  --min-memory <mb>                 Min memory pool in MB
+  --jvm-args <args>                 Extra JVM arguments (space-separated)
+  --game-args <args>                Extra game arguments (space-separated)
+  --fullscreen                      Launch in fullscreen
+  --width <px> / --height <px>      Window dimensions
+  --server <host>                   Auto-connect to server on launch
+  --server-port <port>              Server port (default: ${GAME.defaultServerPort})
+  --dry-run                         Print command without executing
+  --mod-jar <path>                  Mod JAR to inject
+
+Server Options (for server/serve):
+  --server-memory <mb>              Server max memory (default: ${GAME.defaultServerMemoryMb})
+  --server-min-memory <mb>          Server min memory in MB
+  --server-game-args <args>         Extra server-side arguments
 
 SDK Options:
   --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
@@ -64,6 +84,7 @@ async function main() {
   switch (cmd) {
     case "launch": await runLaunch(rest); break;
     case "serve": await runServe(rest); break;
+    case "server": await runServer(rest); break;
     case "list": await runList(); break;
     case "installed": await runInstalled(); break;
     case "install": await runInstall(rest); break;
@@ -114,6 +135,12 @@ Options:
   --mc-dir <path>                   Game directory (default: isolated MCP dir)
   --java <path>                     Java executable path
   --memory <mb>                     Max memory in MB (default: ${GAME.defaultMaxMemoryMb})
+  --min-memory <mb>                 Min memory in MB (default: ${GAME.defaultMinMemoryMb})
+  --jvm-args <args>                 Extra JVM arguments (space-separated)
+  --game-args <args>                Extra game arguments (space-separated)
+  --fullscreen                      Launch in fullscreen mode
+  --width <px>                      Window width (default: ${GAME.defaultWidth})
+  --height <px>                     Window height (default: ${GAME.defaultHeight})
   --port <port>                     MCP port
   --server <host>                   Auto-connect to server on launch
   --server-port <port>              Server port (default: ${GAME.defaultServerPort})
@@ -129,6 +156,12 @@ Options:
       "mc-dir": { type: "string" },
       java: { type: "string" },
       memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
+      "min-memory": { type: "string" },
+      "jvm-args": { type: "string" },
+      "game-args": { type: "string" },
+      fullscreen: { type: "boolean", default: false },
+      width: { type: "string" },
+      height: { type: "string" },
       port: { type: "string" },
       server: { type: "string" },
       "server-port": { type: "string", default: String(GAME.defaultServerPort) },
@@ -151,6 +184,10 @@ Options:
   const config = loadConfig();
   const account = selectedAccount(config);
 
+  const extraJvmParts: string[] = [];
+  if (config.java_args) extraJvmParts.push(config.java_args);
+  if (typeof values["jvm-args"] === "string") extraJvmParts.push(values["jvm-args"]);
+
   const launchConfig: LaunchConfig = {
     versionId,
     mcDir: typeof values["mc-dir"] === "string" ? values["mc-dir"] : gameDirPath(config),
@@ -159,14 +196,24 @@ Options:
     mcpPort: typeof values.port === "string" ? parseInt(values.port, 10) : config.mcp_port ?? await findFreePort(),
     dryRun: values["dry-run"] === true,
     maxMemoryMb: parseInt(typeof values.memory === "string" ? values.memory : String(config.max_memory_mb), 10),
-    minMemoryMb: config.min_memory_mb,
-    extraJvmArgs: config.java_args,
-    extraGameArgs: buildExtraGameArgs(config.game_args, values.server, values["server-port"]),
+    minMemoryMb: typeof values["min-memory"] === "string"
+      ? parseInt(values["min-memory"] as string, 10)
+      : config.min_memory_mb,
+    extraJvmArgs: extraJvmParts.length > 0 ? extraJvmParts.join(" ") : undefined,
+    extraGameArgs: buildExtraGameArgs(
+      config.game_args,
+      typeof values["game-args"] === "string" ? (values["game-args"] as string) : undefined,
+      values.server,
+      values["server-port"],
+    ),
     javaPath: typeof values.java === "string" ? values.java : javaExecPath(config) ?? undefined,
     playerName: account ? accountUsername(account) : PLAYER.defaultName,
     uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
     accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
     userType: account ? accountUserType(account) : PLAYER.defaultUserType,
+    width: typeof values.width === "string" ? parseInt(values.width, 10) : config.width,
+    height: typeof values.height === "string" ? parseInt(values.height, 10) : config.height,
+    fullscreen: values.fullscreen === true || config.fullscreen,
   };
 
   if (!launchConfig.javaPath) {
@@ -193,6 +240,9 @@ Options:
   console.error(`  Java: ${cmd.java}`);
   console.error(`  MCP Port: ${launchConfig.mcpPort}`);
   console.error(`  Game Dir: ${mcDir_}`);
+  console.error(`  Memory: ${launchConfig.maxMemoryMb}MB / ${launchConfig.minMemoryMb}MB`);
+  if (launchConfig.fullscreen) console.error(`  Fullscreen: true`);
+  else console.error(`  Resolution: ${launchConfig.width}x${launchConfig.height}`);
 
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
@@ -579,17 +629,110 @@ async function runTui() {
 
 function buildExtraGameArgs(
   base: string | undefined,
+  extraGameArgs?: string,
   server?: string | boolean,
   serverPort?: string | boolean,
 ): string | undefined {
   const parts: string[] = [];
   if (base) parts.push(base);
+  if (extraGameArgs) parts.push(extraGameArgs);
   if (typeof server === "string") {
     parts.push(`--server`, server);
     const port = typeof serverPort === "string" ? serverPort : String(GAME.defaultServerPort);
     parts.push(`--port`, port);
   }
   return parts.length > 0 ? parts.join(" ") : undefined;
+}
+
+async function runServer(args: string[]) {
+  if (args.length === 0 || args[0] === "-h" || args[0] === "--help") {
+    console.log(`Usage: minecraft-mod-mcp server <version> [options]
+
+Launch a standalone Minecraft server.
+
+Options:
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
+  --java <path>                     Java executable path
+  --memory <mb>                     Max memory in MB (default: ${GAME.defaultServerMemoryMb})
+  --min-memory <mb>                 Min memory in MB
+  --jvm-args <args>                 Extra JVM arguments (space-separated)
+  --game-args <args>                Extra server arguments (space-separated)
+  --dry-run                         Print command without executing
+  --mod-jar <path>                  Mod JAR to copy into server mods/`);
+    return;
+  }
+
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      loader: { type: "string", default: GAME.defaultLoader },
+      java: { type: "string" },
+      memory: { type: "string", default: String(GAME.defaultServerMemoryMb) },
+      "min-memory": { type: "string" },
+      "jvm-args": { type: "string" },
+      "game-args": { type: "string" },
+      "dry-run": { type: "boolean", default: false },
+      "mod-jar": { type: "string" },
+    },
+    strict: false,
+  });
+
+  const versionArg = positionals[0];
+  const loader = (values.loader ?? GAME.defaultLoader) as Loader;
+  const { installServer: installServerFn, launchServer: launchServerFn } = await import("./mc/server.js");
+  const { copyFileSync } = await import("node:fs");
+
+  console.log(`=== Setting up server ${versionArg} (${loader}) ===\n`);
+
+  console.log(`[1/2] Installing server...`);
+  const setup = await installServerFn(versionArg, loader, (msg) => console.error(`  ${msg}`));
+  console.log(`  Server dir: ${setup.serverDir}`);
+  console.log(`  Server JAR: ${setup.jarPath}`);
+
+  if (typeof values["mod-jar"] === "string") {
+    const modJarSrc = values["mod-jar"] as string;
+    if (existsSync(modJarSrc)) {
+      const modsDir = join(setup.serverDir, "mods");
+      if (!existsSync(modsDir)) mkdirSync(modsDir, { recursive: true });
+      const dest = join(modsDir, modJarSrc.split(/[/\\]/).pop()!);
+      copyFileSync(modJarSrc, dest);
+      console.log(`  Mod JAR copied to: ${dest}`);
+    }
+  }
+
+  const maxMem = parseInt(values.memory as string, 10);
+  const minMem = typeof values["min-memory"] === "string" ? parseInt(values["min-memory"] as string, 10) : undefined;
+
+  if (values["dry-run"]) {
+    const parts = [`java`, `-Xmx${maxMem}m`];
+    if (minMem) parts.push(`-Xms${minMem}m`);
+    parts.push(`-Dmcp.port=0`);
+    if (typeof values["jvm-args"] === "string") parts.push(...(values["jvm-args"] as string).split(/\s+/).filter(Boolean));
+    parts.push(`-jar`, setup.jarPath, `--nogui`);
+    if (typeof values["game-args"] === "string") parts.push(...(values["game-args"] as string).split(/\s+/).filter(Boolean));
+    console.log(`\n[dry-run] Command:`);
+    console.log(`  ${parts.join(" ")}`);
+    return;
+  }
+
+  console.log(`\n[2/2] Starting server...`);
+  const srv = launchServerFn(setup, {
+    javaPath: typeof values.java === "string" ? values.java : undefined,
+    maxMemoryMb: maxMem,
+    minMemoryMb: minMem,
+    extraJvmArgs: typeof values["jvm-args"] === "string" ? (values["jvm-args"] as string) : undefined,
+    extraGameArgs: typeof values["game-args"] === "string" ? (values["game-args"] as string) : undefined,
+  });
+
+  srv.process.on("error", (err) => {
+    console.error(`Server launch failed: ${err.message}`);
+    process.exit(1);
+  });
+
+  console.error(`  Server PID: ${srv.process.pid}`);
+  console.error(`  Port: ${srv.port}`);
+  console.error(`  Dir: ${srv.dir}`);
+  console.error(`Server launched successfully.`);
 }
 
 async function runServe(args: string[]) {
@@ -602,7 +745,15 @@ Options:
   --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
   --java <path>                     Java executable path
   --memory <mb>                     Client max memory (default: ${GAME.defaultMaxMemoryMb})
+  --min-memory <mb>                 Client min memory in MB
   --server-memory <mb>              Server max memory (default: ${GAME.defaultServerMemoryMb})
+  --server-min-memory <mb>          Server min memory in MB
+  --jvm-args <args>                 Extra JVM args for both (space-separated)
+  --game-args <args>                Extra game args for client (space-separated)
+  --server-game-args <args>         Extra args for server (space-separated)
+  --fullscreen                      Launch client in fullscreen
+  --width <px>                      Client window width
+  --height <px>                     Client window height
   --port <port>                     MCP port
   --dry-run                         Show plan without executing
   --mod-jar <path>                  Mod JAR to inject into both sides`);
@@ -615,7 +766,15 @@ Options:
       loader: { type: "string", default: GAME.defaultLoader },
       java: { type: "string" },
       memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
+      "min-memory": { type: "string" },
       "server-memory": { type: "string", default: String(GAME.defaultServerMemoryMb) },
+      "server-min-memory": { type: "string" },
+      "jvm-args": { type: "string" },
+      "game-args": { type: "string" },
+      "server-game-args": { type: "string" },
+      fullscreen: { type: "boolean", default: false },
+      width: { type: "string" },
+      height: { type: "string" },
       port: { type: "string" },
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
@@ -635,7 +794,14 @@ Options:
   console.log(`  Server dir: ${setup.serverDir}`);
 
   if (values["dry-run"]) {
-    console.log(`\n[dry-run] Would launch server: java -Xmx${values["server-memory"]}m -jar ${setup.jarPath} --nogui`);
+    const serverMem = values["server-memory"] as string;
+    const serverMinMem = values["server-min-memory"] as string;
+    const dryCmd = [`java`, `-Xmx${serverMem}m`];
+    if (serverMinMem) dryCmd.push(`-Xms${serverMinMem}m`);
+    dryCmd.push(`-Dmcp.port=0`, `-jar`, setup.jarPath, `--nogui`);
+    if (typeof values["server-game-args"] === "string") dryCmd.push(...(values["server-game-args"] as string).split(/\s+/).filter(Boolean));
+    console.log(`\n[dry-run] Server command:`);
+    console.log(`  ${dryCmd.join(" ")}`);
     console.log(`[dry-run] Would launch client connecting to ${SERVER.connectHost}:${GAME.defaultServerPort}`);
     return;
   }
@@ -644,6 +810,9 @@ Options:
   const srv = launchServer(setup, {
     javaPath: typeof values.java === "string" ? values.java : undefined,
     maxMemoryMb: parseInt(values["server-memory"] as string, 10),
+    minMemoryMb: typeof values["server-min-memory"] === "string" ? parseInt(values["server-min-memory"] as string, 10) : undefined,
+    extraJvmArgs: typeof values["jvm-args"] === "string" ? (values["jvm-args"] as string) : undefined,
+    extraGameArgs: typeof values["server-game-args"] === "string" ? (values["server-game-args"] as string) : undefined,
   });
   console.log(`  Server PID: ${srv.process.pid}, port: ${srv.port}`);
   console.log(`  Waiting 15s for server startup...`);
@@ -660,6 +829,12 @@ Options:
   if (typeof values.java === "string") launchArgs.push("--java", values.java);
   if (typeof values["mod-jar"] === "string") launchArgs.push("--mod-jar", values["mod-jar"]);
   if (values.port) launchArgs.push("--port", values.port as string);
+  if (values.fullscreen) launchArgs.push("--fullscreen");
+  if (typeof values.width === "string") launchArgs.push("--width", values.width);
+  if (typeof values.height === "string") launchArgs.push("--height", values.height);
+  if (typeof values["min-memory"] === "string") launchArgs.push("--min-memory", values["min-memory"]);
+  if (typeof values["jvm-args"] === "string") launchArgs.push("--jvm-args", values["jvm-args"]);
+  if (typeof values["game-args"] === "string") launchArgs.push("--game-args", values["game-args"]);
 
   await runLaunch(launchArgs);
 }

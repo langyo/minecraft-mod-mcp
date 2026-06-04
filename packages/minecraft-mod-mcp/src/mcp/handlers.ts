@@ -194,19 +194,34 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   const account = selectedAccount(config);
   const mcpPort = config.mcp_port ?? await findFreePort();
 
+  const extraJvmParts: string[] = [];
+  if (config.java_args) extraJvmParts.push(config.java_args);
+  if (params.jvm_args) extraJvmParts.push(String(params.jvm_args));
+
+  const extraGameParts: string[] = [];
+  if (config.game_args) extraGameParts.push(config.game_args);
+  if (params.game_args) extraGameParts.push(String(params.game_args));
+  if (params.server) {
+    extraGameParts.push(`--server`, String(params.server));
+    extraGameParts.push(`--port`, String(params.server_port ?? GAME.defaultServerPort));
+  }
+
   const cmd = buildLaunchCommand({
     versionId,
     loader,
     mcpPort,
-    maxMemoryMb: config.max_memory_mb,
-    minMemoryMb: config.min_memory_mb,
-    extraJvmArgs: config.java_args,
-    extraGameArgs: config.game_args,
+    maxMemoryMb: Number(params.memory) || config.max_memory_mb,
+    minMemoryMb: Number(params.min_memory) || config.min_memory_mb,
+    extraJvmArgs: extraJvmParts.length > 0 ? extraJvmParts.join(" ") : undefined,
+    extraGameArgs: extraGameParts.length > 0 ? extraGameParts.join(" ") : undefined,
     javaPath: javaExecPath(config) ?? undefined,
     playerName: account ? accountUsername(account) : PLAYER.defaultName,
     uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
     accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
     userType: account ? accountUserType(account) : PLAYER.defaultUserType,
+    width: Number(params.width) || config.width,
+    height: Number(params.height) || config.height,
+    fullscreen: params.fullscreen === true || config.fullscreen,
   }, vj, loadVersionsData());
 
   const mcDir_ = gameDirPath(config);
@@ -316,7 +331,12 @@ async function launchServerTool(params: Record<string, unknown>, _mod: ModClient
   if (!version) throw new Error("Parameter 'version' is required.");
 
   const setup = await installServer(version, loader);
-  const srv = launchServer(setup, { maxMemoryMb: memory });
+  const srv = launchServer(setup, {
+    maxMemoryMb: memory,
+    minMemoryMb: params.min_memory ? Number(params.min_memory) : undefined,
+    extraJvmArgs: params.jvm_args ? String(params.jvm_args) : undefined,
+    extraGameArgs: params.game_args ? String(params.game_args) : undefined,
+  });
   return { launched: true, pid: srv.process.pid, port: srv.port, dir: srv.dir };
 }
 
@@ -352,6 +372,9 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
     uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
     accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
     userType: account ? accountUserType(account) : PLAYER.defaultUserType,
+    width: Number(params.width) || config.width,
+    height: Number(params.height) || config.height,
+    fullscreen: params.fullscreen === true || config.fullscreen,
   }, vj, loadVersionsData());
 
   const mcDir_ = gameDirPath(config);

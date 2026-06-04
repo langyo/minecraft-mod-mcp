@@ -186,18 +186,31 @@ export interface LaunchedServer {
 
 export function launchServer(
   setup: ServerSetup,
-  opts?: { javaPath?: string; maxMemoryMb?: number },
+  opts?: { javaPath?: string; maxMemoryMb?: number; minMemoryMb?: number; extraJvmArgs?: string; extraGameArgs?: string },
 ): LaunchedServer {
   const port = GAME.defaultServerPort;
   const java = opts?.javaPath || findJavaForVersion(SERVER.defaultJavaVersion);
   const maxMem = opts?.maxMemoryMb ?? GAME.defaultServerMemoryMb;
 
-  const args = [
-    `-Xmx${maxMem}m`,
-    `-Dmcp.port=0`,
-    `-jar`, setup.jarPath,
-    "--nogui",
-  ];
+  const args: string[] = [];
+
+  args.push(`-Xmx${maxMem}m`);
+  if (opts?.minMemoryMb) args.push(`-Xms${opts.minMemoryMb}m`);
+  args.push(`-Dmcp.port=0`);
+
+  if (opts?.extraJvmArgs) {
+    for (const arg of opts.extraJvmArgs.split(/\s+/)) {
+      if (arg) args.push(arg);
+    }
+  }
+
+  args.push(`-jar`, setup.jarPath, "--nogui");
+
+  if (opts?.extraGameArgs) {
+    for (const arg of opts.extraGameArgs.split(/\s+/)) {
+      if (arg) args.push(arg);
+    }
+  }
 
   const child = spawn(java, args, {
     cwd: setup.serverDir,

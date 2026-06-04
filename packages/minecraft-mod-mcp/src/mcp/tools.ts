@@ -259,6 +259,15 @@ export const TOOLS: ToolDef[] = [
     inputSchema: z.object({
       version: z.string().describe("Minecraft version, e.g. \"1.21.7\", \"26.1.2\"."),
       loader: zOpt(z.enum(["forge", "fabric", "neoforge"])).default("forge"),
+      memory: zOpt(z.number()).describe("Max memory pool in MB (default: 2048)"),
+      min_memory: zOpt(z.number()).describe("Min memory pool in MB"),
+      jvm_args: zOpt(z.string()).describe("Extra JVM arguments (space-separated)"),
+      game_args: zOpt(z.string()).describe("Extra game arguments (space-separated)"),
+      fullscreen: zOpt(z.boolean()).describe("Launch in fullscreen mode"),
+      width: zOpt(z.number()).describe("Window width in pixels"),
+      height: zOpt(z.number()).describe("Window height in pixels"),
+      server: zOpt(z.string()).describe("Auto-connect to this server host on launch"),
+      server_port: zOpt(z.number()).describe("Server port (default: 25565)"),
     }),
   },
   {
@@ -321,6 +330,9 @@ export const TOOLS: ToolDef[] = [
       version: z.string().describe("Minecraft version."),
       loader: zOpt(z.enum(["forge", "fabric", "neoforge"])).default("forge"),
       memory: zOpt(z.number()).describe("Server max memory in MB (default: 1024)"),
+      min_memory: zOpt(z.number()).describe("Server min memory in MB"),
+      jvm_args: zOpt(z.string()).describe("Extra JVM arguments (space-separated)"),
+      game_args: zOpt(z.string()).describe("Extra server arguments (space-separated)"),
     }),
   },
   {
@@ -331,6 +343,9 @@ export const TOOLS: ToolDef[] = [
       loader: zOpt(z.enum(["forge", "fabric", "neoforge"])).default("forge"),
       memory: zOpt(z.number()).describe("Client max memory in MB (default: 2048)"),
       server_memory: zOpt(z.number()).describe("Server max memory in MB (default: 1024)"),
+      fullscreen: zOpt(z.boolean()).describe("Launch client in fullscreen"),
+      width: zOpt(z.number()).describe("Client window width in pixels"),
+      height: zOpt(z.number()).describe("Client window height in pixels"),
     }),
   },
 ];
