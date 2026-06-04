@@ -1,9 +1,10 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import type { ModClient } from "./mod-client.js";
+import type { ModClient } from "./modClient.js";
+import { PLAYER, GAME, MOD, MCP } from "../mc/defaults.js";
 
 export function createApiApp(mod: ModClient): Server {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    const url = new URL(req.url ?? "/", `http://127.0.0.1`);
+    const url = new URL(req.url ?? "/", `http://${MCP.bindAddress}`);
     const path = url.pathname;
 
     res.setHeader("Content-Type", "application/json");
@@ -13,7 +14,7 @@ export function createApiApp(mod: ModClient): Server {
         const rt = typeof (globalThis as any).Deno !== "undefined" ? "deno" : typeof (globalThis as any).Bun !== "undefined" ? "bun" : "node";
         res.end(JSON.stringify({
           ok: true,
-          type: "minecraft-mod-mcp-server",
+          type: MOD.httpServerName,
           runtime: rt,
           mod: mod.getStatus(),
         }));
@@ -36,22 +37,19 @@ export function createApiApp(mod: ModClient): Server {
         const body = await readBody(req);
 
         if (path === "/api/launch") {
-          const version = (body && typeof body === "object" && "version" in body) ? String((body as any).version) : "1.21.7";
-          const loader = (body && typeof body === "object" && "loader" in body) ? String((body as any).loader) : "forge";
+          const version = (body && typeof body === "object" && "version" in body) ? String((body as any).version) : GAME.defaultVersion;
+          const loader = (body && typeof body === "object" && "loader" in body) ? String((body as any).loader) : GAME.defaultLoader;
           const { buildLaunchCommand } = await import("../mc/launch.js");
-          const { loadVersion } = await import("../mc/version-json.js");
+          const { loadVersionMerged } = await import("../mc/versionJson.js");
           const { loadConfig, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType } = await import("../mc/settings.js");
           const { findFreePort } = await import("../discovery/scanner.js");
-          const { loadVersionsData } = await import("../mc/versions-data.js");
-          const { getVersion, getVersionForLoader } = await import("../mc/versions.js");
+          const { loadVersionsData } = await import("../mc/versionsData.js");
+          const { ensureVersionInstalled } = await import("../mc/download.js");
           const { spawn } = await import("node:child_process");
+          const { existsSync, mkdirSync } = await import("node:fs");
 
-          const data = loadVersionsData();
-          let versionId = version;
-          const vi = getVersion(data, version);
-          if (vi) versionId = getVersionForLoader(data, version, loader as any) ?? vi.version_id;
-
-          const vj = loadVersion(versionId);
+          const versionId = await ensureVersionInstalled(version, loader as any);
+          const vj = loadVersionMerged(versionId);
           const config = loadConfig();
           const account = selectedAccount(config);
           const mcpPort = config.mcp_port ?? await findFreePort();
@@ -65,15 +63,17 @@ export function createApiApp(mod: ModClient): Server {
             extraJvmArgs: config.java_args,
             extraGameArgs: config.game_args,
             javaPath: javaExecPath(config) ?? undefined,
-            playerName: account ? accountUsername(account) : "Player",
-            uuid: account ? accountUuid(account) : "0",
-            accessToken: account ? accountAccessToken(account) : "0",
-            userType: account ? accountUserType(account) : "legacy",
-          }, vj, data);
+            playerName: account ? accountUsername(account) : PLAYER.defaultName,
+            uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
+            accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
+            userType: account ? accountUserType(account) : PLAYER.defaultUserType,
+          }, vj, loadVersionsData());
 
-          const child = spawn(cmd.java, cmd.args, { cwd: gameDirPath(config), stdio: "ignore" });
+          const mcDir_ = gameDirPath(config);
+          if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
+          const child = spawn(cmd.java, cmd.args, { cwd: mcDir_, stdio: "ignore" });
           mod.setMcProcess(child);
-          res.end(JSON.stringify({ launched: true, version, loader, pid: child.pid }));
+          res.end(JSON.stringify({ launched: true, version: versionId, loader, pid: child.pid }));
           return;
         }
 

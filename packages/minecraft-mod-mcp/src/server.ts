@@ -1,7 +1,8 @@
-import { ModClient } from "./api/mod-client.js";
+import { ModClient } from "./api/modClient.js";
 import { createMcpServer, connectStdio } from "./mcp/transport.js";
-import { findMod, waitForMod } from "./discovery/scanner.js";
+import { findMod } from "./discovery/scanner.js";
 import { PORT_START, PORT_END } from "./consts.js";
+import { MCP, SERVER } from "./mc/defaults.js";
 
 export interface ServerOptions {
   autoDiscover?: boolean;
@@ -28,7 +29,7 @@ function discoverInBackground(mod: ModClient, timeout?: number): void {
       log(`Found mod: ${status.version}-${status.loader} (pid ${status.pid}) on port ${status.port}`);
     } else {
       log("No mod found. Background scanning every 5s...");
-      const t = timeout || 300_000;
+      const t = timeout || MCP.discoverTimeoutMs;
       const result = await mod.waitForConnection(t);
       if (result) {
         log(`Mod connected: ${result.version}-${result.loader} on port ${result.port}`);
@@ -42,5 +43,5 @@ function discoverInBackground(mod: ModClient, timeout?: number): void {
 }
 
 function log(msg: string) {
-  console.error(`[minecraft-mod-mcp] ${msg}`);
+  console.error(`[${SERVER.userAgent}] ${msg}`);
 }

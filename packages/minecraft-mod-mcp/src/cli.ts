@@ -1,19 +1,21 @@
 import { parseArgs } from "node:util";
 import { startServer } from "./server.js";
-import { loadVersionsData } from "./mc/versions-data.js";
-import { getVersions, getVersion, getVersionById, getVersionForLoader, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
-import { loadVersion } from "./mc/version-json.js";
-import { buildLaunchCommand, type LaunchConfig } from "./mc/launch.js";
-import { loadConfig, saveConfig, addAccount, removeAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "./mc/settings.js";
-import { detectJavas } from "./mc/java-detect.js";
+import { loadVersionsData } from "./mc/versionsData.js";
+import { getVersions, getVersion, getVersionForLoader, loaders, getFgEra, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
+import { loadVersionMerged } from "./mc/versionJson.js";
+import { buildLaunchCommand, ensureJavaForLaunch, type LaunchConfig } from "./mc/launch.js";
+import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, type Account } from "./mc/settings.js";
+import { detectJavas } from "./mc/javaDetect.js";
+import { ensureJavaInstalled } from "./mc/javaDownload.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
-import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion } from "./mc/download.js";
-import { mcDir, versionsDir, classpathSeparator, findJavaForVersion } from "./mc/platform.js";
+import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "./mc/download.js";
+import { versionsDir, classpathSeparator } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
-import { PORT_START, PORT_END } from "./consts.js";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { gradleProxyEnv, setupGlobalProxy } from "./mc/proxy.js";
+import { join, resolve } from "node:path";
+import { GAME, MCP, PLAYER, SERVER } from "./mc/defaults.js";
 
 const HELP = `minecraft-mod-mcp — Minecraft MCP Bridge + Launcher CLI
 
@@ -33,14 +35,22 @@ Usage:
   minecraft-mod-mcp java                     Detect installed Java versions
   minecraft-mod-mcp status                   Show connection status
   minecraft-mod-mcp tui                      Interactive TUI launcher
+  minecraft-mod-mcp sdk <version> [opts]     Build mod SDK for a version
+
+SDK Options:
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
+  --java <path>                     Java executable override
+  --no-build                        Only ensure Java/dependencies, don't build
 
 MCP Server Options:
   --no-discover              Don't scan for running Minecraft mod
-  --discover-timeout <ms>    Timeout for mod discovery (default: 300000)
+  --discover-timeout <ms>    Timeout for mod discovery (default: ${MCP.discoverTimeoutMs})
   -h, --help                 Show this help
 `;
 
 async function main() {
+  await setupGlobalProxy();
+
   const args = process.argv.slice(2);
 
   if (args.length === 0 || args[0] === "mcp") {
@@ -61,6 +71,7 @@ async function main() {
     case "java": await runJava(); break;
     case "status": await runStatus(); break;
     case "tui": await runTui(); break;
+    case "sdk": await runSdk(rest); break;
     case "-h":
     case "--help":
       console.log(HELP);
@@ -99,13 +110,13 @@ async function runLaunch(args: string[]) {
     console.log(`Usage: minecraft-mod-mcp launch <version> [options]
 
 Options:
-  --loader <forge|fabric|neoforge>  Mod loader (default: forge)
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
   --mc-dir <path>                   Game directory (default: isolated MCP dir)
   --java <path>                     Java executable path
-  --memory <mb>                     Max memory in MB (default: 2048)
+  --memory <mb>                     Max memory in MB (default: ${GAME.defaultMaxMemoryMb})
   --port <port>                     MCP port
   --server <host>                   Auto-connect to server on launch
-  --server-port <port>              Server port (default: 25565)
+  --server-port <port>              Server port (default: ${GAME.defaultServerPort})
   --dry-run                         Print command without executing
   --mod-jar <path>                  Path to mod JAR to inject`);
     return;
@@ -114,13 +125,13 @@ Options:
   const { values, positionals } = parseArgs({
     args,
     options: {
-      loader: { type: "string", default: "forge" },
+      loader: { type: "string", default: GAME.defaultLoader },
       "mc-dir": { type: "string" },
       java: { type: "string" },
-      memory: { type: "string", default: "2048" },
+      memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
       port: { type: "string" },
       server: { type: "string" },
-      "server-port": { type: "string", default: "25565" },
+      "server-port": { type: "string", default: String(GAME.defaultServerPort) },
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
     },
@@ -128,27 +139,15 @@ Options:
   });
 
   const versionArg = positionals[0];
-  const loader = (values.loader ?? "forge") as Loader;
+  const loader = (values.loader ?? GAME.defaultLoader) as Loader;
+
+  console.log(`Resolving version ${versionArg} (${loader})...`);
+  const versionId = await ensureVersionInstalled(versionArg, loader, (msg) => {
+    console.error(`  ${msg}`);
+  });
+
+  const vj = loadVersionMerged(versionId);
   const data = loadVersionsData();
-
-  let versionId: string | undefined;
-  const vi = getVersion(data, versionArg);
-  if (vi) {
-    versionId = getVersionForLoader(data, versionArg, loader) ?? undefined;
-    if (!versionId) {
-      console.error(`${loader} is not available for ${versionArg}`);
-      process.exit(1);
-    }
-  } else {
-    versionId = versionArg;
-  }
-
-  if (!versionId) {
-    console.error(`Unknown version: ${versionArg}`);
-    process.exit(1);
-  }
-
-  const vj = loadVersion(versionId);
   const config = loadConfig();
   const account = selectedAccount(config);
 
@@ -164,11 +163,17 @@ Options:
     extraJvmArgs: config.java_args,
     extraGameArgs: buildExtraGameArgs(config.game_args, values.server, values["server-port"]),
     javaPath: typeof values.java === "string" ? values.java : javaExecPath(config) ?? undefined,
-    playerName: account ? accountUsername(account) : "Player",
-    uuid: account ? accountUuid(account) : "0",
-    accessToken: account ? accountAccessToken(account) : "0",
-    userType: account ? accountUserType(account) : "legacy",
+    playerName: account ? accountUsername(account) : PLAYER.defaultName,
+    uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
+    accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
+    userType: account ? accountUserType(account) : PLAYER.defaultUserType,
   };
+
+  if (!launchConfig.javaPath) {
+    launchConfig.javaPath = await ensureJavaForLaunch(launchConfig, vj, data, (msg) => {
+      console.error(`  ${msg}`);
+    });
+  }
 
   const cmd = buildLaunchCommand(launchConfig, vj, data);
 
@@ -183,6 +188,7 @@ Options:
   }
 
   const mcDir_ = launchConfig.mcDir!;
+  if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
   console.error(`Launching ${versionId} (${loader})...`);
   console.error(`  Java: ${cmd.java}`);
   console.error(`  MCP Port: ${launchConfig.mcpPort}`);
@@ -233,7 +239,7 @@ async function runInstall(args: string[]) {
   if (args.length === 0) {
     console.error("Usage: minecraft-mod-mcp install <version> [options]");
     console.error("\nOptions:");
-    console.error("  --loader <forge|fabric|neoforge>  Mod loader (default: forge)");
+    console.error("  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})");
     console.error("\nUse 'minecraft-mod-mcp list' to see supported versions.");
     process.exit(1);
   }
@@ -241,13 +247,13 @@ async function runInstall(args: string[]) {
   const { values, positionals } = parseArgs({
     args,
     options: {
-      loader: { type: "string", default: "forge" },
+      loader: { type: "string", default: GAME.defaultLoader },
     },
     strict: false,
   });
 
   const versionArg = positionals[0];
-  const loader = (values.loader ?? "forge") as Loader;
+  const loader = (values.loader ?? GAME.defaultLoader) as Loader;
   const data = loadVersionsData();
 
   const vi = getVersion(data, versionArg);
@@ -450,6 +456,121 @@ async function runStatus() {
   }
 }
 
+async function runSdk(args: string[]) {
+  if (args.length === 0 || args[0] === "-h" || args[0] === "--help") {
+    console.log(`Usage: minecraft-mod-mcp sdk <version> [options]
+
+Prepare mod build environment and build.
+
+Options:
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
+  --java <path>                     Java executable override
+  --no-build                        Only ensure Java, don't run gradle build
+`);
+    return;
+  }
+
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: {
+      loader: { type: "string", default: GAME.defaultLoader },
+      java: { type: "string" },
+      "no-build": { type: "boolean", default: false },
+    },
+    strict: true,
+  });
+
+  const versionArg = positionals[0] ?? "";
+  if (!versionArg) {
+    console.error("Version is required.");
+    process.exit(1);
+  }
+  const loader = (values.loader ?? GAME.defaultLoader) as Loader;
+
+  const data = loadVersionsData();
+  const info = getVersion(data, versionArg);
+  if (!info) {
+    console.error(`Unknown version: ${versionArg}`);
+    console.error(`Use 'minecraft-mod-mcp list' to see supported versions.`);
+    process.exit(1);
+  }
+
+  const availableLoaders = loaders(info);
+  if (!availableLoaders.includes(loader)) {
+    console.error(`Loader '${loader}' not available for ${versionArg}. Available: ${availableLoaders.join(", ")}`);
+    process.exit(1);
+  }
+
+  const modProjectDir = resolve("packages", "mods", versionArg, loader);
+  if (!existsSync(modProjectDir)) {
+    console.error(`Mod project directory not found: ${modProjectDir}`);
+    console.error(`Make sure you are running from the repository root.`);
+    process.exit(1);
+  }
+
+  const gradlew = isWin() ? "gradlew.bat" : "gradlew";
+  const gradlewPath = join(modProjectDir, gradlew);
+  if (!existsSync(gradlewPath)) {
+    console.error(`Gradle wrapper not found: ${gradlewPath}`);
+    process.exit(1);
+  }
+
+  console.log(`=== SDK: ${versionArg} (${loader}) ===\n`);
+  console.log(`Project dir: ${modProjectDir}`);
+
+  let javaVersion = info.java;
+  const era = getFgEra(data, info.fg_era);
+  if (era && (loader === "forge" || loader === "neoforge")) {
+    javaVersion = era.java;
+  }
+  if (loader === "fabric") {
+    javaVersion = Math.max(javaVersion, 17);
+  }
+  let javaExe: string;
+
+  if (typeof values.java === "string") {
+    javaExe = values.java;
+    console.log(`Using specified Java: ${javaExe}`);
+  } else {
+    console.log(`\n[1/2] Ensuring Java ${javaVersion}...`);
+    const home = await ensureJavaInstalled(javaVersion, (msg) => console.error(`  ${msg}`));
+    javaExe = isWin() ? join(home, "bin", "java.exe") : join(home, "bin", "java");
+    console.log(`  Java ${javaVersion}: ${home}`);
+  }
+
+  if (values["no-build"]) {
+    console.log(`\n--no-build specified, skipping build.`);
+    console.log(`\nReady. Run: cd ${modProjectDir} && ${gradlew} build`);
+    return;
+  }
+
+  console.log(`\n[2/2] Building mod...`);
+  console.log(`  Running: ${gradlew} build`);
+
+  const buildResult = await runGradle(modProjectDir, gradlew, ["build"], javaExe);
+
+  if (buildResult.code !== 0) {
+    console.error(`\nBuild FAILED (exit code ${buildResult.code}).`);
+    console.error(`\nstdout:\n${buildResult.stdout}`);
+    console.error(`\nstderr:\n${buildResult.stderr}`);
+    process.exit(1);
+  }
+
+  const jars = findJars(modProjectDir);
+  if (jars.length > 0) {
+    console.log(`\nBuild succeeded! Output:`);
+    for (const j of jars) {
+      const sizeKB = Math.round(j.size / 1024);
+      console.log(`  ${j.path} (${sizeKB} KB)`);
+    }
+  } else {
+    console.log(`\nBuild succeeded (no JAR found in build/libs/).`);
+  }
+
+  console.log(`\nProject ready: cd ${modProjectDir} && ${gradlew} build`);
+}
+
 async function runTui() {
   console.error("TUI mode is not yet implemented. Use CLI subcommands instead.");
   console.error("Run `minecraft-mod-mcp --help` for available commands.");
@@ -465,7 +586,7 @@ function buildExtraGameArgs(
   if (base) parts.push(base);
   if (typeof server === "string") {
     parts.push(`--server`, server);
-    const port = typeof serverPort === "string" ? serverPort : "25565";
+    const port = typeof serverPort === "string" ? serverPort : String(GAME.defaultServerPort);
     parts.push(`--port`, port);
   }
   return parts.length > 0 ? parts.join(" ") : undefined;
@@ -478,10 +599,10 @@ async function runServe(args: string[]) {
 One-command: install server + install client + launch both.
 
 Options:
-  --loader <forge|fabric|neoforge>  Mod loader (default: forge)
+  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})
   --java <path>                     Java executable path
-  --memory <mb>                     Client max memory (default: 2048)
-  --server-memory <mb>              Server max memory (default: 1024)
+  --memory <mb>                     Client max memory (default: ${GAME.defaultMaxMemoryMb})
+  --server-memory <mb>              Server max memory (default: ${GAME.defaultServerMemoryMb})
   --port <port>                     MCP port
   --dry-run                         Show plan without executing
   --mod-jar <path>                  Mod JAR to inject into both sides`);
@@ -491,10 +612,10 @@ Options:
   const { values, positionals } = parseArgs({
     args,
     options: {
-      loader: { type: "string", default: "forge" },
+      loader: { type: "string", default: GAME.defaultLoader },
       java: { type: "string" },
-      memory: { type: "string", default: "2048" },
-      "server-memory": { type: "string", default: "1024" },
+      memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
+      "server-memory": { type: "string", default: String(GAME.defaultServerMemoryMb) },
       port: { type: "string" },
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
@@ -503,9 +624,9 @@ Options:
   });
 
   const versionArg = positionals[0];
-  const loader = (values.loader ?? "forge") as Loader;
+  const loader = (values.loader ?? GAME.defaultLoader) as Loader;
   const { installServer, launchServer } = await import("./mc/server.js");
-  const { serverDir } = await import("./mc/settings.js");
+  await import("./mc/settings.js");
 
   console.log(`=== Setting up ${versionArg} (${loader}) ===\n`);
 
@@ -515,7 +636,7 @@ Options:
 
   if (values["dry-run"]) {
     console.log(`\n[dry-run] Would launch server: java -Xmx${values["server-memory"]}m -jar ${setup.jarPath} --nogui`);
-    console.log(`[dry-run] Would launch client connecting to localhost:25565`);
+    console.log(`[dry-run] Would launch client connecting to ${SERVER.connectHost}:${GAME.defaultServerPort}`);
     return;
   }
 
@@ -526,7 +647,7 @@ Options:
   });
   console.log(`  Server PID: ${srv.process.pid}, port: ${srv.port}`);
   console.log(`  Waiting 15s for server startup...`);
-  await new Promise((r) => setTimeout(r, 15000));
+  await new Promise((r) => setTimeout(r, GAME.serverStartupWaitMs));
 
   console.log(`\n[3/3] Launching client (auto-connect to localhost:${srv.port})...`);
   const launchArgs = [
@@ -547,3 +668,56 @@ main().catch((err) => {
   console.error("Fatal:", err);
   process.exit(1);
 });
+
+function isWin(): boolean {
+  return process.platform === "win32";
+}
+
+function runGradle(
+  cwd: string,
+  gradlew: string,
+  args: string[],
+  javaExe: string,
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolve_) => {
+    const proxyEnv = gradleProxyEnv();
+    const env = { ...process.env, ...proxyEnv, JAVA_HOME: resolve(javaExe, "..", "..") };
+    const proc = spawn(join(cwd, gradlew), args, {
+      cwd,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: isWin(),
+    });
+
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    proc.stdout?.on("data", (c: Buffer) => stdoutChunks.push(c));
+    proc.stderr?.on("data", (c: Buffer) => {
+      stderrChunks.push(c);
+      process.stderr.write(c);
+    });
+
+    proc.on("close", (code) => {
+      resolve_({
+        code: code ?? 1,
+        stdout: Buffer.concat(stdoutChunks).toString("utf-8"),
+        stderr: Buffer.concat(stderrChunks).toString("utf-8"),
+      });
+    });
+  });
+}
+
+function findJars(projectDir: string): { path: string; size: number }[] {
+  const libsDir = join(projectDir, "build", "libs");
+  if (!existsSync(libsDir)) return [];
+  const results: { path: string; size: number }[] = [];
+  try {
+    for (const f of readdirSync(libsDir)) {
+      if (f.endsWith(".jar")) {
+        const full = join(libsDir, f);
+        results.push({ path: full, size: statSync(full).size });
+      }
+    }
+  } catch {}
+  return results;
+}

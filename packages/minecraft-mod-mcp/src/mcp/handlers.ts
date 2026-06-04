@@ -1,19 +1,20 @@
 import { TOOLS } from "./tools.js";
-import type { ModClient } from "../api/mod-client.js";
+import type { ModClient } from "../api/modClient.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { GAME, PLAYER, SERVER } from "../mc/defaults.js";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import { loadVersionsData } from "../mc/versions-data.js";
-import { getVersion, getVersionForLoader, getVersionById, getVersions, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "../mc/versions.js";
-import { loadVersion } from "../mc/version-json.js";
+import { loadVersionsData } from "../mc/versionsData.js";
+import { getVersion, getVersionForLoader, getVersions, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "../mc/versions.js";
+import { loadVersionMerged } from "../mc/versionJson.js";
 import { buildLaunchCommand } from "../mc/launch.js";
-import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, defaultConfig, type Account } from "../mc/settings.js";
+import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, type Account } from "../mc/settings.js";
 import { findFreePort } from "../discovery/scanner.js";
-import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion } from "../mc/download.js";
-import { detectJavas } from "../mc/java-detect.js";
+import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "../mc/download.js";
+import { detectJavas } from "../mc/javaDetect.js";
 import { createOfflineUuid } from "../mc/auth.js";
 import { versionsDir } from "../mc/platform.js";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 
 const MANAGEMENT_TOOLS = new Set([
   "launch_minecraft", "kill_minecraft", "get_minecraft_status",
@@ -186,25 +187,9 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   const loader = String(params.loader || "forge") as Loader;
   if (!version) throw new Error("Parameter 'version' is required. Use list_supported_versions to see available versions.");
 
-  const data = loadVersionsData();
-
-  let versionId: string | undefined;
-  const vi = getVersion(data, version);
-  if (vi) {
-    versionId = getVersionForLoader(data, version, loader) ?? undefined;
-    if (!versionId) throw new Error(`${loader} is not available for ${version}`);
-  } else {
-    const byId = getVersionById(data, version);
-    if (byId) versionId = byId.version_id;
-    else versionId = version;
-  }
-
-  if (!versionId) {
-    const available = getVersions(data).map((v) => v.mc_version).join(", ");
-    throw new Error(`Unknown version: "${version}". Available: ${available}`);
-  }
-
-  const vj = loadVersion(versionId);
+  const logs: string[] = [];
+  const versionId = await ensureVersionInstalled(version, loader, (msg) => logs.push(msg));
+  const vj = loadVersionMerged(versionId);
   const config = loadConfig();
   const account = selectedAccount(config);
   const mcpPort = config.mcp_port ?? await findFreePort();
@@ -218,13 +203,15 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
     extraJvmArgs: config.java_args,
     extraGameArgs: config.game_args,
     javaPath: javaExecPath(config) ?? undefined,
-    playerName: account ? accountUsername(account) : "Player",
-    uuid: account ? accountUuid(account) : "0",
-    accessToken: account ? accountAccessToken(account) : "0",
-    userType: account ? accountUserType(account) : "legacy",
-  }, vj, data);
+    playerName: account ? accountUsername(account) : PLAYER.defaultName,
+    uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
+    accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
+    userType: account ? accountUserType(account) : PLAYER.defaultUserType,
+  }, vj, loadVersionsData());
 
   const mcDir_ = gameDirPath(config);
+  if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
+
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
     stdio: "ignore",
@@ -236,7 +223,7 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   });
 
   mod.setMcProcess(child);
-  return { launched: true, version: versionId, loader, pid: child.pid, mcpPort, javaVersion: cmd.javaVersion };
+  return { launched: true, version: versionId, loader, pid: child.pid, mcpPort, javaVersion: cmd.javaVersion, logs };
 }
 
 async function installVersion(params: Record<string, unknown>): Promise<unknown> {
@@ -321,11 +308,11 @@ async function installServerTool(params: Record<string, unknown>): Promise<unkno
   return { installed: true, serverDir: setup.serverDir, jarPath: setup.jarPath, versionId: setup.versionId, logs };
 }
 
-async function launchServerTool(params: Record<string, unknown>, mod: ModClient): Promise<unknown> {
+async function launchServerTool(params: Record<string, unknown>, _mod: ModClient): Promise<unknown> {
   const { installServer, launchServer } = await import("../mc/server.js");
   const version = String(params.version || "");
   const loader = String(params.loader || "forge") as Loader;
-  const memory = Number(params.memory) || 1024;
+  const memory = Number(params.memory) || GAME.defaultServerMemoryMb;
   if (!version) throw new Error("Parameter 'version' is required.");
 
   const setup = await installServer(version, loader);
@@ -337,20 +324,17 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   const { installServer, launchServer } = await import("../mc/server.js");
   const version = String(params.version || "");
   const loader = String(params.loader || "forge") as Loader;
-  const clientMem = Number(params.memory) || 2048;
-  const serverMem = Number(params.server_memory) || 1024;
+  const clientMem = Number(params.memory) || GAME.defaultMaxMemoryMb;
+  const serverMem = Number(params.server_memory) || GAME.defaultServerMemoryMb;
   if (!version) throw new Error("Parameter 'version' is required.");
 
   const setup = await installServer(version, loader);
   const srv = launchServer(setup, { maxMemoryMb: serverMem });
 
-  await new Promise((r) => setTimeout(r, 15000));
+  await new Promise((r) => setTimeout(r, GAME.serverStartupWaitMs));
 
-  const data = loadVersionsData();
-  let versionId = getVersionForLoader(data, version, loader) ?? undefined;
-  if (!versionId) throw new Error(`${loader} not available for ${version}`);
-
-  const vj = loadVersion(versionId);
+  const versionId = await ensureVersionInstalled(version, loader);
+  const vj = loadVersionMerged(versionId);
   const config = loadConfig();
   const account = selectedAccount(config);
   const mcpPort = config.mcp_port ?? await findFreePort();
@@ -362,15 +346,17 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
     maxMemoryMb: clientMem,
     minMemoryMb: config.min_memory_mb,
     extraJvmArgs: config.java_args,
-    extraGameArgs: `--server localhost --port ${srv.port}`,
+    extraGameArgs: `--server ${SERVER.connectHost} --port ${srv.port}`,
     javaPath: javaExecPath(config) ?? undefined,
-    playerName: account ? accountUsername(account) : "Player",
-    uuid: account ? accountUuid(account) : "0",
-    accessToken: account ? accountAccessToken(account) : "0",
-    userType: account ? accountUserType(account) : "legacy",
-  }, vj, data);
+    playerName: account ? accountUsername(account) : PLAYER.defaultName,
+    uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
+    accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
+    userType: account ? accountUserType(account) : PLAYER.defaultUserType,
+  }, vj, loadVersionsData());
 
   const mcDir_ = gameDirPath(config);
+  if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
+
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
     stdio: "ignore",
@@ -380,6 +366,6 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   mod.setMcProcess(child);
   return {
     server: { pid: srv.process.pid, port: srv.port, dir: srv.dir },
-    client: { pid: child.pid, version: versionId, mcpPort, connectingTo: `localhost:${srv.port}` },
+    client: { pid: child.pid, version: versionId, mcpPort, connectingTo: `${SERVER.connectHost}:${srv.port}` },
   };
 }

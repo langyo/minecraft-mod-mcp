@@ -47,6 +47,10 @@ node_modules/
 *~
 dist/
 
+# MC runtime logs
+logs/
+.mixin.out/
+
 # Auto-generated TS bindings (ts-rs)
 /packages/launcher/shared/*/bindings/
 /packages/launcher/frontend/src/bindings/

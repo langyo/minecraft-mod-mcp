@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isWindows, isMacos } from "../runtime/detector.js";
 import { versionsDir, librariesDir } from "./platform.js";
+import { loadVersionsData } from "./versionsData.js";
+import { getVersionById } from "./versions.js";
 
 export interface VersionJson {
   id: string;
@@ -103,6 +105,128 @@ export function loadVersion(versionId: string): VersionJson {
   return loadVersionJson(path);
 }
 
+function inferMcVersion(versionId: string): string | null {
+  const data = loadVersionsData();
+  const info = getVersionById(data, versionId);
+  return info?.mc_version ?? null;
+}
+
+export function loadVersionMerged(versionId: string): VersionJson {
+  let primary = loadVersion(versionId);
+  primary = mergeWithParents(primary);
+  if (!primary.assets && !primary.inheritsFrom) {
+    const mcVer = inferMcVersion(versionId);
+    if (mcVer && mcVer !== versionId) {
+      try {
+        const parent = loadVersion(mcVer);
+        const merged = mergeWithParents(parent);
+        return {
+          id: primary.id,
+          type: primary.type || merged.type,
+          mainClass: primary.mainClass || merged.mainClass,
+          inheritsFrom: mcVer,
+          libraries: mergeLibraries(merged.libraries ?? [], primary.libraries ?? []),
+          arguments: mergeArguments(merged.arguments, primary.arguments),
+          minecraftArguments: primary.minecraftArguments || merged.minecraftArguments,
+          assetIndex: primary.assetIndex || merged.assetIndex,
+          assets: primary.assets || merged.assets,
+          downloads: primary.downloads || merged.downloads,
+          jar: primary.jar || merged.jar,
+          releaseTime: primary.releaseTime || merged.releaseTime,
+        };
+      } catch {}
+    }
+  }
+  return primary;
+}
+
+function mergeWithParents(vj: VersionJson): VersionJson {
+  if (!vj.inheritsFrom) return vj;
+
+  let parent: VersionJson;
+  try {
+    parent = loadVersion(vj.inheritsFrom);
+  } catch {
+    return vj;
+  }
+
+  parent = mergeWithParents(parent);
+
+  return {
+    id: vj.id,
+    type: vj.type || parent.type,
+    mainClass: vj.mainClass || parent.mainClass,
+    inheritsFrom: vj.inheritsFrom,
+    libraries: mergeLibraries(parent.libraries ?? [], vj.libraries ?? []),
+    arguments: mergeArguments(parent.arguments, vj.arguments),
+    minecraftArguments: vj.minecraftArguments || parent.minecraftArguments,
+    assetIndex: vj.assetIndex || parent.assetIndex,
+    assets: vj.assets || parent.assets,
+    downloads: vj.downloads || parent.downloads,
+    jar: vj.jar || parent.jar,
+    releaseTime: vj.releaseTime || parent.releaseTime,
+  };
+}
+
+function libBaseKey(name: string): string {
+  const parts = name.split(":");
+  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : name;
+}
+
+function libRuleKey(lib: Library): string {
+  if (!lib.rules || lib.rules.length === 0) return libBaseKey(lib.name!) + ":all";
+  const oses = lib.rules.filter(r => r.os?.name).map(r => `${r.action}:${r.os!.name}`).sort().join(",");
+  return libBaseKey(lib.name!) + ":" + oses;
+}
+
+function mergeLibraries(parent: Library[], child: Library[]): Library[] {
+  const parentByName = new Map<string, Library>();
+  for (const lib of parent) {
+    if (lib.name) parentByName.set(lib.name, lib);
+  }
+
+  const result: Library[] = [];
+  const childFullKeys = new Set<string>();
+  const childBaseKeys = new Set<string>();
+  for (const lib of child) {
+    if (lib.name) {
+      childFullKeys.add(libRuleKey(lib));
+      childBaseKeys.add(libBaseKey(lib.name));
+      if (!lib.downloads) {
+        const parentLib = parentByName.get(lib.name);
+        if (parentLib?.downloads) {
+          result.push({ ...lib, downloads: parentLib.downloads });
+          continue;
+        }
+      }
+      result.push(lib);
+    }
+  }
+  for (const lib of parent) {
+    if (!lib.name) continue;
+    if (childFullKeys.has(libRuleKey(lib))) continue;
+    if (!childBaseKeys.has(libBaseKey(lib.name))) {
+      result.push(lib);
+    } else if (lib.rules && lib.rules.length > 0) {
+      result.push(lib);
+    }
+  }
+  return result;
+}
+
+function mergeArguments(
+  parent: VersionJson["arguments"],
+  child: VersionJson["arguments"],
+): VersionJson["arguments"] {
+  if (!parent && !child) return undefined;
+  if (!parent) return child;
+  if (!child) return parent;
+  return {
+    game: [...(parent.game ?? []), ...(child.game ?? [])],
+    jvm: [...(parent.jvm ?? []), ...(child.jvm ?? [])],
+  };
+}
+
 export function collectAllArgs(vj: VersionJson): { jvmArgs: string[]; gameArgs: string[] } {
   const gameArgs: string[] = [];
   const jvmArgs: string[] = [];
@@ -137,13 +261,22 @@ export function collectAllArgs(vj: VersionJson): { jvmArgs: string[]; gameArgs: 
   return { jvmArgs, gameArgs };
 }
 
-export function shouldApply(rules: Rule[]): boolean {
+export function shouldApply(rules: Rule[], features?: Record<string, boolean>): boolean {
   if (rules.length === 0) return true;
+  const feats = features ?? {};
 
   let allow = false;
   let deny = false;
 
   for (const rule of rules) {
+    if (rule.features) {
+      const featMatch = Object.entries(rule.features).every(([k, v]) => {
+        if (typeof v === "boolean") return feats[k] === v;
+        return feats[k] != null;
+      });
+      if (!featMatch) continue;
+    }
+
     const osMatch = rule.os ? matchOs(rule.os) : true;
     if (osMatch) {
       if (rule.action === "allow") allow = true;
@@ -210,8 +343,27 @@ export function resolveClasspath(libraries: Library[]): string[] {
     }
 
     const path = libraryPath(lib.name);
-    if (existsSync(path)) classpath.push(path);
+    if (existsSync(path)) {
+      classpath.push(path);
+    } else {
+      const universalPath = path.replace(/\.jar$/, "-universal.jar");
+      if (existsSync(universalPath)) classpath.push(universalPath);
+    }
   }
 
-  return classpath;
+  const patched = patchClasspath(classpath);
+
+  return patched;
+}
+
+function patchClasspath(classpath: string[]): string[] {
+  return classpath.map(p => {
+    if (p.includes("launchwrapper-1.9")) {
+      const better = p
+        .replace(/launchwrapper[\\/]1\.9[\\/]/, "launchwrapper/1.12/")
+        .replace("launchwrapper-1.9.jar", "launchwrapper-1.12.jar");
+      if (existsSync(better)) return better;
+    }
+    return p;
+  });
 }

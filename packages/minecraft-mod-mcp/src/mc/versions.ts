@@ -1,11 +1,12 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { versionsDir } from "./platform.js";
-import type { VersionJson } from "./version-json.js";
+import type { VersionJson } from "./versionJson.js";
+import { FABRIC } from "./defaults.js";
 
 export type Loader = "forge" | "neoforge" | "fabric";
 
-export const DEFAULT_FABRIC_LOADER_VERSION = "0.16.14";
+export const DEFAULT_FABRIC_LOADER_VERSION = FABRIC.defaultLoaderVersion;
 
 export interface FgEra {
   key: string;
@@ -146,7 +147,7 @@ function discoverLoaderVersionId(mcVersion: string, loader: Loader, loaderVer?: 
         const mc = vj.mainClass?.toLowerCase() ?? "";
         if (loader === "neoforge" && mc.includes("neoforged")) return dirName;
         if (loader === "fabric" && mc.includes("fabricmc")) return dirName;
-        if (loader === "forge" && (mc.includes("minecraftforge") || mc.includes("forgebootstrap"))) return dirName;
+        if (loader === "forge" && (mc.includes("minecraftforge") || mc.includes("forgebootstrap") || mc.includes("modlauncher") || mc.includes("launchwrapper"))) return dirName;
       } catch {
         continue;
       }
