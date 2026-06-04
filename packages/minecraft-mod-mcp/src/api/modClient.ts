@@ -1,5 +1,6 @@
 import { PORT_START, PORT_END, type ModStatus } from "../consts.js";
 import { findMod, waitForMod, probePort } from "../discovery/scanner.js";
+import { MCP, MOD } from "../mc/defaults.js";
 
 export class ModClient {
   private modPort: number | null = null;
@@ -22,16 +23,16 @@ export class ModClient {
     const status = await findMod(startPort, endPort);
     if (status) {
       this.modPort = status.port;
-      this.baseUrl = `http://127.0.0.1:${status.port}`;
+      this.baseUrl = `http://${MCP.bindAddress}:${status.port}`;
     }
     return status;
   }
 
-  async waitForConnection(timeoutMs = 120_000): Promise<ModStatus | null> {
+  async waitForConnection(timeoutMs: number = MCP.waitTimeoutMs): Promise<ModStatus | null> {
     const status = await waitForMod(PORT_START, PORT_END, timeoutMs);
     if (status) {
       this.modPort = status.port;
-      this.baseUrl = `http://127.0.0.1:${status.port}`;
+      this.baseUrl = `http://${MCP.bindAddress}:${status.port}`;
     }
     return status;
   }
@@ -54,7 +55,7 @@ export class ModClient {
     }
     const body: Record<string, unknown> = { cmd: method, ...(params || {}) };
     try {
-      const resp = await fetch(`${this.baseUrl}/api/cmd`, {
+      const resp = await fetch(`${this.baseUrl}${MOD.cmdEndpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -77,7 +78,7 @@ export class ModClient {
       if (!this.baseUrl) throw new Error("Mod not connected");
     }
     try {
-      const resp = await fetch(`${this.baseUrl}/api/screenshot`);
+      const resp = await fetch(`${this.baseUrl}${MOD.screenshotEndpoint}`);
       if (!resp.ok) throw new Error(`Screenshot failed: ${resp.status}`);
       return resp.json();
     } catch (err: any) {

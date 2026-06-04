@@ -1,7 +1,8 @@
 import { join, resolve } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
 import { crossHomedir, isWindows, isMacos, classpathSeparator as cpSep } from "../runtime/detector.js";
-import { detectJavas } from "./java-detect.js";
+import { detectJavas } from "./javaDetect.js";
+import { PATHS, JAVA } from "./defaults.js";
 
 function homedir(): string {
   return crossHomedir();
@@ -9,29 +10,29 @@ function homedir(): string {
 
 export function mcDir(): string {
   if (isWindows() && process.env.APPDATA) {
-    return join(process.env.APPDATA, ".minecraft");
+    return join(process.env.APPDATA, PATHS.mcDirName);
   }
-  return join(homedir(), ".minecraft");
+  return join(homedir(), PATHS.mcDirName);
 }
 
 export function versionsDir(): string {
-  return join(mcDir(), "versions");
+  return join(mcDir(), PATHS.versionsDirName);
 }
 
 export function librariesDir(): string {
-  return join(mcDir(), "libraries");
+  return join(mcDir(), PATHS.librariesDirName);
 }
 
 export function assetsDir(): string {
-  return join(mcDir(), "assets");
+  return join(mcDir(), PATHS.assetsDirName);
 }
 
 export function nativesDir(versionId: string): string {
-  return join(mcDir(), "versions", versionId, "natives");
+  return join(mcDir(), PATHS.versionsDirName, versionId, PATHS.nativesDirName);
 }
 
 export function launcherDir(): string {
-  return join(mcDir(), "mcp_launcher");
+  return join(mcDir(), PATHS.launcherDirName);
 }
 
 export function modJarPath(mcVersion: string, loader: string): string {
@@ -47,14 +48,23 @@ export function jdkHome(javaVersion: number): string | null {
   const envVal = process.env[envVar];
   if (envVal && existsSync(envVal)) return envVal;
 
-  const jdksDir = join(homedir(), ".gradle", "jdks");
+  const mcJavaDir = join(launcherDir(), PATHS.javaDirName, `jdk-${javaVersion}`);
+  if (existsSync(mcJavaDir)) {
+    try {
+      const jdk = readdirSync(mcJavaDir, { withFileTypes: true })
+        .find(e => e.isDirectory() && !e.name.startsWith("."));
+      if (jdk) {
+        const home = join(mcJavaDir, jdk.name);
+        const exe = isWindows() ? join(home, "bin", "java.exe") : join(home, "bin", "java");
+        if (existsSync(exe)) return home;
+      }
+    } catch {}
+  }
+
+  const jdksDir = join(homedir(), PATHS.gradleJdksSubdir);
   if (!existsSync(jdksDir)) return null;
 
-  const prefixes: Record<number, string> = {
-    8: "eclipse_adoptium-8",
-    17: "eclipse_adoptium-17",
-    21: "eclipse_adoptium-21",
-  };
+  const prefixes = JAVA.jdkDirPrefixes;
 
   const prefix = prefixes[javaVersion];
   if (!prefix) return null;
@@ -100,13 +110,18 @@ export function findJavaForVersion(targetVersion: number): string {
 
   const all = detectJavas();
   const sorted = [...all].sort((a, b) => a.version - b.version);
-  const exact = sorted.find((j) => j.version === targetVersion);
-  if (exact) return exact.path;
 
-  const higher = sorted.find((j) => j.version >= targetVersion);
-  if (higher) return higher.path;
+  const pick =
+    sorted.find((j) => j.version === targetVersion) ??
+    sorted.find((j) => j.version >= targetVersion) ??
+    (sorted.length > 0 ? sorted[sorted.length - 1] : null);
 
-  if (sorted.length > 0) return sorted[sorted.length - 1].path;
+  if (pick) {
+    const exe = isWindows()
+      ? join(pick.path, "bin", "java.exe")
+      : join(pick.path, "bin", "java");
+    if (existsSync(exe)) return exe;
+  }
 
   return isWindows() ? "java.exe" : "java";
 }
