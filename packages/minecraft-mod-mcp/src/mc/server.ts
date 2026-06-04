@@ -8,7 +8,7 @@ import { findJavaForVersion, librariesDir, versionsDir } from "./platform.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 import { DOWNLOAD, GAME, SERVER, type ServerType, SERVER_TYPES } from "./defaults.js";
-import { fetchWithFallback } from "./proxy.js";
+import { fetchWithFallback, javaProxyArgs } from "./proxy.js";
 
 export interface ServerProperties {
   serverPort?: number;
@@ -303,7 +303,8 @@ async function installForgeServer(mcVersion: string, forgeVersion: string, sDir:
 
   onProgress?.(`Running Forge server installer...`);
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(javaPath, ["-jar", installerPath, "--installServer", sDir], {
+    const proxyArgs = javaProxyArgs();
+    const child = spawn(javaPath, [...proxyArgs, "-jar", installerPath, "--installServer", sDir], {
       cwd: sDir,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -408,8 +409,9 @@ async function installNeoForgeServer(neoforgeVersion: string, mcVersion: string,
   }
 
   onProgress?.(`Running NeoForge server installer...`);
+  const proxyArgs = javaProxyArgs();
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(javaPath, ["-jar", installerPath, "--installServer", sDir], {
+    const child = spawn(javaPath, [...proxyArgs, "-jar", installerPath, "--installServer", sDir], {
       cwd: sDir,
       stdio: ["ignore", "pipe", "pipe"],
     });

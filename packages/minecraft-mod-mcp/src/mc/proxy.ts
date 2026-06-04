@@ -37,36 +37,58 @@ export async function setupGlobalProxy(): Promise<void> {
       undici.setGlobalDispatcher(agent);
       proxyActive = true;
       console.warn(`[WARN] Using system proxy: ${url}`);
+      const testOk = await probeProxyTls();
+      if (!testOk) {
+        console.warn(`[WARN] Proxy TLS interception detected — disabling TLS verification`);
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+      }
     }
   } catch {}
 }
 
-export async function fetchWithFallback(url: string, init?: RequestInit): Promise<Response> {
-  const proxyTimeout = 15_000;
+async function probeProxyTls(): Promise<boolean> {
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), proxyTimeout);
-    const resp = await fetch(url, { ...init, signal: controller.signal });
-    clearTimeout(timer);
-    return resp;
-  } catch (proxyErr: any) {
-    if (!proxyActive) throw proxyErr;
-
-    console.warn(`[WARN] Proxy request failed (${proxyErr.message}), retrying direct...`);
-    try {
-      const undici = await import("undici");
-      if (undici.setGlobalDispatcher) {
-        undici.setGlobalDispatcher(new undici.Agent());
-      }
-    } catch {}
-
-    const resp = await fetch(url, init);
-    if (resp.ok) {
-      console.warn(`[WARN] Direct connection succeeded — proxy bypassed for remaining requests.`);
-      proxyActive = false;
-    }
-    return resp;
+    const resp = await fetch("https://piston-meta.mojang.com/", { method: "HEAD", signal: AbortSignal.timeout(8_000) });
+    return resp.ok || resp.status < 500;
+  } catch {
+    return false;
   }
+}
+
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+export async function fetchWithFallback(url: string, init?: RequestInit): Promise<Response> {
+  const maxRetries = 3;
+  const proxyTimeout = 15_000;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), proxyTimeout);
+      const resp = await fetch(url, { ...init, signal: controller.signal });
+      clearTimeout(timer);
+      return resp;
+    } catch (err: any) {
+      const isProxy = proxyActive;
+      const isRetryable = /ECONNRESET|ETIMEDOUT|ECONNREFUSED|abort|socket hang up|fetch failed/i.test(err.message || "");
+      if (isProxy && isRetryable && attempt === 0) {
+        console.warn(`[WARN] Proxy request failed (${err.message}), retrying direct...`);
+        try {
+          const undici = await import("undici");
+          if (undici.setGlobalDispatcher) {
+            undici.setGlobalDispatcher(new undici.Agent());
+          }
+          proxyActive = false;
+        } catch {}
+      }
+      if (isRetryable && attempt < maxRetries - 1) {
+        console.warn(`[WARN] Retrying (${attempt + 1}/${maxRetries}): ${url.slice(0, 80)}...`);
+        await sleep(2000 * (attempt + 1));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("unreachable");
 }
 
 function detectFromEnv(): ProxySettings | null {
