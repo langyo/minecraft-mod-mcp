@@ -90,6 +90,10 @@ npx minecraft-mod-mcp
 https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/ko/AI-TOOLS.md
 ```
 
+### 5. CLI 사용
+
+**[→ CLI 사용 가이드](./CLI.md)** —— 클라이언트 및 서버 실행, 버전 및 계정 관리, SDK 빌드를 모두 명령줄에서.
+
 ---
 
 ## 사용 팁

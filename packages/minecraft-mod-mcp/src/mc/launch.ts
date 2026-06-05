@@ -122,6 +122,7 @@ export interface LaunchConfig {
   userType?: string;
   width?: number;
   height?: number;
+  fullscreen?: boolean;
 }
 
 export interface LaunchCommand {
@@ -326,6 +327,10 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
 
   if (sortFixApplied) {
     allArgs.push("--tweakClass", "mcp.fix.SortFixTweaker");
+  }
+
+  if (config.fullscreen) {
+    allArgs.push("--fullscreen");
   }
 
   if (config.extraGameArgs) {

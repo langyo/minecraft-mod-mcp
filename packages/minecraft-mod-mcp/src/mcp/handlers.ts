@@ -194,19 +194,34 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   const account = selectedAccount(config);
   const mcpPort = config.mcp_port ?? await findFreePort();
 
+  const extraJvmParts: string[] = [];
+  if (config.java_args) extraJvmParts.push(config.java_args);
+  if (params.jvm_args) extraJvmParts.push(String(params.jvm_args));
+
+  const extraGameParts: string[] = [];
+  if (config.game_args) extraGameParts.push(config.game_args);
+  if (params.game_args) extraGameParts.push(String(params.game_args));
+  if (params.server) {
+    extraGameParts.push(`--server`, String(params.server));
+    extraGameParts.push(`--port`, String(params.server_port ?? GAME.defaultServerPort));
+  }
+
   const cmd = buildLaunchCommand({
     versionId,
     loader,
     mcpPort,
-    maxMemoryMb: config.max_memory_mb,
-    minMemoryMb: config.min_memory_mb,
-    extraJvmArgs: config.java_args,
-    extraGameArgs: config.game_args,
+    maxMemoryMb: Number(params.memory) || config.max_memory_mb,
+    minMemoryMb: Number(params.min_memory) || config.min_memory_mb,
+    extraJvmArgs: extraJvmParts.length > 0 ? extraJvmParts.join(" ") : undefined,
+    extraGameArgs: extraGameParts.length > 0 ? extraGameParts.join(" ") : undefined,
     javaPath: javaExecPath(config) ?? undefined,
     playerName: account ? accountUsername(account) : PLAYER.defaultName,
     uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
     accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
     userType: account ? accountUserType(account) : PLAYER.defaultUserType,
+    width: Number(params.width) || config.width,
+    height: Number(params.height) || config.height,
+    fullscreen: params.fullscreen === true || config.fullscreen,
   }, vj, loadVersionsData());
 
   const mcDir_ = gameDirPath(config);
@@ -301,35 +316,72 @@ async function installServerTool(params: Record<string, unknown>): Promise<unkno
   const { installServer } = await import("../mc/server.js");
   const version = String(params.version || "");
   const loader = String(params.loader || "forge") as Loader;
+  const serverType = (params.server_type || "vanilla") as import("../mc/defaults.js").ServerType;
   if (!version) throw new Error("Parameter 'version' is required.");
 
+  const serverProps: Record<string, unknown> = {};
+  if (params.port) serverProps.serverPort = Number(params.port);
+  if (params.motd) serverProps.motd = String(params.motd);
+  if (params.max_players) serverProps.maxPlayers = Number(params.max_players);
+  if (params.gamemode) serverProps.gamemode = String(params.gamemode);
+  if (params.difficulty) serverProps.difficulty = String(params.difficulty);
+  if (params.online_mode != null) serverProps.onlineMode = params.online_mode === true;
+  if (params.level_seed) serverProps.levelSeed = String(params.level_seed);
+  if (params.level_name) serverProps.levelName = String(params.level_name);
+  if (params.level_type) serverProps.levelType = String(params.level_type);
+  if (params.white_list != null) serverProps.whiteList = params.white_list === true;
+
   const logs: string[] = [];
-  const setup = await installServer(version, loader, (msg) => logs.push(msg));
-  return { installed: true, serverDir: setup.serverDir, jarPath: setup.jarPath, versionId: setup.versionId, logs };
+  const setup = await installServer(version, loader, (msg) => logs.push(msg), serverType, serverProps);
+  return { installed: true, serverDir: setup.serverDir, jarPath: setup.jarPath, versionId: setup.versionId, serverType: setup.serverType, logs };
 }
 
 async function launchServerTool(params: Record<string, unknown>, _mod: ModClient): Promise<unknown> {
   const { installServer, launchServer } = await import("../mc/server.js");
   const version = String(params.version || "");
   const loader = String(params.loader || "forge") as Loader;
+  const serverType = (params.server_type || "vanilla") as import("../mc/defaults.js").ServerType;
   const memory = Number(params.memory) || GAME.defaultServerMemoryMb;
   if (!version) throw new Error("Parameter 'version' is required.");
 
-  const setup = await installServer(version, loader);
-  const srv = launchServer(setup, { maxMemoryMb: memory });
-  return { launched: true, pid: srv.process.pid, port: srv.port, dir: srv.dir };
+  const serverProps: Record<string, unknown> = {};
+  if (params.port) serverProps.serverPort = Number(params.port);
+  if (params.motd) serverProps.motd = String(params.motd);
+  if (params.max_players) serverProps.maxPlayers = Number(params.max_players);
+  if (params.gamemode) serverProps.gamemode = String(params.gamemode);
+  if (params.difficulty) serverProps.difficulty = String(params.difficulty);
+
+  const setup = await installServer(version, loader, undefined, serverType, serverProps);
+  const srv = launchServer(setup, {
+    maxMemoryMb: memory,
+    minMemoryMb: params.min_memory ? Number(params.min_memory) : undefined,
+    extraJvmArgs: params.jvm_args ? String(params.jvm_args) : undefined,
+    extraGameArgs: params.game_args ? String(params.game_args) : undefined,
+    port: params.port ? Number(params.port) : undefined,
+    javaVersion: setup.javaVersion,
+  });
+  return { launched: true, pid: srv.process.pid, port: srv.port, dir: srv.dir, serverType: setup.serverType };
 }
 
 async function serveTool(params: Record<string, unknown>, mod: ModClient): Promise<unknown> {
   const { installServer, launchServer } = await import("../mc/server.js");
   const version = String(params.version || "");
   const loader = String(params.loader || "forge") as Loader;
+  const serverType = (params.server_type || "vanilla") as import("../mc/defaults.js").ServerType;
   const clientMem = Number(params.memory) || GAME.defaultMaxMemoryMb;
   const serverMem = Number(params.server_memory) || GAME.defaultServerMemoryMb;
   if (!version) throw new Error("Parameter 'version' is required.");
 
-  const setup = await installServer(version, loader);
-  const srv = launchServer(setup, { maxMemoryMb: serverMem });
+  const serverProps: Record<string, unknown> = {};
+  if (params.port) serverProps.serverPort = Number(params.port);
+  if (params.motd) serverProps.motd = String(params.motd);
+  if (params.max_players) serverProps.maxPlayers = Number(params.max_players);
+  if (params.gamemode) serverProps.gamemode = String(params.gamemode);
+  if (params.difficulty) serverProps.difficulty = String(params.difficulty);
+
+  const setup = await installServer(version, loader, undefined, serverType, serverProps);
+  const serverPort = Number(params.port) || GAME.defaultServerPort;
+  const srv = launchServer(setup, { maxMemoryMb: serverMem, port: serverPort, javaVersion: setup.javaVersion });
 
   await new Promise((r) => setTimeout(r, GAME.serverStartupWaitMs));
 
@@ -352,6 +404,9 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
     uuid: account ? accountUuid(account) : PLAYER.defaultUuid,
     accessToken: account ? accountAccessToken(account) : PLAYER.defaultAccessToken,
     userType: account ? accountUserType(account) : PLAYER.defaultUserType,
+    width: Number(params.width) || config.width,
+    height: Number(params.height) || config.height,
+    fullscreen: params.fullscreen === true || config.fullscreen,
   }, vj, loadVersionsData());
 
   const mcDir_ = gameDirPath(config);
@@ -365,7 +420,7 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
 
   mod.setMcProcess(child);
   return {
-    server: { pid: srv.process.pid, port: srv.port, dir: srv.dir },
+    server: { pid: srv.process.pid, port: srv.port, dir: srv.dir, serverType: setup.serverType },
     client: { pid: child.pid, version: versionId, mcpPort, connectingTo: `${SERVER.connectHost}:${srv.port}` },
   };
 }

@@ -18,7 +18,7 @@ function parseTomlBasic(content: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   let current: Record<string, unknown> = result;
 
-  for (const rawLine of content.split("\n")) {
+  for (const rawLine of content.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
 

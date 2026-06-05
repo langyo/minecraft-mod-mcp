@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { PORT_START, PORT_END, type ModStatus } from "../consts.js";
 import { findMod, waitForMod, probePort } from "../discovery/scanner.js";
 import { MCP, MOD } from "../mc/defaults.js";
@@ -97,7 +98,11 @@ export class ModClient {
 
   killMc() {
     if (this.mcProcess && this.mcProcess.exitCode === null) {
-      this.mcProcess.kill("SIGTERM");
+      if (process.platform === "win32") {
+        try { execSync(`taskkill /PID ${this.mcProcess.pid}`, { stdio: "ignore" }); } catch {}
+      } else {
+        this.mcProcess.kill("SIGTERM");
+      }
       this.mcProcess = null;
     }
   }

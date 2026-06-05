@@ -90,6 +90,10 @@ npx minecraft-mod-mcp
 https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/ru/AI-TOOLS.md
 ```
 
+### 5. Использование CLI
+
+**[→ Руководство по CLI](./CLI.md)** — запуск клиентов и серверов, управление версиями и аккаунтами, сборка SDK — всё из командной строки.
+
 ---
 
 ## Советы по использованию

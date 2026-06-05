@@ -31,6 +31,8 @@ npx minecraft-mod-mcp
 npx minecraft-mod-mcp --port 9878 --no-discover
 ```
 
+For the full CLI reference (launching servers, managing versions, accounts, building SDKs), see **[CLI Usage Guide](../../docs/guides/en/CLI.md)** — available in 8 languages.
+
 ## MCP Configuration
 
 Add to your `.mcp.json` or `opencode.json`:
