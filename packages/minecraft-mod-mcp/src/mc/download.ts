@@ -7,7 +7,7 @@ import type { VersionJson } from "./versionJson.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 import { GAME, MCP, PATHS, DOWNLOAD } from "./defaults.js";
-import { fetchWithFallback } from "./proxy.js";
+import { fetchWithFallback, downloadWithNativeFallback } from "./proxy.js";
 
 export interface ForgeInstallProfileLegacy {
   install: {
@@ -92,20 +92,16 @@ export async function downloadFile(
   const dir = dirname(path);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
-  const resp = await fetchWithFallback(url);
-  if (!resp.ok) throw new Error(`Download failed for ${url}: HTTP ${resp.status}`);
-
-  const arrayBuf = await resp.arrayBuffer();
-  const buffer = Buffer.from(arrayBuf);
+  await downloadWithNativeFallback(url, path);
 
   if (expectedSha1) {
-    const actual = createHash("sha1").update(buffer).digest("hex");
+    const { readFile } = await import("node:fs/promises");
+    const buf = await readFile(path);
+    const actual = createHash("sha1").update(buf).digest("hex");
     if (actual.toLowerCase() !== expectedSha1.toLowerCase()) {
       throw new Error(`SHA-1 mismatch for ${path}: expected ${expectedSha1}, got ${actual}`);
     }
   }
-
-  writeFileSync(path, buffer);
 }
 
 export async function downloadVersion(

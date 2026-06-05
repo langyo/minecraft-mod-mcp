@@ -430,6 +430,9 @@ async function installNeoForgeServer(neoforgeVersion: string, mcVersion: string,
     child.on("error", reject);
   });
 
+  const winArgs = join(sDir, "libraries", "net", "neoforged", "neoforge", neoforgeVersion, "win_args.txt");
+  if (existsSync(winArgs)) return winArgs;
+
   for (const entry of readdirSync(sDir)) {
     if (entry.includes("neoforge") && entry.endsWith(".jar") && !entry.includes("installer")) {
       return join(sDir, entry);
@@ -536,20 +539,29 @@ export function launchServer(
   const java = opts?.javaPath || findJavaForVersion(javaVersion);
   const maxMem = opts?.maxMemoryMb ?? GAME.defaultServerMemoryMb;
 
-  const args: string[] = [];
-  args.push(`-Xmx${maxMem}m`);
-  if (opts?.minMemoryMb) args.push(`-Xms${opts.minMemoryMb}m`);
-  args.push(`-Dmcp.port=0`);
+  const isNeoForgeScript = setup.jarPath.endsWith(".txt");
+  const isRunScript = setup.jarPath.endsWith("run.bat") || setup.jarPath.endsWith("run.sh");
 
-  if (opts?.extraJvmArgs) {
-    for (const arg of opts.extraJvmArgs.split(/\s+/)) {
-      if (arg) args.push(arg);
+  const args: string[] = [];
+  if (isNeoForgeScript) {
+    args.push(`-Xmx${maxMem}m`);
+    if (opts?.minMemoryMb) args.push(`-Xms${opts.minMemoryMb}m`);
+    args.push(`@${setup.jarPath}`, "--nogui");
+  } else if (isRunScript) {
+    args.push(setup.jarPath);
+  } else {
+    args.push(`-Xmx${maxMem}m`);
+    if (opts?.minMemoryMb) args.push(`-Xms${opts.minMemoryMb}m`);
+    args.push(`-Dmcp.port=0`);
+    if (opts?.extraJvmArgs) {
+      for (const arg of opts.extraJvmArgs.split(/\s+/)) {
+        if (arg) args.push(arg);
+      }
     }
+    args.push(`-jar`, setup.jarPath, "--nogui");
   }
 
-  args.push(`-jar`, setup.jarPath, "--nogui");
-
-  if (opts?.extraGameArgs) {
+  if (opts?.extraGameArgs && !isNeoForgeScript) {
     for (const arg of opts.extraGameArgs.split(/\s+/)) {
       if (arg) args.push(arg);
     }
@@ -557,13 +569,15 @@ export function launchServer(
 
   const logPath = join(setup.serverDir, "server-launch.log");
   const logFd = openSync(logPath, "a");
-  const prefix = `\n[${new Date().toISOString()}] Launching: ${java} ${args.join(" ")}\n`;
+  const launchCmd = isRunScript ? setup.jarPath : java;
+  const prefix = `\n[${new Date().toISOString()}] Launching: ${launchCmd} ${args.join(" ")}\n`;
   writeFileSync(logFd, prefix);
 
-  const child = spawn(java, args, {
+  const child = spawn(launchCmd, isRunScript ? [] : args, {
     cwd: setup.serverDir,
     stdio: ["ignore", logFd, logFd],
     detached: process.platform !== "win32",
+    shell: isRunScript,
   });
 
   child.on("error", (err) => {

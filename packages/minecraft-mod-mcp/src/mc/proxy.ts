@@ -57,6 +57,23 @@ async function probeProxyTls(): Promise<boolean> {
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
+async function nativeDownload(url: string, destPath: string): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  const ps = process.platform === "win32"
+    ? ["Invoke-WebRequest", "-Uri", url, "-OutFile", destPath, "-TimeoutSec", "60"]
+    : undefined;
+  if (!ps) throw new Error("Native fallback only supported on Windows");
+  return new Promise<void>((resolve, reject) => {
+    const child = execFile("powershell", ["-NoProfile", "-Command", ...ps], {
+      timeout: 120_000,
+      windowsHide: true,
+    }, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
 export async function fetchWithFallback(url: string, init?: RequestInit): Promise<Response> {
   const maxRetries = 3;
   const proxyTimeout = 15_000;
@@ -89,6 +106,19 @@ export async function fetchWithFallback(url: string, init?: RequestInit): Promis
     }
   }
   throw new Error("unreachable");
+}
+
+export async function downloadWithNativeFallback(url: string, destPath: string): Promise<void> {
+  try {
+    const resp = await fetchWithFallback(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(destPath, buf);
+  } catch (fetchErr: any) {
+    console.warn(`[WARN] Node fetch failed for ${url.slice(0, 60)}... (${fetchErr.cause?.code || fetchErr.message}), trying native download...`);
+    await nativeDownload(url, destPath);
+  }
 }
 
 function detectFromEnv(): ProxySettings | null {
