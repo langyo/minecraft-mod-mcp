@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, copyFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, copyFileSync, readdirSync, symlinkSync, statSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { serverDir } from "./settings.js";
 import { downloadFile, downloadForgeInstaller, downloadFabricLoader, downloadNeoforgeInstaller } from "./download.js";
@@ -8,7 +8,7 @@ import { findJavaForVersion, librariesDir, versionsDir } from "./platform.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 import { DOWNLOAD, GAME, SERVER, type ServerType, SERVER_TYPES } from "./defaults.js";
-import { fetchWithFallback, javaProxyArgs } from "./proxy.js";
+import { fetchWithFallback, javaProxyArgs, gradleProxyEnv } from "./proxy.js";
 
 export interface ServerProperties {
   serverPort?: number;
@@ -208,6 +208,37 @@ async function downloadPaperServer(mcVersion: string, sDir: string, onProgress?:
   return jarPath;
 }
 
+function isValidPortableGit(dir: string): boolean {
+  return existsSync(join(dir, "bin", "git.exe")) ||
+    existsSync(join(dir, "bin", "git")) ||
+    existsSync(join(dir, "PortableGit", "bin", "git.exe")) ||
+    existsSync(join(dir, "PortableGit", "bin", "git"));
+}
+
+function reusePortableGit(sDir: string): void {
+  const base = serverDir();
+  if (!existsSync(base)) return;
+
+  for (const sibling of readdirSync(base)) {
+    const subPath = join(base, sibling);
+    try { if (!statSync(subPath).isDirectory()) continue; } catch { continue; }
+    for (const entry of readdirSync(subPath)) {
+      if (!entry.startsWith("PortableGit")) continue;
+      const src = join(subPath, entry);
+      if (!isValidPortableGit(src)) continue;
+      const dst = join(sDir, entry);
+      if (existsSync(dst) && isValidPortableGit(dst)) return;
+      if (existsSync(dst)) {
+        try { rmSync(dst, { recursive: true, force: true }); } catch { return; }
+      }
+      try {
+        symlinkSync(src, dst, "junction");
+        return;
+      } catch { /* junction failed */ }
+    }
+  }
+}
+
 async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, targets: string[], onProgress?: (msg: string) => void): Promise<string> {
   const buildToolsJar = join(sDir, "BuildTools.jar");
   if (!existsSync(buildToolsJar)) {
@@ -222,11 +253,15 @@ async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, 
     return jarPath;
   }
 
+  reusePortableGit(sDir);
+
   onProgress?.(`Compiling ${targets.join(" + ")} for ${mcVersion} via BuildTools (may take a few minutes)...`);
-  const args = ["-jar", buildToolsJar, "--rev", mcVersion, ...targets.map(t => `--compile ${t}`).flatMap(s => s.split(" "))];
+  const proxyArgs = javaProxyArgs();
+  const sslArgs = proxyArgs.length > 0 ? ["-Djavax.net.ssl.trustStoreType=Windows-ROOT"] : [];
+  const args = [...proxyArgs, ...sslArgs, "-jar", buildToolsJar, "--rev", mcVersion, ...targets.map(t => `--compile ${t}`).flatMap(s => s.split(" "))];
 
   return new Promise((resolve, reject) => {
-    const child = spawn(javaPath, args, { cwd: sDir, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(javaPath, args, { cwd: sDir, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...gradleProxyEnv() } });
     let stderr = "";
     child.stdout?.on("data", (c: Buffer) => { const msg = c.toString().trim(); if (msg) onProgress?.(msg); });
     child.stderr?.on("data", (c: Buffer) => { stderr += c.toString(); });
