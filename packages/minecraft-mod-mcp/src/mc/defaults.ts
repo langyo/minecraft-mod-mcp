@@ -23,8 +23,8 @@ export const GAME = {
   serverStartupWaitMs: 15000,
   defaultVersion: "1.21.7",
   defaultLoader: "forge",
-  defaultLanguage: "zh-CN",
-  defaultDownloadSource: "bmclapi",
+  defaultLanguage: "en-US",
+  defaultDownloadSource: "mojang" as const,
   javaVersionFallback: 17,
   javaVersionThresholds: { mc117: 17, mc116: 16, mc113: 13 } as Record<string, number>,
 } as const;
@@ -136,4 +136,6 @@ export const MOD = {
 
 export const FABRIC = {
   defaultLoaderVersion: "0.16.14",
+  defaultInstallerVersion: "0.11.2",
+  mavenBaseUrl: "https://maven.fabricmc.net",
 } as const;

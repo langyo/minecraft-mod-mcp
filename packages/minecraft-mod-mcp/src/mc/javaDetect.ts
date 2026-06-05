@@ -78,12 +78,12 @@ function platformCandidates(): string[] {
 function windowsCandidates(): string[] {
   const paths: string[] = [];
   const roots = [
-    "C:\\Program Files\\Java",
-    "C:\\Program Files\\Eclipse Adoptium",
-    "C:\\Program Files\\Zulu",
-    "C:\\Program Files\\Microsoft",
-    "C:\\Program Files\\AdoptOpenJDK",
-    "C:\\Program Files (x86)\\Java",
+    join("C:", "Program Files", "Java"),
+    join("C:", "Program Files", "Eclipse Adoptium"),
+    join("C:", "Program Files", "Zulu"),
+    join("C:", "Program Files", "Microsoft"),
+    join("C:", "Program Files", "AdoptOpenJDK"),
+    join("C:", "Program Files (x86)", "Java"),
   ];
 
   for (const root of roots) {
@@ -92,7 +92,7 @@ function windowsCandidates(): string[] {
 
   const userProfile = process.env.USERPROFILE;
   if (userProfile) {
-    for (const sub of ["scoop\\apps\\java", "scoop\\apps\\openjdk"]) {
+    for (const sub of [join("scoop", "apps", "java"), join("scoop", "apps", "openjdk")]) {
       const dir = join(userProfile, sub);
       if (existsSync(dir)) scanSubdirsDirect(dir, paths);
     }

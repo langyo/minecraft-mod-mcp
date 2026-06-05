@@ -10,7 +10,7 @@ import { findJavaForVersion, librariesDir, versionsDir } from "./platform.js";
 import { isWindows } from "../runtime/detector.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
-import { DOWNLOAD, GAME, SERVER, type ServerType, SERVER_TYPES } from "./defaults.js";
+import { DOWNLOAD, GAME, SERVER, FABRIC, type ServerType, SERVER_TYPES } from "./defaults.js";
 import { fetchWithFallback, javaProxyArgs, gradleProxyEnv } from "./proxy.js";
 
 export interface ServerProperties {
@@ -233,12 +233,13 @@ function findSystemGitDir(): string | null {
   } catch {}
 
   if (isWindows()) {
-    candidates.push(
-      join(process.env.ProgramFiles ?? "C:\\Program Files", "Git"),
-      join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "Git"),
-      join(process.env.LocalAppData ?? "", "Programs", "Git"),
-      "C:\\Git",
-    );
+    const pf = process.env.ProgramFiles;
+    const pf86 = process.env["ProgramFiles(x86)"];
+    const localApp = process.env.LocalAppData;
+    if (pf) candidates.push(join(pf, "Git"));
+    if (pf86) candidates.push(join(pf86, "Git"));
+    if (localApp) candidates.push(join(localApp, "Programs", "Git"));
+    candidates.push(join("C:", "Git"));
   } else if (isMacos()) {
     candidates.push(
       "/usr/local",
@@ -276,7 +277,7 @@ function linkSystemGit(workDir: string): void {
   if (existsSync(gitLink)) {
     try { rmSync(gitLink, { recursive: true, force: true }); } catch { return; }
   }
-  try { symlinkSync(sysGit, gitLink, "junction"); } catch { /* junction failed */ }
+  try { symlinkSync(sysGit, gitLink, isWindows() ? "junction" : "dir"); } catch { /* symlink failed */ }
 }
 
 async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, targets: string[], onProgress?: (msg: string) => void): Promise<string> {
@@ -300,7 +301,7 @@ async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, 
 
   onProgress?.(`Compiling ${targets.join(" + ")} for ${mcVersion} via BuildTools (may take a few minutes)...`);
   const proxyArgs = javaProxyArgs();
-  const sslArgs = proxyArgs.length > 0 ? ["-Djavax.net.ssl.trustStoreType=Windows-ROOT"] : [];
+  const sslArgs = proxyArgs.length > 0 && isWindows() ? ["-Djavax.net.ssl.trustStoreType=Windows-ROOT"] : [];
   const args = [...proxyArgs, ...sslArgs, "-jar", buildToolsJar, "--rev", mcVersion, ...targets.map(t => `--compile ${t}`).flatMap(s => s.split(" "))];
 
   return new Promise((resolve, reject) => {
@@ -437,7 +438,8 @@ async function installFabricServer(mcVersion: string, sDir: string, javaPath: st
   const loaderVer = stableLoader?.loader.version ?? loaders[0]?.loader.version;
   if (!loaderVer) throw new Error(`No Fabric loader found for ${mcVersion}`);
 
-  const installerUrl = `https://maven.fabricmc.net/net/fabricmc/fabric-installer/0.11.2/fabric-installer-0.11.2.jar`;
+  const instVer = FABRIC.defaultInstallerVersion;
+  const installerUrl = `${FABRIC.mavenBaseUrl}/net/fabricmc/fabric-installer/${instVer}/fabric-installer-${instVer}.jar`;
   const installerPath = join(sDir, "fabric-installer.jar");
   if (!existsSync(installerPath)) {
     onProgress?.(`Downloading Fabric installer...`);
@@ -616,7 +618,7 @@ export function launchServer(
   const maxMem = opts?.maxMemoryMb ?? GAME.defaultServerMemoryMb;
 
   const isNeoForgeScript = setup.jarPath.endsWith(".txt");
-  const isRunScript = setup.jarPath.endsWith("run.bat") || setup.jarPath.endsWith("run.sh");
+  const isRunScript = isWindows() ? setup.jarPath.endsWith("run.bat") : setup.jarPath.endsWith("run.sh");
 
   const args: string[] = [];
   if (isNeoForgeScript) {
