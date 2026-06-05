@@ -71,7 +71,7 @@ export function createApiApp(mod: ModClient): Server {
 
           const mcDir_ = gameDirPath(config);
           if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
-          const child = spawn(cmd.java, cmd.args, { cwd: mcDir_, stdio: "ignore" });
+          const child = spawn(cmd.java, cmd.args, { cwd: mcDir_, stdio: "ignore", detached: process.platform !== "win32" });
           mod.setMcProcess(child);
           res.end(JSON.stringify({ launched: true, version: versionId, loader, pid: child.pid }));
           return;

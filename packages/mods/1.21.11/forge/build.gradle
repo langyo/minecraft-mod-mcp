@@ -5,7 +5,7 @@ plugins {
     id 'net.minecraftforge.gradle' version '[7.0.23,8)'
 }
 
-version = '0.1.1-SNAPSHOT'
+version = '0.2.0-SNAPSHOT'
 group = 'xyz.langyo'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)

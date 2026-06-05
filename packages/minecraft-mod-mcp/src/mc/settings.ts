@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { isWindows } from "../runtime/detector.js";
 import { launcherDir } from "./platform.js";
 import { GAME, PATHS } from "./defaults.js";
@@ -75,7 +75,7 @@ export function loadConfig(): LauncherConfig {
 
 export function saveConfig(config: LauncherConfig): void {
   const path = configPath();
-  const dir = join(path, "..");
+  const dir = dirname(path);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(path, JSON.stringify(config, null, 2), "utf-8");
 }

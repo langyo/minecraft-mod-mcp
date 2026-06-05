@@ -77,13 +77,16 @@ function platformCandidates(): string[] {
 
 function windowsCandidates(): string[] {
   const paths: string[] = [];
+  const sd = process.env.SystemDrive || "C:";
+  const pf = process.env.ProgramFiles || join(sd, "Program Files");
+  const pf86 = process.env["ProgramFiles(x86)"] || join(sd, "Program Files (x86)");
   const roots = [
-    "C:\\Program Files\\Java",
-    "C:\\Program Files\\Eclipse Adoptium",
-    "C:\\Program Files\\Zulu",
-    "C:\\Program Files\\Microsoft",
-    "C:\\Program Files\\AdoptOpenJDK",
-    "C:\\Program Files (x86)\\Java",
+    join(pf, "Java"),
+    join(pf, "Eclipse Adoptium"),
+    join(pf, "Zulu"),
+    join(pf, "Microsoft"),
+    join(pf, "AdoptOpenJDK"),
+    join(pf86, "Java"),
   ];
 
   for (const root of roots) {
@@ -92,7 +95,7 @@ function windowsCandidates(): string[] {
 
   const userProfile = process.env.USERPROFILE;
   if (userProfile) {
-    for (const sub of ["scoop\\apps\\java", "scoop\\apps\\openjdk"]) {
+    for (const sub of [join("scoop", "apps", "java"), join("scoop", "apps", "openjdk")]) {
       const dir = join(userProfile, sub);
       if (existsSync(dir)) scanSubdirsDirect(dir, paths);
     }
@@ -161,7 +164,7 @@ function parseReleaseFile(home: string): { version: number; vendor: string } | n
     let javaVersion: string | null = null;
     let implementor = "Unknown";
 
-    for (const line of content.split("\n")) {
+    for (const line of content.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (trimmed.startsWith("JAVA_VERSION=")) {
         javaVersion = stripQuotes(trimmed.slice("JAVA_VERSION=".length));

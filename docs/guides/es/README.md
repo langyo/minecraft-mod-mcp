@@ -90,6 +90,10 @@ O pega este enlace a tu agente de IA y deja que él se encargue de la configurac
 https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/es/AI-TOOLS.md
 ```
 
+### 5. Uso de la CLI
+
+**[→ Guía de uso de la CLI](./CLI.md)** — lanza clientes y servidores, gestiona versiones y cuentas, compila SDKs, todo desde la línea de comandos.
+
 ---
 
 ## Consejos de uso

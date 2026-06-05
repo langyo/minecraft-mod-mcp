@@ -23,8 +23,8 @@ export const GAME = {
   serverStartupWaitMs: 15000,
   defaultVersion: "1.21.7",
   defaultLoader: "forge",
-  defaultLanguage: "zh-CN",
-  defaultDownloadSource: "bmclapi",
+  defaultLanguage: "en-US",
+  defaultDownloadSource: "mojang" as const,
   javaVersionFallback: 17,
   javaVersionThresholds: { mc117: 17, mc116: 16, mc113: 13 } as Record<string, number>,
 } as const;
@@ -102,6 +102,10 @@ export const AUTH = {
   slowDownIntervalMs: 10000,
 } as const;
 
+export type ServerType = "vanilla" | "spigot" | "craftbukkit" | "paper" | "forge" | "fabric" | "neoforge";
+
+export const SERVER_TYPES: readonly ServerType[] = ["vanilla", "spigot", "craftbukkit", "paper", "forge", "fabric", "neoforge"] as const;
+
 export const SERVER = {
   rconPort: 25575,
   networkCompressionThreshold: 256,
@@ -111,12 +115,15 @@ export const SERVER = {
   simulationDistance: 10,
   maxWorldSize: 29999984,
   connectHost: "localhost",
-  defaultJavaVersion: 17,
+  defaultJavaVersion: 21,
   userAgent: "minecraft-mcp",
   bindAddress: "0.0.0.0",
   eulaFileName: "eula.txt",
   propertiesFileName: "server.properties",
   modsDirName: "mods",
+  defaultType: "vanilla" as ServerType,
+  buildToolsUrl: "https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar",
+  paperApiUrl: "https://api.papermc.io/v2/projects/paper",
 } as const;
 
 export const MOD = {
@@ -127,6 +134,12 @@ export const MOD = {
   httpServerName: "minecraft-mod-mcp-server",
 } as const;
 
+export const BUILD = {
+  portableGitDirName: "PortableGit-2.45.2-64-bit",
+} as const;
+
 export const FABRIC = {
   defaultLoaderVersion: "0.16.14",
+  defaultInstallerVersion: "0.11.2",
+  mavenBaseUrl: "https://maven.fabricmc.net",
 } as const;
