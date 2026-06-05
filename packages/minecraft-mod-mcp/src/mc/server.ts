@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, copyFileSync, readdirSync, symlinkSync, statSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, copyFileSync, readdirSync, symlinkSync, statSync, rmSync, realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
+import { execSync } from "node:child_process";
 import { serverDir } from "./settings.js";
 import { downloadFile, downloadForgeInstaller, downloadFabricLoader, downloadNeoforgeInstaller } from "./download.js";
 import { loadVersion } from "./versionJson.js";
@@ -218,13 +219,58 @@ function buildCacheDir(): string {
 
 const PORTABLE_GIT_DIR = "PortableGit-2.45.2-64-bit";
 
+function findSystemGitDir(): string | null {
+  const gitExe = isWindows() ? "git.exe" : "git";
+  const candidates: string[] = [];
+
+  try {
+    const which = execSync(`${isWindows() ? "where" : "which"} ${gitExe}`, { encoding: "utf-8", timeout: 5000 }).trim();
+    const first = which.split(/\r?\n/)[0].trim();
+    if (first) {
+      const gitDir = dirname(dirname(first));
+      if (existsSync(join(gitDir, "bin", gitExe))) return gitDir;
+    }
+  } catch {}
+
+  if (isWindows()) {
+    candidates.push(
+      join(process.env.ProgramFiles ?? "C:\\Program Files", "Git"),
+      join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "Git"),
+      join(process.env.LocalAppData ?? "", "Programs", "Git"),
+      "C:\\Git",
+    );
+  } else if (isMacos()) {
+    candidates.push(
+      "/usr/local",
+      "/opt/homebrew",
+      "/usr",
+    );
+    try {
+      const brew = execSync("brew --prefix git 2>/dev/null", { encoding: "utf-8", timeout: 5000 }).trim();
+      if (brew) candidates.push(brew);
+    } catch {}
+  } else {
+    candidates.push(
+      "/usr",
+      "/usr/local",
+    );
+  }
+
+  for (const dir of candidates) {
+    if (existsSync(join(dir, "bin", gitExe))) return dir;
+  }
+  return null;
+}
+
 function linkSystemGit(workDir: string): void {
   const wrapper = join(workDir, PORTABLE_GIT_DIR);
   const gitLink = join(wrapper, "PortableGit");
-  if (existsSync(join(gitLink, "bin", "git.exe")) || existsSync(join(gitLink, "bin", "git"))) return;
+  const gitExe = isWindows() ? "git.exe" : "git";
 
-  const sysGit = isWindows() ? join(process.env.ProgramFiles ?? "C:\\Program Files", "Git") : "/usr";
-  if (!existsSync(join(sysGit, "bin", isWindows() ? "git.exe" : "git"))) return;
+  if (existsSync(join(gitLink, "bin", gitExe))) return;
+
+  const sysGit = findSystemGitDir();
+  if (!sysGit) return;
 
   if (!existsSync(wrapper)) mkdirSync(wrapper, { recursive: true });
   if (existsSync(gitLink)) {
