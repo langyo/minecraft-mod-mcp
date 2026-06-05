@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, createWriteStream, readdirSync, rmSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, dirname } from "node:path";
 import { isWindows, isMacos } from "../runtime/detector.js";
 import { launcherDir, jdkHome } from "./platform.js";
 import { JAVA, PATHS } from "./defaults.js";
@@ -69,7 +69,7 @@ async function downloadFile(url: string, dest: string, expectedSize: number, onP
   if (!res.ok) throw new Error(`Download failed: ${res.status}`);
   if (!res.body) throw new Error("No response body");
 
-  mkdirSync(join(dest, ".."), { recursive: true });
+  mkdirSync(dirname(dest), { recursive: true });
 
   const total = parseInt(res.headers.get("content-length") ?? "0");
   let downloaded = 0;

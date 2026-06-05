@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { startServer } from "./server.js";
+import { isWindows } from "./runtime/detector.js";
 import { loadVersionsData } from "./mc/versionsData.js";
 import { getVersions, getVersion, getVersionForLoader, loaders, getFgEra, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
 import { loadVersionMerged } from "./mc/versionJson.js";
@@ -574,7 +575,7 @@ Options:
     process.exit(1);
   }
 
-  const gradlew = isWin() ? "gradlew.bat" : "gradlew";
+  const gradlew = isWindows() ? "gradlew.bat" : "gradlew";
   const gradlewPath = join(modProjectDir, gradlew);
   if (!existsSync(gradlewPath)) {
     console.error(`Gradle wrapper not found: ${gradlewPath}`);
@@ -600,7 +601,7 @@ Options:
   } else {
     console.log(`\n[1/2] Ensuring Java ${javaVersion}...`);
     const home = await ensureJavaInstalled(javaVersion, (msg) => console.error(`  ${msg}`));
-    javaExe = isWin() ? join(home, "bin", "java.exe") : join(home, "bin", "java");
+    javaExe = isWindows() ? join(home, "bin", "java.exe") : join(home, "bin", "java");
     console.log(`  Java ${javaVersion}: ${home}`);
   }
 
@@ -1105,10 +1106,6 @@ main().catch((err) => {
   process.exit(1);
 });
 
-function isWin(): boolean {
-  return process.platform === "win32";
-}
-
 function runGradle(
   cwd: string,
   gradlew: string,
@@ -1122,7 +1119,7 @@ function runGradle(
       cwd,
       env,
       stdio: ["ignore", "pipe", "pipe"],
-      shell: isWin(),
+      shell: isWindows(),
     });
 
     const stdoutChunks: Buffer[] = [];

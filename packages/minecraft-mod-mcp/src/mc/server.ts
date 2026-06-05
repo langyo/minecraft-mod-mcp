@@ -7,7 +7,7 @@ import { downloadFile, downloadForgeInstaller, downloadFabricLoader, downloadNeo
 import { loadVersion } from "./versionJson.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { findJavaForVersion, librariesDir, versionsDir } from "./platform.js";
-import { isWindows } from "../runtime/detector.js";
+import { isWindows, isMacos } from "../runtime/detector.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 import { DOWNLOAD, GAME, SERVER, FABRIC, BUILD, type ServerType, SERVER_TYPES } from "./defaults.js";
@@ -508,8 +508,9 @@ async function installNeoForgeServer(neoforgeVersion: string, mcVersion: string,
     child.on("error", reject);
   });
 
-  const winArgs = join(sDir, "libraries", "net", "neoforged", "neoforge", neoforgeVersion, "win_args.txt");
-  if (existsSync(winArgs)) return winArgs;
+  const argsFile = isWindows() ? "win_args.txt" : "unix_args.txt";
+  const argsPath = join(sDir, "libraries", "net", "neoforged", "neoforge", neoforgeVersion, argsFile);
+  if (existsSync(argsPath)) return argsPath;
 
   for (const entry of readdirSync(sDir)) {
     if (entry.includes("neoforge") && entry.endsWith(".jar") && !entry.includes("installer")) {

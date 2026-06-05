@@ -173,7 +173,12 @@ function detectFromWindowsRegistry(): ProxySettings | null {
 function detectFromMacos(): ProxySettings | null {
   if (process.platform !== "darwin") return null;
   try {
-    for (const service of ["Wi-Fi", "Ethernet"]) {
+    let services = ["Wi-Fi", "Ethernet"];
+    try {
+      const list = execSync("networksetup -listallnetworkservices", { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
+      services = list.split(/\r?\n/).slice(1).map(s => s.trim()).filter(Boolean);
+    } catch {}
+    for (const service of services) {
       for (const proto of ["getwebproxy", "getsecurewebproxy"]) {
         const out = execSync(`networksetup -${proto} "${service}"`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
         const lines = out.split(/\r?\n/).map(l => l.trim());
