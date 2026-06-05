@@ -10,7 +10,7 @@ import { findJavaForVersion, librariesDir, versionsDir } from "./platform.js";
 import { isWindows } from "../runtime/detector.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
-import { DOWNLOAD, GAME, SERVER, FABRIC, type ServerType, SERVER_TYPES } from "./defaults.js";
+import { DOWNLOAD, GAME, SERVER, FABRIC, BUILD, type ServerType, SERVER_TYPES } from "./defaults.js";
 import { fetchWithFallback, javaProxyArgs, gradleProxyEnv } from "./proxy.js";
 
 export interface ServerProperties {
@@ -217,7 +217,7 @@ function buildCacheDir(): string {
   return d;
 }
 
-const PORTABLE_GIT_DIR = "PortableGit-2.45.2-64-bit";
+const PORTABLE_GIT_DIR = BUILD.portableGitDirName;
 
 function findSystemGitDir(): string | null {
   const gitExe = isWindows() ? "git.exe" : "git";
@@ -239,7 +239,7 @@ function findSystemGitDir(): string | null {
     if (pf) candidates.push(join(pf, "Git"));
     if (pf86) candidates.push(join(pf86, "Git"));
     if (localApp) candidates.push(join(localApp, "Programs", "Git"));
-    candidates.push(join("C:", "Git"));
+    candidates.push(join(process.env.SystemDrive || "C:", "Git"));
   } else if (isMacos()) {
     candidates.push(
       "/usr/local",

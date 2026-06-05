@@ -59,14 +59,21 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 async function nativeDownload(url: string, destPath: string): Promise<void> {
   const { execFile } = await import("node:child_process");
-  const ps = process.platform === "win32"
-    ? ["Invoke-WebRequest", "-Uri", url, "-OutFile", destPath, "-TimeoutSec", "60"]
-    : undefined;
-  if (!ps) throw new Error("Native fallback only supported on Windows");
+  if (process.platform === "win32") {
+    const ps = ["Invoke-WebRequest", "-Uri", url, "-OutFile", destPath, "-TimeoutSec", "60"];
+    return new Promise<void>((resolve, reject) => {
+      execFile("powershell", ["-NoProfile", "-Command", ...ps], {
+        timeout: 120_000,
+        windowsHide: true,
+      }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
   return new Promise<void>((resolve, reject) => {
-    const child = execFile("powershell", ["-NoProfile", "-Command", ...ps], {
+    execFile("curl", ["-fSL", "-o", destPath, "--connect-timeout", "60", url], {
       timeout: 120_000,
-      windowsHide: true,
     }, (err) => {
       if (err) reject(err);
       else resolve();
@@ -169,7 +176,7 @@ function detectFromMacos(): ProxySettings | null {
     for (const service of ["Wi-Fi", "Ethernet"]) {
       for (const proto of ["getwebproxy", "getsecurewebproxy"]) {
         const out = execSync(`networksetup -${proto} "${service}"`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
-        const lines = out.split("\n").map(l => l.trim());
+        const lines = out.split(/\r?\n/).map(l => l.trim());
         const enabled = lines[0] === "Yes";
         const host = lines[1];
         const port = parseInt(lines[2], 10);

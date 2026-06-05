@@ -109,9 +109,9 @@ async function extractArchive(archive: string, outDir: string): Promise<void> {
     const { execFileSync } = await import("node:child_process");
     const psScript = `
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::ExtractToDirectory('${archive}', '${outDir}')
+[System.IO.Compression.ZipFile]::ExtractToDirectory($args[0], $args[1])
 `.trim();
-    execFileSync("powershell", ["-NoProfile", "-Command", psScript], {
+    execFileSync("powershell", ["-NoProfile", "-Command", psScript, "-args", archive, outDir], {
       stdio: "pipe",
       timeout: JAVA.extractTimeoutMs,
     });

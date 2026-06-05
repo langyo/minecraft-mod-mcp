@@ -77,13 +77,16 @@ function platformCandidates(): string[] {
 
 function windowsCandidates(): string[] {
   const paths: string[] = [];
+  const sd = process.env.SystemDrive || "C:";
+  const pf = process.env.ProgramFiles || join(sd, "Program Files");
+  const pf86 = process.env["ProgramFiles(x86)"] || join(sd, "Program Files (x86)");
   const roots = [
-    join("C:", "Program Files", "Java"),
-    join("C:", "Program Files", "Eclipse Adoptium"),
-    join("C:", "Program Files", "Zulu"),
-    join("C:", "Program Files", "Microsoft"),
-    join("C:", "Program Files", "AdoptOpenJDK"),
-    join("C:", "Program Files (x86)", "Java"),
+    join(pf, "Java"),
+    join(pf, "Eclipse Adoptium"),
+    join(pf, "Zulu"),
+    join(pf, "Microsoft"),
+    join(pf, "AdoptOpenJDK"),
+    join(pf86, "Java"),
   ];
 
   for (const root of roots) {
@@ -161,7 +164,7 @@ function parseReleaseFile(home: string): { version: number; vendor: string } | n
     let javaVersion: string | null = null;
     let implementor = "Unknown";
 
-    for (const line of content.split("\n")) {
+    for (const line of content.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (trimmed.startsWith("JAVA_VERSION=")) {
         javaVersion = stripQuotes(trimmed.slice("JAVA_VERSION=".length));

@@ -134,6 +134,10 @@ export const MOD = {
   httpServerName: "minecraft-mod-mcp-server",
 } as const;
 
+export const BUILD = {
+  portableGitDirName: "PortableGit-2.45.2-64-bit",
+} as const;
+
 export const FABRIC = {
   defaultLoaderVersion: "0.16.14",
   defaultInstallerVersion: "0.11.2",
