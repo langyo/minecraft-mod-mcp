@@ -230,8 +230,9 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
     stdio: "ignore",
-    detached: process.platform !== "win32",
+    detached: true,
   });
+  child.unref();
 
   child.on("error", (err) => {
     console.error(`[minecraft-mod-mcp] Launch failed: ${err.message}`);
@@ -415,8 +416,9 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
     stdio: "ignore",
-    detached: process.platform !== "win32",
+    detached: true,
   });
+  child.unref();
 
   mod.setMcProcess(child);
   return {

@@ -18,19 +18,18 @@ public final class InputInjectionHelper {
         if (ReflectionCache.LWJGL3) {
             try {
                 Object mc = ReflectionCache.getMinecraftInstance();
-                Object kbHandler = mc.getClass().getField("keyboardHandler").get(mc);
-                kbHandler.getClass().getMethod("keyPress", long.class, int.class, int.class, int.class, int.class)
-                    .invoke(kbHandler, handle, key, 0, action, 0);
-                return;
-            } catch (NoSuchFieldException nsfe) {
-                try {
-                    Object mc = ReflectionCache.getMinecraftInstance();
-                    Object kbHandler = mc.getClass().getMethod("keyboardHandler").invoke(mc);
-                    kbHandler.getClass().getMethod("keyPress", long.class, int.class, int.class, int.class, int.class)
-                        .invoke(kbHandler, handle, key, 0, action, 0);
-                    return;
-                } catch (Exception e2) {
-                    System.err.println("[Input] sendKey GLFW: " + e2.getMessage());
+                Object kbHandler = getKeyboardHandler(mc);
+                if (kbHandler != null) {
+                    for (java.lang.reflect.Method m : kbHandler.getClass().getDeclaredMethods()) {
+                        Class<?>[] pts = m.getParameterTypes();
+                        if (pts.length == 5 && pts[0] == long.class && pts[1] == int.class
+                                && pts[2] == int.class && pts[3] == int.class && pts[4] == int.class
+                                && !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+                            m.setAccessible(true);
+                            m.invoke(kbHandler, handle, key, 0, action, 0);
+                            return;
+                        }
+                    }
                 }
             } catch (Exception e) {
                 System.err.println("[Input] sendKey GLFW: " + e.getMessage());
@@ -44,6 +43,23 @@ public final class InputInjectionHelper {
             if (action == 1) r.keyPress(vk);
             else r.keyRelease(vk);
         } catch (Exception e) { System.err.println("[Input] sendKey: " + e.getMessage()); }
+    }
+
+    private static Object getKeyboardHandler(Object mc) {
+        try { return mc.getClass().getField("keyboardHandler").get(mc); } catch (Exception ignored) {}
+        try { return mc.getClass().getDeclaredField("keyboardHandler").get(mc); } catch (Exception ignored) {}
+        java.lang.reflect.Field discovered = ReflectionCache.getDiscoveredField("keyboardHandler");
+        if (discovered != null) { try { discovered.setAccessible(true); return discovered.get(mc); } catch (Exception ignored) {} }
+        for (java.lang.reflect.Field f : ReflectionCache.getAllFields(mc.getClass())) {
+            if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+                try { f.setAccessible(true); Object v = f.get(mc); if (v != null && ReflectionCache.isKeyboardHandlerType(v.getClass())) return v; } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
+    private static Object getMouseHandlerField(Object mc) {
+        return ReflectionCache.getMouseHandler(mc);
     }
 
     public static void sendMouseButton(long handle, int button, int action) {
@@ -96,16 +112,18 @@ public final class InputInjectionHelper {
         if (ReflectionCache.LWJGL3) {
             try {
                 Object mc = ReflectionCache.getMinecraftInstance();
-                Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
-                for (java.lang.reflect.Method m : mouseHandler.getClass().getDeclaredMethods()) {
-                    String name = m.getName();
-                    if ((name.equals("lambda$setup$2") || name.equals("lambda$setup$3") || name.contains("scroll"))
-                        && !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
-                        Class<?>[] pt = m.getParameterTypes();
-                        if (pt.length == 3 && pt[0] == long.class && pt[1] == double.class && pt[2] == double.class) {
-                            m.setAccessible(true);
-                            m.invoke(mouseHandler, handle, 0.0, scrollY);
-                            return;
+                Object mouseHandler = ReflectionCache.getMouseHandler(mc);
+                if (mouseHandler != null) {
+                    for (java.lang.reflect.Method m : mouseHandler.getClass().getDeclaredMethods()) {
+                        String name = m.getName();
+                        if ((name.contains("scroll") || name.startsWith("lambda$setup$"))
+                            && !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+                            Class<?>[] pt = m.getParameterTypes();
+                            if (pt.length == 3 && pt[0] == long.class && pt[1] == double.class && pt[2] == double.class) {
+                                m.setAccessible(true);
+                                m.invoke(mouseHandler, handle, 0.0, scrollY);
+                                return;
+                            }
                         }
                     }
                 }
@@ -124,16 +142,18 @@ public final class InputInjectionHelper {
         if (ReflectionCache.LWJGL3) {
             try {
                 Object mc = ReflectionCache.getMinecraftInstance();
-                Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
-                for (java.lang.reflect.Method m : mouseHandler.getClass().getDeclaredMethods()) {
-                    String name = m.getName();
-                    if ((name.contains("cursor") || name.equals("lambda$setup$0") || name.equals("lambda$setup$1"))
-                        && !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
-                        Class<?>[] pt = m.getParameterTypes();
-                        if (pt.length == 3 && pt[0] == long.class && pt[1] == double.class && pt[2] == double.class) {
-                            m.setAccessible(true);
-                            m.invoke(mouseHandler, handle, x, y);
-                            return;
+                Object mouseHandler = ReflectionCache.getMouseHandler(mc);
+                if (mouseHandler != null) {
+                    for (java.lang.reflect.Method m : mouseHandler.getClass().getDeclaredMethods()) {
+                        String name = m.getName();
+                        if ((name.contains("cursor") || name.contains("pos") || name.startsWith("lambda$setup$"))
+                            && !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+                            Class<?>[] pt = m.getParameterTypes();
+                            if (pt.length == 3 && pt[0] == long.class && pt[1] == double.class && pt[2] == double.class) {
+                                m.setAccessible(true);
+                                m.invoke(mouseHandler, handle, x, y);
+                                return;
+                            }
                         }
                     }
                 }
@@ -171,16 +191,21 @@ public final class InputInjectionHelper {
                 }
 
                 Object mc = ReflectionCache.getMinecraftInstance();
-                Object mouseHandler = mc.getClass().getField("mouseHandler").get(mc);
-                for (java.lang.reflect.Field f : mouseHandler.getClass().getDeclaredFields()) {
-                    if (f.getType() == double.class) {
-                        String name = f.getName().toLowerCase();
-                        if (name.contains("xpos") || name.equals("x")) {
-                            f.setAccessible(true);
-                            f.setDouble(mouseHandler, x);
-                        } else if (name.contains("ypos") || name.equals("y")) {
-                            f.setAccessible(true);
-                            f.setDouble(mouseHandler, y);
+                Object mouseHandler = ReflectionCache.getMouseHandler(mc);
+                if (mouseHandler != null) {
+                    int doubleFieldsSet = 0;
+                    for (java.lang.reflect.Field f : mouseHandler.getClass().getDeclaredFields()) {
+                        if (f.getType() == double.class) {
+                            String name = f.getName().toLowerCase();
+                            if ((name.contains("xpos") || name.equals("x") || name.contains("cursorx") || doubleFieldsSet == 0) && doubleFieldsSet < 2) {
+                                f.setAccessible(true);
+                                f.setDouble(mouseHandler, doubleFieldsSet == 0 ? x : y);
+                                doubleFieldsSet++;
+                            } else if ((name.contains("ypos") || name.equals("y") || name.contains("cursory")) && doubleFieldsSet < 2) {
+                                f.setAccessible(true);
+                                f.setDouble(mouseHandler, y);
+                                doubleFieldsSet++;
+                            }
                         }
                     }
                 }

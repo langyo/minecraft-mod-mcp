@@ -15,9 +15,14 @@ public final class ReflectionCache {
 
     private static Class<?> glfwClass, gl11Class, gl30Class, displayClass, mcClass;
     private static Method mcGetInstanceMethod;
+    private static volatile Object cachedMcInstance;
     private static Method glfwSetInputModeMethod, glfwSetCursorPosMethod;
     private static int GLFW_CURSOR, GLFW_CURSOR_NORMAL, GLFW_CURSOR_DISABLED;
     private static volatile boolean classCacheInit = false;
+
+    private static final Map<String, Field> discoveredFields = new ConcurrentHashMap<>();
+    private static final Map<String, Method> discoveredMethods = new ConcurrentHashMap<>();
+    private static volatile boolean fieldsDiscovered = false;
 
     static final boolean LWJGL3;
 
@@ -33,6 +38,7 @@ public final class ReflectionCache {
         if (classCacheInit) return;
         try {
             try { mcClass = Class.forName("net.minecraft.client.Minecraft"); } catch (Exception ignored) {}
+            if (mcClass == null) try { mcClass = Class.forName("net.minecraft.client.MinecraftClient"); } catch (Exception ignored) {}
             if (mcClass != null) {
                 try { mcGetInstanceMethod = mcClass.getMethod("getInstance"); } catch (Exception ignored) {}
                 if (mcGetInstanceMethod == null) try { mcGetInstanceMethod = mcClass.getMethod("getMinecraft"); } catch (Exception ignored) {}
@@ -75,10 +81,193 @@ public final class ReflectionCache {
     static int getGlfwCursorNormal() { return GLFW_CURSOR_NORMAL; }
     static int getGlfwCursorDisabled() { return GLFW_CURSOR_DISABLED; }
 
+    public static void setMinecraftInstance(Object instance) {
+        cachedMcInstance = instance;
+        if (instance != null) discoverFields(instance);
+    }
+
+    static void discoverFields(Object mc) {
+        if (fieldsDiscovered) return;
+        fieldsDiscovered = true;
+        try {
+            Class<?> mcClazz = mc.getClass();
+            for (Field f : getAllFields(mcClazz)) {
+                if (Modifier.isStatic(f.getModifiers())) continue;
+                f.setAccessible(true);
+                Class<?> ft = f.getType();
+                if (ft == mcClazz) continue;
+                if (ft.isPrimitive()) continue;
+                if (ft.getName().startsWith("java.")) continue;
+                if (!discoveredFields.containsKey("player") && isPlayerType(ft)) {
+                    discoveredFields.put("player", f);
+                    dbg("discovered player field: " + f.getName() + " type=" + ft.getName());
+                }
+                if (!discoveredFields.containsKey("level") && isLevelType(ft)) {
+                    discoveredFields.put("level", f);
+                    dbg("discovered level field: " + f.getName() + " type=" + ft.getName());
+                }
+                if (!discoveredFields.containsKey("screen") && isScreenType(ft)) {
+                    discoveredFields.put("screen", f);
+                    dbg("discovered screen field: " + f.getName() + " type=" + ft.getName());
+                }
+                if (!discoveredFields.containsKey("mouseHandler") && isMouseHandlerType(ft)) {
+                    discoveredFields.put("mouseHandler", f);
+                    dbg("discovered mouseHandler field: " + f.getName() + " type=" + ft.getName());
+                }
+                if (!discoveredFields.containsKey("keyboardHandler") && isKeyboardHandlerType(ft)) {
+                    discoveredFields.put("keyboardHandler", f);
+                    dbg("discovered keyboardHandler field: " + f.getName() + " type=" + ft.getName());
+                }
+                if (!discoveredFields.containsKey("window") && isWindowType(ft)) {
+                    discoveredFields.put("window", f);
+                    dbg("discovered window field: " + f.getName() + " type=" + ft.getName());
+                }
+                if (!discoveredFields.containsKey("gameMode") && isGameModeType(ft)) {
+                    discoveredFields.put("gameMode", f);
+                    dbg("discovered gameMode field: " + f.getName() + " type=" + ft.getName());
+                }
+            }
+            for (Method m : getAllMethods(mcClazz)) {
+                if (m.getParameterCount() == 0 && m.getReturnType() != void.class) {
+                    String rtName = m.getReturnType().getName();
+                    if (!discoveredMethods.containsKey("getMainRenderTarget")
+                            && (rtName.contains("RenderTarget") || rtName.contains("Framebuffer") || rtName.contains("FrameBuffer"))) {
+                        discoveredMethods.put("getMainRenderTarget", m);
+                        dbg("discovered getMainRenderTarget: " + m.getName() + " ret=" + rtName);
+                    }
+                }
+                if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class
+                        && !m.getName().startsWith("lambda$")) {
+                    if (!discoveredMethods.containsKey("execute")) {
+                        discoveredMethods.put("execute", m);
+                        dbg("discovered execute: " + m.getName());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            dbg("discoverFields failed: " + e.getMessage());
+        }
+    }
+
+    private static void dbg(String msg) {
+        System.out.println("[MCP-Discovery] " + msg);
+    }
+
+    static Field getDiscoveredField(String name) { return discoveredFields.get(name); }
+    static Method getDiscoveredMethod(String name) { return discoveredMethods.get(name); }
+
+    private static boolean isPlayerType(Class<?> clazz) {
+        int doubleCount = 0;
+        boolean hasStringReturn = false;
+        for (Method m : getAllMethods(clazz)) {
+            if (m.getParameterCount() == 0) {
+                if (m.getReturnType() == double.class) doubleCount++;
+                if (m.getReturnType() == String.class) hasStringReturn = true;
+            }
+        }
+        return doubleCount >= 5 && hasStringReturn;
+    }
+
+    private static boolean isLevelType(Class<?> clazz) {
+        for (Method m : getAllMethods(clazz)) {
+            if (m.getParameterCount() == 0 && m.getReturnType().isEnum()) return true;
+        }
+        for (Method m : getAllMethods(clazz)) {
+            String n = m.getName();
+            if (m.getParameterCount() == 0 && (n.equals("getDifficulty") || n.equals("difficulty"))) return true;
+        }
+        int entityCount = 0;
+        for (Method m : getAllMethods(clazz)) {
+            if (m.getParameterCount() <= 1) {
+                String rt = m.getReturnType().getName();
+                if (rt.contains("Entity") || rt.contains("Player")) entityCount++;
+            }
+        }
+        return entityCount >= 3;
+    }
+
+    private static boolean isScreenType(Class<?> clazz) {
+        for (Method m : getAllMethods(clazz)) {
+            Class<?>[] pts = m.getParameterTypes();
+            if (pts.length == 3 && m.getReturnType() == boolean.class) {
+                if ((pts[0] == int.class && pts[1] == int.class && pts[2] == int.class)
+                        || (pts[0] == double.class && pts[1] == double.class && pts[2] == int.class)) return true;
+            }
+            if (pts.length == 3 && pts[0] == int.class && pts[1] == int.class && pts[2] == float.class
+                    && m.getReturnType() == void.class) return true;
+        }
+        return false;
+    }
+
+    private static boolean isMouseHandlerType(Class<?> clazz) {
+        for (Method m : getAllMethods(clazz)) {
+            Class<?>[] pts = m.getParameterTypes();
+            if (pts.length == 4 && pts[0] == long.class && pts[1] == int.class
+                    && pts[2] == int.class && pts[3] == int.class
+                    && !Modifier.isStatic(m.getModifiers())) return true;
+        }
+        return false;
+    }
+
+    static boolean isKeyboardHandlerType(Class<?> clazz) {
+        for (Method m : getAllMethods(clazz)) {
+            Class<?>[] pts = m.getParameterTypes();
+            if (pts.length == 5 && pts[0] == long.class && pts[1] == int.class
+                    && pts[2] == int.class && pts[3] == int.class && pts[4] == int.class
+                    && !Modifier.isStatic(m.getModifiers())) return true;
+        }
+        return false;
+    }
+
+    private static boolean isWindowType(Class<?> clazz) {
+        boolean hasLongReturn = false;
+        boolean hasIntReturn = false;
+        for (Method m : getAllMethods(clazz)) {
+            if (m.getParameterCount() == 0) {
+                if (m.getReturnType() == long.class) hasLongReturn = true;
+                if (m.getReturnType() == int.class) hasIntReturn = true;
+            }
+        }
+        return hasLongReturn && hasIntReturn;
+    }
+
+    private static boolean isGameModeType(Class<?> clazz) {
+        for (Method m : getAllMethods(clazz)) {
+            String n = m.getName();
+            if (n.equals("getPlayerMode") || n.equals("getGameMode") || n.equals("getCurrentGameType")
+                    || n.equals("getGameModeForPlayer") || n.equals("method_XXXX")) return true;
+        }
+        boolean hasEnumReturn = false;
+        for (Method m : getAllMethods(clazz)) {
+            if (m.getParameterCount() == 0 && m.getReturnType().isEnum()) hasEnumReturn = true;
+        }
+        boolean hasPlayerParam = false;
+        boolean hasHandParam = false;
+        for (Method m : getAllMethods(clazz)) {
+            for (Class<?> pt : m.getParameterTypes()) {
+                String ptn = pt.getName();
+                if (ptn.contains("Player") || ptn.contains("player")) hasPlayerParam = true;
+                if (ptn.contains("Hand") || ptn.contains("hand")) hasHandParam = true;
+            }
+        }
+        return hasEnumReturn && (hasPlayerParam || hasHandParam);
+    }
+
     static Object getMinecraftInstance() {
+        if (cachedMcInstance != null) return cachedMcInstance;
         initClassCache();
         try {
-            if (mcGetInstanceMethod != null) return mcGetInstanceMethod.invoke(null);
+            if (mcGetInstanceMethod != null) {
+                Object instance = mcGetInstanceMethod.invoke(null);
+                if (instance != null) { cachedMcInstance = instance; return instance; }
+            }
+            if (mcClass != null) {
+                for (Field f : getAllFields(mcClass)) {
+                    if (f.getType() == mcClass && Modifier.isStatic(f.getModifiers())) {
+                        try { f.setAccessible(true); Object v = f.get(null); if (v != null) { cachedMcInstance = v; return v; } } catch (Exception ignored) {}
+                    }
+                }
+            }
             throw new RuntimeException("No Minecraft static getter found");
         } catch (Exception e) {
             throw new RuntimeException("Failed to get Minecraft instance", e);
@@ -167,13 +356,11 @@ public final class ReflectionCache {
         for (Field f : getAllFields(mc.getClass())) {
             String n = f.getName();
             if (n.equals("player") || n.equals("thePlayer") || n.equals("field_71439_g")) {
-                try {
-                    f.setAccessible(true);
-                    Object p = f.get(mc);
-                    if (p != null) return p;
-                } catch (Exception ignored) {}
+                try { f.setAccessible(true); Object p = f.get(mc); if (p != null) return p; } catch (Exception ignored) {}
             }
         }
+        Field discovered = discoveredFields.get("player");
+        if (discovered != null) { try { discovered.setAccessible(true); return discovered.get(mc); } catch (Exception ignored) {} }
         return null;
     }
 
@@ -183,13 +370,11 @@ public final class ReflectionCache {
         for (Field f : getAllFields(mc.getClass())) {
             String n = f.getName();
             if (n.equals("theWorld") || n.equals("field_71441_f") || n.equals("level") || n.equals("world")) {
-                try {
-                    f.setAccessible(true);
-                    Object v = f.get(mc);
-                    if (v != null) return v;
-                } catch (Exception ignored) {}
+                try { f.setAccessible(true); Object v = f.get(mc); if (v != null) return v; } catch (Exception ignored) {}
             }
         }
+        Field discovered = discoveredFields.get("level");
+        if (discovered != null) { try { discovered.setAccessible(true); return discovered.get(mc); } catch (Exception ignored) {} }
         return null;
     }
 
@@ -199,11 +384,12 @@ public final class ReflectionCache {
         for (Field f : getAllFields(player.getClass())) {
             String n = f.getName();
             if (n.equals("theWorld") || n.equals("field_70170_p") || n.equals("level") || n.equals("world")) {
-                try {
-                    f.setAccessible(true);
-                    Object v = f.get(player);
-                    if (v != null) return v;
-                } catch (Exception ignored) {}
+                try { f.setAccessible(true); Object v = f.get(player); if (v != null) return v; } catch (Exception ignored) {}
+            }
+        }
+        for (Field f : getAllFields(player.getClass())) {
+            if (!Modifier.isStatic(f.getModifiers()) && !f.getType().isPrimitive() && !f.getType().getName().startsWith("java.")) {
+                try { f.setAccessible(true); Object v = f.get(player); if (v != null && isLevelType(v.getClass())) return v; } catch (Exception ignored) {}
             }
         }
         return null;
@@ -217,6 +403,8 @@ public final class ReflectionCache {
             }
         }
         try { return mc.getClass().getMethod("screen").invoke(mc); } catch (Exception ignored) {}
+        Field discovered = discoveredFields.get("screen");
+        if (discovered != null) { try { discovered.setAccessible(true); return discovered.get(mc); } catch (Exception ignored) {} }
         return null;
     }
 
@@ -301,6 +489,8 @@ public final class ReflectionCache {
             try { return mc.getClass().getField(name).get(mc); } catch (Exception ignored) {}
             try { return mc.getClass().getDeclaredField(name).get(mc); } catch (Exception ignored) {}
         }
+        Field discovered = discoveredFields.get("mouseHandler");
+        if (discovered != null) { try { discovered.setAccessible(true); return discovered.get(mc); } catch (Exception ignored) {} }
         for (Field f : getAllFields(mc.getClass())) {
             if (f.getType().getSimpleName().contains("MouseHandler") || f.getType().getSimpleName().contains("Mouse")) {
                 try { f.setAccessible(true); return f.get(mc); } catch (Exception ignored) {}

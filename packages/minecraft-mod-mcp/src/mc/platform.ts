@@ -8,11 +8,27 @@ function homedir(): string {
   return crossHomedir();
 }
 
+let _mcDir: string | null = null;
+
 export function mcDir(): string {
+  if (_mcDir) return _mcDir;
+
+  const candidates: string[] = [];
   if (isWindows() && process.env.APPDATA) {
-    return join(process.env.APPDATA, PATHS.mcDirName);
+    candidates.push(join(process.env.APPDATA, PATHS.mcDirName));
   }
-  return join(homedir(), PATHS.mcDirName);
+  candidates.push(join(homedir(), PATHS.mcDirName));
+
+  for (const dir of candidates) {
+    if (existsSync(dir) && existsSync(join(dir, PATHS.versionsDirName))) {
+      _mcDir = dir;
+      return dir;
+    }
+  }
+
+  const fallback = candidates[0] || join(homedir(), PATHS.mcDirName);
+  _mcDir = fallback;
+  return fallback;
 }
 
 export function versionsDir(): string {

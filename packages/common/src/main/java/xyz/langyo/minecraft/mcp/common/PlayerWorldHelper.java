@@ -75,10 +75,34 @@ public final class PlayerWorldHelper {
 
     public static String getGameType(Object mc) throws Exception {
         try {
-            Object gm = mc.getClass().getMethod("gameMode").invoke(mc);
-            Object pt = gm.getClass().getMethod("getPlayerMode").invoke(gm);
-            return (String) pt.getClass().getMethod("getName").invoke(pt);
-        } catch (NoSuchMethodException e) { return "survival"; }
+            Object gm = null;
+            try { gm = mc.getClass().getMethod("gameMode").invoke(mc); } catch (NoSuchMethodException ignored) {}
+            if (gm == null) {
+                java.lang.reflect.Field discovered = ReflectionCache.getDiscoveredField("gameMode");
+                if (discovered != null) { try { discovered.setAccessible(true); gm = discovered.get(mc); } catch (Exception ignored) {} }
+            }
+            if (gm == null) {
+                for (java.lang.reflect.Field f : ReflectionCache.getAllFields(mc.getClass())) {
+                    String fn = f.getName().toLowerCase();
+                    if (fn.contains("gamemode") || fn.contains("interaction") || fn.contains("multiplayer") || fn.contains("playercontroller") || fn.contains("field_71442_b")) {
+                        try { f.setAccessible(true); gm = f.get(mc); break; } catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (gm != null) {
+                for (Method m : ReflectionCache.getAllMethods(gm.getClass())) {
+                    if (m.getReturnType().isEnum() && m.getParameterCount() == 0 && m.getReturnType().getSimpleName().contains("Game")) {
+                        try { Object pt = m.invoke(gm); return (String) pt.getClass().getMethod("getName").invoke(pt); } catch (Exception ignored) {}
+                    }
+                }
+                for (Method m : ReflectionCache.getAllMethods(gm.getClass())) {
+                    if (m.getName().equals("getPlayerMode") && m.getParameterCount() == 0) {
+                        try { Object pt = m.invoke(gm); return (String) pt.getClass().getMethod("getName").invoke(pt); } catch (Exception ignored) {}
+                    }
+                }
+            }
+            return "survival";
+        } catch (Exception e) { return "survival"; }
     }
 
     public static String sendCommand(Object mc, String cmd) {
@@ -266,13 +290,17 @@ public final class PlayerWorldHelper {
 
     public static String debugFields(Object mc) {
         StringBuilder sb = new StringBuilder("{\"class\":\"").append(mc.getClass().getName()).append("\",");
-        sb.append("\"fields\":[");
         List<Field> all = ReflectionCache.getAllFields(mc.getClass());
+        sb.append("\"fieldCount\":").append(all.size()).append(",");
+        sb.append("\"fields\":[");
         boolean first = true;
         for (Field f : all) {
             String n = f.getName();
             if (n.contains("Player") || n.contains("player") || n.contains("field_71439") ||
-                n.contains("World") || n.contains("world") || n.contains("field_71441") || n.contains("field_71435")) {
+                n.contains("World") || n.contains("world") || n.contains("field_71441") || n.contains("field_71435") ||
+                n.contains("Mouse") || n.contains("mouse") || n.contains("Keyboard") || n.contains("keyboard") ||
+                n.contains("Screen") || n.contains("screen") || n.contains("Window") || n.contains("window") ||
+                n.contains("Game") || n.contains("game")) {
                 try {
                     f.setAccessible(true);
                     Object v = f.get(mc);
@@ -826,50 +854,15 @@ public final class PlayerWorldHelper {
     }
 
     private static Object getPlayer(Object mc) throws Exception {
-        try { return mc.getClass().getMethod("player").invoke(mc); } catch (NoSuchMethodException ignored) {}
-        for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
-            String n = f.getName();
-            if (n.equals("player") || n.equals("thePlayer") || n.equals("field_71439_g")) {
-                try {
-                    f.setAccessible(true);
-                    Object p = f.get(mc);
-                    if (p != null) return p;
-                } catch (Exception ignored) {}
-            }
-        }
-        return null;
+        return ReflectionCache.getPlayer(mc);
     }
 
     private static Object getLevel(Object mc) throws Exception {
-        try { return mc.getClass().getMethod("level").invoke(mc); } catch (NoSuchMethodException ignored) {}
-        try { return mc.getClass().getMethod("world").invoke(mc); } catch (NoSuchMethodException ignored) {}
-        for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
-            String n = f.getName();
-            if (n.equals("theWorld") || n.equals("field_71441_f") || n.equals("level") || n.equals("world")) {
-                try {
-                    f.setAccessible(true);
-                    Object v = f.get(mc);
-                    if (v != null) return v;
-                } catch (Exception ignored) {}
-            }
-        }
-        return null;
+        return ReflectionCache.getLevel(mc);
     }
 
     private static Object getPlayerLevel(Object player) throws Exception {
-        try { return player.getClass().getMethod("level").invoke(player); } catch (NoSuchMethodException ignored) {}
-        try { return player.getClass().getMethod("world").invoke(player); } catch (NoSuchMethodException ignored) {}
-        for (Field f : ReflectionCache.getAllFields(player.getClass())) {
-            String n = f.getName();
-            if (n.equals("theWorld") || n.equals("field_70170_p") || n.equals("level") || n.equals("world")) {
-                try {
-                    f.setAccessible(true);
-                    Object v = f.get(player);
-                    if (v != null) return v;
-                } catch (Exception ignored) {}
-            }
-        }
-        return null;
+        return ReflectionCache.getPlayerLevel(player);
     }
 
     private static Object fieldOrNull(Object obj, String fieldName) {

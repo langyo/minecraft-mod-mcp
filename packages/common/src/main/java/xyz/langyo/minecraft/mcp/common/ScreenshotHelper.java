@@ -105,8 +105,7 @@ public final class ScreenshotHelper {
             public void run() {
                 ReflectionHelper.dbg("takeScreenshotOnMainThread: capturer running on thread: " + Thread.currentThread().getName());
                 try {
-                    Object rt = null;
-                    try { Method m = mc.getClass().getMethod("getMainRenderTarget"); rt = m.invoke(mc); } catch (Exception ignored) {}
+                    Object rt = getMainRenderTarget(mc);
                     int texId = 0, fboId = 0;
                     if (rt != null) {
                         for (Field f : ReflectionCache.getAllFields(rt.getClass())) {
@@ -209,9 +208,7 @@ public final class ScreenshotHelper {
             try { screenshotClass = Class.forName("net.minecraft.client.Screenshot"); }
             catch (ClassNotFoundException e) { return null; }
 
-            Object renderTarget;
-            try { renderTarget = mc.getClass().getMethod("getMainRenderTarget").invoke(mc); }
-            catch (Exception e) { System.err.println("[MCP-Native] no getMainRenderTarget: " + e.getMessage()); return null; }
+            Object renderTarget = getMainRenderTarget(mc);
             if (renderTarget == null) { System.err.println("[MCP-Native] renderTarget is null"); return null; }
 
             Class<?> nativeImageClass;
@@ -298,17 +295,15 @@ public final class ScreenshotHelper {
     private static byte[] _takeGlScreenshot0Inner(Object mc, int width, int height) throws Exception {
         updateSkyColor(mc);
         if (width <= 0 || height <= 0) throw new RuntimeException("bad dims " + width + "x" + height);
-        Object fb = null;
-        try { Method m = mc.getClass().getMethod("getMainRenderTarget"); fb = m.invoke(mc); } catch (NoSuchMethodException e) {}
+        Object fb = getMainRenderTarget(mc);
         int colorTexId = 0;
         int fboId = 0;
         if (fb != null) {
             try {
                 for (Field f : ReflectionCache.getAllFields(fb.getClass())) {
-                    String fn = f.getName(); f.setAccessible(true);
+                    f.setAccessible(true);
                     if (f.getType() == int.class) {
-                        int fv = f.getInt(fb);
-                        if ((fn.equals("frameBufferId")||fn.equals("fbo")||fn.equals("framebuffer")||fn.contains("Fbo")||fn.contains("frameBuffer")) && fv > 0) fboId = fv;
+                        try { int fv = f.getInt(fb); if (fv > 0 && fboId == 0) fboId = fv; } catch (Exception ignored) {}
                     }
                 }
                 if (fboId == 0) {
@@ -347,8 +342,13 @@ public final class ScreenshotHelper {
         }
         if (fb != null) {
             try {
-                Field fw = fb.getClass().getDeclaredField("width"); fw.setAccessible(true); int fbw = fw.getInt(fb);
-                Field fh = fb.getClass().getDeclaredField("height"); fh.setAccessible(true); int fbh = fh.getInt(fb);
+                int fbw = 0, fbh = 0;
+                for (Field f : ReflectionCache.getAllFields(fb.getClass())) {
+                    if (f.getType() == int.class) {
+                        f.setAccessible(true);
+                        try { int v = f.getInt(fb); if (v > 0) { if (fbw == 0) fbw = v; else if (fbh == 0) fbh = v; } } catch (Exception ignored) {}
+                    }
+                }
                 if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; }
             } catch (Exception ignored) {}
         }
@@ -751,14 +751,14 @@ public final class ScreenshotHelper {
     public static void cacheFrameFromRenderThread(Object mc) {
         if (System.currentTimeMillis() - cachedScreenshotTime < 1000) return;
         try {
-            Object rt = null;
-            try { Method m = mc.getClass().getMethod("getMainRenderTarget"); rt = m.invoke(mc); }
-            catch (Exception e) { return; }
+            Object rt = getMainRenderTarget(mc);
             if (rt == null) return;
             int w = 0, h = 0;
             for (Field f : ReflectionCache.getAllFields(rt.getClass())) {
                 f.setAccessible(true);
-                if (f.getName().equals("width") && f.getType() == int.class) { try { w = f.getInt(rt); } catch (Exception ignored) {} }
+                if (f.getType() == int.class) {
+                    try { int v = f.getInt(rt); if (v > 0) { if (w == 0) w = v; else if (h == 0) h = v; } } catch (Exception ignored) {}
+                }
                 if (f.getName().equals("height") && f.getType() == int.class) { try { h = f.getInt(rt); } catch (Exception ignored) {} }
             }
             if (w <= 0 || h <= 0) return;
@@ -934,17 +934,7 @@ public final class ScreenshotHelper {
     }
 
     private static Object getLevelFromMc(Object mc) {
-        try {
-            for (Method m : mc.getClass().getMethods()) {
-                if (m.getName().equals("level") && m.getParameterCount() == 0) return m.invoke(mc);
-            }
-            for (Field f : mc.getClass().getDeclaredFields()) {
-                String tn = f.getType().getSimpleName();
-                if (tn.equals("ClientLevel") || tn.equals("ClientWorld") || tn.equals("World") || tn.equals("WorldClient")) {
-                    f.setAccessible(true); return f.get(mc);
-                }
-            }
-        } catch (Exception ignored) {}
+        try { return ReflectionCache.getLevel(mc); } catch (Exception ignored) {}
         return null;
     }
 
@@ -961,5 +951,20 @@ public final class ScreenshotHelper {
             }
         } catch (Exception ignored) {}
         return 0f;
+    }
+
+    private static Object getMainRenderTarget(Object mc) {
+        try { return mc.getClass().getMethod("getMainRenderTarget").invoke(mc); } catch (Exception ignored) {}
+        Method discovered = ReflectionCache.getDiscoveredMethod("getMainRenderTarget");
+        if (discovered != null) { try { discovered.setAccessible(true); return discovered.invoke(mc); } catch (Exception ignored) {} }
+        for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
+            if (m.getParameterCount() == 0 && m.getReturnType() != void.class && !m.getReturnType().isPrimitive()) {
+                String rtName = m.getReturnType().getName();
+                if (rtName.contains("RenderTarget") || rtName.contains("Framebuffer") || rtName.contains("FrameBuffer")) {
+                    try { m.setAccessible(true); return m.invoke(mc); } catch (Exception ignored) {}
+                }
+            }
+        }
+        return null;
     }
 }

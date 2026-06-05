@@ -263,8 +263,9 @@ Options:
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
     stdio: "ignore",
-    detached: process.platform !== "win32",
+    detached: true,
   });
+  child.unref();
 
   child.on("error", (err) => {
     console.error(`Launch failed: ${err.message}`);
