@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, copyFileSync, readdirSync, symlinkSync, statSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { tmpdir } from "node:os";
 import { serverDir } from "./settings.js";
 import { downloadFile, downloadForgeInstaller, downloadFabricLoader, downloadNeoforgeInstaller } from "./download.js";
 import { loadVersion } from "./versionJson.js";
@@ -208,6 +209,12 @@ async function downloadPaperServer(mcVersion: string, sDir: string, onProgress?:
   return jarPath;
 }
 
+function buildCacheDir(): string {
+  const d = join(tmpdir(), "minecraft-mcp-build");
+  if (!existsSync(d)) mkdirSync(d, { recursive: true });
+  return d;
+}
+
 function isValidPortableGit(dir: string): boolean {
   return existsSync(join(dir, "bin", "git.exe")) ||
     existsSync(join(dir, "bin", "git")) ||
@@ -215,37 +222,25 @@ function isValidPortableGit(dir: string): boolean {
     existsSync(join(dir, "PortableGit", "bin", "git"));
 }
 
-function reusePortableGit(sDir: string): void {
-  const base = serverDir();
-  if (!existsSync(base)) return;
-
-  for (const sibling of readdirSync(base)) {
-    const subPath = join(base, sibling);
-    try { if (!statSync(subPath).isDirectory()) continue; } catch { continue; }
-    for (const entry of readdirSync(subPath)) {
-      if (!entry.startsWith("PortableGit")) continue;
-      const src = join(subPath, entry);
-      if (!isValidPortableGit(src)) continue;
-      const dst = join(sDir, entry);
-      if (existsSync(dst) && isValidPortableGit(dst)) return;
-      if (existsSync(dst)) {
-        try { rmSync(dst, { recursive: true, force: true }); } catch { return; }
-      }
-      try {
-        symlinkSync(src, dst, "junction");
-        return;
-      } catch { /* junction failed */ }
+function ensurePortableGit(workDir: string): void {
+  const cache = buildCacheDir();
+  for (const entry of readdirSync(cache)) {
+    if (!entry.startsWith("PortableGit")) continue;
+    const src = join(cache, entry);
+    if (!isValidPortableGit(src)) continue;
+    const dst = join(workDir, entry);
+    if (existsSync(dst) && isValidPortableGit(dst)) return;
+    if (existsSync(dst)) {
+      try { rmSync(dst, { recursive: true, force: true }); } catch { return; }
     }
+    try {
+      symlinkSync(src, dst, "junction");
+      return;
+    } catch { /* junction failed */ }
   }
 }
 
 async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, targets: string[], onProgress?: (msg: string) => void): Promise<string> {
-  const buildToolsJar = join(sDir, "BuildTools.jar");
-  if (!existsSync(buildToolsJar)) {
-    onProgress?.(`Downloading BuildTools...`);
-    await downloadFile(SERVER.buildToolsUrl, buildToolsJar);
-  }
-
   const jarName = targets[0] === "craftbukkit" ? `craftbukkit-${mcVersion}.jar` : `spigot-${mcVersion}.jar`;
   const jarPath = join(sDir, jarName);
   if (existsSync(jarPath)) {
@@ -253,7 +248,16 @@ async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, 
     return jarPath;
   }
 
-  reusePortableGit(sDir);
+  const workDir = join(buildCacheDir(), `${mcVersion}-${targets[0]}`);
+  if (!existsSync(workDir)) mkdirSync(workDir, { recursive: true });
+
+  const buildToolsJar = join(workDir, "BuildTools.jar");
+  if (!existsSync(buildToolsJar)) {
+    onProgress?.(`Downloading BuildTools...`);
+    await downloadFile(SERVER.buildToolsUrl, buildToolsJar);
+  }
+
+  ensurePortableGit(workDir);
 
   onProgress?.(`Compiling ${targets.join(" + ")} for ${mcVersion} via BuildTools (may take a few minutes)...`);
   const proxyArgs = javaProxyArgs();
@@ -261,25 +265,23 @@ async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, 
   const args = [...proxyArgs, ...sslArgs, "-jar", buildToolsJar, "--rev", mcVersion, ...targets.map(t => `--compile ${t}`).flatMap(s => s.split(" "))];
 
   return new Promise((resolve, reject) => {
-    const child = spawn(javaPath, args, { cwd: sDir, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...gradleProxyEnv() } });
+    const child = spawn(javaPath, args, { cwd: workDir, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...gradleProxyEnv() } });
     let stderr = "";
     child.stdout?.on("data", (c: Buffer) => { const msg = c.toString().trim(); if (msg) onProgress?.(msg); });
     child.stderr?.on("data", (c: Buffer) => { stderr += c.toString(); });
 
     child.on("close", (code) => {
-      if (existsSync(jarPath)) {
+      let found: string | null = null;
+      for (const sub of [workDir, join(workDir, "Spigot"), join(workDir, "CraftBukkit"), "."]) {
+        const candidate = join(sub, jarName);
+        if (existsSync(candidate)) { found = candidate; break; }
+      }
+      if (found) {
+        mkdirSync(sDir, { recursive: true });
+        copyFileSync(found, jarPath);
         onProgress?.(`${jarName} compiled successfully.`);
         resolve(jarPath);
         return;
-      }
-      for (const sub of ["Spigot", "CraftBukkit", "."]) {
-        const alt = join(sDir, sub, jarName);
-        if (existsSync(alt)) {
-          if (sub !== ".") copyFileSync(alt, jarPath);
-          onProgress?.(`${jarName} compiled successfully.`);
-          resolve(jarPath);
-          return;
-        }
       }
       reject(new Error(`BuildTools failed (exit ${code}): ${stderr.slice(-500)}`));
     });
