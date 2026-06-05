@@ -6,6 +6,7 @@ import { downloadFile, downloadForgeInstaller, downloadFabricLoader, downloadNeo
 import { loadVersion } from "./versionJson.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { findJavaForVersion, librariesDir, versionsDir } from "./platform.js";
+import { isWindows } from "../runtime/detector.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 import { DOWNLOAD, GAME, SERVER, type ServerType, SERVER_TYPES } from "./defaults.js";
@@ -215,29 +216,21 @@ function buildCacheDir(): string {
   return d;
 }
 
-function isValidPortableGit(dir: string): boolean {
-  return existsSync(join(dir, "bin", "git.exe")) ||
-    existsSync(join(dir, "bin", "git")) ||
-    existsSync(join(dir, "PortableGit", "bin", "git.exe")) ||
-    existsSync(join(dir, "PortableGit", "bin", "git"));
-}
+const PORTABLE_GIT_DIR = "PortableGit-2.45.2-64-bit";
 
-function ensurePortableGit(workDir: string): void {
-  const cache = buildCacheDir();
-  for (const entry of readdirSync(cache)) {
-    if (!entry.startsWith("PortableGit")) continue;
-    const src = join(cache, entry);
-    if (!isValidPortableGit(src)) continue;
-    const dst = join(workDir, entry);
-    if (existsSync(dst) && isValidPortableGit(dst)) return;
-    if (existsSync(dst)) {
-      try { rmSync(dst, { recursive: true, force: true }); } catch { return; }
-    }
-    try {
-      symlinkSync(src, dst, "junction");
-      return;
-    } catch { /* junction failed */ }
+function linkSystemGit(workDir: string): void {
+  const wrapper = join(workDir, PORTABLE_GIT_DIR);
+  const gitLink = join(wrapper, "PortableGit");
+  if (existsSync(join(gitLink, "bin", "git.exe")) || existsSync(join(gitLink, "bin", "git"))) return;
+
+  const sysGit = isWindows() ? join(process.env.ProgramFiles ?? "C:\\Program Files", "Git") : "/usr";
+  if (!existsSync(join(sysGit, "bin", isWindows() ? "git.exe" : "git"))) return;
+
+  if (!existsSync(wrapper)) mkdirSync(wrapper, { recursive: true });
+  if (existsSync(gitLink)) {
+    try { rmSync(gitLink, { recursive: true, force: true }); } catch { return; }
   }
+  try { symlinkSync(sysGit, gitLink, "junction"); } catch { /* junction failed */ }
 }
 
 async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, targets: string[], onProgress?: (msg: string) => void): Promise<string> {
@@ -257,7 +250,7 @@ async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, 
     await downloadFile(SERVER.buildToolsUrl, buildToolsJar);
   }
 
-  ensurePortableGit(workDir);
+  linkSystemGit(workDir);
 
   onProgress?.(`Compiling ${targets.join(" + ")} for ${mcVersion} via BuildTools (may take a few minutes)...`);
   const proxyArgs = javaProxyArgs();
