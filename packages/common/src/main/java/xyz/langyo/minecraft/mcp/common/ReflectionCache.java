@@ -4,8 +4,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ReflectionCache {
@@ -91,42 +94,45 @@ public final class ReflectionCache {
         fieldsDiscovered = true;
         try {
             Class<?> mcClazz = mc.getClass();
-            for (Field f : getAllFields(mcClazz)) {
+            List<Field> allFields = getAllFields(mcClazz);
+            Map<String, List<Field>> candidates = new java.util.LinkedHashMap<>();
+            candidates.put("mouseHandler", new ArrayList<>());
+            candidates.put("keyboardHandler", new ArrayList<>());
+            candidates.put("window", new ArrayList<>());
+            candidates.put("player", new ArrayList<>());
+            candidates.put("level", new ArrayList<>());
+            candidates.put("gameMode", new ArrayList<>());
+            candidates.put("screen", new ArrayList<>());
+
+            for (Field f : allFields) {
                 if (Modifier.isStatic(f.getModifiers())) continue;
                 f.setAccessible(true);
                 Class<?> ft = f.getType();
                 if (ft == mcClazz) continue;
                 if (ft.isPrimitive()) continue;
                 if (ft.getName().startsWith("java.")) continue;
-                if (!discoveredFields.containsKey("player") && isPlayerType(ft)) {
-                    discoveredFields.put("player", f);
-                    dbg("discovered player field: " + f.getName() + " type=" + ft.getName());
-                }
-                if (!discoveredFields.containsKey("level") && isLevelType(ft)) {
-                    discoveredFields.put("level", f);
-                    dbg("discovered level field: " + f.getName() + " type=" + ft.getName());
-                }
-                if (!discoveredFields.containsKey("screen") && isScreenType(ft)) {
-                    discoveredFields.put("screen", f);
-                    dbg("discovered screen field: " + f.getName() + " type=" + ft.getName());
-                }
-                if (!discoveredFields.containsKey("mouseHandler") && isMouseHandlerType(ft)) {
-                    discoveredFields.put("mouseHandler", f);
-                    dbg("discovered mouseHandler field: " + f.getName() + " type=" + ft.getName());
-                }
-                if (!discoveredFields.containsKey("keyboardHandler") && isKeyboardHandlerType(ft)) {
-                    discoveredFields.put("keyboardHandler", f);
-                    dbg("discovered keyboardHandler field: " + f.getName() + " type=" + ft.getName());
-                }
-                if (!discoveredFields.containsKey("window") && isWindowType(ft)) {
-                    discoveredFields.put("window", f);
-                    dbg("discovered window field: " + f.getName() + " type=" + ft.getName());
-                }
-                if (!discoveredFields.containsKey("gameMode") && isGameModeType(ft)) {
-                    discoveredFields.put("gameMode", f);
-                    dbg("discovered gameMode field: " + f.getName() + " type=" + ft.getName());
+
+                boolean matched = false;
+                try { if (isMouseHandlerType(ft)) { candidates.get("mouseHandler").add(f); matched = true; } } catch (Throwable ignored) {}
+                try { if (isKeyboardHandlerType(ft)) { candidates.get("keyboardHandler").add(f); matched = true; } } catch (Throwable ignored) {}
+                try { if (!matched && isWindowType(ft)) { candidates.get("window").add(f); matched = true; } } catch (Throwable ignored) {}
+                try { if (!matched && isPlayerType(ft)) { candidates.get("player").add(f); matched = true; } } catch (Throwable ignored) {}
+                try { if (!matched && isLevelType(ft)) { candidates.get("level").add(f); matched = true; } } catch (Throwable ignored) {}
+                try { if (!matched && isGameModeType(ft)) { candidates.get("gameMode").add(f); matched = true; } } catch (Throwable ignored) {}
+                try { if (!matched && isScreenType(ft)) { candidates.get("screen").add(f); } } catch (Throwable ignored) {}
+            }
+
+            Set<Field> used = new HashSet<>();
+            for (Map.Entry<String, List<Field>> entry : candidates.entrySet()) {
+                for (Field f : entry.getValue()) {
+                    if (used.add(f)) {
+                        discoveredFields.put(entry.getKey(), f);
+                        dbg("discovered " + entry.getKey() + " field: " + f.getName() + " type=" + f.getType().getName());
+                        break;
+                    }
                 }
             }
+
             for (Method m : getAllMethods(mcClazz)) {
                 if (m.getParameterCount() == 0 && m.getReturnType() != void.class) {
                     String rtName = m.getReturnType().getName();
@@ -187,16 +193,31 @@ public final class ReflectionCache {
     }
 
     private static boolean isScreenType(Class<?> clazz) {
+        boolean hasRender = false;
+        boolean hasBoolReturn = false;
+        boolean hasVoidReturn = false;
         for (Method m : getAllMethods(clazz)) {
             Class<?>[] pts = m.getParameterTypes();
-            if (pts.length == 3 && m.getReturnType() == boolean.class) {
-                if ((pts[0] == int.class && pts[1] == int.class && pts[2] == int.class)
-                        || (pts[0] == double.class && pts[1] == double.class && pts[2] == int.class)) return true;
-            }
-            if (pts.length == 3 && pts[0] == int.class && pts[1] == int.class && pts[2] == float.class
-                    && m.getReturnType() == void.class) return true;
+            if (pts.length == 4 && !pts[0].isPrimitive() && pts[0].getName().startsWith("net.minecraft.")
+                    && pts[1] == int.class && pts[2] == int.class && pts[3] == float.class
+                    && m.getReturnType() == void.class) hasRender = true;
+            if (m.getParameterCount() == 0 && m.getReturnType() == boolean.class
+                    && !Modifier.isStatic(m.getModifiers())) hasBoolReturn = true;
+            if (m.getParameterCount() == 0 && m.getReturnType() == void.class
+                    && !Modifier.isStatic(m.getModifiers())) hasVoidReturn = true;
         }
-        return false;
+        if (hasRender) return true;
+        boolean hasMouseClicked = false;
+        hasBoolReturn = false;
+        hasVoidReturn = false;
+        for (Method m : getAllMethods(clazz)) {
+            Class<?>[] pts = m.getParameterTypes();
+            if (pts.length == 3 && m.getReturnType() == boolean.class
+                    && pts[0] == double.class && pts[1] == double.class && pts[2] == int.class) hasMouseClicked = true;
+            if (m.getParameterCount() == 0 && m.getReturnType() == boolean.class) hasBoolReturn = true;
+            if (m.getParameterCount() == 0 && m.getReturnType() == void.class) hasVoidReturn = true;
+        }
+        return hasMouseClicked && hasBoolReturn && hasVoidReturn;
     }
 
     private static boolean isMouseHandlerType(Class<?> clazz) {
@@ -235,7 +256,7 @@ public final class ReflectionCache {
         for (Method m : getAllMethods(clazz)) {
             String n = m.getName();
             if (n.equals("getPlayerMode") || n.equals("getGameMode") || n.equals("getCurrentGameType")
-                    || n.equals("getGameModeForPlayer") || n.equals("method_XXXX")) return true;
+                    || n.equals("getGameModeForPlayer")) return true;
         }
         boolean hasEnumReturn = false;
         for (Method m : getAllMethods(clazz)) {
@@ -295,6 +316,16 @@ public final class ReflectionCache {
             for (Method m : cur.getDeclaredMethods()) methods.add(m);
             cur = cur.getSuperclass();
         }
+        try {
+            for (Class<?> iface : clazz.getInterfaces()) {
+                for (Method m : iface.getMethods()) {
+                    if (methods.stream().noneMatch(em -> em.getName().equals(m.getName())
+                            && Arrays.equals(em.getParameterTypes(), m.getParameterTypes()))) {
+                        methods.add(m);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
         return methods;
     }
 
@@ -405,7 +436,38 @@ public final class ReflectionCache {
         try { return mc.getClass().getMethod("screen").invoke(mc); } catch (Exception ignored) {}
         Field discovered = discoveredFields.get("screen");
         if (discovered != null) { try { discovered.setAccessible(true); return discovered.get(mc); } catch (Exception ignored) {} }
+        for (Field f : getAllFields(mc.getClass())) {
+            if (Modifier.isStatic(f.getModifiers())) continue;
+            try {
+                f.setAccessible(true);
+                Object val = f.get(mc);
+                if (val == null) continue;
+                if (isScreenInstance(val)) return val;
+            } catch (Exception ignored) {}
+        }
         return null;
+    }
+
+    private static boolean isScreenInstance(Object obj) {
+        try {
+            Class<?> clazz = obj.getClass();
+            boolean hasVoidNoArg = false;
+            boolean hasBoolNoArg = false;
+            boolean hasMouseClicked = false;
+            for (Method m : getAllMethods(clazz)) {
+                if (Modifier.isStatic(m.getModifiers())) continue;
+                Class<?>[] pts = m.getParameterTypes();
+                if (m.getParameterCount() == 0) {
+                    if (m.getReturnType() == void.class) hasVoidNoArg = true;
+                    if (m.getReturnType() == boolean.class) hasBoolNoArg = true;
+                }
+                if (pts.length == 3 && m.getReturnType() == boolean.class
+                        && pts[0] == double.class && pts[1] == double.class && pts[2] == int.class) hasMouseClicked = true;
+            }
+            return hasVoidNoArg && hasBoolNoArg && hasMouseClicked;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     static Object castParam(Class<?> type, double value) {

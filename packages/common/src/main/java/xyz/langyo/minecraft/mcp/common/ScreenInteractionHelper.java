@@ -18,38 +18,53 @@ public final class ScreenInteractionHelper {
             Object screen = getCurrentScreen(mc);
             if (screen == null) return "{\"error\":\"no screen\"}";
             String screenName = screen.getClass().getSimpleName();
-            double gx = (double) x;
+            ReflectionHelper.dbg("guiClick: gui(" + x + "," + y + ") screen=" + screenName);
+            String glfwResult = tryGlfwClick(mc, x, y, button);
+            if (glfwResult != null && glfwResult.contains("\"clicked\":true")) return glfwResult;            double gx = (double) x;
             double gy = (double) y;
-            ReflectionHelper.dbg("guiClick: gui(" + (int)gx + "," + (int)gy + ") screen=" + screenName);
             StringBuilder results = new StringBuilder();
-            for (Method m : ReflectionCache.getAllMethods(screen.getClass())) {
-                String n = m.getName();
+            for (Method m : screen.getClass().getMethods()) {
                 Class<?>[] pt = m.getParameterTypes();
-                if (m.getParameterCount() == 3 && (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class)) {
-                    boolean isMouseLike = (pt[0] == double.class && pt[1] == double.class && pt[2] == int.class);
-                    boolean isIntMouse = (pt[0] == int.class && pt[1] == int.class && pt[2] == int.class);
-                    if (isMouseLike || isIntMouse) {
-                        ReflectionHelper.dbg("guiClick: trying handler " + n + " params=" + java.util.Arrays.toString(pt) + " from " + m.getDeclaringClass().getSimpleName());
-                        try {
-                            m.setAccessible(true);
-                            Object result = isMouseLike ? m.invoke(screen, gx, gy, button) : m.invoke(screen, (int)gx, (int)gy, button);
-                            if (results.length() > 0) results.append(",");
-                            results.append("\"").append(n).append("\":").append(result);
-                            if (Boolean.TRUE.equals(result)) break;
-                        } catch (Exception e) {
-                            ReflectionHelper.dbg("guiClick: " + n + " failed: " + e.getMessage());
-                        }
-                    }
+                if (!(m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class)) continue;
+                try {
+                    m.setAccessible(true);
+                    Object result = null;
+                    if (m.getParameterCount() == 3 && pt[0] == double.class && pt[1] == double.class && pt[2] == int.class) {
+                        result = m.invoke(screen, gx, gy, button);
+                    } else if (m.getParameterCount() == 3 && pt[0] == int.class && pt[1] == int.class && pt[2] == int.class) {
+                        result = m.invoke(screen, (int)gx, (int)gy, button);
+                    } else if (m.getParameterCount() == 3 && !pt[0].isPrimitive() && pt[1] == double.class && pt[2] == double.class) {
+                        result = m.invoke(screen, null, gx, gy);
+                    } else if (m.getParameterCount() == 2 && pt[0] == double.class && pt[1] == double.class) {
+                        result = m.invoke(screen, gx, gy);
+                    } else if (m.getParameterCount() == 4 && !pt[0].isPrimitive() && pt[1] == double.class && pt[2] == double.class && pt[3] == int.class) {
+                        result = m.invoke(screen, null, gx, gy, button);
+                    } else { continue; }
+                    ReflectionHelper.dbg("guiClick: " + m.getName() + java.util.Arrays.toString(pt) + "=" + result + " from " + m.getDeclaringClass().getSimpleName());
+                    if (results.length() > 0) results.append(",");
+                    results.append("\"").append(m.getName()).append("\":").append(result);
+                    if (Boolean.TRUE.equals(result)) break;
+                } catch (Exception e) {
+                    ReflectionHelper.dbg("guiClick: " + m.getName() + " failed: " + e.getMessage());
                 }
             }
             String widgetResult = "";
             for (Field f : ReflectionCache.getAllFields(screen.getClass())) {
-                String fn = f.getName();
-                if (fn.equals("children") || fn.equals("renderables") || fn.equals("widgets")) {
-                    f.setAccessible(true);
-                    Object list = f.get(screen);
-                    if (list instanceof java.util.List) {
-                        for (Object w : (java.util.List<?>) list) {
+                f.setAccessible(true);
+                Object list;
+                try { list = f.get(screen); } catch (Exception e) { continue; }
+                if (!(list instanceof java.util.List)) continue;
+                java.util.List<?> wList = (java.util.List<?>) list;
+                if (wList.isEmpty()) continue;
+                boolean hasWidgetCoords = false;
+                for (Field wf : wList.get(0).getClass().getFields()) {
+                    String wfn = wf.getName();
+                    if ((wfn.equals("x") || wfn.equals("y") || wfn.equals("width") || wfn.equals("height")) && wf.getType() == int.class) {
+                        hasWidgetCoords = true; break;
+                    }
+                }
+                if (!hasWidgetCoords) continue;
+                for (Object w : wList) {
                             try {
                                 int wx=0, wy=0, ww=0, wh=0;
                                 for (Field wf : ReflectionCache.getAllFields(w.getClass())) {
@@ -66,41 +81,46 @@ public final class ScreenInteractionHelper {
                                     double relX = gx - wx;
                                     double relY = gy - wy;
                                     boolean widgetClicked = false;
-                                    for (String priority : new String[]{"mouseClicked","mouseReleased"}) {
-                                        for (Method bm : ReflectionCache.getAllMethods(w.getClass())) {
-                                            if (!bm.getName().equals(priority)) continue;
-                                            Class<?>[] bpt = bm.getParameterTypes();
-                                            if (bm.getParameterCount() == 3
-                                                    && bpt[0] == double.class && bpt[1] == double.class && bpt[2] == int.class
-                                                    && bm.getReturnType() == boolean.class) {
-                                                try {
-                                                    bm.setAccessible(true);
-                                                    Object r = bm.invoke(w, relX, relY, button);
-                                                    ReflectionHelper.dbg("guiClick: widget." + bm.getName() + "(" + (int)relX + "," + (int)relY + ")=" + r);
-                                                    if (Boolean.TRUE.equals(r)) { widgetClicked = true; break; }
-                                                } catch (Exception e) {
-                                                    ReflectionHelper.dbg("guiClick: widget." + bm.getName() + " failed: " + e.getMessage());
-                                                }
-                                            }
+                                    for (Method bm : w.getClass().getMethods()) {
+                                        if (!bm.getDeclaringClass().getName().startsWith("net.minecraft.") && !bm.getDeclaringClass().getName().startsWith("java.")) continue;
+                                        Class<?>[] bpt = bm.getParameterTypes();
+                                        if (bm.getReturnType() != boolean.class && bm.getReturnType() != Boolean.class) continue;
+                                        try {
+                                            bm.setAccessible(true);
+                                            Object r = null;
+                                            if (bm.getParameterCount() == 3 && bpt[0] == double.class && bpt[1] == double.class && bpt[2] == int.class) {
+                                                r = bm.invoke(w, relX, relY, button);
+                                            } else if (bm.getParameterCount() == 2 && bpt[0] == double.class && bpt[1] == double.class) {
+                                                r = bm.invoke(w, relX, relY);
+                                            } else if (bm.getParameterCount() == 3 && !bpt[0].isPrimitive() && bpt[1] == double.class && bpt[2] == double.class) {
+                                                r = bm.invoke(w, null, relX, relY);
+                                            } else { continue; }
+                                            ReflectionHelper.dbg("guiClick: widget." + bm.getName() + "=" + r);
+                                            if (Boolean.TRUE.equals(r)) { widgetClicked = true; break; }
+                                        } catch (Exception e) {
+                                            ReflectionHelper.dbg("guiClick: widget." + bm.getName() + " failed: " + e.getMessage());
                                         }
-                                        if (widgetClicked) break;
                                     }
                                     if (!widgetClicked) {
                                         for (Method bm : ReflectionCache.getAllMethods(w.getClass())) {
                                             Class<?>[] bpt = bm.getParameterTypes();
-                                            if (bm.getParameterCount() == 3
-                                                    && bpt[0] == double.class && bpt[1] == double.class && bpt[2] == int.class
-                                                    && bm.getReturnType() == boolean.class) {
-                                                try {
-                                                    bm.setAccessible(true);
-                                                    Object r = bm.invoke(w, relX, relY, button);
-                                                    ReflectionHelper.dbg("guiClick: widget." + bm.getName() + "(" + (int)relX + "," + (int)relY + ")=" + r);
-                                                    if (Boolean.TRUE.equals(r)) { widgetClicked = true; break; }
-                                                } catch (Exception e) {
-                                                    ReflectionHelper.dbg("guiClick: widget." + bm.getName() + " failed: " + e.getMessage());
-                                                }
-                                            }
+                                            if (bm.getReturnType() != boolean.class && bm.getReturnType() != Boolean.class) continue;
+                                            try {
+                                                bm.setAccessible(true);
+                                                Object r = null;
+                                                if (bm.getParameterCount() == 3 && bpt[0] == double.class && bpt[1] == double.class && bpt[2] == int.class) {
+                                                    r = bm.invoke(w, relX, relY, button);
+                                                } else if (bm.getParameterCount() == 2 && bpt[0] == double.class && bpt[1] == double.class) {
+                                                    r = bm.invoke(w, relX, relY);
+                                                } else if (bm.getParameterCount() == 3 && !bpt[0].isPrimitive() && bpt[1] == double.class && bpt[2] == double.class) {
+                                                    r = bm.invoke(w, null, relX, relY);
+                                                } else { continue; }
+                                                ReflectionHelper.dbg("guiClick: widget2." + bm.getName() + "=" + r);
+                                                if (Boolean.TRUE.equals(r)) { widgetClicked = true; break; }
+                                            } catch (Exception e) {
+                                                ReflectionHelper.dbg("guiClick: widget2." + bm.getName() + " failed: " + e.getMessage());
                                         }
+                                    }
                                     }
                                     if (!widgetClicked) {
                                         for (Method bm : ReflectionCache.getAllMethods(w.getClass())) {
@@ -146,13 +166,84 @@ public final class ScreenInteractionHelper {
                             } catch(Exception ignored){}
                         }
                     }
+            if (results.length() > 0 || !widgetResult.isEmpty())
+                return "{\"clicked\":true,\"screen\":\"" + screenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"results\":{" + results.toString() + "}" + widgetResult + (glfwResult != null ? ",\"glfw\":\"" + glfwResult.replace("\"", "'") + "\"" : "") + "}";
+            StringBuilder methodInfo = new StringBuilder();
+            for (Method m : screen.getClass().getMethods()) {
+                if (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class) {
+                    Class<?>[] pt = m.getParameterTypes();
+                    if (methodInfo.length() < 500) {
+                        methodInfo.append(m.getName()).append("(");
+                        for (int i = 0; i < pt.length; i++) { if (i > 0) methodInfo.append(","); methodInfo.append(pt[i].getSimpleName()); }
+                        methodInfo.append(") ");
+                    }
                 }
             }
-            if (results.length() > 0 || !widgetResult.isEmpty())
-                return "{\"clicked\":true,\"screen\":\"" + screenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"results\":{" + results.toString() + "}" + widgetResult + "}";
-            return "{\"error\":\"no click method on " + screen.getClass().getName() + "\"}";
+            return "{\"error\":\"no click on " + screen.getClass().getName() + "\",\"methods\":\"" + methodInfo + "\"}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
+    private static volatile String glfwClickResult = null;
+
+    private static String tryGlfwClick(Object mc, int x, int y, int button) {
+        try {
+            Object mouseHandler = ReflectionCache.getMouseHandler(mc);
+            if (mouseHandler == null) return "{\"error\":\"no mouseHandler\"}";
+            long handle = WindowHelper.getWindowHandle(mc);
+            if (handle == 0) return "{\"error\":\"no windowHandle\"}";
+            double guiScale = 1.0;
+            try {
+                Object window = WindowHelper.findWindowObject(mc);
+                if (window != null) {
+                    for (java.lang.reflect.Method sm : window.getClass().getMethods()) {
+                        if (sm.getParameterCount() == 0 && (sm.getReturnType() == double.class || sm.getReturnType() == float.class)) {
+                            try { guiScale = ((Number) sm.invoke(window)).doubleValue(); if (guiScale > 0) break; } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            if (guiScale <= 0) guiScale = 1.0;
+            double winX = x / guiScale;
+            double winY = y / guiScale;
+            final double fWinX = winX;
+            final double fWinY = winY;
+            final long fHandle = handle;
+            final int fButton = button;
+            final Object fMH = mouseHandler;
+            glfwClickResult = null;
+            ReflectedInputHandler.executeOnRenderThread(() -> {
+                try {
+                    ReflectionHelper.dbg("glfwClick: running on render thread");
+                    for (java.lang.reflect.Method m : fMH.getClass().getDeclaredMethods()) {
+                        Class<?>[] pt = m.getParameterTypes();
+                        if (pt.length == 3 && pt[0] == long.class && pt[1] == double.class && pt[2] == double.class
+                                && !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+                            try { m.setAccessible(true); m.invoke(fMH, fHandle, fWinX, fWinY); ReflectionHelper.dbg("glfwClick: cursor pos set"); break; } catch (Exception e) { ReflectionHelper.dbg("glfwClick: cursor pos failed: " + e.getMessage()); }
+                        }
+                    }
+                    java.lang.reflect.Method btnMethod = ReflectionCache.findMouseButtonMethod(fMH.getClass());
+                    if (btnMethod != null) {
+                        btnMethod.setAccessible(true);
+                        btnMethod.invoke(fMH, fHandle, fButton, 1, 0);
+                        Thread.sleep(50);
+                        btnMethod.invoke(fMH, fHandle, fButton, 0, 0);
+                        glfwClickResult = "{\"clicked\":true,\"method\":\"glfw\",\"gui\":[" + x + "," + y + "]";
+                        ReflectionHelper.dbg("glfwClick: success");
+                    } else {
+                        glfwClickResult = "{\"error\":\"glfw: no btn method\"}";
+                    }
+                } catch (Exception e) {
+                    glfwClickResult = "{\"error\":\"glfw exec: " + e.getMessage() + "\"}";
+                    ReflectionHelper.dbg("glfwClick: failed: " + e.getMessage());
+                }
+            });
+            long deadline = System.currentTimeMillis() + 2000;
+            while (glfwClickResult == null && System.currentTimeMillis() < deadline) Thread.sleep(50);
+            return glfwClickResult;
+        } catch (Exception e) {
+            return "{\"error\":\"glfw: " + e.getMessage() + "\"}";
         }
     }
 
@@ -730,13 +821,8 @@ public final class ScreenInteractionHelper {
     }
 
     static Object getCurrentScreen(Object mc) throws Exception {
-        for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
-            String n = f.getName();
-            if (n.equals("currentScreen") || n.equals("screen") || n.equals("field_71462_r") || n.equals("field_175283_aN")) {
-                try { f.setAccessible(true); return f.get(mc); } catch (Exception ignored) {}
-            }
-        }
-        try { return mc.getClass().getMethod("screen").invoke(mc); } catch (Exception ignored) {}
+        Object screen = ReflectionCache.getCurrentScreen(mc);
+        if (screen != null) return screen;
         return null;
     }
 

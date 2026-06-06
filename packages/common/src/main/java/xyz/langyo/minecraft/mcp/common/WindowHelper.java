@@ -76,7 +76,7 @@ public final class WindowHelper {
         } catch (Exception e) { return 0; }
     }
 
-    private static Object findWindowObject(Object mc) throws Exception {
+    static Object findWindowObject(Object mc) throws Exception {
         for (String name : new String[]{"getWindow", "getMainWindow"}) {
             try { return mc.getClass().getMethod(name).invoke(mc); } catch (NoSuchMethodException ignored) {}
         }
