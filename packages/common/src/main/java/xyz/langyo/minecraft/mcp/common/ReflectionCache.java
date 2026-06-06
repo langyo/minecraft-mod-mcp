@@ -441,16 +441,31 @@ public final class ReflectionCache {
             try {
                 f.setAccessible(true);
                 Object val = f.get(mc);
-                if (val == null) continue;
-                if (isScreenInstance(val)) return val;
+                if (val != null && isScreenInstance(val)) return val;
             } catch (Exception ignored) {}
         }
         return null;
     }
 
+    static boolean isScreenInstancePublic(Object obj) {
+        Class<?> clazz = obj.getClass();
+        Class<?> cur = clazz;
+        while (cur != null && cur != Object.class) {
+            if (cur.getSimpleName().equals("class_437")) return true;
+            cur = cur.getSuperclass();
+        }
+        return false;
+    }
+
     private static boolean isScreenInstance(Object obj) {
         try {
             Class<?> clazz = obj.getClass();
+            for (Method m : getAllMethods(clazz)) {
+                Class<?>[] pts = m.getParameterTypes();
+                if (pts.length == 4 && !pts[0].isPrimitive() && pts[0].getName().startsWith("net.minecraft.")
+                        && pts[1] == int.class && pts[2] == int.class && pts[3] == float.class
+                        && m.getReturnType() == void.class && !Modifier.isStatic(m.getModifiers())) return true;
+            }
             boolean hasVoidNoArg = false;
             boolean hasBoolNoArg = false;
             boolean hasMouseClicked = false;
@@ -463,6 +478,8 @@ public final class ReflectionCache {
                 }
                 if (pts.length == 3 && m.getReturnType() == boolean.class
                         && pts[0] == double.class && pts[1] == double.class && pts[2] == int.class) hasMouseClicked = true;
+                if (pts.length == 3 && m.getReturnType() == boolean.class
+                        && !pts[0].isPrimitive() && pts[1] == double.class && pts[2] == double.class) hasMouseClicked = true;
             }
             return hasVoidNoArg && hasBoolNoArg && hasMouseClicked;
         } catch (Throwable t) {
