@@ -71,27 +71,19 @@ public final class InputInjectionHelper {
                     java.lang.reflect.Method target = ReflectionCache.findMouseButtonMethod(mouseHandler.getClass());
                     if (target != null) {
                         target.setAccessible(true);
-                        target.invoke(mouseHandler, handle, button, action, 0);
-                        return;
-                    }
-                }
-                try {
-                    Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                    java.lang.reflect.Method glfwSetInputMode = glfwClass.getMethod("glfwSetInputMode", long.class, int.class, int.class);
-                    int GLFW_STICKY_MOUSE_BUTTONS = glfwClass.getDeclaredField("GLFW_STICKY_MOUSE_BUTTONS").getInt(null);
-                    glfwSetInputMode.invoke(null, handle, GLFW_STICKY_MOUSE_BUTTONS, 1);
-                    Class<?>MouseButtonCallback = null;
-                    for (java.lang.reflect.Method cbm : glfwClass.getDeclaredMethods()) {
-                        if (cbm.getName().equals("glfwSetMouseButtonCallback") && cbm.getParameterCount() == 2) {
-                            cbm.invoke(null, handle, (java.lang.reflect.Proxy.newProxyInstance(
-                                Thread.currentThread().getContextClassLoader(),
-                                new Class<?>[]{ Class.forName("org.lwjgl.glfw.GLFWMouseButtonCallbackI") },
-                                (proxy, method, args) -> null
-                            )));
-                            break;
+                        Class<?>[] pt = target.getParameterTypes();
+                        if (pt.length == 3 && pt[1] != int.class) {
+                            Object mouseInput = createMouseInput(pt[1], button, 0);
+                            if (mouseInput != null) {
+                                target.invoke(mouseHandler, handle, mouseInput, action);
+                                return;
+                            }
+                        } else {
+                            target.invoke(mouseHandler, handle, button, action, 0);
+                            return;
                         }
                     }
-                } catch (Exception ignored) {}
+                }
                 ReflectionHelper.dbg("sendMouseButton: NO matching method found!");
             } catch (Exception e) {
                 ReflectionHelper.dbg("sendMouseButton GLFW: " + e.getMessage());
@@ -106,6 +98,49 @@ public final class InputInjectionHelper {
             if (action == 1) r.mousePress(mask);
             else r.mouseRelease(mask);
         } catch (Exception e) { System.err.println("[Input] sendMouseButton: " + e.getMessage()); }
+    }
+
+    public static Object createMouseInputPublic(Class<?> mouseInputClass, int button, int modifiers) {
+        return createMouseInput(mouseInputClass, button, modifiers);
+    }
+
+    private static Object createMouseInput(Class<?> mouseInputClass, int button, int modifiers) {
+        try {
+            for (java.lang.reflect.Constructor<?> c : mouseInputClass.getDeclaredConstructors()) {
+                c.setAccessible(true);
+                Class<?>[] pt = c.getParameterTypes();
+                if (pt.length == 2 && pt[0] == int.class && pt[1] == int.class) {
+                    return c.newInstance(button, modifiers);
+                }
+                if (pt.length == 1 && pt[0] == int.class) {
+                    return c.newInstance(button);
+                }
+            }
+            for (java.lang.reflect.Method m : mouseInputClass.getDeclaredMethods()) {
+                if (java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+                    Class<?>[] pt = m.getParameterTypes();
+                    if (m.getReturnType() == mouseInputClass && pt.length == 2 && pt[0] == int.class && pt[1] == int.class) {
+                        return m.invoke(null, button, modifiers);
+                    }
+                    if (m.getReturnType() == mouseInputClass && pt.length == 1 && pt[0] == int.class) {
+                        return m.invoke(null, button);
+                    }
+                }
+            }
+            Object[] enums = mouseInputClass.getEnumConstants();
+            if (enums != null && enums.length > 0) {
+                for (Object e : enums) {
+                    String name = ((Enum<?>) e).name();
+                    if (button == 0 && name.contains("LEFT")) return e;
+                    if (button == 1 && name.contains("RIGHT")) return e;
+                    if (button == 2 && name.contains("MIDDLE")) return e;
+                }
+                return enums[0];
+            }
+        } catch (Exception e) {
+            ReflectionHelper.dbg("createMouseInput failed: " + e.getMessage());
+        }
+        return null;
     }
 
     public static void sendScroll(long handle, double scrollY) {

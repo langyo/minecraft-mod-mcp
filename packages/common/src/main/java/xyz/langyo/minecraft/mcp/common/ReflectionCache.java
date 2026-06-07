@@ -550,8 +550,10 @@ public final class ReflectionCache {
         Method fallback = null;
         for (Method m : mouseHandlerClass.getDeclaredMethods()) {
             Class<?>[] pt = m.getParameterTypes();
-            if (pt.length != 4 || pt[0] != long.class || pt[1] != int.class || pt[2] != int.class || pt[3] != int.class) continue;
             if (Modifier.isStatic(m.getModifiers())) continue;
+            boolean isOldSig = pt.length == 4 && pt[0] == long.class && pt[1] == int.class && pt[2] == int.class && pt[3] == int.class;
+            boolean isNewSig = pt.length == 3 && pt[0] == long.class && pt[2] == int.class;
+            if (!isOldSig && !isNewSig) continue;
             String name = m.getName();
             if (name.equals("mouseButton")) return m;
             if (name.equals("onPress") && exactMatch == null) exactMatch = m;

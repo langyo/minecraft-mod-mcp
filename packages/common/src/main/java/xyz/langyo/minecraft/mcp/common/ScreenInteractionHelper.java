@@ -103,6 +103,102 @@ public final class ScreenInteractionHelper {
                 gy = y * scaleY;
                 ReflectionHelper.dbg("guiClick: scaled click(" + x + "," + y + ")→gui(" + (int)gx + "," + (int)gy + ") scale=" + scaleX);
             }
+            if (screenName.equals("class_526")) {
+                try {
+                    Object worldListWidget = null;
+                    for (Field sf : ReflectionCache.getAllFields(screen.getClass())) {
+                        if (sf.getName().equals("field_3218")) {
+                            sf.setAccessible(true);
+                            try { worldListWidget = sf.get(screen); } catch (Exception ignored) {}
+                            break;
+                        }
+                    }
+                    if (worldListWidget == null) {
+                        for (Field sf : ReflectionCache.getAllFields(screen.getClass())) {
+                            sf.setAccessible(true);
+                            try { Object v = sf.get(screen); if (v != null && v.getClass().getName().equals("net.minecraft.class_528")) { worldListWidget = v; break; } } catch (Exception ignored) {}
+                        }
+                    }
+                    if (worldListWidget != null) {
+                        ReflectionHelper.dbg("guiClick: found levelList=" + worldListWidget.getClass().getName());
+                        java.util.List<?> entries = null;
+                        for (Field ef : ReflectionCache.getAllFields(worldListWidget.getClass())) {
+                            ef.setAccessible(true);
+                            try { Object v = ef.get(worldListWidget); if (v instanceof java.util.List && !((java.util.List<?>)v).isEmpty()) { entries = (java.util.List<?>)v; ReflectionHelper.dbg("guiClick: entries field=" + ef.getName() + " count=" + entries.size()); break; } } catch (Exception ignored) {}
+                        }
+                        if (entries != null && !entries.isEmpty()) {
+                            Object firstEntry = entries.get(0);
+                            ReflectionHelper.dbg("guiClick: firstEntry type=" + firstEntry.getClass().getName());
+                            Object levelSummary = null;
+                            if (firstEntry.getClass().getName().equals("net.minecraft.class_34")) {
+                                levelSummary = firstEntry;
+                                ReflectionHelper.dbg("guiClick: entry IS LevelSummary");
+                            } else {
+                                for (Method gm : firstEntry.getClass().getMethods()) {
+                                    if (gm.getParameterCount() == 0 && !java.lang.reflect.Modifier.isStatic(gm.getModifiers())) {
+                                        try { gm.setAccessible(true); Object r = gm.invoke(firstEntry); if (r != null && r.getClass().getName().equals("net.minecraft.class_34")) { levelSummary = r; ReflectionHelper.dbg("guiClick: got levelSummary via " + gm.getName()); break; } } catch (Exception ignored) {}
+                                    }
+                                }
+                                if (levelSummary == null) {
+                                    for (Field ef2 : ReflectionCache.getAllFields(firstEntry.getClass())) {
+                                        ef2.setAccessible(true);
+                                        try { Object v = ef2.get(firstEntry); if (v != null && v.getClass().getName().equals("net.minecraft.class_34")) { levelSummary = v; ReflectionHelper.dbg("guiClick: got levelSummary from field " + ef2.getName()); break; } } catch (Exception ignored) {}
+                                    }
+                                }
+                            }
+                            if (levelSummary != null) {
+                                for (Method wm : screen.getClass().getDeclaredMethods()) {
+                                    if (wm.getName().equals("method_19940") || (wm.getParameterCount() == 1 && wm.getParameterTypes()[0].getName().equals("net.minecraft.class_34") && wm.getReturnType() == void.class)) {
+                                        try { wm.setAccessible(true); wm.invoke(screen, levelSummary); ReflectionHelper.dbg("guiClick: called worldSelected via " + wm.getName()); } catch (Exception e) { ReflectionHelper.dbg("guiClick: worldSelected failed: " + e.getMessage()); }
+                                        break;
+                                    }
+                                }
+                                try {
+                                    Class<?> loaderClass = Class.forName("net.minecraft.class_7196");
+                                    Object levelStorage = null;
+                                    for (Method lsm : mc.getClass().getMethods()) {
+                                        if (lsm.getParameterCount() == 0 && lsm.getReturnType().getName().equals("net.minecraft.class_32") && !java.lang.reflect.Modifier.isStatic(lsm.getModifiers())) {
+                                            try { lsm.setAccessible(true); levelStorage = lsm.invoke(mc); break; } catch (Exception ignored) {}
+                                        }
+                                    }
+                                    if (levelStorage != null) {
+                                        Object loader = loaderClass.getConstructor(Class.forName("net.minecraft.class_310"), Class.forName("net.minecraft.class_32")).newInstance(mc, levelStorage);
+                                        String levelName = null;
+                                        for (Method gm : levelSummary.getClass().getMethods()) {
+                                            if (gm.getParameterCount() == 0 && gm.getReturnType() == String.class) {
+                                                try { gm.setAccessible(true); String n = (String) gm.invoke(levelSummary); if (n != null && !n.isEmpty()) { levelName = n; break; } } catch (Exception ignored) {}
+                                            }
+                                        }
+                                        if (levelName == null) {
+                                            for (Field nf : ReflectionCache.getAllFields(levelSummary.getClass())) {
+                                                if (nf.getType() == String.class && !java.lang.reflect.Modifier.isStatic(nf.getModifiers())) {
+                                                    try { nf.setAccessible(true); String v = (String) nf.get(levelSummary); if (v != null && !v.isEmpty()) { levelName = v; break; } } catch (Exception ignored) {}
+                                                }
+                                            }
+                                        }
+                                        if (levelName != null) {
+                                            ReflectionHelper.dbg("guiClick: loading world '" + levelName + "' via IntegratedServerLoader");
+                                            for (Method sm : loaderClass.getDeclaredMethods()) {
+                                                if (sm.getParameterCount() == 2 && sm.getParameterTypes()[0] == String.class && java.lang.Runnable.class.isAssignableFrom(sm.getParameterTypes()[1]) && !java.lang.reflect.Modifier.isStatic(sm.getModifiers())) {
+                                                    try { sm.setAccessible(true); sm.invoke(loader, levelName, (Runnable) () -> {}); ReflectionHelper.dbg("guiClick: world load started"); return "{\"clicked\":true,\"screen\":\"class_526\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"worldLoaded\":true}"; } catch (Exception e) { ReflectionHelper.dbg("guiClick: load failed: " + e.getMessage()); }
+                                                    break;
+                                                }
+                                            }
+                                        } else { ReflectionHelper.dbg("guiClick: could not determine world name"); }
+                                    }
+                                } catch (Exception e) { ReflectionHelper.dbg("guiClick: loader creation failed: " + e.getMessage()); }
+                            } else {
+                                ReflectionHelper.dbg("guiClick: no levelSummary from entry, trying worldSelected with null");
+                                for (Method wm : screen.getClass().getDeclaredMethods()) {
+                                    if (wm.getName().equals("method_19940")) { try { wm.setAccessible(true); wm.invoke(screen, (Object)null); } catch (Exception ignored) {} break; }
+                                }
+                            }
+                        }
+                    } else {
+                        ReflectionHelper.dbg("guiClick: levelList field not found on " + screen.getClass().getName());
+                    }
+                } catch (Exception e) { ReflectionHelper.dbg("guiClick: world select error: " + e.getMessage()); }
+            }
             StringBuilder results = new StringBuilder();
             java.util.List<Method> clickedMethods = new java.util.ArrayList<>();
             Method isMouseOverMethod = null;
@@ -157,118 +253,264 @@ public final class ScreenInteractionHelper {
             String widgetResult = "";
             int[] widgetBounds = null;
             Object hitWidget = null;
-            int listFieldCount = 0;
-            for (Field f : ReflectionCache.getAllFields(screen.getClass())) {
-                f.setAccessible(true);
-                Object list;
-                try { list = f.get(screen); } catch (Exception e) { continue; }
-                if (!(list instanceof java.util.List)) continue;
-                java.util.List<?> wList = (java.util.List<?>) list;
-                listFieldCount++;
-                if (wList.isEmpty()) continue;
-                boolean hasIntFields = false;
-                for (Field wf : wList.get(0).getClass().getFields()) {
-                    if (wf.getType() == int.class) { hasIntFields = true; break; }
-                }
-                if (!hasIntFields) {
-                    for (Field wf : ReflectionCache.getAllFields(wList.get(0).getClass())) {
-                        if (wf.getType() == int.class) { hasIntFields = true; break; }
-                    }
-                }
-                if (!hasIntFields) continue;
-                java.util.List<Field> wFields = ReflectionCache.getAllFields(wList.get(0).getClass());
-                java.util.List<Integer> intFieldIndices = new java.util.ArrayList<>();
-                for (int i = 0; i < wFields.size(); i++) {
-                    if (wFields.get(i).getType() == int.class) intFieldIndices.add(i);
-                }
-                if (intFieldIndices.size() < 4) continue;
-                int nWidgets = wList.size();
-                int[] allVals = new int[intFieldIndices.size()];
-                try { for (int i = 0; i < intFieldIndices.size(); i++) { wFields.get(intFieldIndices.get(i)).setAccessible(true); allVals[i] = wFields.get(intFieldIndices.get(i)).getInt(wList.get(0)); } } catch (Exception ignored) { continue; }
-                java.util.Set<Integer> constantFieldSet = new java.util.LinkedHashSet<>();
-                java.util.Set<Integer> varyingFieldSet = new java.util.LinkedHashSet<>();
-                for (int fi = 0; fi < intFieldIndices.size(); fi++) {
-                    boolean constant = true;
-                    int val0 = allVals[fi];
-                    for (int wi = 1; wi < nWidgets; wi++) {
-                        try {
-                            int v = wFields.get(intFieldIndices.get(fi)).getInt(wList.get(wi));
-                            if (v != val0) { constant = false; break; }
-                        } catch (Exception e) { constant = false; break; }
-                    }
-                    if (constant) constantFieldSet.add(fi); else varyingFieldSet.add(fi);
-                }
-                int heightIdx = -1, widthIdx = -1;
-                for (int fi : constantFieldSet) {
-                    if (allVals[fi] == 20 && heightIdx < 0) heightIdx = fi;
-                }
-                for (int fi : constantFieldSet) {
-                    if (fi == heightIdx) continue;
-                    if (allVals[fi] == 200 && widthIdx < 0) widthIdx = fi;
-                }
-                if (widthIdx < 0) { for (int fi : constantFieldSet) { if (fi != heightIdx && allVals[fi] == 98 && widthIdx < 0) widthIdx = fi; } }
-                if (widthIdx < 0) { for (int fi : constantFieldSet) { if (fi != heightIdx && allVals[fi] > 50 && allVals[fi] < 500 && widthIdx < 0) widthIdx = fi; } }
-                java.util.List<Integer> xyIndices = new java.util.ArrayList<>();
-                int perWidgetWidthIdx = -1;
-                for (int fi : varyingFieldSet) {
-                    boolean allStandardWidths = true;
-                    for (int wi = 0; wi < nWidgets; wi++) {
-                        try {
-                            int v = wFields.get(intFieldIndices.get(fi)).getInt(wList.get(wi));
-                            if (v != 200 && v != 150 && v != 98 && v != 50) { allStandardWidths = false; break; }
-                        } catch (Exception e) { allStandardWidths = false; break; }
-                    }
-                if (allStandardWidths && perWidgetWidthIdx < 0) { perWidgetWidthIdx = fi; ReflectionHelper.dbg("guiClick: perWidgetWidth fi=" + fi + " vals=" + allVals[fi]); }
-                else { xyIndices.add(fi); }
-                }
-                if (heightIdx < 0 || xyIndices.size() < 2) {
-                    xyIndices.clear();
-                    for (int fi = 0; fi < intFieldIndices.size(); fi++) { if (fi != heightIdx && fi != widthIdx && fi != perWidgetWidthIdx) xyIndices.add(fi); }
-                }
-                ReflectionHelper.dbg("guiClick: list #" + listFieldCount + " size=" + nWidgets + " elem=" + wList.get(0).getClass().getSimpleName() + " const=" + constantFieldSet + " var=" + varyingFieldSet + " hIdx=" + heightIdx + " wIdx=" + widthIdx + " pww=" + perWidgetWidthIdx + " xy=" + xyIndices);
-                if (listFieldCount == 1) { for (int wi = 0; wi < Math.min(nWidgets, 8); wi++) { try { StringBuilder sb = new StringBuilder("w" + wi + ":"); for (int fi = 0; fi < intFieldIndices.size(); fi++) { sb.append(wFields.get(intFieldIndices.get(fi)).getInt(wList.get(wi))).append(","); } ReflectionHelper.dbg("guiClick: " + sb); } catch (Exception e) { ReflectionHelper.dbg("guiClick: w" + wi + " err: " + e.getMessage()); } } }
-                for (Object w : wList) {
-                    try {
-                        int[] fVals = new int[intFieldIndices.size()];
-                        for (int i = 0; i < intFieldIndices.size(); i++) { try { wFields.get(intFieldIndices.get(i)).setAccessible(true); fVals[i] = wFields.get(intFieldIndices.get(i)).getInt(w); } catch (Exception e) { fVals[i] = -1; } }
-                        if (heightIdx < 0) continue;
-                        int h = fVals[heightIdx];
-                        if (hitWidget != null) continue;
-                        int pww = perWidgetWidthIdx >= 0 ? fVals[perWidgetWidthIdx] : -1;
-                        for (int xi = 0; xi < xyIndices.size() - 1; xi++) {
-                            for (int yi = xi + 1; yi < xyIndices.size(); yi++) {
-                                int[] wOptions;
-                                if (widthIdx >= 0 && pww > 0) wOptions = new int[]{pww};
-                                else if (widthIdx >= 0) wOptions = new int[]{fVals[widthIdx]};
-                                else if (pww > 0) wOptions = new int[]{pww};
-                                else wOptions = new int[]{200, 150, 98};
-                                for (int wVal : wOptions) {
-                                    if (wVal <= 0) continue;
-                                    int vx = fVals[xyIndices.get(xi)], vy = fVals[xyIndices.get(yi)];
-                                    if (vx >= 0 && vy >= 0 && h > 0 && gx >= vx && gx < vx + wVal && gy >= vy && gy < vy + h) {
-                                        widgetBounds = new int[]{vx, vy, wVal, h};
-                                        hitWidget = w;
-                                        ReflectionHelper.dbg("guiClick: hit " + w.getClass().getSimpleName() + " at (" + vx + "," + vy + ")+" + wVal + "x" + h);
-                                        break;
-                                    }
-                                    vx = fVals[xyIndices.get(yi)]; vy = fVals[xyIndices.get(xi)];
-                                    if (vx >= 0 && vy >= 0 && h > 0 && gx >= vx && gx < vx + wVal && gy >= vy && gy < vy + h) {
-                                        widgetBounds = new int[]{vx, vy, wVal, h};
-                                        hitWidget = w;
-                                        ReflectionHelper.dbg("guiClick: hit " + w.getClass().getSimpleName() + " at (" + vx + "," + vy + ")+" + wVal + "x" + h);
-                                        break;
-                                    }
-                                }
-                                if (hitWidget != null) break;
+            ReflectionHelper.dbg("guiClick: starting children scan (primary)");
+            try {
+                for (Method cm : screen.getClass().getMethods()) {
+                    if (cm.getParameterCount() != 0) continue;
+                    if (!java.util.List.class.isAssignableFrom(cm.getReturnType())) continue;
+                    if (java.lang.reflect.Modifier.isStatic(cm.getModifiers())) continue;
+                    cm.setAccessible(true);
+                    Object childrenObj;
+                    try { childrenObj = cm.invoke(screen); } catch (Exception e) { continue; }
+                    if (!(childrenObj instanceof java.util.List)) continue;
+                    java.util.List<?> children = (java.util.List<?>) childrenObj;
+                    ReflectionHelper.dbg("guiClick: children method=" + cm.getName() + " size=" + children.size());
+                    for (Object child : children) {
+                        if (child == null) continue;
+                        Class<?> cc = child.getClass();
+                        int cx = -1, cy = -1, cw = -1, ch = -1;
+                        int cright = -1, cbottom = -1;
+                        for (Method gm : cc.getMethods()) {
+                            if (gm.getParameterCount() != 0 || gm.getReturnType() != int.class) continue;
+                            String gmn = gm.getName();
+                            try {
+                                gm.setAccessible(true);
+                                int val = ((Number) gm.invoke(child)).intValue();
+                                if (gmn.contains("46426")) cx = val;
+                                else if (gmn.contains("46427")) cy = val;
+                                else if (gmn.contains("25368")) { if (cright < 0) cright = val; }
+                                else if (gmn.contains("25364")) { if (cbottom < 0) cbottom = val; }
+                                else if (gmn.contains("55442")) { if (cright < 0) cright = val; }
+                                else if (gmn.contains("55443")) { if (cbottom < 0) cbottom = val; }
+                                else if (gmn.contains("25402")) { if (cx < 0) cx = val; }
+                                else if (gmn.contains("25403")) { if (cy < 0) cy = val; }
+                                else if (gmn.contains("25404")) { if (cw < 0) cw = val; }
+                                else if (gmn.contains("25405")) { if (ch < 0) ch = val; }
+                                else if (gmn.contains("48590")) { if (ch < 0) ch = val; }
+                            } catch (Exception ignored) {}
+                        }
+                        if (cright > 0 && cbottom > 0) {
+                            if (cright > cx && cright < 1000 && cbottom < cy) {
+                                cw = cright;
+                                ch = cbottom;
+                            } else if (cright > cx) {
+                                cw = cright - cx;
                             }
-                            if (hitWidget != null) break;
+                            if (cbottom > cy) {
+                                ch = cbottom - cy;
+                            } else if (cbottom > 0 && cbottom < 100) {
+                                ch = cbottom;
+                            }
+                        }
+                        if (cx >= 0 && cy >= 0 && cw > 0 && ch > 0) {
+                            ReflectionHelper.dbg("guiClick: child " + cc.getSimpleName() + " bounds=(" + cx + "," + cy + ")+" + cw + "x" + ch + " r=" + cright + " b=" + cbottom);
+                        } else {
+                            ReflectionHelper.dbg("guiClick: child " + cc.getSimpleName() + " cx=" + cx + " cy=" + cy + " cw=" + cw + " ch=" + ch + " right=" + cright + " bottom=" + cbottom);
+                        }
+                        if (cx >= 0 && cy >= 0 && cw > 0 && ch > 0 && ch <= 40) {
+                            if (gx >= cx && gx < cx + cw && gy >= cy && gy < cy + ch) {
+                                hitWidget = child;
+                                widgetBounds = new int[]{cx, cy, cw, ch};
+                                ReflectionHelper.dbg("guiClick: hit child widget " + cc.getSimpleName());
+                                break;
+                            }
+                        }
+                    }
+                    if (hitWidget != null) break;
+                }
+                if (hitWidget != null) widgetResult = invokeWidgetCallback(hitWidget, gx, gy, button, widgetBounds);
+            } catch (Exception e) {
+                ReflectionHelper.dbg("guiClick: children scan failed: " + e.getMessage());
+            }
+            if (hitWidget == null) {
+                ReflectionHelper.dbg("guiClick: children scan missed, trying field scan");
+                for (Field sf : ReflectionCache.getAllFields(screen.getClass())) {
+                    if (java.lang.reflect.Modifier.isStatic(sf.getModifiers())) continue;
+                    try {
+                        sf.setAccessible(true);
+                        Object widget = sf.get(screen);
+                        if (widget == null || widget == screen) continue;
+                        Class<?> wc = widget.getClass();
+                        boolean isWidget = false;
+                        for (Class<?> sup = wc; sup != null && sup != Object.class; sup = sup.getSuperclass()) {
+                            if (sup.getSimpleName().contains("ClickableWidget") || sup.getSimpleName().contains("AbstractButton")
+                                || sup.getName().contains("class_4185") || sup.getName().contains("class_5676")) {
+                                isWidget = true; break;
+                            }
+                        }
+                        if (!isWidget && !(widget instanceof java.util.List)) {
+                            boolean hasXY = false;
+                            for (Method wm : wc.getMethods()) {
+                                if ((wm.getName().equals("getX") || wm.getName().equals("getY") || wm.getName().equals("method_25402"))
+                                    && wm.getParameterCount() == 0 && wm.getReturnType() == int.class) { hasXY = true; break; }
+                            }
+                            if (!hasXY) continue;
+                            isWidget = true;
+                        }
+                        if (!isWidget) continue;
+                        int wx = -1, wy = -1, ww = -1, wh = -1;
+                        int wright = -1, wbottom = -1;
+                        for (Method wm : wc.getMethods()) {
+                            if (wm.getParameterCount() != 0 || wm.getReturnType() != int.class) continue;
+                            String mn = wm.getName();
+                            try {
+                                wm.setAccessible(true);
+                                int val = ((Number) wm.invoke(widget)).intValue();
+                                if (mn.equals("getX") || mn.contains("25402") || mn.contains("46426")) wx = val;
+                                else if (mn.equals("getY") || mn.contains("25403") || mn.contains("46427")) wy = val;
+                                else if (mn.equals("getWidth") || mn.contains("25404") || mn.contains("55442")) ww = val;
+                                else if (mn.equals("getHeight") || mn.contains("25405") || mn.contains("48590")) wh = val;
+                                else if (mn.contains("25368")) wright = val;
+                                else if (mn.contains("25364")) wbottom = val;
+                            } catch (Exception ignored) {}
+                        }
+                        if (wx >= 0 && wright > wx) ww = wright - wx;
+                        if (wy >= 0 && wbottom > wy) wh = wbottom - wy;
+                        if (wx < 0 || wy < 0 || ww <= 0 || wh <= 0) {
+                            java.util.List<Field> wIntFields = new java.util.ArrayList<>();
+                            for (Field wf : ReflectionCache.getAllFields(wc)) {
+                                if (wf.getType() == int.class && !java.lang.reflect.Modifier.isStatic(wf.getModifiers())) wIntFields.add(wf);
+                            }
+                            int[] ivals = new int[wIntFields.size()];
+                            for (int i = 0; i < wIntFields.size(); i++) {
+                                try { wIntFields.get(i).setAccessible(true); ivals[i] = wIntFields.get(i).getInt(widget); } catch (Exception e) { ivals[i] = -1; }
+                            }
+                            if (ivals.length >= 4) { wx = ivals[0]; wy = ivals[1]; ww = ivals[2]; wh = ivals[3]; }
+                        }
+                        if (wx >= 0 && wy >= 0 && ww > 0 && wh > 0 && wh <= 40) {
+                            ReflectionHelper.dbg("guiClick: field " + sf.getName() + "=" + wc.getSimpleName() + " bounds=(" + wx + "," + wy + ")+" + ww + "x" + wh);
+                            if (gx >= wx && gx < wx + ww && gy >= wy && gy < wy + wh) {
+                                hitWidget = widget;
+                                widgetBounds = new int[]{wx, wy, ww, wh};
+                                ReflectionHelper.dbg("guiClick: hit field widget " + sf.getName());
+                                break;
+                            }
                         }
                     } catch (Exception ignored) {}
                 }
+                if (hitWidget != null) {
+                    widgetResult = invokeWidgetCallback(hitWidget, gx, gy, button, widgetBounds);
+                    if (!widgetResult.contains("\"callback\"")) {
+                        hitWidget = null;
+                        widgetResult = "";
+                    }
+                }
             }
-            ReflectionHelper.dbg("guiClick: widget search done, listFields=" + listFieldCount + " hit=" + (hitWidget != null));
-            if (hitWidget != null) {
-                widgetResult = invokeWidgetCallback(hitWidget, gx, gy, button, widgetBounds);
+            if (hitWidget == null) {
+                ReflectionHelper.dbg("guiClick: children+field scan missed, trying list scan");
+                int listFieldCount = 0;
+                for (Field f : ReflectionCache.getAllFields(screen.getClass())) {
+                    f.setAccessible(true);
+                    Object list;
+                    try { list = f.get(screen); } catch (Exception e) { continue; }
+                    if (!(list instanceof java.util.List)) continue;
+                    java.util.List<?> wList = (java.util.List<?>) list;
+                    listFieldCount++;
+                    if (wList.isEmpty()) continue;
+                    boolean hasIntFields = false;
+                    for (Field wf : wList.get(0).getClass().getFields()) {
+                        if (wf.getType() == int.class) { hasIntFields = true; break; }
+                    }
+                    if (!hasIntFields) {
+                        for (Field wf : ReflectionCache.getAllFields(wList.get(0).getClass())) {
+                            if (wf.getType() == int.class) { hasIntFields = true; break; }
+                        }
+                    }
+                    if (!hasIntFields) continue;
+                    java.util.List<Field> wFields = ReflectionCache.getAllFields(wList.get(0).getClass());
+                    java.util.List<Integer> intFieldIndices = new java.util.ArrayList<>();
+                    for (int i = 0; i < wFields.size(); i++) {
+                        if (wFields.get(i).getType() == int.class) intFieldIndices.add(i);
+                    }
+                    if (intFieldIndices.size() < 4) continue;
+                    int nWidgets = wList.size();
+                    int[] allVals = new int[intFieldIndices.size()];
+                    try { for (int i = 0; i < intFieldIndices.size(); i++) { wFields.get(intFieldIndices.get(i)).setAccessible(true); allVals[i] = wFields.get(intFieldIndices.get(i)).getInt(wList.get(0)); } } catch (Exception ignored) { continue; }
+                    java.util.Set<Integer> constantFieldSet = new java.util.LinkedHashSet<>();
+                    java.util.Set<Integer> varyingFieldSet = new java.util.LinkedHashSet<>();
+                    for (int fi = 0; fi < intFieldIndices.size(); fi++) {
+                        boolean constant = true;
+                        int val0 = allVals[fi];
+                        for (int wi = 1; wi < nWidgets; wi++) {
+                            try {
+                                int v = wFields.get(intFieldIndices.get(fi)).getInt(wList.get(wi));
+                                if (v != val0) { constant = false; break; }
+                            } catch (Exception e) { constant = false; break; }
+                        }
+                        if (constant) constantFieldSet.add(fi); else varyingFieldSet.add(fi);
+                    }
+                    int heightIdx = -1, widthIdx = -1;
+                    for (int fi : constantFieldSet) {
+                        if (allVals[fi] == 20 && heightIdx < 0) heightIdx = fi;
+                    }
+                    for (int fi : constantFieldSet) {
+                        if (fi == heightIdx) continue;
+                        if (allVals[fi] == 200 && widthIdx < 0) widthIdx = fi;
+                    }
+                    if (widthIdx < 0) { for (int fi : constantFieldSet) { if (fi != heightIdx && allVals[fi] == 98 && widthIdx < 0) widthIdx = fi; } }
+                    if (widthIdx < 0) { for (int fi : constantFieldSet) { if (fi != heightIdx && allVals[fi] > 50 && allVals[fi] < 500 && widthIdx < 0) widthIdx = fi; } }
+                    java.util.List<Integer> xyIndices = new java.util.ArrayList<>();
+                    int perWidgetWidthIdx = -1;
+                    for (int fi : varyingFieldSet) {
+                        boolean allStandardWidths = true;
+                        for (int wi = 0; wi < nWidgets; wi++) {
+                            try {
+                                int v = wFields.get(intFieldIndices.get(fi)).getInt(wList.get(wi));
+                                if (v != 200 && v != 150 && v != 98 && v != 50) { allStandardWidths = false; break; }
+                            } catch (Exception e) { allStandardWidths = false; break; }
+                        }
+                    if (allStandardWidths && perWidgetWidthIdx < 0) { perWidgetWidthIdx = fi; ReflectionHelper.dbg("guiClick: perWidgetWidth fi=" + fi + " vals=" + allVals[fi]); }
+                    else { xyIndices.add(fi); }
+                    }
+                    if (heightIdx < 0 || xyIndices.size() < 2) {
+                        xyIndices.clear();
+                        for (int fi = 0; fi < intFieldIndices.size(); fi++) { if (fi != heightIdx && fi != widthIdx && fi != perWidgetWidthIdx) xyIndices.add(fi); }
+                    }
+                    ReflectionHelper.dbg("guiClick: list #" + listFieldCount + " size=" + nWidgets + " elem=" + wList.get(0).getClass().getSimpleName() + " const=" + constantFieldSet + " var=" + varyingFieldSet + " hIdx=" + heightIdx + " wIdx=" + widthIdx + " pww=" + perWidgetWidthIdx + " xy=" + xyIndices);
+                    for (Object w : wList) {
+                        try {
+                            int[] fVals = new int[intFieldIndices.size()];
+                            for (int i = 0; i < intFieldIndices.size(); i++) { try { wFields.get(intFieldIndices.get(i)).setAccessible(true); fVals[i] = wFields.get(intFieldIndices.get(i)).getInt(w); } catch (Exception e) { fVals[i] = -1; } }
+                            if (heightIdx < 0) continue;
+                            int h = fVals[heightIdx];
+                            if (hitWidget != null) continue;
+                            int pww = perWidgetWidthIdx >= 0 ? fVals[perWidgetWidthIdx] : -1;
+                            for (int xi = 0; xi < xyIndices.size() - 1; xi++) {
+                                for (int yi = xi + 1; yi < xyIndices.size(); yi++) {
+                                    int[] wOptions;
+                                    if (widthIdx >= 0 && pww > 0) wOptions = new int[]{pww};
+                                    else if (widthIdx >= 0) wOptions = new int[]{fVals[widthIdx]};
+                                    else if (pww > 0) wOptions = new int[]{pww};
+                                    else wOptions = new int[]{200, 150, 98};
+                                    for (int wVal : wOptions) {
+                                        if (wVal <= 0) continue;
+                                        int vx = fVals[xyIndices.get(xi)], vy = fVals[xyIndices.get(yi)];
+                                        if (vx >= 0 && vy >= 0 && h > 0 && gx >= vx && gx < vx + wVal && gy >= vy && gy < vy + h) {
+                                            widgetBounds = new int[]{vx, vy, wVal, h};
+                                            hitWidget = w;
+                                            ReflectionHelper.dbg("guiClick: hit list " + w.getClass().getSimpleName() + " at (" + vx + "," + vy + ")+" + wVal + "x" + h);
+                                            break;
+                                        }
+                                        vx = fVals[xyIndices.get(yi)]; vy = fVals[xyIndices.get(xi)];
+                                        if (vx >= 0 && vy >= 0 && h > 0 && gx >= vx && gx < vx + wVal && gy >= vy && gy < vy + h) {
+                                            widgetBounds = new int[]{vx, vy, wVal, h};
+                                            hitWidget = w;
+                                            ReflectionHelper.dbg("guiClick: hit list " + w.getClass().getSimpleName() + " at (" + vx + "," + vy + ")+" + wVal + "x" + h);
+                                            break;
+                                        }
+                                    }
+                                    if (hitWidget != null) break;
+                                }
+                                if (hitWidget != null) break;
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    if (hitWidget != null) break;
+                }
+                ReflectionHelper.dbg("guiClick: list scan done, hit=" + (hitWidget != null));
+                if (hitWidget != null) {
+                    widgetResult = invokeWidgetCallback(hitWidget, gx, gy, button, widgetBounds);
+                }
             }
             if (widgetResult.contains("\"callback\""))
                 return "{\"clicked\":true,\"screen\":\"" + screenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"results\":{" + results.toString() + "}" + widgetResult + "}";
@@ -317,6 +559,54 @@ public final class ScreenInteractionHelper {
                         return "{\"clicked\":true,\"screen\":\"" + screenName + "." + subName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"results\":{" + subResults.toString() + "}" + subWidgetResult + "}";
                     }
                 } catch (Exception ignored) {}
+            }
+            ReflectionHelper.dbg("guiClick: trying children mouseClicked at gui(" + (int)gx + "," + (int)gy + ")");
+            boolean childClicked = false;
+            try {
+                for (Method cm : screen.getClass().getMethods()) {
+                    if (cm.getParameterCount() != 0 || !java.util.List.class.isAssignableFrom(cm.getReturnType())) continue;
+                    if (java.lang.reflect.Modifier.isStatic(cm.getModifiers())) continue;
+                    cm.setAccessible(true);
+                    Object childrenObj = cm.invoke(screen);
+                    if (!(childrenObj instanceof java.util.List)) continue;
+                    java.util.List<?> children = (java.util.List<?>) childrenObj;
+                    for (Object child : children) {
+                        if (child == null || child == screen) continue;
+                        String childName = child.getClass().getSimpleName();
+                        for (Method mci : child.getClass().getMethods()) {
+                            if (mci.getReturnType() != boolean.class || mci.getParameterCount() < 2) continue;
+                            Class<?>[] mpt = mci.getParameterTypes();
+                            try {
+                                mci.setAccessible(true);
+                                Object r = null;
+                                if (mpt.length == 3 && mpt[0] == double.class && mpt[1] == double.class && mpt[2] == int.class) {
+                                    r = mci.invoke(child, gx, gy, button);
+                                } else if (mpt.length == 3 && !mpt[0].isPrimitive() && mpt[1] == double.class && mpt[2] == double.class) {
+                                    Object clickType = createClickType(mpt[0], button);
+                                    if (clickType != null) r = mci.invoke(child, clickType, gx, gy);
+                                } else if (mpt.length == 4 && !mpt[0].isPrimitive() && mpt[1] == double.class && mpt[2] == double.class && mpt[3] == int.class) {
+                                    Object clickType = createClickType(mpt[0], button);
+                                    if (clickType != null) r = mci.invoke(child, clickType, gx, gy, button);
+                                } else { continue; }
+                                if (Boolean.TRUE.equals(r)) {
+                                    ReflectionHelper.dbg("guiClick: child " + childName + "." + mci.getName() + " hit at (" + (int)gx + "," + (int)gy + ")");
+                                    childClicked = true;
+                                    break;
+                                }
+                            } catch (Exception e) { ReflectionHelper.dbg("guiClick: child " + childName + "." + mci.getName() + " err: " + e.getMessage()); }
+                        }
+                        if (childClicked) break;
+                    }
+                    if (childClicked) break;
+                }
+            } catch (Exception ignored) {}
+            if (childClicked) {
+                try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+                Object newScreen = getCurrentScreen(mc);
+                if (newScreen == null || newScreen.getClass() != screen.getClass()) {
+                    String newScreenName = newScreen != null ? newScreen.getClass().getSimpleName() : "null";
+                    return "{\"clicked\":true,\"screen\":\"" + screenName + "->" + newScreenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"method\":\"child.mouseClicked\"}";
+                }
             }
             String glfwResult = tryGlfwClick(mc, x, y, button);
             if (glfwResult != null && glfwResult.contains("\"clicked\":true")) return glfwResult;
@@ -396,10 +686,28 @@ public final class ScreenInteractionHelper {
                 }
             }
             for (java.lang.reflect.Constructor<?> c : type.getDeclaredConstructors()) {
-                if (c.getParameterCount() == 1 && c.getParameterTypes()[0] == int.class) {
-                    c.setAccessible(true);
+                c.setAccessible(true);
+                Class<?>[] cpt = c.getParameterTypes();
+                if (cpt.length == 1 && (cpt[0] == int.class || cpt[0] == Integer.class)) {
                     return c.newInstance(button);
+                } else if (cpt.length == 2 && cpt[0] == int.class && cpt[1] == int.class) {
+                    return c.newInstance(button, 0);
                 }
+            }
+            for (java.lang.reflect.Constructor<?> c : type.getDeclaredConstructors()) {
+                c.setAccessible(true);
+                Class<?>[] cpt = c.getParameterTypes();
+                Object[] args = new Object[cpt.length];
+                boolean ok = true;
+                for (int i = 0; i < cpt.length; i++) {
+                    if (cpt[i] == int.class || cpt[i] == Integer.class) args[i] = 0;
+                    else if (cpt[i] == long.class) args[i] = 0L;
+                    else if (cpt[i] == double.class) args[i] = 0.0;
+                    else if (cpt[i] == float.class) args[i] = 0.0f;
+                    else if (cpt[i] == boolean.class) args[i] = false;
+                    else { ok = false; break; }
+                }
+                if (ok && args.length > 0) try { return c.newInstance(args); } catch (Exception ignored) {}
             }
         } catch (Exception e) {
             ReflectionHelper.dbg("createClickType failed for " + type.getName() + ": " + e.getMessage());
@@ -426,9 +734,20 @@ public final class ScreenInteractionHelper {
             java.lang.reflect.Method btnMethod = ReflectionCache.findMouseButtonMethod(mouseHandler.getClass());
             if (btnMethod != null) {
                 btnMethod.setAccessible(true);
-                btnMethod.invoke(mouseHandler, handle, button, 1, 0);
-                Thread.sleep(50);
-                btnMethod.invoke(mouseHandler, handle, button, 0, 0);
+                Class<?>[] bpt = btnMethod.getParameterTypes();
+                if (bpt.length == 3 && bpt[1] != int.class) {
+                    Object mouseInputPress = InputInjectionHelper.createMouseInputPublic(bpt[1], button, 0);
+                    Object mouseInputRelease = InputInjectionHelper.createMouseInputPublic(bpt[1], button, 0);
+                    if (mouseInputPress != null && mouseInputRelease != null) {
+                        btnMethod.invoke(mouseHandler, handle, mouseInputPress, 1);
+                        Thread.sleep(50);
+                        btnMethod.invoke(mouseHandler, handle, mouseInputRelease, 0);
+                    }
+                } else {
+                    btnMethod.invoke(mouseHandler, handle, button, 1, 0);
+                    Thread.sleep(50);
+                    btnMethod.invoke(mouseHandler, handle, button, 0, 0);
+                }
                 ReflectionHelper.dbg("glfwClick: success");
                 return "{\"clicked\":true,\"method\":\"glfw\",\"gui\":[" + x + "," + y + "]}";
             }

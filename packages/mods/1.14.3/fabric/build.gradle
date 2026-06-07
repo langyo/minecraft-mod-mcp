@@ -16,6 +16,7 @@ repositories {
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
+sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
     minecraft "com.mojang:minecraft:1.14.3"
