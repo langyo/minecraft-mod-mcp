@@ -804,7 +804,6 @@ public final class ScreenshotHelper {
                     img.setRGB(x, h - 1 - y, (r << 16) | (g << 8) | b);
                 }
             }
-            System.out.println("[MCP-SKY] color=0x" + Integer.toHexString(sc) + " rgb=(" + skyR + "," + skyG + "," + skyB + ") replaced=" + replaced + "/" + (w*h));
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(img, "jpg", baos);
             return baos.toByteArray();

@@ -156,7 +156,6 @@ public final class ReflectionCache {
     }
 
     private static void dbg(String msg) {
-        System.out.println("[MCP-Discovery] " + msg);
     }
 
     static Field getDiscoveredField(String name) { return discoveredFields.get(name); }

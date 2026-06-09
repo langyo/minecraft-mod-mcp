@@ -5,24 +5,12 @@ import net.fabricmc.api.ClientModInitializer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.File;
+
 
 public class ModDevMcpMod implements ClientModInitializer {
     public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;
     private ReflectedInputHandler handler;
-
-    private static void logToFile(String msg) {
-        try {
-            String home = System.getProperty("user.home");
-            File f = new File(home + File.separator + "mcp_screen.log");
-            BufferedWriter w = new BufferedWriter(new FileWriter(f, true));
-            w.write(System.currentTimeMillis() + " " + msg + "\n");
-            w.close();
-        } catch (Exception ignored) {}
-    }
 
     @Override
     public void onInitializeClient() {
@@ -30,7 +18,7 @@ public class ModDevMcpMod implements ClientModInitializer {
         handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
         int port = McpConfig.getServerPort();
         httpServer = new McpHttpServer(handler, port);
-        logToFile("[MCP-INIT] Mod initialized, starting HTTP server on port " + port);
+
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
@@ -39,9 +27,7 @@ public class ModDevMcpMod implements ClientModInitializer {
                     if (mc != null) ReflectionHelper.setMinecraftInstance(mc);
                 } catch (Exception ignored) {}
                 httpServer.start();
-                logToFile("[MCP-INIT] HTTP server started");
             } catch (Exception e) {
-                logToFile("[MCP-INIT] HTTP server failed: " + e.getMessage());
             }
         }, "MCP-HTTP").start();
     }
@@ -141,7 +127,6 @@ public class ModDevMcpMod implements ClientModInitializer {
                                                     }
                                                 }
                                                 m.setAccessible(true); m.invoke(child, (double)bx, (double)by);
-                                                logToFile("[MCP-AUTO] Clicked compat warning button at (" + bx + "," + by + ")");
                                                 break;
                                             }
                                         }
@@ -151,7 +136,6 @@ public class ModDevMcpMod implements ClientModInitializer {
                             }
                         }
                     } catch (Exception e) {
-                        logToFile("[MCP-AUTO] Compat warning auto-click failed: " + e.getMessage());
                     }
                 }
             } else {
@@ -180,19 +164,14 @@ public class ModDevMcpMod implements ClientModInitializer {
             int h = getGuiHeight();
             int mx = (int) getMouseX();
             int my = (int) getMouseY();
-            String sn = screen.getClass().getSimpleName();
             boolean ctrl = ReflectionHelper.isMcpControlMode();
             boolean hasWorld = mc.world != null;
-            logToFile("[MCP-RENDER] screen=" + sn + " control=" + ctrl + " world=" + hasWorld + " gui=" + w + "x" + h);
             if (ctrl) {
                 McpOverlayLogic.renderResumeButton(wrapRenderer((DrawContext) ctx), mc.textRenderer, "Resume", w, h, mx, my);
-                logToFile("[MCP-RENDER] rendered Resume button");
             } else if (hasWorld && screen != null) {
                 McpOverlayLogic.renderTransferButton(wrapRenderer((DrawContext) ctx), mc.textRenderer, "", w, h, mx, my);
-                logToFile("[MCP-RENDER] rendered Transfer button");
             }
         } catch (Exception e) {
-            logToFile("[MCP-RENDER] ERROR: " + e.getMessage());
         }
     }
 

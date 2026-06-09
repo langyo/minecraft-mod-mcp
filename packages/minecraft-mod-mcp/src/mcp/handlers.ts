@@ -13,8 +13,26 @@ import { findFreePort } from "../discovery/scanner.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "../mc/download.js";
 import { detectJavas } from "../mc/javaDetect.js";
 import { createOfflineUuid } from "../mc/auth.js";
-import { versionsDir } from "../mc/platform.js";
-import { existsSync, mkdirSync } from "node:fs";
+import { versionsDir, modJarPath } from "../mc/platform.js";
+import { existsSync, copyFileSync, mkdirSync } from "node:fs";
+
+function mcVersionGte(version: string, target: string): boolean {
+  const parse = (v: string) => v.split(".").map(Number);
+  const a = parse(version), b = parse(target);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0, y = b[i] ?? 0;
+    if (x > y) return true;
+    if (x < y) return false;
+  }
+  return true;
+}
+
+function buildServerConnectArgs(host: string, port: number, mcVersion: string): string {
+  if (mcVersionGte(mcVersion, "1.20.5")) {
+    return `--quickPlayMultiplayer ${host}:${port}`;
+  }
+  return `--server ${host} --port ${port}`;
+}
 
 const MANAGEMENT_TOOLS = new Set([
   "launch_minecraft", "kill_minecraft", "get_minecraft_status",
@@ -206,10 +224,13 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
     extraGameParts.push(`--port`, String(params.server_port ?? GAME.defaultServerPort));
   }
 
+  const modJar = modJarPath(version, loader);
+
   const cmd = buildLaunchCommand({
     versionId,
     loader,
     mcpPort,
+    modJar: modJar ?? undefined,
     maxMemoryMb: Number(params.memory) || config.max_memory_mb,
     minMemoryMb: Number(params.min_memory) || config.min_memory_mb,
     extraJvmArgs: extraJvmParts.length > 0 ? extraJvmParts.join(" ") : undefined,
@@ -381,10 +402,20 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   if (params.difficulty) serverProps.difficulty = String(params.difficulty);
 
   const setup = await installServer(version, loader, undefined, serverType, serverProps);
+
+  const modJar = modJarPath(version, loader);
+  if (modJar && existsSync(modJar)) {
+    const serverModsDir = join(setup.serverDir, SERVER.modsDirName);
+    if (!existsSync(serverModsDir)) mkdirSync(serverModsDir, { recursive: true });
+    const dest = join(serverModsDir, modJar.split(/[/\\]/).pop()!);
+    copyFileSync(modJar, dest);
+  }
+
   const serverPort = Number(params.port) || GAME.defaultServerPort;
   const srv = launchServer(setup, { maxMemoryMb: serverMem, port: serverPort, javaVersion: setup.javaVersion });
 
-  await new Promise((r) => setTimeout(r, GAME.serverStartupWaitMs));
+  const { waitForServer } = await import("../mc/server.js");
+  await waitForServer(setup.serverDir);
 
   const versionId = await ensureVersionInstalled(version, loader);
   const vj = loadVersionMerged(versionId);
@@ -396,10 +427,11 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
     versionId,
     loader,
     mcpPort,
+    modJar: modJarPath(version, loader) ?? undefined,
     maxMemoryMb: clientMem,
     minMemoryMb: config.min_memory_mb,
     extraJvmArgs: config.java_args,
-    extraGameArgs: `--server ${SERVER.connectHost} --port ${srv.port}`,
+    extraGameArgs: buildServerConnectArgs(SERVER.connectHost, srv.port, version),
     javaPath: javaExecPath(config) ?? undefined,
     playerName: account ? accountUsername(account) : PLAYER.defaultName,
     uuid: account ? accountUuid(account) : PLAYER.defaultUuid,

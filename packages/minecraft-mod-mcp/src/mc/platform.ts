@@ -51,12 +51,20 @@ export function launcherDir(): string {
   return join(mcDir(), PATHS.launcherDirName);
 }
 
-export function modJarPath(mcVersion: string, loader: string): string {
+export function modJarPath(mcVersion: string, loader: string): string | null {
   const projectDir = resolve("packages", "mods", mcVersion, loader);
-  if (loader === "fabric") {
-    return join(projectDir, "build", "libs", `mcpmod-fabric-${mcVersion}-1.0.0.jar`);
-  }
-  return join(projectDir, "build", "libs", `mcpmod-${loader}-${mcVersion}-1.0.0.jar`);
+  const libsDir = join(projectDir, "build", "libs");
+  if (!existsSync(libsDir)) return null;
+
+  try {
+    const jars = readdirSync(libsDir).filter(f => f.endsWith(".jar") && !f.endsWith("-sources.jar") && !f.endsWith("-javadoc.jar"));
+    if (jars.length > 0) {
+      jars.sort((a, b) => b.length - a.length);
+      return join(libsDir, jars[0]);
+    }
+  } catch {}
+
+  return null;
 }
 
 export function jdkHome(javaVersion: number): string | null {
