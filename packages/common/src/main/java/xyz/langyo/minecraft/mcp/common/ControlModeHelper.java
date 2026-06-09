@@ -277,22 +277,22 @@ public final class ControlModeHelper {
         List<Field> booleanFields = new ArrayList<>();
         for (Field f : ReflectionCache.getAllFields(mouseHandler.getClass())) {
             String fn = f.getName().toLowerCase();
-            if ((fn.contains("grabbed")) && f.getType() == boolean.class) {
+            if (f.getType() == boolean.class && (fn.contains("grabbed") || fn.contains("cursorlocked"))) {
                 f.setAccessible(true);
                 mouseGrabbedField = f;
                 ReflectionHelper.dbg("cursor: found mouseGrabbed=" + f.getName());
             }
-            if (fn.contains("accumulateddx") && f.getType() == double.class) {
+            if (f.getType() == double.class && (fn.contains("accumulateddx") || fn.contains("cursordeltax"))) {
                 f.setAccessible(true);
                 accumulatedDXField = f;
                 ReflectionHelper.dbg("cursor: found accDX=" + f.getName());
             }
-            if (fn.contains("accumulateddy") && f.getType() == double.class) {
+            if (f.getType() == double.class && (fn.contains("accumulateddy") || fn.contains("cursordeltay"))) {
                 f.setAccessible(true);
                 accumulatedDYField = f;
                 ReflectionHelper.dbg("cursor: found accDY=" + f.getName());
             }
-            if (f.getType() == boolean.class && f.getName().toLowerCase().contains("cursor")) {
+            if (f.getType() == boolean.class && fn.contains("cursor")) {
                 booleanFields.add(f);
             }
         }
