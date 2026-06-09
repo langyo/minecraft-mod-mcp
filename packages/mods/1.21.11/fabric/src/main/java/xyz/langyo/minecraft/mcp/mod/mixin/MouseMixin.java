@@ -14,24 +14,8 @@ public abstract class MouseMixin {
     @Shadow private double cursorDeltaY;
     @Shadow private boolean cursorLocked;
 
-    @Inject(method = "updateMouse", at = @At("HEAD"), cancellable = true)
-    private void suppressUpdateMouse(double timeDelta, CallbackInfo ci) {
-        if (xyz.langyo.minecraft.mcp.common.ReflectionHelper.isMcpControlMode()) {
-            this.cursorDeltaX = 0.0;
-            this.cursorDeltaY = 0.0;
-            ci.cancel();
-        }
-    }
-
-    @Inject(method = "onCursorPos", at = @At("HEAD"))
-    private void suppressCursorPosDelta(long window, double xpos, double ypos, CallbackInfo ci) {
-        if (xyz.langyo.minecraft.mcp.common.ReflectionHelper.isMcpControlMode()) {
-            this.cursorLocked = false;
-        }
-    }
-
     @Inject(method = "tick", at = @At("HEAD"))
-    private void forceCursorUnlocked(CallbackInfo ci) {
+    private void suppressInControlMode(CallbackInfo ci) {
         if (xyz.langyo.minecraft.mcp.common.ReflectionHelper.isMcpControlMode()) {
             this.cursorDeltaX = 0.0;
             this.cursorDeltaY = 0.0;
