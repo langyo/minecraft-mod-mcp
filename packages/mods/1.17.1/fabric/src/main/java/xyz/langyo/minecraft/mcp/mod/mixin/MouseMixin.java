@@ -14,6 +14,9 @@ import xyz.langyo.minecraft.mcp.mod.ModDevMcpMod;
 public abstract class MouseMixin {
     @Shadow private double x;
     @Shadow private double y;
+    @Shadow private double cursorDeltaX;
+    @Shadow private double cursorDeltaY;
+    @Shadow private boolean cursorLocked;
 
     @Inject(method = "onMouseButton", at = @At("HEAD"), cancellable = true)
     private void onMouseButton(long window, int button, int action, int mods, CallbackInfo ci) {
@@ -36,6 +39,9 @@ public abstract class MouseMixin {
     @Inject(method = "updateMouse", at = @At("HEAD"), cancellable = true)
     private void onUpdateMouse(CallbackInfo ci) {
         if (ReflectionHelper.isMcpControlMode()) {
+            this.cursorDeltaX = 0.0;
+            this.cursorDeltaY = 0.0;
+            this.cursorLocked = false;
             ci.cancel();
         }
     }

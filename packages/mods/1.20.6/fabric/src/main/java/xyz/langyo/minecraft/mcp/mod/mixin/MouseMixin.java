@@ -15,6 +15,9 @@ public abstract class MouseMixin {
 
     @Shadow private double x;
     @Shadow private double y;
+    @Shadow private double cursorDeltaX;
+    @Shadow private double cursorDeltaY;
+    @Shadow private boolean cursorLocked;
 
     @Inject(method = "onMouseButton", at = @At("HEAD"), cancellable = true)
     private void onMouseButton(long window, int button, int action, int mods, CallbackInfo ci) {
@@ -35,14 +38,18 @@ public abstract class MouseMixin {
     @Inject(method = "updateMouse", at = @At("HEAD"), cancellable = true)
     private void onUpdateMouse(double timeDelta, CallbackInfo ci) {
         if (ReflectionHelper.isMcpControlMode()) {
+            this.cursorDeltaX = 0.0;
+            this.cursorDeltaY = 0.0;
             ci.cancel();
         }
     }
 
-    @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
         if (ReflectionHelper.isMcpControlMode()) {
-            ci.cancel();
+            this.cursorDeltaX = 0.0;
+            this.cursorDeltaY = 0.0;
+            this.cursorLocked = false;
         }
     }
 }
