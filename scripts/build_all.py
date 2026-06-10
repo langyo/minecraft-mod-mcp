@@ -26,7 +26,7 @@ from version_config import (
     ALL_VERSIONS, FG_ERAS, MODS_DIR,
     get_loaders, get_fg_era, get_jdk_home, find_jdk17, is_legacy, JDK_PATHS,
 )
-from mirrors import probe_all as probe_mirrors, patch_all_wrappers, generate_init_gradle
+from mirrors import probe_all as probe_mirrors, patch_all_wrappers_local, generate_init_gradle
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS_DIR_ACTUAL = MODS_DIR
@@ -218,9 +218,9 @@ def main():
 
     probe_mirrors()
 
-    patched = patch_all_wrappers(BASE)
+    patched = patch_all_wrappers_local(BASE)
     if patched > 0:
-        print(f"  Patched {patched} gradle-wrapper.properties with working mirror\n")
+        print(f"  Patched {patched} gradle-wrapper.properties with local cache\n")
 
     generate_init_gradle()
 
