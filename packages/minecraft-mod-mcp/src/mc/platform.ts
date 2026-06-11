@@ -8,11 +8,27 @@ function homedir(): string {
   return crossHomedir();
 }
 
+let _mcDir: string | null = null;
+
 export function mcDir(): string {
+  if (_mcDir) return _mcDir;
+
+  const candidates: string[] = [];
   if (isWindows() && process.env.APPDATA) {
-    return join(process.env.APPDATA, PATHS.mcDirName);
+    candidates.push(join(process.env.APPDATA, PATHS.mcDirName));
   }
-  return join(homedir(), PATHS.mcDirName);
+  candidates.push(join(homedir(), PATHS.mcDirName));
+
+  for (const dir of candidates) {
+    if (existsSync(dir) && existsSync(join(dir, PATHS.versionsDirName))) {
+      _mcDir = dir;
+      return dir;
+    }
+  }
+
+  const fallback = candidates[0] || join(homedir(), PATHS.mcDirName);
+  _mcDir = fallback;
+  return fallback;
 }
 
 export function versionsDir(): string {
@@ -35,12 +51,20 @@ export function launcherDir(): string {
   return join(mcDir(), PATHS.launcherDirName);
 }
 
-export function modJarPath(mcVersion: string, loader: string): string {
+export function modJarPath(mcVersion: string, loader: string): string | null {
   const projectDir = resolve("packages", "mods", mcVersion, loader);
-  if (loader === "fabric") {
-    return join(projectDir, "build", "libs", `mcpmod-fabric-${mcVersion}-1.0.0.jar`);
-  }
-  return join(projectDir, "build", "libs", `mcpmod-${loader}-${mcVersion}-1.0.0.jar`);
+  const libsDir = join(projectDir, "build", "libs");
+  if (!existsSync(libsDir)) return null;
+
+  try {
+    const jars = readdirSync(libsDir).filter(f => f.endsWith(".jar") && !f.endsWith("-sources.jar") && !f.endsWith("-javadoc.jar"));
+    if (jars.length > 0) {
+      jars.sort((a, b) => b.length - a.length);
+      return join(libsDir, jars[0]);
+    }
+  } catch {}
+
+  return null;
 }
 
 export function jdkHome(javaVersion: number): string | null {

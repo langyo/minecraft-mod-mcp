@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync } from "node:fs";
 import { join, extname, basename } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { crossHomedir, isWindows, isMacos } from "../runtime/detector.js";
@@ -9,9 +9,27 @@ import { loadVersionsData, type VersionsData } from "./versionsData.js";
 import { getVersionById, type Loader } from "./versions.js";
 import { installedJavaHome, ensureJavaInstalled } from "./javaDownload.js";
 import { detectJavas } from "./javaDetect.js";
-import { LAUNCHER, PLAYER, GAME } from "./defaults.js";
+import { LAUNCHER, PLAYER, GAME, SERVER } from "./defaults.js";
 
 const NATIVE_EXTS = new Set([".dll", ".so", ".dylib", ".jnilib"]);
+
+function ensureOptionsTxt(gameDir: string) {
+  const optionsPath = join(gameDir, "options.txt");
+  if (existsSync(optionsPath)) return;
+  if (!GAME.defaultOptionsTxt) return;
+  try {
+    writeFileSync(optionsPath, GAME.defaultOptionsTxt + "\n", "utf-8");
+  } catch {}
+}
+
+function deployModToModsDir(gameDir: string, modJar: string) {
+  const modsDir = join(gameDir, SERVER.modsDirName);
+  if (!existsSync(modsDir)) mkdirSync(modsDir, { recursive: true });
+  const dest = join(modsDir, modJar.split(/[/\\]/).pop()!);
+  if (!existsSync(dest)) {
+    copyFileSync(modJar, dest);
+  }
+}
 
 function getNativeOsKey(): string {
   if (isWindows()) return "windows";
@@ -201,6 +219,11 @@ export async function ensureJavaForLaunch(
 export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?: VersionsData): LaunchCommand {
   const vd = data ?? loadVersionsData();
   const mcDir = config.mcDir ?? join(crossHomedir(), ".minecraft");
+  ensureOptionsTxt(mcDir);
+
+  if (config.modJar && existsSync(config.modJar) && config.loader === "fabric") {
+    deployModToModsDir(mcDir, config.modJar);
+  }
 
   let versionInfo = getVersionById(vd, config.versionId);
   if (!versionInfo) {
@@ -220,7 +243,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   if (existsSync(versionJar) && versionJar !== baseJar) classpathPaths.push(versionJar);
 
   if (config.modJar && existsSync(config.modJar)) {
-    classpathPaths.push(config.modJar);
+    classpathPaths.unshift(config.modJar);
   }
 
   const needsSortFix = needsLegacySortFix(config.versionId, targetJavaVersion);
@@ -256,6 +279,9 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   if (config.mcpPort) {
     allArgs.push(`-Dmcp.port=${config.mcpPort}`);
   }
+
+  allArgs.push("-Dmcp.mod.version=0.4.0");
+  allArgs.push(`-Dmcp.mod.loader=${config.loader ?? "forge"}`);
 
   if (targetJavaVersion >= 9) {
     allArgs.push(...LEGACY_JVM_ARGS);

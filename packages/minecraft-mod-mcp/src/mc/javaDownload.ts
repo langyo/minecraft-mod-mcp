@@ -107,11 +107,10 @@ async function extractArchive(archive: string, outDir: string): Promise<void> {
 
   if (isWindows()) {
     const { execFileSync } = await import("node:child_process");
-    const psScript = `
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::ExtractToDirectory($args[0], $args[1])
-`.trim();
-    execFileSync("powershell", ["-NoProfile", "-Command", psScript, "-args", archive, outDir], {
+    const escArchive = archive.replace(/'/g, "''");
+    const escOutDir = outDir.replace(/'/g, "''");
+    const psScript = `Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('${escArchive}', '${escOutDir}')`;
+    execFileSync("powershell", ["-NoProfile", "-Command", psScript], {
       stdio: "pipe",
       timeout: JAVA.extractTimeoutMs,
     });

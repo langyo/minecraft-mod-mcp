@@ -1,0 +1,12 @@
+[
+  {
+    "version": "1.21.11",
+    "timestamp": "2026-06-11T01:04:59.068148",
+    "status": "LAUNCH_FAIL",
+    "details": "MCP API did not respond within 180s",
+    "rot_before": null,
+    "rot_after": null,
+    "delta_yaw": null,
+    "delta_pitch": null
+  }
+]

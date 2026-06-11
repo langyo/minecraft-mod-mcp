@@ -58,34 +58,10 @@ public final class ControlModeHelper {
         try {
             mcpControlMode = true;
             mcpControlModeEnterTime = System.currentTimeMillis();
-            System.out.println("[MCP-ENTER] stacktrace: " + java.util.Arrays.toString(new Exception().getStackTrace()).substring(0, 500));
             try {
                 Object s = ReflectionCache.getCurrentScreen(mc);
                 hadScreenOnEnter = (s != null);
-                System.out.println("[MCP-ENTER] screen=" + (s != null ? s.getClass().getName() : "NULL"));
-                if (s == null) {
-                    try {
-                        for (Field f : mc.getClass().getDeclaredFields()) {
-                            String fn = f.getName();
-                            if (fn.contains("screen") || fn.contains("Screen") || fn.contains("71462")) {
-                                f.setAccessible(true);
-                                Object val = f.get(mc);
-                                System.out.println("[MCP-ENTER-FIELD] " + fn + " = " + (val != null ? val.getClass().getName() : "null"));
-                            }
-                        }
-                        try {
-                            Object viaMethod = mc.getClass().getMethod("screen").invoke(mc);
-                            System.out.println("[MCP-ENTER-METHOD] screen() = " + (viaMethod != null ? viaMethod.getClass().getName() : "null"));
-                        } catch (Exception e) {
-                            System.out.println("[MCP-ENTER-METHOD] failed: " + e.getMessage());
-                        }
-                    } catch (Exception e) {
-                        System.out.println("[MCP-ENTER-DIAG] failed: " + e.getMessage());
-                    }
-                }
-            } catch (Exception e) {
-                System.out.println("[MCP-ENTER] getCurrentScreen failed: " + e.getMessage());
-            }
+            } catch (Exception ignored) {}
             mouseReleaseActive = false;
             forceCursorAndReleaseMouse(mc);
             logModEvent("enter_control_mode", "MCP took control");
@@ -96,7 +72,6 @@ public final class ControlModeHelper {
 
     public static String exitMcpControlMode(Object mc) {
         try {
-            System.out.println("[MCP-EXIT] stacktrace: " + java.util.Arrays.toString(new Exception().getStackTrace()).substring(0, 500));
             mcpControlMode = false;
             mcpControlModeExitTime = System.currentTimeMillis();
             logModEvent("exit_control_mode", "Manual control restored");
@@ -106,24 +81,41 @@ public final class ControlModeHelper {
                 try {
                     Object mh = ReflectionCache.getMouseHandler(mc);
                     if (mh != null) {
-                        try {
-                            for (Method m : mh.getClass().getMethods()) {
-                                if (m.getName().equals("releaseMouse") && m.getParameterCount() == 0) {
-                                    m.invoke(mh);
-                                    break;
-                                }
+                        initMouseFields(mh);
+                        for (Method m : mh.getClass().getMethods()) {
+                            String n = m.getName();
+                            if (m.getParameterCount() == 0 && (n.equals("lockCursor") || n.equals("method_1611") || n.equals("func_224798_b"))) {
+                                m.setAccessible(true);
+                                m.invoke(mh);
+                                break;
                             }
-                        } catch (Exception ignored) {}
+                        }
+                        if (mouseGrabbedField != null) {
+                            mouseGrabbedField.setBoolean(mh, true);
+                        }
                     }
-                    ReflectionHelper.dbg("exitMcpControlMode: released mouse");
+                    long handle = WindowHelper.getWindowHandle(mc);
+                    if (handle != 0) {
+                        initCursorCache();
+                        int GLFW_CURSOR_DISABLED = 212995;
+                        try {
+                            Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+                            GLFW_CURSOR_DISABLED = glfw.getField("GLFW_CURSOR_DISABLED").getInt(null);
+                        } catch (Exception ignored) {}
+                        Method glfwSetInputMode = ReflectionCache.getGlfwSetInputModeMethod();
+                        if (glfwSetInputMode != null) {
+                            glfwSetInputMode.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_DISABLED);
+                        }
+                    }
+                    ReflectionHelper.dbg("exitMcpControlMode: locked cursor via lockCursor + GLFW_CURSOR_DISABLED");
                 } catch (Exception ce) {
                     ReflectionHelper.dbg("exitMcpControlMode: failed: " + ce.getMessage());
                 }
             } else {
                 try {
                     Class<?> mouseClass = Class.forName("org.lwjgl.input.Mouse");
-                    mouseClass.getMethod("setGrabbed", boolean.class).invoke(null, false);
-                    ReflectionHelper.dbg("exitMcpControlMode LWJGL2: cursor ungrabbed, MC will re-grab if needed");
+                    mouseClass.getMethod("setGrabbed", boolean.class).invoke(null, true);
+                    ReflectionHelper.dbg("exitMcpControlMode LWJGL2: cursor grabbed");
                 } catch (Exception e) {
                     ReflectionHelper.dbg("exitMcpControlMode LWJGL2: " + e.getMessage());
                 }
@@ -285,22 +277,22 @@ public final class ControlModeHelper {
         List<Field> booleanFields = new ArrayList<>();
         for (Field f : ReflectionCache.getAllFields(mouseHandler.getClass())) {
             String fn = f.getName().toLowerCase();
-            if ((fn.contains("grabbed")) && f.getType() == boolean.class) {
+            if (f.getType() == boolean.class && (fn.contains("grabbed") || fn.contains("cursorlocked"))) {
                 f.setAccessible(true);
                 mouseGrabbedField = f;
                 ReflectionHelper.dbg("cursor: found mouseGrabbed=" + f.getName());
             }
-            if (fn.contains("accumulateddx") && f.getType() == double.class) {
+            if (f.getType() == double.class && (fn.contains("accumulateddx") || fn.contains("cursordeltax"))) {
                 f.setAccessible(true);
                 accumulatedDXField = f;
                 ReflectionHelper.dbg("cursor: found accDX=" + f.getName());
             }
-            if (fn.contains("accumulateddy") && f.getType() == double.class) {
+            if (f.getType() == double.class && (fn.contains("accumulateddy") || fn.contains("cursordeltay"))) {
                 f.setAccessible(true);
                 accumulatedDYField = f;
                 ReflectionHelper.dbg("cursor: found accDY=" + f.getName());
             }
-            if (f.getType() == boolean.class && f.getName().toLowerCase().contains("cursor")) {
+            if (f.getType() == boolean.class && fn.contains("cursor")) {
                 booleanFields.add(f);
             }
         }

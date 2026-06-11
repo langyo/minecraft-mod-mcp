@@ -76,10 +76,12 @@ public final class WindowHelper {
         } catch (Exception e) { return 0; }
     }
 
-    private static Object findWindowObject(Object mc) throws Exception {
+    static Object findWindowObject(Object mc) throws Exception {
         for (String name : new String[]{"getWindow", "getMainWindow"}) {
             try { return mc.getClass().getMethod(name).invoke(mc); } catch (NoSuchMethodException ignored) {}
         }
+        java.lang.reflect.Field discovered = ReflectionCache.getDiscoveredField("window");
+        if (discovered != null) { try { discovered.setAccessible(true); return discovered.get(mc); } catch (Exception ignored) {} }
         for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
             f.setAccessible(true);
             String tn = f.getType().getSimpleName();
@@ -87,10 +89,34 @@ public final class WindowHelper {
                 try { return f.get(mc); } catch (Exception ignored) {}
             }
         }
+        for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
+            f.setAccessible(true);
+            Class<?> ft = f.getType();
+            if (!java.lang.reflect.Modifier.isStatic(f.getModifiers()) && isWindowType(ft)) {
+                try { return f.get(mc); } catch (Exception ignored) {}
+            }
+        }
         return null;
     }
 
+    private static boolean isWindowType(Class<?> clazz) {
+        boolean hasLongReturn = false;
+        boolean hasIntReturn = false;
+        for (Method m : ReflectionCache.getAllMethods(clazz)) {
+            if (m.getParameterCount() == 0) {
+                if (m.getReturnType() == long.class) hasLongReturn = true;
+                if (m.getReturnType() == int.class) hasIntReturn = true;
+            }
+        }
+        return hasLongReturn && hasIntReturn;
+    }
+
     private static long extractHandleFromWindow(Object window) throws Exception {
+        for (Method m : ReflectionCache.getAllMethods(window.getClass())) {
+            if (m.getParameterCount() == 0 && m.getReturnType() == long.class) {
+                try { m.setAccessible(true); Object r = m.invoke(window); if (r instanceof Number && ((Number)r).longValue() != 0) return ((Number)r).longValue(); } catch (Exception ignored) {}
+            }
+        }
         for (String methodName : new String[]{"handle", "getHandle", "getWindow"}) {
             try {
                 Object result = window.getClass().getMethod(methodName).invoke(window);

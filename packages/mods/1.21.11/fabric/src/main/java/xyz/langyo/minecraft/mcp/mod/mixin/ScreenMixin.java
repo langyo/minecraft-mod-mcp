@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.DrawContext;
 import xyz.langyo.minecraft.mcp.mod.ModDevMcpMod;
 
+
 @Mixin(Screen.class)
 public abstract class ScreenMixin {
 

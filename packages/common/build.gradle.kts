@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "xyz.langyo.minecraft.mcp"
-version = "0.1.0-SNAPSHOT"
+version = "0.2.0"
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }

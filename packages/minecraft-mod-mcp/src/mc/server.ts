@@ -69,7 +69,7 @@ function generateServerProperties(overrides: ServerProperties): string {
     "gamemode": overrides.gamemode ?? "survival",
     "enable-command-block": "true",
     "enable-query": "false",
-    "generator-settings": `{"layers":[{"block":"bedrock","height":1},{"block":"dirt","height":2},{"block":"grass_block","height":1}],"biome":"plains"}`,
+    "generator-settings": `{"layers":[{"block":"minecraft:stone","height":1}],"biome":"minecraft:the_void"}`,
     "level-name": overrides.levelName ?? "world",
     "motd": overrides.motd ?? "MCP Server",
     "query.port": String(overrides.serverPort ?? GAME.defaultServerPort),

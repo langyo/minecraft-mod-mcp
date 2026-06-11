@@ -10,10 +10,10 @@ import { detectJavas } from "./mc/javaDetect.js";
 import { ensureJavaInstalled } from "./mc/javaDownload.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "./mc/download.js";
-import { versionsDir, classpathSeparator } from "./mc/platform.js";
+import { versionsDir, classpathSeparator, modJarPath } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync } from "node:fs";
 import { gradleProxyEnv, setupGlobalProxy } from "./mc/proxy.js";
 import { join, resolve } from "node:path";
 import { GAME, MCP, PLAYER, SERVER, SERVER_TYPES, type ServerType } from "./mc/defaults.js";
@@ -208,7 +208,7 @@ Options:
     versionId,
     mcDir: typeof values["mc-dir"] === "string" ? values["mc-dir"] : gameDirPath(config),
     loader,
-    modJar: typeof values["mod-jar"] === "string" ? values["mod-jar"] : undefined,
+    modJar: typeof values["mod-jar"] === "string" ? values["mod-jar"] : modJarPath(versionArg, loader) ?? undefined,
     mcpPort: typeof values.port === "string" ? parseInt(values.port, 10) : config.mcp_port ?? await findFreePort(),
     dryRun: values["dry-run"] === true,
     maxMemoryMb: parseInt(typeof values.memory === "string" ? values.memory : String(config.max_memory_mb), 10),
@@ -221,6 +221,7 @@ Options:
       typeof values["game-args"] === "string" ? (values["game-args"] as string) : undefined,
       values.server,
       values["server-port"],
+      versionArg,
     ),
     javaPath: typeof values.java === "string" ? values.java : javaExecPath(config) ?? undefined,
     playerName: account ? accountUsername(account) : PLAYER.defaultName,
@@ -263,8 +264,9 @@ Options:
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
     stdio: "ignore",
-    detached: process.platform !== "win32",
+    detached: true,
   });
+  child.unref();
 
   child.on("error", (err) => {
     console.error(`Launch failed: ${err.message}`);
@@ -643,19 +645,38 @@ async function runTui() {
   process.exit(1);
 }
 
+function mcVersionGte(version: string, target: string): boolean {
+  const parse = (v: string) => v.split(".").map(Number);
+  const a = parse(version), b = parse(target);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0, y = b[i] ?? 0;
+    if (x > y) return true;
+    if (x < y) return false;
+  }
+  return true;
+}
+
+function serverConnectArgs(host: string, port: number | string, mcVersion: string): string {
+  const portStr = typeof port === "string" ? port : String(port);
+  if (mcVersionGte(mcVersion, "1.20.5")) {
+    return `--quickPlayMultiplayer ${host}:${portStr}`;
+  }
+  return `--server ${host} --port ${portStr}`;
+}
+
 function buildExtraGameArgs(
   base: string | undefined,
   extraGameArgs?: string,
   server?: string | boolean,
   serverPort?: string | boolean,
+  mcVersion?: string,
 ): string | undefined {
   const parts: string[] = [];
   if (base) parts.push(base);
   if (extraGameArgs) parts.push(extraGameArgs);
   if (typeof server === "string") {
-    parts.push(`--server`, server);
     const port = typeof serverPort === "string" ? serverPort : String(GAME.defaultServerPort);
-    parts.push(`--port`, port);
+    parts.push(serverConnectArgs(server, port, mcVersion ?? "1.21.11"));
   }
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
@@ -1066,6 +1087,15 @@ Client Options:
     return;
   }
 
+  const autoModJar = typeof values["mod-jar"] === "string" ? (values["mod-jar"] as string) : modJarPath(versionArg, loader);
+  if (autoModJar && existsSync(autoModJar)) {
+    const serverModsDir = join(setup.serverDir, SERVER.modsDirName);
+    if (!existsSync(serverModsDir)) mkdirSync(serverModsDir, { recursive: true });
+    const dest = join(serverModsDir, autoModJar.split(/[/\\]/).pop()!);
+    copyFileSync(autoModJar, dest);
+    console.log(`  Deployed mod JAR to server: ${dest}`);
+  }
+
   console.log(`\n[2/3] Starting server...`);
   const srv = launchServer(setup, {
     javaPath: typeof values.java === "string" ? values.java : undefined,
@@ -1077,8 +1107,9 @@ Client Options:
     port: serverPort,
   });
   console.log(`  Server PID: ${srv.process.pid}, port: ${srv.port}`);
-  console.log(`  Waiting 15s for server startup...`);
-  await new Promise((r) => setTimeout(r, GAME.serverStartupWaitMs));
+  console.log(`  Waiting for server to start...`);
+  const { waitForServer } = await import("./mc/server.js");
+  await waitForServer(setup.serverDir);
 
   console.log(`\n[3/3] Launching client (auto-connect to localhost:${srv.port})...`);
   const launchArgs = [
@@ -1089,8 +1120,7 @@ Client Options:
     "--memory", String(values.memory),
   ];
   if (typeof values.java === "string") launchArgs.push("--java", values.java);
-  if (typeof values["mod-jar"] === "string") launchArgs.push("--mod-jar", values["mod-jar"]);
-  if (values.port) launchArgs.push("--port", values.port as string);
+  if (autoModJar) launchArgs.push("--mod-jar", autoModJar);
   if (values.fullscreen) launchArgs.push("--fullscreen");
   if (typeof values.width === "string") launchArgs.push("--width", values.width);
   if (typeof values.height === "string") launchArgs.push("--height", values.height);

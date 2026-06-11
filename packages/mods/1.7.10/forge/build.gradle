@@ -11,7 +11,7 @@ buildscript {
 
 apply plugin: "forge"
 
-version = "0.2.0-SNAPSHOT"
+version = "0.2.0"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 

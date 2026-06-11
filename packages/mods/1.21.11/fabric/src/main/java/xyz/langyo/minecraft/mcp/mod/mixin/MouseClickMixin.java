@@ -19,13 +19,11 @@ public abstract class MouseClickMixin {
             if (input.button() != 0) return;
             ModDevMcpMod mod = ModDevMcpMod.INSTANCE;
             if (mod == null) return;
-            Mouse mouse = (Mouse) (Object) this;
             net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
-            if (mc.currentScreen == null) return;
+            boolean inControlMode = xyz.langyo.minecraft.mcp.common.ReflectionHelper.isMcpControlMode();
+            if (mc.currentScreen == null && !inControlMode) return;
             double mx = mc.mouse.getX() * mc.getWindow().getScaledWidth() / (double) mc.getWindow().getWidth();
             double my = mc.mouse.getY() * mc.getWindow().getScaledHeight() / (double) mc.getWindow().getHeight();
-            System.out.println("[MCP-MOD] Mouse.onMouseButton fired btn=" + input.button() + " action=" + action
-                + " mx=" + (int)mx + " my=" + (int)my + " screen=" + mc.currentScreen.getClass().getSimpleName());
             if (action == GLFW.GLFW_PRESS) {
                 if (mod.onMouseClicked(mx, my, input.button())) {
                     mc.setScreen(mc.currentScreen);

@@ -324,13 +324,35 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     }
 
     private byte[] doScreenshot() {
-        int w = getWidth();
-        int h = getHeight();
-        if (w <= 0 || h <= 0) {
-            return null;
-        }
         try {
-            byte[] result = ReflectionHelper.takeScreenshot(mc(), w, h);
+            Object mc = mc();
+            int w = getWidth();
+            int h = getHeight();
+            if (w <= 0 || h <= 0) {
+                java.lang.reflect.Field winField = ReflectionCache.getDiscoveredField("window");
+                if (winField != null) {
+                    try {
+                        winField.setAccessible(true);
+                        Object window = winField.get(mc);
+                        if (window != null) {
+                            for (java.lang.reflect.Method m : ReflectionCache.getAllMethods(window.getClass())) {
+                                if (m.getParameterCount() == 0 && m.getReturnType() == int.class) {
+                                    m.setAccessible(true);
+                                    int v = (int) m.invoke(window);
+                                    if (v > 0) { if (w == 0) w = v; else if (h == 0) { h = v; break; } }
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("[MCP] doScreenshot window fallback: " + e.getMessage());
+                    }
+                }
+            }
+            if (w <= 0 || h <= 0) {
+                System.err.println("[MCP] doScreenshot: no dimensions (w=" + w + " h=" + h + ")");
+                return null;
+            }
+            byte[] result = ReflectionHelper.takeScreenshot(mc, w, h);
             return result;
         } catch (RuntimeException e) {
             System.err.println("[Input] doScreenshot: " + e.getMessage());

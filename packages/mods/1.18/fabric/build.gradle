@@ -2,7 +2,7 @@ plugins {
     id "fabric-loom" version "1.0-SNAPSHOT"
 }
 
-version = "0.2.0-SNAPSHOT"
+version = "0.2.0"
 group = "xyz.langyo"
 
 sourceCompatibility = "17"
@@ -16,6 +16,7 @@ repositories {
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
+sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
     minecraft "com.mojang:minecraft:1.18"

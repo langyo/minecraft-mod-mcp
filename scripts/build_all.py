@@ -26,7 +26,7 @@ from version_config import (
     ALL_VERSIONS, FG_ERAS, MODS_DIR,
     get_loaders, get_fg_era, get_jdk_home, find_jdk17, is_legacy, JDK_PATHS,
 )
-from mirrors import probe_all as probe_mirrors, patch_all_wrappers, generate_init_gradle
+from mirrors import probe_all as probe_mirrors, patch_all_wrappers_local, generate_init_gradle
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS_DIR_ACTUAL = MODS_DIR
@@ -141,32 +141,47 @@ def _build_one(task_info):
     env.pop("JAVA_TOOL_OPTIONS", None)
     env["GRADLE_OPTS"] = "-Xmx3G"
 
+    log_path = os.path.join(path, "build.log")
     start = time.time()
+    with _print_lock:
+        print(f"  START {key} (JDK={jdk})")
+
     cmd = ["cmd", "/c", "gradlew.bat", "build", "--no-daemon", "--rerun-tasks"]
     try:
-        proc = subprocess.run(
-            cmd,
-            cwd=path,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=BUILD_TIMEOUT,
-            env=env,
-        )
+        with open(log_path, "w", encoding="utf-8") as logf:
+            proc = subprocess.run(
+                cmd,
+                cwd=path,
+                stdout=logf,
+                stderr=subprocess.STDOUT,
+                timeout=BUILD_TIMEOUT,
+                env=env,
+            )
         elapsed = time.time() - start
-        out = (proc.stdout or "") + (proc.stderr or "")
+
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            out = f.read()
+
         if proc.returncode == 0 and "BUILD SUCCESSFUL" in out:
+            os.remove(log_path)
             return key, "success", {"key": key, "time": round(elapsed, 1)}
         else:
             err_msg = out[-2000:] if len(out) > 2000 else out
-            log_path = os.path.join(path, "build-error.log")
-            with open(log_path, "w", encoding="utf-8") as lf:
+            error_log = os.path.join(path, "build-error.log")
+            with open(error_log, "w", encoding="utf-8") as lf:
                 lf.write(out)
             return key, "fail", {"key": key, "time": round(elapsed, 1), "error": err_msg}
     except subprocess.TimeoutExpired:
         elapsed = time.time() - start
-        return key, "fail", {"key": key, "time": round(elapsed, 1), "error": "TIMEOUT"}
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        out = ""
+        if os.path.isfile(log_path):
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                out = f.read()[-1000:]
+        return key, "fail", {"key": key, "time": round(elapsed, 1), "error": f"TIMEOUT\n{out}"}
     except Exception as e:
         return key, "fail", {"key": key, "error": str(e)}
 
@@ -218,9 +233,9 @@ def main():
 
     probe_mirrors()
 
-    patched = patch_all_wrappers(BASE)
+    patched = patch_all_wrappers_local(BASE)
     if patched > 0:
-        print(f"  Patched {patched} gradle-wrapper.properties with working mirror\n")
+        print(f"  Patched {patched} gradle-wrapper.properties with local cache\n")
 
     generate_init_gradle()
 
@@ -246,6 +261,8 @@ def main():
         if args.loader and args.loader not in loaders:
             continue
         for loader in loaders:
+            if args.loader and loader != args.loader:
+                continue
             tasks.append((mc, loader, info))
 
     _ensure_jdks(tasks)
@@ -263,6 +280,17 @@ def main():
 
     done = 0
     start_all = time.time()
+    last_heartbeat = [time.time()]
+
+    def _heartbeat():
+        while True:
+            time.sleep(30)
+            elapsed_all = time.time() - start_all
+            with _print_lock:
+                print(f"  ... heartbeat: {done}/{total} done, {elapsed_all:.0f}s elapsed")
+
+    ht = threading.Thread(target=_heartbeat, daemon=True)
+    ht.start()
 
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         future_map = {pool.submit(_build_one, t): t for t in tasks}
