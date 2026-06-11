@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "xyz.langyo.minecraft.mcp.mod.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "InGameHudMixin",
+    "ScreenMixin",
+    "MouseClickMixin",
+    "MouseMixin",
+    "MinecraftClientMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
