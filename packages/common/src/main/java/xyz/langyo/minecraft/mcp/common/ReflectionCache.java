@@ -86,7 +86,19 @@ public final class ReflectionCache {
 
     public static void setMinecraftInstance(Object instance) {
         cachedMcInstance = instance;
-        if (instance != null) discoverFields(instance);
+        if (instance != null) {
+            if (mcClass == null) mcClass = instance.getClass();
+            if (mcGetInstanceMethod == null) {
+                try { mcGetInstanceMethod = mcClass.getMethod("getInstance"); } catch (Exception ignored) {}
+                if (mcGetInstanceMethod == null) try { mcGetInstanceMethod = mcClass.getMethod("getMinecraft"); } catch (Exception ignored) {}
+                if (mcGetInstanceMethod == null) {
+                    for (Method m : mcClass.getMethods()) {
+                        if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) && m.getReturnType() == mcClass && m.getParameterCount() == 0) { mcGetInstanceMethod = m; break; }
+                    }
+                }
+            }
+            discoverFields(instance);
+        }
     }
 
     static void discoverFields(Object mc) {
