@@ -21,10 +21,6 @@ function patchNodePrefixPlugin() {
               new RegExp(`(from\\s*["'])${mod}(["'])`, "g"),
               `$1node:${mod}$2`
             );
-            text = text.replace(
-              new RegExp(`(require\\s*\\(\\s*["'])${mod}(["']\\s*\\))`, "g"),
-              `$1node:${mod}$2`
-            );
           }
           file.contents = new TextEncoder().encode(text);
         }

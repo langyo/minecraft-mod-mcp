@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: "net.minecraftforge.gradle"
 
-version = "0.2.0-SNAPSHOT"
+version = "0.2.0"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
@@ -33,6 +33,7 @@ repositories {
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
+sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
     minecraft "net.minecraftforge:forge:1.16.5-36.2.42"

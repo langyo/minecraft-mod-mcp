@@ -33,6 +33,7 @@ repositories {
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
+sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
     implementation minecraft.dependency('net.minecraftforge:forge:1.21.11-61.1.5')

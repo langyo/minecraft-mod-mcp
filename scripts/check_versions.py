@@ -69,14 +69,15 @@ def check_build_gradle(expected: str) -> list[str]:
         content = path.read_text(encoding="utf-8")
         for m in re.finditer(pattern_groovy, content):
             actual = m.group(1)
-            # Skip Minecraft/Forge platform versions (e.g. "1.12.2-14.23.5.2847")
             if "-" in actual and not actual.startswith("1.0"):
                 continue
-            # Skip non-mod versions (plugin versions, etc.)
             line_start = content.rfind("\n", 0, m.start()) + 1
             line = content[line_start:m.end()]
+            block_start = content.rfind("\n", 0, m.start()) + 1
+            preceding = content[max(0, block_start - 200):block_start]
+            if "neoforge {" in preceding.lower() or "neoforged" in preceding.lower():
+                continue
             if "minecraft" in line.lower() and "version" in line.lower():
-                # Check if this is the Minecraft version block
                 if "net.minecraftforge" not in line.lower():
                     continue
             if actual != expected:

@@ -10,6 +10,7 @@ import net.minecraft.client.gui.screen.GameMenuScreen;
 import xyz.langyo.minecraft.mcp.common.ReflectionHelper;
 import xyz.langyo.minecraft.mcp.mod.ModDevMcpMod;
 
+
 @Mixin(MinecraftClient.class)
 public abstract class MinecraftClientMixin {
 
@@ -20,6 +21,7 @@ public abstract class MinecraftClientMixin {
             mod.onClientTick();
         }
     }
+
     @Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
     private void onOpenScreen(Screen screen, CallbackInfo ci) {
         if (ReflectionHelper.isMcpControlMode() && screen instanceof GameMenuScreen) {

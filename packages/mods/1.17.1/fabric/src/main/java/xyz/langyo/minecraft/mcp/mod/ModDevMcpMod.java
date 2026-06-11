@@ -2,6 +2,7 @@ package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.fabricmc.api.ClientModInitializer;
+import net.minecraft.client.MinecraftClient;
 
 public class ModDevMcpMod implements ClientModInitializer {
     public static ModDevMcpMod INSTANCE;
@@ -17,6 +18,7 @@ public class ModDevMcpMod implements ClientModInitializer {
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
+                try { Object mc = MinecraftClient.getInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
                 httpServer.start();
             } catch (Exception e) {
                 System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
@@ -24,7 +26,9 @@ public class ModDevMcpMod implements ClientModInitializer {
         }, "MCP-HTTP").start();
     }
 
-    public void onClientTick() {}
+    public void onClientTick() {
+        try { Object mc = MinecraftClient.getInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
+    }
 
     public void onInGameHudRender(Object matrices, float tickDelta) {}
     public void onScreenRender(Object matrices, Object screen, int mouseX, int mouseY, float tickDelta) {}

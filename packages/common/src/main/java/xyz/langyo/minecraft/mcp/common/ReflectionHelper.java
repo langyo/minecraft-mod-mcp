@@ -47,6 +47,10 @@ public final class ReflectionHelper {
         return ReflectionCache.getMinecraftInstance();
     }
 
+    public static void setMinecraftInstance(Object instance) {
+        ReflectionCache.setMinecraftInstance(instance);
+    }
+
     public static void setCachedWindowHandle(long handle) {
         WindowHelper.setCachedWindowHandle(handle);
     }

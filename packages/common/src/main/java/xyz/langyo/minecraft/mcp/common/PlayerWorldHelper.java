@@ -12,17 +12,192 @@ public final class PlayerWorldHelper {
         try {
             Object player = getPlayer(mc);
             if (player == null) return "{\"name\":null}";
-            String name = invokeString(player, "getName");
-            double health = getDouble(player, "getHealth");
-            double x = getDouble(player, "getX", "posX");
-            double y = getDouble(player, "getY", "posY");
-            double z = getDouble(player, "getZ", "posZ");
+            String name = getPlayerName(player);
+            double health = getPlayerHealth(player);
+            double[] pos = getPlayerPosition(player);
+            float[] rot = getPlayerRotation(player);
             String dim = getDimensionId(player);
-            return String.format("{\"name\":\"%s\",\"health\":%.1f,\"pos\":\"%.1f %.1f %.1f\",\"dimension\":\"%s\"}",
-                    name, health, x, y, z, dim);
+            String gamemode = detectGameMode(player);
+            int foodLevel = getPlayerFoodLevel(player);
+            if (pos[0] == 0 && pos[1] == 0 && pos[2] == 0 && health == 0) {
+                ReflectionHelper.dbg("playerInfo: player=" + player.getClass().getName() + " name=" + name);
+                for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                    if (m.getParameterCount() == 0 && (m.getReturnType() == double.class || m.getReturnType() == float.class)) {
+                        try { m.setAccessible(true); ReflectionHelper.dbg("playerInfo: " + m.getName() + "()=" + ((Number)m.invoke(player)).doubleValue()); } catch (Exception ignored) {}
+                    }
+                }
+                for (Field f : ReflectionCache.getAllFields(player.getClass())) {
+                    if (f.getType() == double.class || f.getType() == float.class) {
+                        try { f.setAccessible(true); ReflectionHelper.dbg("playerInfo: field " + f.getName() + "=" + (f.getType()==double.class?f.getDouble(player):f.getFloat(player))); } catch (Exception ignored) {}
+                    }
+                }
+            }
+            return String.format("{\"name\":\"%s\",\"health\":%.1f,\"pos\":\"%.1f %.1f %.1f\",\"rotation\":\"%.1f %.1f\",\"dimension\":\"%s\",\"gamemode\":\"%s\",\"food\":%d}",
+                    name, health, pos[0], pos[1], pos[2], rot[0], rot[1], dim, gamemode, foodLevel);
         } catch (Exception e) {
             return "{\"name\":null,\"error\":\"" + e.getMessage() + "\"}";
         }
+    }
+
+    private static String getPlayerName(Object player) {
+        try {
+            for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                if (m.getParameterCount() == 0 && m.getReturnType() == String.class) {
+                    String mn = m.getName();
+                    ReflectionHelper.dbg("name: checking " + mn + " ret=String");
+                    if (mn.contains("74861") || mn.contains("5820") || mn.contains("5477") || mn.contains("56017") || mn.contains("5776") || mn.equals("getName") || mn.equals("getNameForScoreboard") || mn.equals("getStringifiedName") || mn.equals("asString")) {
+                        try { m.setAccessible(true); Object r = m.invoke(player); if (r != null && !r.toString().isEmpty()) { ReflectionHelper.dbg("name: matched " + mn + "=" + r); return r.toString(); } } catch (Exception ignored) {}
+                    }
+                }
+            }
+            for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                if (m.getParameterCount() == 0 && m.getReturnType().getName().contains("Text")) {
+                    String mn = m.getName();
+                    if (mn.contains("56017") || mn.contains("5776") || mn.equals("getName") || mn.equals("getDisplayName") || mn.contains("get")) {
+                        try { m.setAccessible(true); Object r = m.invoke(player); if (r != null) return r.toString(); } catch (Exception ignored) {}
+                    }
+                }
+            }
+            for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                if (m.getParameterCount() == 0 && m.getReturnType().getName().contains("Text")) {
+                    try { m.setAccessible(true); Object r = m.invoke(player); if (r != null) { String s = r.toString(); if (s.length() < 50) return s; } } catch (Exception ignored) {}
+                }
+            }
+            for (Field f : ReflectionCache.getAllFields(player.getClass())) {
+                if (f.getType() == String.class) {
+                    String fn = f.getName();
+                    if (fn.contains("56017") || fn.contains("7688") || fn.equals("name") || fn.equals("gameProfile")) {
+                        try { f.setAccessible(true); Object r = f.get(player); if (r != null && !r.toString().isEmpty()) return r.toString(); } catch (Exception ignored) {}
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
+
+    private static double getPlayerHealth(Object player) {
+        try {
+            for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                if (m.getParameterCount() == 0 && (m.getReturnType() == float.class || m.getReturnType() == double.class)) {
+                    String mn = m.getName();
+                    if (mn.contains("6032") || mn.contains("6033") || mn.equals("getHealth")) {
+                        m.setAccessible(true);
+                        double val = ((Number) m.invoke(player)).doubleValue();
+                        ReflectionHelper.dbg("health: " + mn + "()=" + val);
+                        return val;
+                    }
+                }
+            }
+            ReflectionHelper.dbg("health: method_6032/6033 not found, trying fields");
+            for (Field f : ReflectionCache.getAllFields(player.getClass())) {
+                if ((f.getType() == float.class || f.getType() == double.class)) {
+                    String fn = f.getName();
+                    if (fn.contains("6246") || fn.contains("6033") || fn.equals("health") || fn.equals("dataManager")) {
+                        try { f.setAccessible(true); return f.getFloat(player); } catch (Exception ignored) {}
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        try { return getDouble(player, "getHealth"); } catch (Exception ignored) {}
+        return 0;
+    }
+
+    private static double[] getPlayerPosition(Object player) {
+        double x = 0, y = 0, z = 0;
+        try {
+            for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                if (m.getParameterCount() != 0 || m.getReturnType() != double.class) continue;
+                String mn = m.getName();
+                try {
+                    m.setAccessible(true);
+                    if (mn.contains("23317")) x = ((Number) m.invoke(player)).doubleValue();
+                    else if (mn.contains("23318")) y = ((Number) m.invoke(player)).doubleValue();
+                    else if (mn.contains("23321")) z = ((Number) m.invoke(player)).doubleValue();
+                } catch (Exception ignored) {}
+            }
+            if (x == 0 && y == 0 && z == 0) {
+                for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                    if (m.getParameterCount() != 0 || m.getReturnType() != double.class) continue;
+                    String mn = m.getName();
+                    try {
+                        m.setAccessible(true);
+                        double val = ((Number) m.invoke(player)).doubleValue();
+                        if (mn.equals("getX")) x = val;
+                        else if (mn.equals("getY")) y = val;
+                        else if (mn.equals("getZ")) z = val;
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+        return new double[]{x, y, z};
+    }
+
+    private static float[] getPlayerRotation(Object player) {
+        float yaw = 0, pitch = 0;
+        try {
+            for (Field f : ReflectionCache.getAllFields(player.getClass())) {
+                if (f.getType() != float.class) continue;
+                String fn = f.getName();
+                try {
+                    f.setAccessible(true);
+                    float val = f.getFloat(player);
+                    if (fn.contains("126") || fn.equals("yRot") || fn.equals("yaw")) yaw = val;
+                    else if (fn.contains("125") || fn.equals("xRot") || fn.equals("pitch")) pitch = val;
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
+        return new float[]{yaw, pitch};
+    }
+
+    private static String detectGameMode(Object player) {
+        try {
+            for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                if (m.getParameterCount() != 0) continue;
+                Class<?> rt = m.getReturnType();
+                if (rt.isEnum() && rt.getSimpleName().contains("Game")) {
+                    try { m.setAccessible(true); Object gm = m.invoke(player); return ((Enum<?>) gm).name().toLowerCase(); } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+        return "survival";
+    }
+
+    private static int getPlayerFoodLevel(Object player) {
+        try {
+            Object hungerManager = null;
+            for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                if (m.getParameterCount() == 0 && !m.getReturnType().isPrimitive() && !m.getReturnType().isArray()) {
+                    String rt = m.getReturnType().getName();
+                    if (rt.contains("Hunger") || rt.contains("Food") || rt.contains("class_1398") || rt.contains("class_1702")) {
+                        try { m.setAccessible(true); hungerManager = m.invoke(player); break; } catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (hungerManager == null) {
+                for (Field f : ReflectionCache.getAllFields(player.getClass())) {
+                    String ft = f.getType().getName();
+                    if (ft.contains("Hunger") || ft.contains("Food") || ft.contains("class_1398") || ft.contains("class_1702")) {
+                        try { f.setAccessible(true); hungerManager = f.get(player); break; } catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (hungerManager != null) {
+                for (Field f : ReflectionCache.getAllFields(hungerManager.getClass())) {
+                    if (f.getType() == int.class) {
+                        String fn = f.getName();
+                        if (fn.contains("foodLevel") || fn.contains("7110") || fn.contains("food") || fn.equals("field_23418")) {
+                            try { f.setAccessible(true); return f.getInt(hungerManager); } catch (Exception ignored) {}
+                        }
+                    }
+                }
+                for (Field f : ReflectionCache.getAllFields(hungerManager.getClass())) {
+                    if (f.getType() == int.class) {
+                        try { f.setAccessible(true); int val = f.getInt(hungerManager); if (val > 0 && val <= 40) return val; } catch (Exception ignored) {}
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return 0;
     }
 
     public static String getWorldInfo(Object mc) {
@@ -32,17 +207,47 @@ public final class PlayerWorldHelper {
             String worldName = "unknown";
             String difficulty = "normal";
             String gameType = "survival";
+            long worldTime = 0;
+            String weather = "clear";
 
-            Object server = invokeOrNull(level, "getServer");
+            Object server = findMethodOrNull(level, "getServer");
             if (server != null) {
-                Object wd = invokeOrNull(server, "getWorldData");
-                if (wd != null) worldName = invokeString(wd, "getLevelName");
+                Object wd = findMethodOrNull(server, "getWorldData");
+                if (wd != null) {
+                    for (Method m : ReflectionCache.getAllMethods(wd.getClass())) {
+                        if (m.getParameterCount() == 0 && m.getReturnType() == String.class) {
+                            try { m.setAccessible(true); worldName = (String) m.invoke(wd); break; } catch (Exception ignored) {}
+                        }
+                    }
+                }
             }
             difficulty = getDifficultyKey(level);
             gameType = getGameType(mc);
 
-            return String.format("{\"world_name\":\"%s\",\"difficulty\":\"%s\",\"gametype\":\"%s\"}",
-                    worldName, difficulty, gameType);
+            try {
+                for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
+                    if (m.getParameterCount() == 0 && (m.getReturnType() == long.class || m.getReturnType() == int.class)) {
+                        String mn = m.getName();
+                        if (mn.contains("5430") || mn.contains("24025") || mn.equals("getDayTime") || mn.equals("getGameTime")) {
+                            try { m.setAccessible(true); worldTime = ((Number) m.invoke(level)).longValue(); break; } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            try {
+                for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
+                    if (m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
+                        String mn = m.getName();
+                        if (mn.contains("raining") || mn.contains("thunder") || mn.contains("14090") || mn.contains("14091")) {
+                            try { m.setAccessible(true); if ((boolean) m.invoke(level)) { weather = mn.contains("thunder") ? "thunder" : "rain"; } } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            return String.format("{\"world_name\":\"%s\",\"difficulty\":\"%s\",\"gametype\":\"%s\",\"time\":%d,\"weather\":\"%s\"}",
+                    worldName, difficulty, gameType, worldTime, weather);
         } catch (Exception e) {
             return "{\"world_name\":null,\"error\":\"" + e.getMessage() + "\"}";
         }
@@ -65,8 +270,27 @@ public final class PlayerWorldHelper {
         return "overworld";
     }
 
+    private static Object findMethodOrNull(Object obj, String... methodNames) {
+        for (String name : methodNames) {
+            try { return obj.getClass().getMethod(name).invoke(obj); } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
     public static String getDifficultyKey(Object level) throws Exception {
-        Object diff = level.getClass().getMethod("getDifficulty").invoke(level);
+        Object diff = null;
+        for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
+            if (m.getParameterCount() == 0 && m.getReturnType().isEnum()) {
+                String mn = m.getName();
+                if (mn.contains("Difficulty") || mn.contains("1675") || mn.contains("1676")) {
+                    try { m.setAccessible(true); diff = m.invoke(level); break; } catch (Exception ignored) {}
+                }
+            }
+        }
+        if (diff == null) {
+            try { diff = level.getClass().getMethod("getDifficulty").invoke(level); } catch (NoSuchMethodException ignored) {}
+        }
+        if (diff == null) return "normal";
         try { return (String) diff.getClass().getMethod("getSerializedName").invoke(diff); } catch (NoSuchMethodException ignored) {}
         try { return (String) diff.getClass().getMethod("getName").invoke(diff); } catch (NoSuchMethodException ignored) {}
         try { return ((Enum<?>) diff).name().toLowerCase(); } catch (ClassCastException ignored) {}
@@ -75,10 +299,34 @@ public final class PlayerWorldHelper {
 
     public static String getGameType(Object mc) throws Exception {
         try {
-            Object gm = mc.getClass().getMethod("gameMode").invoke(mc);
-            Object pt = gm.getClass().getMethod("getPlayerMode").invoke(gm);
-            return (String) pt.getClass().getMethod("getName").invoke(pt);
-        } catch (NoSuchMethodException e) { return "survival"; }
+            Object gm = null;
+            try { gm = mc.getClass().getMethod("gameMode").invoke(mc); } catch (NoSuchMethodException ignored) {}
+            if (gm == null) {
+                java.lang.reflect.Field discovered = ReflectionCache.getDiscoveredField("gameMode");
+                if (discovered != null) { try { discovered.setAccessible(true); gm = discovered.get(mc); } catch (Exception ignored) {} }
+            }
+            if (gm == null) {
+                for (java.lang.reflect.Field f : ReflectionCache.getAllFields(mc.getClass())) {
+                    String fn = f.getName().toLowerCase();
+                    if (fn.contains("gamemode") || fn.contains("interaction") || fn.contains("multiplayer") || fn.contains("playercontroller") || fn.contains("field_71442_b")) {
+                        try { f.setAccessible(true); gm = f.get(mc); break; } catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (gm != null) {
+                for (Method m : ReflectionCache.getAllMethods(gm.getClass())) {
+                    if (m.getReturnType().isEnum() && m.getParameterCount() == 0 && m.getReturnType().getSimpleName().contains("Game")) {
+                        try { Object pt = m.invoke(gm); return (String) pt.getClass().getMethod("getName").invoke(pt); } catch (Exception ignored) {}
+                    }
+                }
+                for (Method m : ReflectionCache.getAllMethods(gm.getClass())) {
+                    if (m.getName().equals("getPlayerMode") && m.getParameterCount() == 0) {
+                        try { Object pt = m.invoke(gm); return (String) pt.getClass().getMethod("getName").invoke(pt); } catch (Exception ignored) {}
+                    }
+                }
+            }
+            return "survival";
+        } catch (Exception e) { return "survival"; }
     }
 
     public static String sendCommand(Object mc, String cmd) {
@@ -266,13 +514,17 @@ public final class PlayerWorldHelper {
 
     public static String debugFields(Object mc) {
         StringBuilder sb = new StringBuilder("{\"class\":\"").append(mc.getClass().getName()).append("\",");
-        sb.append("\"fields\":[");
         List<Field> all = ReflectionCache.getAllFields(mc.getClass());
+        sb.append("\"fieldCount\":").append(all.size()).append(",");
+        sb.append("\"fields\":[");
         boolean first = true;
         for (Field f : all) {
             String n = f.getName();
             if (n.contains("Player") || n.contains("player") || n.contains("field_71439") ||
-                n.contains("World") || n.contains("world") || n.contains("field_71441") || n.contains("field_71435")) {
+                n.contains("World") || n.contains("world") || n.contains("field_71441") || n.contains("field_71435") ||
+                n.contains("Mouse") || n.contains("mouse") || n.contains("Keyboard") || n.contains("keyboard") ||
+                n.contains("Screen") || n.contains("screen") || n.contains("Window") || n.contains("window") ||
+                n.contains("Game") || n.contains("game")) {
                 try {
                     f.setAccessible(true);
                     Object v = f.get(mc);
@@ -349,9 +601,20 @@ public final class PlayerWorldHelper {
                     Method target = ReflectionCache.findMouseButtonMethod(mouseHandler.getClass());
                     if (target != null) {
                         target.setAccessible(true);
-                        target.invoke(mouseHandler, handle, 1, 1, 0);
-                        Thread.sleep(50);
-                        target.invoke(mouseHandler, handle, 1, 0, 0);
+                        Class<?>[] tpt = target.getParameterTypes();
+                        if (tpt.length == 3 && tpt[1] != int.class) {
+                            Object mi1 = xyz.langyo.minecraft.mcp.common.InputInjectionHelper.createMouseInputPublic(tpt[1], 1, 0);
+                            Object mi0 = xyz.langyo.minecraft.mcp.common.InputInjectionHelper.createMouseInputPublic(tpt[1], 1, 0);
+                            if (mi1 != null && mi0 != null) {
+                                target.invoke(mouseHandler, handle, mi1, 1);
+                                Thread.sleep(50);
+                                target.invoke(mouseHandler, handle, mi0, 0);
+                            }
+                        } else {
+                            target.invoke(mouseHandler, handle, 1, 1, 0);
+                            Thread.sleep(50);
+                            target.invoke(mouseHandler, handle, 1, 0, 0);
+                        }
                         return "{\"right_click\":true,\"via\":\"screen_mouseHandler\"}";
                     }
                 }
@@ -826,50 +1089,15 @@ public final class PlayerWorldHelper {
     }
 
     private static Object getPlayer(Object mc) throws Exception {
-        try { return mc.getClass().getMethod("player").invoke(mc); } catch (NoSuchMethodException ignored) {}
-        for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
-            String n = f.getName();
-            if (n.equals("player") || n.equals("thePlayer") || n.equals("field_71439_g")) {
-                try {
-                    f.setAccessible(true);
-                    Object p = f.get(mc);
-                    if (p != null) return p;
-                } catch (Exception ignored) {}
-            }
-        }
-        return null;
+        return ReflectionCache.getPlayer(mc);
     }
 
     private static Object getLevel(Object mc) throws Exception {
-        try { return mc.getClass().getMethod("level").invoke(mc); } catch (NoSuchMethodException ignored) {}
-        try { return mc.getClass().getMethod("world").invoke(mc); } catch (NoSuchMethodException ignored) {}
-        for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
-            String n = f.getName();
-            if (n.equals("theWorld") || n.equals("field_71441_f") || n.equals("level") || n.equals("world")) {
-                try {
-                    f.setAccessible(true);
-                    Object v = f.get(mc);
-                    if (v != null) return v;
-                } catch (Exception ignored) {}
-            }
-        }
-        return null;
+        return ReflectionCache.getLevel(mc);
     }
 
     private static Object getPlayerLevel(Object player) throws Exception {
-        try { return player.getClass().getMethod("level").invoke(player); } catch (NoSuchMethodException ignored) {}
-        try { return player.getClass().getMethod("world").invoke(player); } catch (NoSuchMethodException ignored) {}
-        for (Field f : ReflectionCache.getAllFields(player.getClass())) {
-            String n = f.getName();
-            if (n.equals("theWorld") || n.equals("field_70170_p") || n.equals("level") || n.equals("world")) {
-                try {
-                    f.setAccessible(true);
-                    Object v = f.get(player);
-                    if (v != null) return v;
-                } catch (Exception ignored) {}
-            }
-        }
-        return null;
+        return ReflectionCache.getPlayerLevel(player);
     }
 
     private static Object fieldOrNull(Object obj, String fieldName) {

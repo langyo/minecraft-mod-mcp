@@ -8,7 +8,7 @@ export const LAUNCHER = {
 
 export const PLAYER = {
   defaultName: "Player",
-  defaultUuid: "0",
+  defaultUuid: "00000000-0000-0000-0000-000000000000",
   defaultAccessToken: "0",
   defaultUserType: "legacy",
 } as const;
@@ -27,6 +27,31 @@ export const GAME = {
   defaultDownloadSource: "mojang" as const,
   javaVersionFallback: 17,
   javaVersionThresholds: { mc117: 17, mc116: 16, mc113: 13 } as Record<string, number>,
+  defaultOptionsTxt: [
+    "version:29",
+    "autoJump:false",
+    "chatOpacity:1.0",
+    "enableVsync:false",
+    "forceUnicodeFont:false",
+    "fov:70.0",
+    "gamma:1.0",
+    "guiScale:2",
+    "lang:en_US",
+    "maxFps:260",
+    "musicVolume:0.0",
+    "renderDistance:8",
+    "soundCategory_master:0.0",
+    "soundCategory_music:0.0",
+    "soundCategory_record:0.0",
+    "soundCategory_weather:0.0",
+    "soundCategory_block:0.0",
+    "soundCategory_hostile:0.0",
+    "soundCategory_neutral:0.0",
+    "soundCategory_player:0.0",
+    "soundCategory_ambient:0.0",
+    "soundCategory_voice:0.0",
+    "showAccessibilityOnboardingScreen:false",
+  ].join("\n"),
 } as const;
 
 export const MCP = {
