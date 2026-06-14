@@ -1,8 +1,0 @@
-{
-  "mcpmod.control.resume": "恢復手動控制",
-  "mcpmod.control.transfer": "將控制權轉移給 MCP",
-  "mcpmod.control.overlay": "MCP 正在控制遊戲",
-  "mcpmod.control.menu": "系統選單",
-  "mcpmod.description": "用於 AI 代理交互的 Minecraft WebSocket 橋接模組",
-  "mcpmod.control.pause_button": "MCP 接管"
-}

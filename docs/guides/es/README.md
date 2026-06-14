@@ -22,7 +22,7 @@
 **Copia este enlace y pégalo a tu agente de IA — se configurará automáticamente:**
 
 ```
-https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/es/AI-TOOLS.md
+https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/es/AI-TOOLS.md
 ```
 
 Tu IA leerá la guía, configurará la conexión MCP y empezará a controlar el juego. Sin configuración manual.
@@ -87,7 +87,7 @@ Abre el juego con tu modloader. El mod iniciará automáticamente un servidor HT
 O pega este enlace a tu agente de IA y deja que él se encargue de la configuración:
 
 ```
-https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/es/AI-TOOLS.md
+https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/es/AI-TOOLS.md
 ```
 
 ### 5. Uso de la CLI

@@ -1,8 +1,0 @@
-{
-  "mcpmod.control.resume": "Возобновить ручное управление",
-  "mcpmod.control.transfer": "Передать управление MCP",
-  "mcpmod.control.overlay": "MCP управляет игрой",
-  "mcpmod.control.menu": "Системное меню",
-  "mcpmod.description": "WebSocket-мост для взаимодействия AI-агентов с Minecraft",
-  "mcpmod.control.pause_button": "MCP Take Over"
-}
