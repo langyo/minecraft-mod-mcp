@@ -307,7 +307,7 @@ async function runInstall(args: string[]) {
   if (args.length === 0) {
     console.error("Usage: minecraft-mod-mcp install <version> [options]");
     console.error("\nOptions:");
-    console.error("  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})");
+    console.error(`  --loader <forge|fabric|neoforge>  Mod loader (default: ${GAME.defaultLoader})`);
     console.error("\nUse 'minecraft-mod-mcp list' to see supported versions.");
     process.exit(1);
   }
@@ -753,7 +753,6 @@ Resources:
   }
 
   const { installServer: installServerFn, launchServer: launchServerFn } = await import("./mc/server.js");
-  const { copyFileSync } = await import("node:fs");
 
   console.log(`=== Setting up server ${versionArg} (${serverType}) ===\n`);
 
@@ -1058,7 +1057,6 @@ Client Options:
   const loader = (values.loader ?? GAME.defaultLoader) as Loader;
   const serverType = (values.type ?? SERVER.defaultType) as ServerType;
   const { installServer, launchServer } = await import("./mc/server.js");
-  await import("./mc/settings.js");
 
   console.log(`=== Setting up ${versionArg} (${serverType}) ===\n`);
 

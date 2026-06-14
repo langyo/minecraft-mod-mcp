@@ -6,6 +6,7 @@ out/
 .maven-local/
 neoform-cache/
 run/
+release-jars/
 
 *.class
 *.hprof

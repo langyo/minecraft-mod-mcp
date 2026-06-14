@@ -532,7 +532,7 @@ export async function installServer(
 
   let versionId: string;
   let mcVersion: string;
-  let javaVersion = SERVER.defaultJavaVersion;
+  let javaVersion: number = SERVER.defaultJavaVersion;
   let forgeVersion: string | undefined;
   let neoforgeVersion: string | undefined;
 
