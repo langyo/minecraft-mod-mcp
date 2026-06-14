@@ -341,7 +341,7 @@ async function installServerTool(params: Record<string, unknown>): Promise<unkno
   const serverType = (params.server_type || "vanilla") as import("../mc/defaults.js").ServerType;
   if (!version) throw new Error("Parameter 'version' is required.");
 
-  const serverProps: Record<string, unknown> = {};
+  const serverProps: Partial<import("../mc/server.js").ServerProperties> = {};
   if (params.port) serverProps.serverPort = Number(params.port);
   if (params.motd) serverProps.motd = String(params.motd);
   if (params.max_players) serverProps.maxPlayers = Number(params.max_players);
@@ -366,7 +366,7 @@ async function launchServerTool(params: Record<string, unknown>, _mod: ModClient
   const memory = Number(params.memory) || GAME.defaultServerMemoryMb;
   if (!version) throw new Error("Parameter 'version' is required.");
 
-  const serverProps: Record<string, unknown> = {};
+  const serverProps: Partial<import("../mc/server.js").ServerProperties> = {};
   if (params.port) serverProps.serverPort = Number(params.port);
   if (params.motd) serverProps.motd = String(params.motd);
   if (params.max_players) serverProps.maxPlayers = Number(params.max_players);
@@ -394,7 +394,7 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   const serverMem = Number(params.server_memory) || GAME.defaultServerMemoryMb;
   if (!version) throw new Error("Parameter 'version' is required.");
 
-  const serverProps: Record<string, unknown> = {};
+  const serverProps: Partial<import("../mc/server.js").ServerProperties> = {};
   if (params.port) serverProps.serverPort = Number(params.port);
   if (params.motd) serverProps.motd = String(params.motd);
   if (params.max_players) serverProps.maxPlayers = Number(params.max_players);

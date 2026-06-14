@@ -99,7 +99,7 @@ export class ModClient {
   killMc() {
     if (this.mcProcess && this.mcProcess.exitCode === null) {
       if (process.platform === "win32") {
-        try { execSync(`taskkill /PID ${this.mcProcess.pid}`, { stdio: "ignore" }); } catch {}
+        try { execSync(`taskkill /PID ${this.mcProcess.pid} /T /F`, { stdio: "ignore" }); } catch {}
       } else {
         this.mcProcess.kill("SIGTERM");
       }
