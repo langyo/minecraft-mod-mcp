@@ -88,9 +88,6 @@ function extractNativeJar(jarPath: string, outDir: string): void {
   let pos = cdOffset;
   while (pos + 46 <= cdEnd) {
     if (buf.readUInt32LE(pos) !== 0x02014b50) break;
-    buf.readUInt16LE(pos + 10);
-    buf.readUInt32LE(pos + 20);
-    buf.readUInt32LE(pos + 24);
     const nameLen = buf.readUInt16LE(pos + 28);
     const extraLen = buf.readUInt16LE(pos + 30);
     const commentLen = buf.readUInt16LE(pos + 32);
@@ -321,7 +318,8 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
 
   allArgs.push(vj.mainClass);
 
-  const playerName = config.playerName ?? PLAYER.defaultName;  const uuid = config.uuid ?? PLAYER.defaultUuid;
+  const playerName = config.playerName ?? PLAYER.defaultName;
+  const uuid = config.uuid ?? PLAYER.defaultUuid;
   const accessToken = config.accessToken ?? PLAYER.defaultAccessToken;
   const userType = config.userType ?? PLAYER.defaultUserType;
 
