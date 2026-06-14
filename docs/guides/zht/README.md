@@ -22,7 +22,7 @@
 **複製這個連結貼給你的 AI Agent——它會自動完成設定：**
 
 ```
-https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/zht/AI-TOOLS.md
+https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/zht/AI-TOOLS.md
 ```
 
 你的 AI 會自行閱讀指南、設定 MCP 連接，然後開始操控遊戲。無需手動設定。
@@ -87,7 +87,7 @@ npx minecraft-mod-mcp
 或者直接把這段連結貼給你的 AI Agent，讓它自動設定：
 
 ```
-https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/zht/AI-TOOLS.md
+https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/zht/AI-TOOLS.md
 ```
 
 ### 5. 使用 CLI

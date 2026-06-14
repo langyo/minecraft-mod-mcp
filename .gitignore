@@ -55,3 +55,24 @@ logs/
 # Auto-generated TS bindings (ts-rs)
 /packages/launcher/shared/*/bindings/
 /packages/launcher/frontend/src/bindings/
+
+# Root-only junk guards (anchored to repo root)
+# Debug/test screenshots leaked via `git add .`
+/screenshot_*.png
+# Any image committed to the repo root is almost certainly a mistake
+# (logos/icons live under docs/ or packages/.../resources/)
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+/*.webp
+/*.bmp
+# Stray PowerShell redirect artifact
+/0
+# Test/build output residues
+/test-mouse-results.json
+test-*-results.json
+
+# Build output tracked by mistake
+/packages/*/bin/
+

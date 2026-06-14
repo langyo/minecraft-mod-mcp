@@ -22,7 +22,7 @@
 **Copy this link and paste it to your AI agent — it will configure itself automatically:**
 
 ```
-https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/en/AI-TOOLS.md
+https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/en/AI-TOOLS.md
 ```
 
 Your AI reads the guide, sets up the MCP connection, and starts controlling the game. No manual config needed.
@@ -87,7 +87,7 @@ Launch the game with your modloader. The mod starts an HTTP server on port 9876 
 Or paste this link to your AI agent and let it handle the setup:
 
 ```
-https://github.com/langyo/minecraft-mod-mcp/blob/main/docs/guides/en/AI-TOOLS.md
+https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/en/AI-TOOLS.md
 ```
 
 ### 5. Using the CLI
