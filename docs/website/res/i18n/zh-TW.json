@@ -1,0 +1,137 @@
+{
+  "site": {
+    "title": "Minecraft Mod MCP",
+    "tagline": "讓 AI 代理真正上手玩你的 Minecraft —— 來測試你的模組",
+    "description": "一個遊戲內模組 + CLI，透過 MCP 把執行中的 Minecraft 暴露給 AI 代理。代理能看畫面、點擊、輸入、啟動測試用戶端，還能釋放滑鼠讓你繼續在自己的工具裡操作。",
+    "slogan": "以思考的速度測試模組",
+    "nav": {
+      "home": "首頁",
+      "capabilities": "能力",
+      "loop": "閉環",
+      "vision": "視覺",
+      "quickstart": "快速開始",
+      "loaders": "相容性",
+      "about": "關於",
+      "language": "語言",
+      "dark": "深色模式",
+      "light": "淺色模式"
+    },
+    "footer": {
+      "copyright": "© {year} Minecraft Mod MCP。開源授權：MIT / Apache-2.0 / CC0-1.0。"
+    }
+  },
+  "hero": {
+    "download": "下載"
+  },
+  "cap": {
+    "kicker": "它能做什麼",
+    "heading": "代理能做的四件事",
+    "intro": "每一項都對應真實、可驗證的能力——不是行銷話術。",
+    "actuate": {
+      "verb": "操作",
+      "title": "操控執行中的遊戲",
+      "desc": "透過 Java 反射，代理在執行中的用戶端上點擊、輸入、捲動、拖曳和按鍵——無需為每個版本單獨寫程式碼，跨所有受支援版本通用。",
+      "points": [
+        "點擊、拖曳、捲動、按鍵",
+        "檢視任意已開啟的畫面及其按鈕",
+        "執行指令並查詢除錯欄位"
+      ]
+    },
+    "bootstrap": {
+      "verb": "啟動",
+      "title": "自動解決相依並啟動",
+      "desc": "CLI 自動偵測 Java，下載所需的 Minecraft 版本與模組載入器，然後啟動測試用戶端——從乾淨環境到可控遊戲，只需一條指令。",
+      "points": [
+        "自動偵測 / 安裝合適的 Java",
+        "按需取得版本與載入器",
+        "可啟動用戶端、伺服器，或同時啟動"
+      ]
+    },
+    "detach": {
+      "verb": "脫離",
+      "title": "釋放滑鼠，控制權不丟",
+      "desc": "遊戲內的覆蓋層（右上角）可脫離滑鼠游標，這樣切換視窗時遊戲不會自動暫停——MCP 連線保持線上，你可以同時操作 AI 工具。",
+      "points": [
+        "3D 視圖右上角的覆蓋層按鈕",
+        "Alt+Tab 切到 IDE 或代理而不暫停",
+        "整個過程中 MCP 指令持續流通"
+      ]
+    },
+    "see": {
+      "verb": "看見",
+      "title": "帶座標網格的截圖",
+      "desc": "擷取疊加了座標網格的可視區，讓代理準確知道每個元素的位置——這是視覺驅動自主能力的基礎。",
+      "points": [
+        "每張截圖都帶座標網格疊加",
+        "透過 SSE 即時串流推送事件",
+        "搭配視覺模型即可實現完全自主"
+      ]
+    }
+  },
+  "loop": {
+    "kicker": "閉環如何保持暢通",
+    "heading": "代理 ⇄ 橋接 ⇄ 遊戲",
+    "intro": "正是「脫離」覆蓋層讓真正的開發閉環成為可能——AI 工具和遊戲共存，而不是爭搶焦點。",
+    "mcp": "MCP / SSE",
+    "reflect": "反射",
+    "ai": {
+      "title": "AI 代理",
+      "sub": "Claude Code、Cursor、Cline…"
+    },
+    "bridge": {
+      "title": "MCP 橋接",
+      "sub": "HTTP + SSE，連接埠 :9876"
+    },
+    "game": {
+      "title": "Minecraft",
+      "sub": "1.7.2 – 26.1.2"
+    },
+    "tip": {
+      "detach": "點擊右上角覆蓋層即可釋放游標",
+      "alive": "你離開時橋接保持連線線上",
+      "alttab": "Alt+Tab 切到工具再切回來——不再反覆觸發暫停"
+    }
+  },
+  "vision": {
+    "kicker": "解鎖最大自主性",
+    "heading": "搭配視覺模型才最強",
+    "title": "讓模型能推理的網格",
+    "desc": "「看見」本身就有用——但搭配多模態模型（GPT-4o、Claude、Gemini、Qwen-VL……），代理就能讀懂畫面、定位介面、並自主決定下一步動作，無需你在迴圈裡盯著。",
+    "caption": "// 截圖 + 網格 → 模型看到的是座標，而不僅僅是像素",
+    "point": {
+      "grid": "網格給每個像素一個模型可引用的位址",
+      "model": "視覺模型把畫面變成計畫：下一步點哪裡",
+      "autonomy": "看見 + 操作 + 模型 = 自驅的測試閉環"
+    }
+  },
+  "quickstart": {
+    "kicker": "快速上手",
+    "heading": "從零到代理驅動",
+    "guide": "檢視指南",
+    "oneLink": "已經裝好了？你的 AI 代理只需要一個連結——貼上給它，它會自動完成設定。",
+    "step1": {
+      "title": "安裝橋接",
+      "desc": "這個 npm 套件把 CLI 與 MCP 橋融合為一體。"
+    },
+    "step2": {
+      "title": "啟動測試用戶端",
+      "desc": "Java、版本與載入器都會被自動解決。"
+    },
+    "step3": {
+      "title": "脫離滑鼠",
+      "desc": "點擊遊戲內右上角的覆蓋層，讓連線在 Alt+Tab 後依舊存活。"
+    },
+    "step4": {
+      "title": "連接你的 AI",
+      "desc": "將 Claude Code、Cursor、Cline、Copilot 或任何 MCP 工具指向橋接即可。"
+    }
+  },
+  "loader": {
+    "kicker": "一個模組，全載入器通用",
+    "heading": "相容性",
+    "intro": "借助反射，單一程式碼庫即可在所有受支援的 Minecraft 版本上執行。",
+    "forge": "Forge",
+    "fabric": "Fabric",
+    "neoforge": "NeoForge"
+  }
+}

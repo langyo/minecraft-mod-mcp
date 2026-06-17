@@ -1,0 +1,137 @@
+{
+  "site": {
+    "title": "Minecraft Mod MCP",
+    "tagline": "Deja que un agente de IA juegue realmente a tu Minecraft — para probar tus mods",
+    "description": "Un mod dentro del juego + CLI que expone un Minecraft en ejecución a los agentes de IA por MCP. El agente ve la pantalla, hace clic, escribe, lanza un cliente de prueba y libera el ratón para que sigas trabajando en tu herramienta.",
+    "slogan": "Prueba mods a la velocidad del pensamiento",
+    "nav": {
+      "home": "Inicio",
+      "capabilities": "Capacidades",
+      "loop": "El bucle",
+      "vision": "Visión",
+      "quickstart": "Inicio rápido",
+      "loaders": "Compatibilidad",
+      "about": "Acerca de",
+      "language": "Idioma",
+      "dark": "Modo oscuro",
+      "light": "Modo claro"
+    },
+    "footer": {
+      "copyright": "© {year} Minecraft Mod MCP. Código abierto bajo MIT / Apache-2.0 / CC0-1.0."
+    }
+  },
+  "hero": {
+    "download": "Descargar"
+  },
+  "cap": {
+    "kicker": "Qué hace",
+    "heading": "Cuatro cosas que un agente puede hacer",
+    "intro": "Cada una corresponde a una capacidad real y verificable, no a un eslogan.",
+    "actuate": {
+      "verb": "Actuar",
+      "title": "Conducir el juego en vivo",
+      "desc": "Mediante reflexión Java, el agente hace clic, escribe, desplaza, arrastra y pulsa teclas en un cliente en ejecución; funciona en todas las versiones soportadas sin código por versión.",
+      "points": [
+        "Clic, arrastrar, desplazar, pulsaciones",
+        "Inspeccionar cualquier pantalla abierta y sus botones",
+        "Ejecutar comandos y consultar campos de depuración"
+      ]
+    },
+    "bootstrap": {
+      "verb": "Arrancar",
+      "title": "Resolver dependencias y lanzar",
+      "desc": "La CLI detecta Java automáticamente, descarga la versión de Minecraft y el loader pedidos, y arranca un cliente de prueba: de máquina limpia a juego controlado con un comando.",
+      "points": [
+        "Detecta/instala el Java adecuado",
+        "Obtiene versión + loader bajo demanda",
+        "Lanza cliente, servidor o ambos"
+      ]
+    },
+    "detach": {
+      "verb": "Liberar",
+      "title": "Suelta el ratón, mantén el control",
+      "desc": "Una superposición en el juego (arriba a la derecha) libera el cursor para que el juego no se pause al cambiar de ventana: la conexión MCP sigue viva mientras usas tu herramienta de IA.",
+      "points": [
+        "Botón de superposición arriba a la derecha en 3D",
+        "Alt+Tab a tu IDE o agente sin pausar",
+        "Los comandos MCP siguen fluyendo todo el tiempo"
+      ]
+    },
+    "see": {
+      "verb": "Ver",
+      "title": "Captura con una rejilla",
+      "desc": "Captura el viewport con una rejilla de coordenñas superpuesta para que el agente sepa exactamente dónde está cada cosa: la base de la autonomía visual.",
+      "points": [
+        "Rejilla de coordenadas en cada captura",
+        "Transmite eventos en vivo por SSE",
+        "Se combina con un modelo de visión para autonomía total"
+      ]
+    }
+  },
+  "loop": {
+    "kicker": "Cómo se mantiene abierto el bucle",
+    "heading": "Agente ⇄ Puente ⇄ Juego",
+    "intro": "La superposición de liberación es lo que hace posible un bucle de desarrollo real: tu herramienta de IA y el juego coexisten en vez de pelear por el foco.",
+    "mcp": "MCP / SSE",
+    "reflect": "reflexión",
+    "ai": {
+      "title": "Agente IA",
+      "sub": "Claude Code, Cursor, Cline…"
+    },
+    "bridge": {
+      "title": "Puente MCP",
+      "sub": "HTTP + SSE en :9876"
+    },
+    "game": {
+      "title": "Minecraft",
+      "sub": "1.7.2 – 26.1.2"
+    },
+    "tip": {
+      "detach": "Clic en la superposición superior derecha para liberar el cursor",
+      "alive": "El puente mantiene la conexión mientras estás fuera",
+      "alttab": "Alt+Tab a tu herramienta y vuelve — sin re-pausa"
+    }
+  },
+  "vision": {
+    "kicker": "Desbloquea la máxima autonomía",
+    "heading": "Mejor con un modelo de visión",
+    "title": "Una rejilla sobre la que el modelo puede razonar",
+    "desc": "Ver es útil por sí solo, pero combínalo con un modelo multimodal (GPT-4o, Claude, Gemini, Qwen-VL…) y el agente puede leer la pantalla, localizar la UI y decidir su próxima acción sin ti.",
+    "caption": "// captura + rejilla → el modelo ve coordenadas, no solo píxeles",
+    "point": {
+      "grid": "La rejilla da a cada píxel una dirección que el modelo puede citar",
+      "model": "Un modelo de visión convierte el frame en un plan: dónde clicar",
+      "autonomy": "Ver + Actuar + modelo = un bucle de prueba autónomo"
+    }
+  },
+  "quickstart": {
+    "kicker": "En marcha",
+    "heading": "De cero a impulsado por agente",
+    "guide": "Abrir guía",
+    "oneLink": "¿Ya instalado? Tu agente de IA solo necesita un enlace: pégalo y se autoconfigura.",
+    "step1": {
+      "title": "Instala el puente",
+      "desc": "El paquete npm une la CLI y el puente MCP en uno."
+    },
+    "step2": {
+      "title": "Lanza un cliente de prueba",
+      "desc": "Java, la versión y el loader se resuelven automáticamente."
+    },
+    "step3": {
+      "title": "Libera el ratón",
+      "desc": "Clic en la superposición superior derecha del juego para que la conexión sobreviva al Alt+Tab."
+    },
+    "step4": {
+      "title": "Conecta tu IA",
+      "desc": "Apunta Claude Code, Cursor, Cline, Copilot o cualquier herramienta MCP al puente."
+    }
+  },
+  "loader": {
+    "kicker": "Un mod, todos los loaders",
+    "heading": "Compatibilidad",
+    "intro": "La reflexión permite que una única base de código funcione en todas las versiones soportadas.",
+    "forge": "Forge",
+    "fabric": "Fabric",
+    "neoforge": "NeoForge"
+  }
+}

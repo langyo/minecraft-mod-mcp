@@ -1,0 +1,137 @@
+{
+  "site": {
+    "title": "Minecraft Mod MCP",
+    "tagline": "Let an AI agent actually play your Minecraft — to test your mods",
+    "description": "An in-game mod + CLI that exposes a running Minecraft to AI agents over MCP. The agent sees the screen, clicks, types, launches a test client, and frees the mouse so you can keep working in your tool.",
+    "slogan": "Test mods at the speed of thought",
+    "nav": {
+      "home": "Home",
+      "capabilities": "Capabilities",
+      "loop": "The Loop",
+      "vision": "Vision",
+      "quickstart": "Quick Start",
+      "loaders": "Compatibility",
+      "about": "About",
+      "language": "Language",
+      "dark": "Dark mode",
+      "light": "Light mode"
+    },
+    "footer": {
+      "copyright": "© {year} Minecraft Mod MCP. Open source under MIT / Apache-2.0 / CC0-1.0."
+    }
+  },
+  "hero": {
+    "download": "Download"
+  },
+  "cap": {
+    "kicker": "What it does",
+    "heading": "Four things an agent can do",
+    "intro": "Each maps to a real, verifiable capability — not a marketing slogan.",
+    "actuate": {
+      "verb": "Actuate",
+      "title": "Drive the live game",
+      "desc": "Through Java reflection the agent clicks, types, scrolls, drags and presses keys on a running client — working across every supported version with no per-version code.",
+      "points": [
+        "Click, drag, scroll, key presses",
+        "Inspect any open screen and its buttons",
+        "Run commands and query debug fields"
+      ]
+    },
+    "bootstrap": {
+      "verb": "Bootstrap",
+      "title": "Resolve deps & launch",
+      "desc": "The CLI auto-detects Java, downloads the requested Minecraft version and mod loader, then boots a test client — one command from a clean machine to a controlled game.",
+      "points": [
+        "Auto-detects / installs the right Java",
+        "Fetches the version + loader on demand",
+        "Launches client, server, or both together"
+      ]
+    },
+    "detach": {
+      "verb": "Detach",
+      "title": "Release the mouse, keep control",
+      "desc": "An in-game overlay (top-right) detaches the cursor so the game won't auto-pause when you tab away — the MCP connection stays live while you drive your AI tool.",
+      "points": [
+        "Top-right overlay button in the 3D view",
+        "Alt+Tab to your IDE or agent without pausing",
+        "MCP commands keep flowing the whole time"
+      ]
+    },
+    "see": {
+      "verb": "See",
+      "title": "Screenshot with a grid",
+      "desc": "Captures the viewport overlaid with a coordinate grid so the agent knows exactly where things are — the foundation for vision-driven autonomy.",
+      "points": [
+        "Coordinate-grid overlay on every capture",
+        "Stream events live over SSE",
+        "Pairs with a vision model for full autonomy"
+      ]
+    }
+  },
+  "loop": {
+    "kicker": "How the loop stays open",
+    "heading": "Agent ⇄ Bridge ⇄ Game",
+    "intro": "The detach overlay is what makes a real dev loop possible — your AI tool and the game coexist instead of fighting for focus.",
+    "mcp": "MCP / SSE",
+    "reflect": "reflection",
+    "ai": {
+      "title": "AI Agent",
+      "sub": "Claude Code, Cursor, Cline…"
+    },
+    "bridge": {
+      "title": "MCP Bridge",
+      "sub": "HTTP + SSE on :9876"
+    },
+    "game": {
+      "title": "Minecraft",
+      "sub": "1.7.2 – 26.1.2"
+    },
+    "tip": {
+      "detach": "Click the top-right overlay to free the cursor",
+      "alive": "The bridge keeps the connection alive while you're away",
+      "alttab": "Alt+Tab to your tool, then back — no re-triggered pause"
+    }
+  },
+  "vision": {
+    "kicker": "Unlock the most autonomy",
+    "heading": "Best with a vision model",
+    "title": "A grid the model can reason over",
+    "desc": "See is useful on its own — but pair it with a multimodal model (GPT-4o, Claude, Gemini, Qwen-VL…) and the agent can read the screen, locate UI, and decide its next action without you in the loop.",
+    "caption": "// capture + grid → the model sees coordinates, not just pixels",
+    "point": {
+      "grid": "The grid gives every pixel an address the model can cite",
+      "model": "A vision model turns the frame into a plan: where to click next",
+      "autonomy": "See + Actuate + a model = a self-driving test loop"
+    }
+  },
+  "quickstart": {
+    "kicker": "Up and running",
+    "heading": "From zero to agent-driven",
+    "guide": "Open guide",
+    "oneLink": "Already installed? One link is all your AI agent needs — paste it and it self-configures.",
+    "step1": {
+      "title": "Install the bridge",
+      "desc": "The npm package is the CLI + MCP bridge in one."
+    },
+    "step2": {
+      "title": "Launch a test client",
+      "desc": "Java, the version and the loader are resolved automatically."
+    },
+    "step3": {
+      "title": "Detach the mouse",
+      "desc": "Click the top-right in-game overlay so the connection survives Alt+Tab."
+    },
+    "step4": {
+      "title": "Connect your AI",
+      "desc": "Point Claude Code, Cursor, Cline, Copilot or any MCP tool at the bridge."
+    }
+  },
+  "loader": {
+    "kicker": "One mod, every loader",
+    "heading": "Compatibility",
+    "intro": "Reflection means a single codebase runs across every supported Minecraft version.",
+    "forge": "Forge",
+    "fabric": "Fabric",
+    "neoforge": "NeoForge"
+  }
+}
