@@ -207,6 +207,7 @@ public class ModDevMcpMod {
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
+                try { Object mc = ReflectionHelper.getMinecraftInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
                 ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
                 int port = McpConfig.getServerPort();
                 httpServer = new McpHttpServer(handler, port);
@@ -322,6 +323,7 @@ public class ModDevMcpMod {
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
+                try { Object mc = ReflectionHelper.getMinecraftInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
                 httpServer.start();
             } catch (Exception e) {
                 System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
@@ -396,6 +398,7 @@ public class ModDevMcpMod implements ClientModInitializer {
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
+                try { Object mc = ReflectionHelper.getMinecraftInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
                 httpServer.start();
             } catch (Exception e) {
                 System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
@@ -403,7 +406,9 @@ public class ModDevMcpMod implements ClientModInitializer {
         }, "MCP-HTTP").start();
     }
 
-    public void onClientTick() {}
+    public void onClientTick() {
+        try { Object mc = ReflectionHelper.getMinecraftInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
+    }
 """ + extra_methods + "}\n"
 
 
