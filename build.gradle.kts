@@ -3,10 +3,11 @@
 // Each mod lives under packages/mods/{mc}/{loader}/ with its own gradlew + wrapper,
 // because different ForgeGradle/NeoForge/Fabric eras require incompatible Gradle
 // versions (2.14 .. 9.3.1) and plugin ecosystems. The root gradlew never loads those
-// plugins; it just invokes the subproject's own wrapper, so each subproject runs in
-// its own projectDir with its relative paths (../../../common, .maven-local) intact.
+// plugins; it invokes the subproject's own wrapper, then exposes the produced JAR via
+// a real `:jar` task (so tooling that reads `:jar.archiveFileName` works as expected).
 
 val neoforge2612 = layout.projectDirectory.dir("packages/mods/26.1.2/neoforge").asFile
+val subprojectJar = neoforge2612.resolve("build/libs/minecraft-moddev-mcp-neoforge-26.1.2-0.2.0.jar")
 
 fun gradlewCommand(task: String): List<String> =
     if (System.getProperty("os.name").lowercase().contains("windows"))
@@ -31,20 +32,33 @@ fun runDelegated(task: String) {
     }
 }
 
-tasks.register("build") {
+// Runs the neoforge subproject build and makes the produced JAR available to `:jar`.
+val buildNeoforge by tasks.registering {
     group = "build"
-    description = "Build the MC 26.1.2 neoforge mod (delegates to its own gradlew: clean + build)."
-    doLast {
-        runDelegated("clean")
-        runDelegated("build")
-    }
-}
-
-tasks.register("jar") {
-    group = "build"
-    description = "Assemble the MC 26.1.2 neoforge mod JAR (delegates to its own gradlew: clean + jar)."
+    description = "Builds the MC 26.1.2 neoforge mod via its own gradlew (clean + jar)."
     doLast {
         runDelegated("clean")
         runDelegated("jar")
+    }
+}
+
+// A real Jar task so tooling (e.g. teacon CI) can read `archiveFileName`.
+// It packages the JAR produced by the delegated neoforge build.
+tasks.register<Jar>("jar") {
+    group = "build"
+    description = "Expose the MC 26.1.2 neoforge mod JAR at the root project."
+    archiveFileName.set("minecraft-moddev-mcp-neoforge-26.1.2-0.2.0.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("libs"))
+    dependsOn(buildNeoforge)
+    from(zipTree(subprojectJar))
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+
+tasks.register("build") {
+    group = "build"
+    description = "Build the MC 26.1.2 neoforge mod (full, via the subproject's own gradlew)."
+    dependsOn("jar")
+    doLast {
+        runDelegated("build")
     }
 }
