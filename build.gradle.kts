@@ -13,7 +13,10 @@ fun gradlewCommand(task: String): List<String> =
     if (System.getProperty("os.name").lowercase().contains("windows"))
         listOf("cmd", "/c", "gradlew.bat", task)
     else
-        listOf("./gradlew", task)
+        // Use "sh gradlew" instead of "./gradlew": the gradlew script may lack the
+        // executable bit in CI checkouts (git doesn't always preserve mode bits),
+        // and invoking it via sh avoids the "Permission denied" error.
+        listOf("sh", "gradlew", task)
 
 fun runDelegated(task: String) {
     val builder = ProcessBuilder(gradlewCommand(task)).directory(neoforge2612).redirectErrorStream(true)
