@@ -1,0 +1,106 @@
+name: Website
+
+# Builds and deploys the docs/website SPA to GitHub Pages.
+# Tech stack mirrors celestia-island.github.io: Vue 3 + Vite + UnoCSS + Three.js.
+# - Lint + build on push to master/dev and on PRs to master.
+# - Deploy only from master (production branch).
+#
+# Custom domain: add a `docs/website/CNAME` file containing your domain
+# (e.g. `mcp.example.com`); build.py copies it into dist automatically.
+# Until then GitHub Pages serves the site at
+#   https://langyo.github.io/minecraft-mod-mcp/   (base path = /minecraft-mod-mcp/)
+# A base path is injected at build time via VITE_BASE so the hash-router SPA
+# loads assets correctly under the project subpath when no CNAME is present.
+
+on:
+  push:
+    branches: [master, dev]
+    paths:
+      - 'docs/website/**'
+      - '.github/workflows/website.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'docs/website/**'
+      - '.github/workflows/website.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "website-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build website
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/website
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: docs/website/pnpm-lock.yaml
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pnpm dependencies
+        run: pnpm install --ignore-scripts
+
+      - name: Install favicon generator (Pillow)
+        run: pip install Pillow
+
+      # When no CNAME is present, GitHub Pages serves the site under
+      # /minecraft-mod-mcp/. Inject that base so Vite emits correct asset URLs.
+      # With a CNAME (custom domain) the base is root "/".
+      - name: Resolve build base path
+        id: base
+        run: |
+          if [ -f CNAME ]; then
+            echo "base=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=/minecraft-mod-mcp/" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Type check
+        run: npx vue-tsc -b --noEmit
+
+      - name: Build (Vite)
+        run: npx vite build --base "${{ steps.base.outputs.base }}"
+
+      - name: Generate favicons & copy assets
+        run: python3 scripts/build.py --skip-deps --skip-typecheck --skip-vite
+
+      - uses: actions/configure-pages@v5
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        with:
+          path: docs/website/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
