@@ -26,6 +26,18 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Set published version from tag
+        shell: bash
+        run: |
+          # npm reads the version from package.json, not the git tag. For
+          # prerelease tags (v0.2.1-rc1) we must rewrite package.json to the
+          # full tag version, otherwise the rc would publish as the base
+          # version (0.2.1) and collide with the later stable release.
+          TAG="${GITHUB_REF_NAME:-}"
+          VERSION="${TAG#v}"
+          npm version "$VERSION" --no-git-tag-version
+          echo "Publishing version: $(node -p "require('./package.json').version")"
+
       - name: Build
         run: npm run build
 
