@@ -114,6 +114,26 @@ export function getVersionById(data: VersionsData, versionId: string): VersionIn
       };
     }
   }
+  // Fallback: match by MC version (the versionId may be a bare mc like "26.2"
+  // or an inheritsFrom that isn't a stored version_id). This lets us pick up
+  // the java/forge metadata recorded for that MC version even when the loader
+  // version JSON has no javaVersion field (e.g. NeoForge 26.2).
+  const asMc = versionId.replace(/_/g, ".");
+  for (const [key, raw] of Object.entries(data.versions)) {
+    if (key.replace(/_/g, ".") === asMc) {
+      return {
+        mc_version: key.replace(/_/g, "."),
+        forge: raw.forge,
+        fg_era: raw.fg_era,
+        java: raw.java,
+        mappings: raw.mappings,
+        version_id: raw.version_id,
+        neoforge: raw.neoforge ?? null,
+        mdg: raw.mdg ?? null,
+        fabric_yarn: raw.fabric_yarn ?? null,
+      };
+    }
+  }
   return null;
 }
 

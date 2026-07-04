@@ -13,7 +13,7 @@ import { findFreePort } from "../discovery/scanner.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "../mc/download.js";
 import { detectJavas } from "../mc/javaDetect.js";
 import { createOfflineUuid } from "../mc/auth.js";
-import { versionsDir, modJarPath } from "../mc/platform.js";
+import { versionsDir, ensureModJar } from "../mc/platform.js";
 import { existsSync, copyFileSync, mkdirSync } from "node:fs";
 
 function mcVersionGte(version: string, target: string): boolean {
@@ -224,7 +224,7 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
     extraGameParts.push(`--port`, String(params.server_port ?? GAME.defaultServerPort));
   }
 
-  const modJar = modJarPath(version, loader);
+  const modJar = await ensureModJar(version, loader);
 
   const cmd = buildLaunchCommand({
     versionId,
@@ -403,7 +403,7 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
 
   const setup = await installServer(version, loader, undefined, serverType, serverProps);
 
-  const modJar = modJarPath(version, loader);
+  const modJar = await ensureModJar(version, loader);
   if (modJar && existsSync(modJar)) {
     const serverModsDir = join(setup.serverDir, SERVER.modsDirName);
     if (!existsSync(serverModsDir)) mkdirSync(serverModsDir, { recursive: true });
@@ -427,7 +427,7 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
     versionId,
     loader,
     mcpPort,
-    modJar: modJarPath(version, loader) ?? undefined,
+    modJar: (await ensureModJar(version, loader)) ?? undefined,
     maxMemoryMb: clientMem,
     minMemoryMb: config.min_memory_mb,
     extraJvmArgs: config.java_args,

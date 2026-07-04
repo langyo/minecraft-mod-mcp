@@ -1,6 +1,6 @@
 {
   "name": "minecraft-mod-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server bridge & launcher CLI for Minecraft — connect AI tools to Minecraft via Model Context Protocol, launch and manage instances",
   "type": "module",
   "main": "dist/index.cjs",
@@ -22,7 +22,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "prepublishOnly": "npm run build"

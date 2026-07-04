@@ -230,26 +230,29 @@ ALL_VERSIONS = {
     # --- FG 7.x (MC 1.21.4+) ---
     "1.21.4": {"forge": "1.21.4-54.1.14",                  "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.4",
                "version_id": "1.21.4-Forge54.1.14",
-               "neoforge": "21.4.0-beta", "mdg": "2.0.141"},
+               "neoforge": "21.4.0-beta", "mdg": "2.0.141", 'fabric_yarn': '1.21.4+build.1'},
     "1.21.5": {"forge": "1.21.5-55.1.0",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.5",
-               "version_id": "1.21.5-Forge55.1.0"},
+               "version_id": "1.21.5-Forge55.1.0", 'fabric_yarn': '1.21.5+build.1'},
     "1.21.6": {"forge": "1.21.6-56.0.9",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.6",
-               "version_id": "1.21.6-Forge56.0.9"},
+               "version_id": "1.21.6-Forge56.0.9", 'fabric_yarn': '1.21.6+build.1'},
     "1.21.7": {"forge": "1.21.7-57.0.3",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.7",
-               "version_id": "1.21.7-Forge57.0.3"},
+               "version_id": "1.21.7-Forge57.0.3", 'fabric_yarn': '1.21.7+build.1'},
     "1.21.8": {"forge": "1.21.8-58.1.0",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.8",
-               "version_id": "1.21.8-Forge58.1.0"},
+               "version_id": "1.21.8-Forge58.1.0", 'fabric_yarn': '1.21.8+build.1'},
     "1.21.9": {"forge": "1.21.9-59.0.5",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.9",
-               "version_id": "1.21.9-Forge59.0.5"},
+               "version_id": "1.21.9-Forge59.0.5", 'fabric_yarn': '1.21.9+build.1'},
     "1.21.10": {"forge": "1.21.10-60.1.0",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.10",
-               "version_id": "1.21.10-Forge60.1.0"},
+               "version_id": "1.21.10-Forge60.1.0", 'fabric_yarn': '1.21.10+build.1'},
     "1.21.11": {"forge": "1.21.11-61.1.5",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.11",
                "version_id": "1.21.11-forge-61.1.5",
                "neoforge": "21.11.42", "mdg": "2.0.141",
                "fabric_yarn": "1.21.11+build.6"},
     "26.1.2": {"forge": "26.1.2-64.0.8",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
                "version_id": "26.1.2-forge-64.0.8",
-               "neoforge": "26.1.2.36-beta", "mdg": "2.0.141"},
+               "neoforge": "26.1.2.36-beta", "mdg": "2.0.141", 'fabric_yarn': '26.1.2+build.1'},
+    "26.2":   {"forge": "26.2-65.0.3",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.2",
+               "version_id": "26.2-forge-65.0.3",
+               "neoforge": "26.2.0.7-beta", "mdg": "2.0.141"},
 }
 
 # ============================================================
@@ -283,6 +286,7 @@ def get_api_group(mc):
         "1.21.7": "mc26", "1.21.8": "mc26", "1.21.9": "mc26",
         "1.21.10": "mc26", "1.21.11": "mc26",
         "26.1.2": "mc26",
+        "26.2": "mc26",
     }
     return _MAP.get(mc, "fg6")
 

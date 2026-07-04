@@ -23,6 +23,18 @@ def strip_v_prefix(version: str) -> str:
     return version[1:] if version.startswith("v") else version
 
 
+def base_version(tag: str) -> str:
+    """Strip the leading 'v' and any prerelease suffix (-rc1, -beta.2, etc.)
+    so a prerelease tag like 'v0.2.1-rc1' checks against mod version '0.2.1'.
+    The npm/GitHub workflows publish the full tag as the version, but the mod
+    sources only carry the base version."""
+    v = strip_v_prefix(tag)
+    # Split off prerelease: everything after the first '-' that isn't part of
+    # the MC version (MC versions use dots, not hyphens). The suffix may be
+    # immediately followed by a digit (rc1, beta2), so don't require a boundary.
+    return re.split(r"-(?:rc|beta|alpha|pre|snapshot)\d*", v, maxsplit=1, flags=re.IGNORECASE)[0]
+
+
 def fail(msg: str):
     print(f"::error::{msg}")
     raise SystemExit(1)
@@ -48,6 +60,12 @@ def check_file(path: Path, pattern: str, expected: str, label: str) -> list[str]
     return errors
 
 
+def _is_build_artifact(path: Path) -> bool:
+    """True for generated build outputs (build/, .gradle/) — skip these so the
+    check passes locally with stale artifacts present (CI checks out clean)."""
+    return any(part in ("build", ".gradle", "node_modules") for part in path.parts)
+
+
 def check_build_gradle(expected: str) -> list[str]:
     """Check all build.gradle / build.gradle.kts for version strings."""
     errors = []
@@ -57,6 +75,8 @@ def check_build_gradle(expected: str) -> list[str]:
     # New forge/neoforge/fabric: version = '0.1.1-SNAPSHOT'
     # Combined pattern catches both
     for path in MODS_DIR.rglob("build.gradle*"):
+        if _is_build_artifact(path):
+            continue
         # Skip non-mod build files
         parts = path.parts
         try:
@@ -102,6 +122,8 @@ def check_metadata_json(paths_glob: str, expected: str, label: str) -> list[str]
     """Check JSON metadata files for version field."""
     errors = []
     for path in MODS_DIR.rglob(paths_glob):
+        if _is_build_artifact(path):
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -132,8 +154,12 @@ def check_mods_toml(expected: str) -> list[str]:
     errors = []
     pattern = r'version\s*=\s*"([^"]+)"'
     for path in MODS_DIR.rglob("mods.toml"):
+        if _is_build_artifact(path):
+            continue
         errors.extend(check_file(path, pattern, expected, "mods.toml"))
     for path in MODS_DIR.rglob("neoforge.mods.toml"):
+        if _is_build_artifact(path):
+            continue
         errors.extend(check_file(path, pattern, expected, "neoforge.mods.toml"))
     return errors
 
@@ -143,6 +169,8 @@ def check_java_annotations(expected: str) -> list[str]:
     errors = []
     pattern = r'@Mod\([^)]*version\s*=\s*"([^"]+)"'
     for path in MODS_DIR.rglob("ModDevMcpMod.java"):
+        if _is_build_artifact(path):
+            continue
         errors.extend(check_file(path, pattern, expected, "@Mod annotation"))
     return errors
 
@@ -165,7 +193,7 @@ def main():
         print("Usage: python scripts/check_versions.py <tag_version>")
         sys.exit(1)
 
-    tag = strip_v_prefix(sys.argv[1])
+    tag = base_version(sys.argv[1])
     print(f"=== Version Gate: checking all mods for version '{tag}' ===\n")
 
     all_errors = []

@@ -16,7 +16,7 @@ Works with **OpenCode**, **Claude Code**, **Cursor**, and any MCP-compatible AI 
 - **Multi-version**: Minecraft 1.8.9 through 26.1.2, Forge / Fabric / NeoForge
 - **Zero-config port discovery**: mod and server auto-negotiate ports (9876–9000)
 - **Cross-runtime**: Node.js 20+, Deno, Bun
-- **MCP Streamable HTTP transport**: standards-compliant
+- **MCP stdio transport**: the bridge speaks the Model Context Protocol over stdio and proxies every call to the in-game mod's HTTP API
 
 ## Quick Start
 
@@ -24,31 +24,33 @@ Works with **OpenCode**, **Claude Code**, **Cursor**, and any MCP-compatible AI 
 # Install globally
 npm install -g minecraft-mod-mcp
 
-# Or use directly
+# Or use directly — starts the MCP stdio server
 npx minecraft-mod-mcp
 
-# With options
-npx minecraft-mod-mcp --port 9878 --no-discover
+# Start the MCP server, skip background port discovery
+npx minecraft-mod-mcp mcp --no-discover
 ```
 
 For the full CLI reference (launching servers, managing versions, accounts, building SDKs), see **[CLI Usage Guide](../../docs/guides/en/CLI.md)** — available in 8 languages.
 
 ## MCP Configuration
 
-Add to your `.mcp.json` or `opencode.json`:
+This package **is** the MCP server. Add it to your AI tool's config as a **stdio** server launched via `npx` — do not point a URL at it, and do not point an MCP client at the mod's HTTP port (the mod does not speak MCP):
 
 ```json
 {
   "mcpServers": {
-    "minecraft": {
-      "type": "streamable-http",
-      "url": "http://localhost:9876/mcp"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
-The server auto-scans ports 9876–9000. If 9876 is occupied, it picks the next available.
+(Claude Desktop / older clients use `"command": "npx", "args": ["-y", "minecraft-mod-mcp"]` instead.)
+
+The bridge auto-scans ports 9876–9000 to find the running mod, so you never hard-code a port. See **[AI Tool Integration Guide](../../docs/guides/en/AI-TOOLS.md)** for per-tool config and headless/Linux notes.
 
 ## Tools
 
@@ -88,26 +90,26 @@ The server auto-scans ports 9876–9000. If 9876 is occupied, it picks the next 
 | `exit_control_mode` | Return to normal |
 | `release_mouse` | Release cursor |
 | `set_gamemode` | Change game mode |
-| `launch_minecraft` | Start MC (calls launch_mc.py) |
+| `launch_minecraft` | Start a MC client (downloads version + injects mod) |
 | `kill_minecraft` | Stop MC |
 | `get_minecraft_status` | Connection status |
 
 ## How It Works
 
 ```
-AI Tool ──MCP──► minecraft-mod-mcp (TS) ──HTTP──► Minecraft Mod (Java)
-                  port scan 9876-9000              port scan 9876-9000
+AI Tool ──MCP/stdio──► minecraft-mod-mcp bridge ──HTTP──► Minecraft Mod (Java, in-game)
+                        scans ports 9876-9000              serves /api/* on first free port
 ```
 
 1. The Minecraft mod starts an HTTP server on the first available port (9876→9000)
-2. The MCP server discovers the mod by scanning the same range
-3. All communication is pure HTTP — no WebSocket, no hardcoded ports
+2. The bridge discovers the mod by scanning the same range and reading `/api/status`
+3. Each MCP tool call is translated to an HTTP request — no WebSocket, no hardcoded ports
 
 ## Requirements
 
-- Minecraft with the [minecraft-mcp mod](https://github.com/langyo/minecraft-mod-mcp) installed
+- Minecraft with the [minecraft-mcp mod](https://github.com/langyo/minecraft-mod-mcp) installed — or just let the `launch_minecraft` / `serve` tools start one for you
 - Node.js 20+ (or Deno, or Bun)
-- Python 3.11+ (for `launch_mc.py` game launcher)
+- Java (auto-downloaded per version when launching via the bridge)
 
 ## License
 

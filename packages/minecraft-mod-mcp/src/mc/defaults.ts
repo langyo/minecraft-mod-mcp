@@ -1,7 +1,7 @@
 export const LAUNCHER = {
   name: "MMML",
   nameGame: "MCP-Launcher",
-  version: "0.1.0",
+  version: "0.2.1",
   versionType: "release",
   mcpServerName: "minecraft-mod-mcp",
 } as const;

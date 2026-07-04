@@ -301,9 +301,42 @@ jobs:
           }
           Write-Host "Total: $((Get-ChildItem dist).Count) JARs"
 
+      - name: Build release notes from commit log
+        id: notes
+        shell: bash
+        run: |
+          # Generate a chronological commit log since the last release tag,
+          # matching the hand-written style of previous releases.
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+          {
+            echo "body<<EOF"
+            echo "## ${GITHUB_REF_NAME}"
+            echo ""
+            echo "### Commits"
+            git log $RANGE --pretty=format:"- %s (%h)" --no-merges
+            echo ""
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Detect prerelease
+        id: pre
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME:-}"
+          if [[ "$TAG" =~ -(rc|beta|alpha|pre|snapshot)[0-9]*$ ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.jar
-          generate_release_notes: true
+          body: ${{ steps.notes.outputs.body }}
+          prerelease: ${{ steps.pre.outputs.prerelease }}
           fail_on_unmatched_files: true
