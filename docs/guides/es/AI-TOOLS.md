@@ -8,14 +8,21 @@
 > {
 >   "mcpServers": {
 >     "minecraft-mcp": {
->       "type": "sse",
->       "url": "http://localhost:9876/api/events"
+>       "type": "local",
+>       "command": ["npx", "-y", "minecraft-mod-mcp"]
 >     }
 >   }
 > }
 > ```
 >
 > **Para usuarios**: Simplemente pega la URL de esta página a tu agente de IA y se configurará automáticamente. No necesitas configuración manual.
+
+<!-- bridge-fix -->
+> ⚠️ **Important / 重要 / Важно**: Connect via the **stdio bridge** `npx -y minecraft-mod-mcp` (MCP `type: "local"`),
+> **not** by pointing `"type":"sse"` at `http://localhost:9876/api/events`. The mod's `/api/events` is a plain
+> debug SSE stream and is **not** an MCP transport — an SSE config will fail to list or call any tool.
+> The bridge is the only component that speaks MCP and auto-discovers which port the game is on (9876→9000).
+> See the [English guide](../en/AI-TOOLS.md) for the authoritative, up-to-date instructions.
 
 ---
 
@@ -27,8 +34,8 @@ La mayoría de las herramientas de codificación con IA usan la misma configurac
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -60,7 +67,7 @@ El servidor MCP de Minecraft expone los siguientes endpoints HTTP (puerto por de
 | `/api/events` | GET | Flujo SSE (Server-Sent Events) para historial de llamadas en tiempo real |
 | `/api/calls` | GET | Devuelve los últimos 50 eventos de llamada como array JSON |
 
-> **Requisitos previos**: Asegúrate de que el daemon de Minecraft Mod MCP esté en ejecución y que un cliente de Minecraft con el mod MCP esté conectado. Ejecuta `just daemon` y luego `just launch <version> <loader>`.
+> **Requisitos previos**: Asegúrate de que el daemon de Minecraft Mod MCP esté en ejecución y que un cliente de Minecraft con el mod MCP esté conectado. Ejecuta `npx -y minecraft-mod-mcp` (the bridge auto-discovers the game) or launch a client via the `launch_minecraft` tool.
 
 ---
 
@@ -68,7 +75,7 @@ El servidor MCP de Minecraft expone los siguientes endpoints HTTP (puerto por de
 
 La mayoría de las herramientas de codificación con IA soportan el **Protocolo de Contexto de Modelo (MCP)** para conectarse a servidores externos. El servidor MCP de Minecraft se puede conectar mediante:
 
-- **Transporte SSE**: Apunta el cliente MCP de la herramienta a `http://localhost:9876/api/events`
+- **MCP (stdio bridge — required)**: run `npx -y minecraft-mod-mcp`. This is the only MCP-compatible transport; the bridge auto-discovers the game's port (9876→9000). The mod's `/api/events` is not an MCP transport.
 - **API REST HTTP**: Envía solicitudes POST directamente a `http://localhost:9876/api/cmd`
 
 Las secciones siguientes proporcionan instrucciones de configuración específicas para cada herramienta.
@@ -87,14 +94,14 @@ Asistente de codificación con IA basado en terminal de Anthropic.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
-Alternativamente, usa `claude mcp add minecraft-mcp --transport sse http://localhost:9876/api/events`.
+Alternativamente, usa `claude mcp add minecraft-mod-mcp -- npx -y minecraft-mod-mcp`.
 
 ### Claude Desktop / Claude for IDE
 
@@ -109,8 +116,8 @@ La aplicación de escritorio y las versiones del plugin para VS Code/JetBrains I
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -128,8 +135,8 @@ Agente de codificación de terminal de código abierto.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -145,14 +152,14 @@ Editor de código con IA que prioriza la inteligencia artificial, con soporte pa
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
-O mediante la interfaz de usuario: **Cursor Settings → MCP → Add new MCP Server**, establece el tipo de transporte a **SSE** e introduce la URL.
+O mediante la interfaz de usuario: **Cursor Settings → MCP → Add new MCP Server**, type **stdio**, command `npx -y minecraft-mod-mcp`.
 
 ### Cline
 
@@ -164,8 +171,8 @@ Extensión de codificación con IA para VS Code.
 {
   "cline.mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -181,8 +188,8 @@ Extensión inteligente para VS Code para escritura y refactorización de código
 {
   "roo.mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -198,8 +205,8 @@ Plugin eficiente para VS Code para generación de código y gestión de proyecto
 {
   "kilo.mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -215,8 +222,8 @@ Programador de pares con IA de GitHub en VS Code.
 {
   "github.copilot.mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -229,7 +236,9 @@ GitHub Copilot para la línea de comandos.
 **Configuración**: Establece variables de entorno o usa `gh copilot config`:
 
 ```bash
-export MCP_SERVER_URL="http://localhost:9876/api/events"
+# GitHub Copilot CLI does not load MCP servers from an env var.
+# Use a stdio-capable MCP host instead, e.g. Claude Code:
+#   claude mcp add minecraft-mod-mcp -- npx -y minecraft-mod-mcp
 ```
 
 ### CodeBuddy / WorkBuddy
@@ -242,8 +251,8 @@ Herramienta de programación inteligente full-stack potenciada por IA.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -256,8 +265,8 @@ Editor con IA capaz de completar de forma independiente diversas tareas de desar
 **Configuración**: Navega a **Settings → MCP Servers → Add Server**:
 
 - **Name**: `minecraft-mcp`
-- **Transport**: SSE
-- **URL**: `http://localhost:9876/api/events`
+- **Transport**: stdio
+- **URL**: `npx -y minecraft-mod-mcp`
 
 ### ZCode
 
@@ -269,8 +278,8 @@ Combina potentes agentes de IA con cadenas de herramientas existentes.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -283,8 +292,8 @@ Asistente de programación inteligente.
 **Configuración**: Navega a **Settings → MCP → Add Server**:
 
 - **Name**: `minecraft-mcp`
-- **Transport**: SSE
-- **URL**: `http://localhost:9876/api/events`
+- **Transport**: stdio
+- **URL**: `npx -y minecraft-mod-mcp`
 
 ### Qoder
 
@@ -296,8 +305,8 @@ Plataforma de programación con agentes para software del mundo real.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -313,8 +322,8 @@ Agente de codificación con IA de terminal, de nivel empresarial, para flujos de
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -330,8 +339,8 @@ Herramienta de programación con IA para terminal, compatible con interfaces CLI
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -347,8 +356,8 @@ Herramienta de Agente de IA que soporta ejecución local y tareas de ingeniería
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -364,8 +373,8 @@ Asistente de codificación potenciado por DeepSeek.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -381,8 +390,8 @@ Herramienta de codificación con IA enfocada en razonamiento.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -397,8 +406,8 @@ Asistente de codificación con IA basado en CLI.
 ```yaml
 mcp_servers:
   minecraft-mcp:
-    type: sse
-    url: http://localhost:9876/api/events
+    type: stdio
+    command: ["npx", "-y", "minecraft-mod-mcp"]
 ```
 
 ### Oh My Pi
@@ -411,8 +420,8 @@ Plataforma versátil de agentes de IA.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -428,8 +437,8 @@ Compañero de codificación ligero con IA.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -449,8 +458,8 @@ Asistente de IA de código abierto que se ejecuta localmente con extensibilidad 
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -463,8 +472,8 @@ IDE de aplicaciones de IA con soporte para múltiples integraciones de modelos.
 **Configuración**: Navega a **Settings → MCP Servers → Add**:
 
 - **Name**: `minecraft-mcp`
-- **Transport**: SSE
-- **URL**: `http://localhost:9876/api/events`
+- **Transport**: stdio
+- **URL**: `npx -y minecraft-mod-mcp`
 
 ### Hermes Agent
 
@@ -476,8 +485,8 @@ Agente de IA de código abierto con auto-evolución y memoria persistente.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -493,8 +502,8 @@ Framework de bots potenciado por IA.
 {
   "mcp_servers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -510,8 +519,8 @@ Agente de IA ligero para diversas tareas.
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }

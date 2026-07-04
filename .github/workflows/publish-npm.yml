@@ -32,7 +32,21 @@ jobs:
       - name: Test
         run: npm test --if-present
 
+      - name: Determine npm dist-tag
+        id: disttag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME:-}"
+          # Prerelease tags (v1.2.3-rc1, -beta.2, etc.) publish under 'next'
+          # so they don't replace 'latest' — `npx minecraft-mod-mcp` still
+          # resolves to the last stable release.
+          if [[ "$TAG" =~ -(rc|beta|alpha|pre|snapshot)[0-9]*$ ]]; then
+            echo "disttag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "disttag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish
-        run: npm publish --access public
+        run: npm publish --access public --tag ${{ steps.disttag.outputs.disttag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

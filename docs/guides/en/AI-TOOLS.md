@@ -2,105 +2,188 @@
 
 **[English](./AI-TOOLS.md)** &bull; **[简体中文](../zhs/AI-TOOLS.md)** &bull; **[繁體中文](../zht/AI-TOOLS.md)** &bull; **[日本語](../ja/AI-TOOLS.md)** &bull; **[한국어](../ko/AI-TOOLS.md)** &bull; **[Français](../fr/AI-TOOLS.md)** &bull; **[Español](../es/AI-TOOLS.md)** &bull; **[Русский](../ru/AI-TOOLS.md)**
 
-> **🤖 For AI Agents**: If a user asks you to connect to Minecraft, add this MCP server config and start using the 35+ tools listed at the end of this guide:
+> **🤖 For AI Agents — read this first**
+>
+> Connect to Minecraft through the **`minecraft-mod-mcp` stdio bridge**, NOT by pointing an MCP/SSE client at a port directly. The bridge is the only component that speaks the MCP protocol; it also auto-discovers which port the running game is on, so you never have to guess.
+>
+> Add this MCP server config (stdio, launched via `npx`), then use the 45 tools the bridge exposes:
 >
 > ```json
 > {
 >   "mcpServers": {
->     "minecraft-mcp": {
->       "type": "sse",
->       "url": "http://localhost:9876/api/events"
+>     "minecraft-mod-mcp": {
+>       "type": "local",
+>       "command": ["npx", "-y", "minecraft-mod-mcp"]
 >     }
 >   }
 > }
 > ```
 >
-> **For humans**: You can just paste this page's URL to your AI agent and it will configure itself. No manual setup needed.
+> **Why a bridge, and not a URL?** The in-game mod runs an HTTP server but it does **not** implement the MCP protocol. Pointing `"type":"sse"`/`"url"` at the mod will fail to list tools or call them. The `npx minecraft-mod-mcp` bridge is what actually speaks MCP (over stdio) and forwards each call to the mod.
+>
+> **For humans**: paste this page's URL to your AI agent and it will configure the bridge itself. The only other thing it needs is a Minecraft client running with the mod — the bridge can even launch that for you (see [Launching Minecraft](#launching-minecraft)).
 
 ---
 
-## Quick Setup
+## How it actually works
 
-Most AI coding tools use the same SSE-based MCP configuration. Add this to your tool's config file:
+```mermaid
+flowchart LR
+    A["AI Tool<br/>(Claude Code, Cursor, OpenCode, …)<br/>.mcp.json → stdio"]
+    B["minecraft-mod-mcp bridge<br/>(npm package, runs via npx)<br/>speaks MCP, scans ports 9876→9000"]
+    C["Minecraft Mod<br/>(in-game, Forge/Fabric/NeoForge)<br/>HTTP server on first free port"]
+
+    A -- "MCP / stdio (JSON-RPC)" --> B
+    B -- "HTTP: /api/cmd, /api/screenshot, /api/status" --> C
+```
+
+1. Your AI tool spawns the bridge as a child process (`npx -y minecraft-mod-mcp`) and talks MCP to it over stdio.
+2. The bridge scans ports **9876 → 9000**, hits `/api/status` on each, and latches onto the first port that answers with `type:"minecraft-mod"`. This is how it finds the game even when 9876 is taken.
+3. Each MCP tool call (`screenshot`, `click`, `execute_command`, …) is translated into an HTTP request to the mod. The bridge also exposes `launch_minecraft` / `serve` tools so it can start the game itself.
+
+> **Key point**: the bridge is the single source of truth for "which Minecraft client am I talking to". It reads `version`, `loader`, `pid`, and `port` from `/api/status` during discovery. You never hard-code a port.
+
+---
+
+## Quick setup
+
+### 1. Add the bridge to your AI tool
+
+Most MCP-compatible tools read a config file in the project root. Use the **stdio** form:
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
+If you prefer it installed globally first (`npm install -g minecraft-mod-mcp`), the command can simply be `["minecraft-mod-mcp"]`.
+
 Common config file locations:
 
-| Tool | Config File |
+| Tool | Config file |
 |------|-------------|
 | Claude Code, OpenCode, CodeBuddy, WorkBuddy | `.mcp.json` in project root |
 | Cursor | `.cursor/mcp.json` in project root |
 | Cline, Roo Code, Kilo Code | VS Code `settings.json` |
-| Claude Desktop | `claude_desktop_config.json` (see below for OS paths) |
-| Others | See tool-specific sections below |
+| Claude Desktop | `claude_desktop_config.json` (see OS paths below) |
+| Others | see [Coding agent tools](#coding-agent-tools) |
 
-> See the [tool-by-tool instructions](#coding-agent-tools) below for exact paths, UI-based setup, and tool-specific formats.
+### 2. Have a Minecraft client running with the mod
 
----
+Either launch the game yourself (install the mod JAR from [Releases](https://github.com/langyo/minecraft-mod-mcp/releases) into your `mods` folder), or **let the bridge do it** — once connected, call the `launch_minecraft` MCP tool:
 
-## Minecraft Mod MCP HTTP Endpoints
+```
+launch_minecraft(version="1.21.7", loader="forge")
+```
 
-The Minecraft Mod MCP server exposes the following HTTP endpoints (default port: **9876**):
+The bridge downloads the version, picks a free MCP port, injects the mod, and starts the client. See [Launching Minecraft](#launching-minecraft).
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/status` | GET | Health check |
-| `/api/cmd` | POST | JSON-RPC command dispatch (body: `{"cmd":"...", "params":{...}}`) |
-| `/api/screenshot` | GET | Take a screenshot, returns PNG base64 |
-| `/api/events` | GET | SSE (Server-Sent Events) stream for real-time call history |
-| `/api/calls` | GET | Returns last 50 call events as JSON array |
+### 3. Verify the connection
 
-> **Prerequisites**: Ensure the Minecraft Mod MCP daemon is running and a Minecraft client with the MCP mod is connected. Run `just daemon` then `just launch <version> <loader>`.
+Call the `ping` or `get_minecraft_status` MCP tool. The bridge reports whether it found the mod and on which port. Alternatively run the CLI directly:
 
----
-
-## Integration Methods
-
-Most AI coding tools support the **Model Context Protocol (MCP)** for connecting to external servers. The Minecraft Mod MCP server can be connected via:
-
-- **SSE Transport**: Point the tool's MCP client to `http://localhost:9876/api/events`
-- **HTTP REST API**: Send POST requests directly to `http://localhost:9876/api/cmd`
-
-The sections below provide tool-specific configuration instructions.
+```bash
+npx -y minecraft-mod-mcp status
+```
 
 ---
 
-## Coding Agent Tools
+## Requirements
+
+- **Node.js ≥ 20** (for the `npx` bridge). Deno and Bun also work.
+- **A Minecraft client with the mod installed** — OR just let the bridge launch one (`launch_minecraft` / `serve`), in which case you also need **Java** (the bridge auto-downloads the right JDK per version).
+- **No Python, no `just` required.** The `just`/Python commands in the repo are for project contributors only, not for end users or AI agents.
+
+> ⚠️ **Do not follow old instructions that say `just daemon`.** That command (`scripts/mc_vtty.py`) is an internal development/test harness and is not part of the published toolchain. The bridge replaces it entirely.
+
+---
+
+## Linux & headless environments
+
+The `npx` bridge itself is **fully headless** — it is a stdio process with no GUI of its own. It runs fine over SSH, in containers, and in WSL. There are only two environment-specific things to be aware of:
+
+### The bridge needs nothing but Node
+
+```bash
+# Works with no DISPLAY set:
+npx -y minecraft-mod-mcp status
+npx -y minecraft-mod-mcp mcp --no-discover   # starts the stdio server, no game needed
+```
+
+You can confirm the MCP server is alive by feeding it a handshake (the bridge replies with its tool list even before any game is running):
+
+```bash
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+  | npx -y minecraft-mod-mcp mcp --no-discover
+```
+
+### The Minecraft *client* needs a display
+
+Minecraft is a GUI app. To run it on a headless Linux box you need one of:
+
+- A real X11/Wayland session (e.g. an XFCE desktop — `echo $DISPLAY` should be set, e.g. `:0`).
+- **Xvfb** (virtual framebuffer) if there is no physical/remote display:
+  ```bash
+  xvfb-run -a -s "-screen 0 1280x720x24" npx -y minecraft-mod-mcp launch 1.21.7 --loader forge
+  ```
+  Screenshots still work under Xvfb, so this is enough for automated/agent-driven testing.
+- A dedicated server only (no client GUI): use the `server` / `launch_server` tools or `npx minecraft-mod-mcp server <version>`. This needs no display at all.
+
+If `launch_minecraft` fails with a display/AWT error, set `DISPLAY` or wrap the launch in `xvfb-run`. The bridge inherits your environment, so `export DISPLAY=:0` (or running inside an XFCE session) is usually all that's needed.
+
+---
+
+## Launching Minecraft
+
+The bridge can bring up a whole game session through MCP tools or the CLI — no manual version/loader wrangling:
+
+| Goal | MCP tool | CLI equivalent |
+|------|----------|----------------|
+| List supported versions | `list_supported_versions` | `npx minecraft-mod-mcp list` |
+| Install a version+loader | `install_version` | `npx minecraft-mod-mcp install 1.21.7 --loader forge` |
+| Start a client | `launch_minecraft` | `npx minecraft-mod-mcp launch 1.21.7 --loader forge` |
+| Start a dedicated server | `launch_server` | `npx minecraft-mod-mcp server 1.21.7` |
+| Server + auto-connected client | `serve` | `npx minecraft-mod-mcp serve 1.21.7` |
+| Create an offline account | `create_offline_account` | `npx minecraft-mod-mcp auth offline Player` |
+| Kill the running client | `kill_minecraft` | — |
+
+Full CLI reference: **[CLI Usage Guide](./CLI.md)**.
+
+> After `launch_minecraft`, the bridge automatically discovers the freshly-started mod (it scans 9876→9000 on every tool call until it finds one). You don't need to tell it the port.
+
+---
+
+## Coding agent tools
 
 ### Claude Code
 
-Anthropic's terminal-based AI coding assistant.
-
-**Configuration**: Create or edit `.mcp.json` in your project root:
+**Config** (`.mcp.json` in project root):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
-Alternatively, use `claude mcp add minecraft-mcp --transport sse http://localhost:9876/api/events`.
+Or via CLI: `claude mcp add minecraft-mod-mcp -- npx -y minecraft-mod-mcp`.
 
 ### Claude Desktop / Claude for IDE
 
-The desktop app and VS Code/JetBrains IDE plugin versions of Claude.
-
-**Configuration**: Edit `claude_desktop_config.json`:
+**Config** (`claude_desktop_config.json`):
 
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
@@ -108,28 +191,26 @@ The desktop app and VS Code/JetBrains IDE plugin versions of Claude.
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
-For **Claude for IDE** (VS Code / JetBrains), the configuration is the same — use the `.mcp.json` file in your project root.
+For **Claude for IDE** (VS Code / JetBrains), use the same `.mcp.json` form as Claude Code.
 
 ### OpenCode
 
-Open-source terminal coding agent.
-
-**Configuration**: Create `.opencode.json` in your project root or edit `~/.config/opencode/config.json`:
+**Config**: `.opencode.json` in project root, or `~/.config/opencode/config.json`:
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -137,35 +218,33 @@ Open-source terminal coding agent.
 
 ### Cursor
 
-AI-first code editor with custom model support.
-
-**Configuration**: Create `.cursor/mcp.json` in your project root:
+**Config** (`.cursor/mcp.json` in project root):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+    "minecraft-mod-mcp": {
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
-Or via UI: **Cursor Settings → MCP → Add new MCP Server**, set transport type to **SSE** and enter the URL.
+Or via UI: **Cursor Settings → MCP → Add new MCP Server**, type **stdio**, command `npx -y minecraft-mod-mcp`.
 
 ### Cline
 
-VS Code AI coding extension.
-
-**Configuration**: Open VS Code Settings (`Ctrl+,`), search for `cline.mcpServers`, or add to `settings.json`:
+**Config** (VS Code `settings.json`):
 
 ```json
 {
   "cline.mcpServers": {
-    "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+    "minecraft-mod-mcp": {
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"],
+      "disabled": false,
+      "autoApprove": []
     }
   }
 }
@@ -173,16 +252,14 @@ VS Code AI coding extension.
 
 ### Roo Code
 
-Intelligent VS Code extension for code writing and refactoring.
-
-**Configuration**: Add to VS Code `settings.json` (same format as Cline):
+**Config** (VS Code `settings.json`, same shape as Cline):
 
 ```json
 {
   "roo.mcpServers": {
-    "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+    "minecraft-mod-mcp": {
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -190,16 +267,14 @@ Intelligent VS Code extension for code writing and refactoring.
 
 ### Kilo Code
 
-Efficient VS Code plugin for code generation and project management.
-
-**Configuration**: Add to VS Code `settings.json`:
+**Config** (VS Code `settings.json`):
 
 ```json
 {
   "kilo.mcpServers": {
-    "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+    "minecraft-mod-mcp": {
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -207,43 +282,29 @@ Efficient VS Code plugin for code generation and project management.
 
 ### GitHub Copilot
 
-GitHub's AI pair programmer in VS Code.
-
-**Configuration**: Create `.github/copilot-instructions.md` in your workspace, or configure MCP via VS Code settings:
+**Config** (VS Code `settings.json`):
 
 ```json
 {
   "github.copilot.mcpServers": {
-    "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+    "minecraft-mod-mcp": {
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
-### GitHub Copilot CLI
-
-GitHub Copilot for the command line.
-
-**Configuration**: Set environment variables or use `gh copilot config`:
-
-```bash
-export MCP_SERVER_URL="http://localhost:9876/api/events"
-```
-
 ### CodeBuddy / WorkBuddy
 
-AI-powered full-stack intelligent programming tool.
-
-**Configuration**: Create `mcp.json` in your project root or workspace:
+**Config** (`mcp.json` in project root):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -251,26 +312,22 @@ AI-powered full-stack intelligent programming tool.
 
 ### TRAE
 
-AI editor capable of independently completing various development tasks.
+**Settings → MCP Servers → Add**:
 
-**Configuration**: Navigate to **Settings → MCP Servers → Add Server**:
-
-- **Name**: `minecraft-mcp`
-- **Transport**: SSE
-- **URL**: `http://localhost:9876/api/events`
+- **Name**: `minecraft-mod-mcp`
+- **Transport**: stdio
+- **Command**: `npx -y minecraft-mod-mcp`
 
 ### ZCode
 
-Combines powerful AI agents with existing toolchains.
-
-**Configuration**: Edit `~/.zcode/config.json`:
+**Config** (`~/.zcode/config.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -278,26 +335,22 @@ Combines powerful AI agents with existing toolchains.
 
 ### Lingma
 
-Intelligent programming assistant.
+**Settings → MCP → Add Server**:
 
-**Configuration**: Navigate to **Settings → MCP → Add Server**:
-
-- **Name**: `minecraft-mcp`
-- **Transport**: SSE
-- **URL**: `http://localhost:9876/api/events`
+- **Name**: `minecraft-mod-mcp`
+- **Transport**: stdio
+- **Command**: `npx -y minecraft-mod-mcp`
 
 ### Qoder
 
-Agent programming platform for real-world software.
-
-**Configuration**: Edit `~/.qoder/mcp.json`:
+**Config** (`~/.qoder/mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -305,16 +358,14 @@ Agent programming platform for real-world software.
 
 ### Droid
 
-Enterprise-grade terminal AI coding agent for end-to-end workflows.
-
-**Configuration**: Edit `~/.droid/mcp.json`:
+**Config** (`~/.droid/mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -322,16 +373,14 @@ Enterprise-grade terminal AI coding agent for end-to-end workflows.
 
 ### Crush
 
-Terminal AI programming tool supporting CLI and TUI interfaces.
-
-**Configuration**: Edit `~/.crush/config.json`:
+**Config** (`~/.crush/config.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -339,16 +388,14 @@ Terminal AI programming tool supporting CLI and TUI interfaces.
 
 ### Goose
 
-AI Agent tool supporting local execution and automated engineering tasks.
-
-**Configuration**: Edit `~/.config/goose/mcp.json`:
+**Config** (`~/.config/goose/mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -356,16 +403,14 @@ AI Agent tool supporting local execution and automated engineering tasks.
 
 ### Deep Code
 
-DeepSeek-powered coding assistant.
-
-**Configuration**: Edit `~/.deepcode/config.json`:
+**Config** (`~/.deepcode/config.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -373,16 +418,14 @@ DeepSeek-powered coding assistant.
 
 ### Reasonix
 
-Reasoning-focused AI coding tool.
-
-**Configuration**: Edit `~/.reasonix/config.json`:
+**Config** (`~/.reasonix/config.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -390,29 +433,25 @@ Reasoning-focused AI coding tool.
 
 ### Langcli
 
-CLI-based AI coding assistant.
-
-**Configuration**: Edit `~/.langcli/config.yaml`:
+**Config** (`~/.langcli/config.yaml`):
 
 ```yaml
 mcp_servers:
-  minecraft-mcp:
-    type: sse
-    url: http://localhost:9876/api/events
+  minecraft-mod-mcp:
+    type: stdio
+    command: ["npx", "-y", "minecraft-mod-mcp"]
 ```
 
 ### Oh My Pi
 
-Versatile AI agent platform.
-
-**Configuration**: Edit `~/.oh-my-pi/mcp.json`:
+**Config** (`~/.oh-my-pi/mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -420,16 +459,14 @@ Versatile AI agent platform.
 
 ### Pi
 
-Lightweight AI coding companion.
-
-**Configuration**: Edit `~/.pi/config.json`:
+**Config** (`~/.pi/config.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -437,20 +474,18 @@ Lightweight AI coding companion.
 
 ---
 
-## General Agent Tools
+## General agent tools
 
 ### OpenClaw
 
-Open-source AI assistant that runs locally with Skills extensibility.
-
-**Configuration**: Edit `openclaw.json` in your workspace:
+**Config** (`openclaw.json` in workspace):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -458,26 +493,22 @@ Open-source AI assistant that runs locally with Skills extensibility.
 
 ### Cherry Studio
 
-AI application IDE supporting multiple model integrations.
+**Settings → MCP Servers → Add**:
 
-**Configuration**: Navigate to **Settings → MCP Servers → Add**:
-
-- **Name**: `minecraft-mcp`
-- **Transport**: SSE
-- **URL**: `http://localhost:9876/api/events`
+- **Name**: `minecraft-mod-mcp`
+- **Transport**: stdio
+- **Command**: `npx -y minecraft-mod-mcp`
 
 ### Hermes Agent
 
-Open-source self-evolving AI agent with persistent memory.
-
-**Configuration**: Edit `~/.hermes/config.json`:
+**Config** (`~/.hermes/config.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -485,16 +516,14 @@ Open-source self-evolving AI agent with persistent memory.
 
 ### AstrBot
 
-AI-powered bot framework.
-
-**Configuration**: Edit `astrbot_config.json`:
+**Config** (`astrbot_config.json`):
 
 ```json
 {
   "mcp_servers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -502,16 +531,14 @@ AI-powered bot framework.
 
 ### nanobot
 
-Lightweight AI agent for various tasks.
-
-**Configuration**: Edit `~/.nanobot/config.json`:
+**Config** (`~/.nanobot/config.json`):
 
 ```json
 {
   "mcpServers": {
-    "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+    "minecraft-mod-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -519,75 +546,79 @@ Lightweight AI agent for various tasks.
 
 ---
 
-## Direct HTTP REST API Access
+## Direct HTTP REST API (advanced)
 
-For tools that do not natively support the MCP protocol, you can interact with the Minecraft Mod MCP server directly via its HTTP REST API:
+If you are not using MCP at all, you can talk to the mod's HTTP server directly with `curl`. You must first find the port (the bridge scans 9876→9000; `/api/status` tells you which one is the mod):
 
 ```bash
+# Find the running mod's port
+for p in $(seq 9876 -1 9000); do
+  curl -s "http://localhost:$p/api/status" | grep -q '"type":"minecraft-mod"' && echo "mod on port $p" && break
+done
+
 # Health check
 curl http://localhost:9876/api/status
 
-# Execute a command
+# Run a command
 curl -X POST http://localhost:9876/api/cmd \
   -H "Content-Type: application/json" \
   -d '{"cmd":"screenshot","params":{}}'
 
 # Take a screenshot
 curl http://localhost:9876/api/screenshot
-
-# Subscribe to events (SSE stream)
-curl http://localhost:9876/api/events
 ```
 
-### Common Commands
+> **Note**: the `/api/events` endpoint is a plain **debug SSE stream** of call history (for the in-game `/debug` dashboard). It is **not** an MCP transport — do not configure it as an MCP `"type":"sse"` server. Use the stdio bridge above for MCP.
+
+### Common commands
 
 | Command | Description |
 |---------|-------------|
-| `screenshot` | Take a screenshot, returns base64 data URI |
-| `screenshot_to_file` | Take a screenshot and save to a local file (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
-| `click` | Click at (x, y) coordinates |
+| `screenshot` | Capture a screenshot, returns a base64 data URI |
+| `screenshot_to_file` | Capture a screenshot and save to a local file (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
+| `click` | Click at (x, y) |
 | `press_key` | Press a keyboard key |
 | `type_text` | Type a text string |
-| `scroll` | Perform mouse scroll |
-| `execute_command` | Execute a Minecraft slash command |
-| `get_player_info` | Get player position and status |
-| `get_world_info` | Get world information |
+| `scroll` | Scroll the mouse wheel |
+| `execute_command` | Run a Minecraft slash command |
+| `get_player_info` | Get player position and state |
+| `get_world_info` | Get world info |
 
 ---
 
-## Visual Recognition Integration
+## Visual recognition integration
 
-You can pair Minecraft Mod MCP with **vision-capable MCP servers** to let AI agents *see and understand* what's happening in the game — reading UI text, diagnosing errors, analyzing layouts, and more.
+You can pair Minecraft Mod MCP with a **vision-capable MCP server** so the agent can *see and understand* what's on screen — read UI text, diagnose errors, analyze layout.
 
-### How It Works
+### How it works
 
-1. Minecraft Mod MCP takes a screenshot and saves it to a local file via `screenshot_to_file`
-2. A vision MCP server reads that file and analyzes it
-3. The AI agent coordinates both — screenshot → analyze → act
+1. The bridge's `screenshot_to_file` tool saves a frame to disk.
+2. A vision MCP server reads that file and analyzes it.
+3. The agent coordinates both — screenshot → analyze → act.
 
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["minecraft-mod-mcp bridge<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
-    A --> D["Minecraft Mod MCP<br/>click x=400,y=300<br/>→ enters game"]
+    A --> D["minecraft-mod-mcp bridge<br/>click x=400,y=300<br/>→ enters game"]
 ```
 
 ### GLM Vision MCP Server
 
-[GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) is a local MCP server powered by GLM-4.6V, providing:
+[GLM Vision MCP Server](https://docs.bigmodel.cn/cn/coding-plan/mcp/vision-mcp-server) (`@z_ai/mcp-server`) is a local MCP server powered by GLM-4.6V:
 
-| Tool | Use Case |
-|------|----------|
-| `ui_to_artifact` | Convert UI screenshots into code, prompts, or design specs |
-| `extract_text_from_screenshot` | OCR text from game UI (chat, signs, menus) |
-| `diagnose_error_screenshot` | Parse error dialogs and stack traces in-game |
-| `understand_technical_diagram` | Read redstone circuits, schematics |
-| `analyze_data_visualization` | Read in-game stats, dashboards |
-| `image_analysis` | General visual understanding of game scenes |
+| Tool | Use |
+|------|-----|
+| `ui_to_artifact` | Convert a UI screenshot into code, prompts, or design specs |
+| `extract_text_from_screenshot` | OCR text from in-game UI (chat, signs, menus) |
+| `diagnose_error_screenshot` | Parse in-game error dialogs and stack traces |
+| `understand_technical_diagram` | Interpret redstone circuits, schematics |
+| `analyze_data_visualization` | Read in-game statistics, dashboards |
+| `image_analysis` | General visual understanding of a game scene |
 | `ui_diff_check` | Compare before/after screenshots |
 
-**Installation** (requires Node.js >= 18):
+**Setup** (requires Node.js ≥ 18):
 
 ```bash
 # Claude Code
@@ -597,9 +628,8 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 {
   "mcpServers": {
     "zai-mcp-server": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@z_ai/mcp-server"],
+      "type": "local",
+      "command": ["npx", "-y", "@z_ai/mcp-server"],
       "env": {
         "Z_AI_API_KEY": "<your_zhipu_api_key>",
         "Z_AI_MODE": "ZHIPU"
@@ -609,33 +639,49 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 }
 ```
 
-> **Note**: The vision MCP reads files from disk, so always use `screenshot_to_file` (not `screenshot`) before calling vision tools. Your AI agent can request a specific file path when calling `screenshot_to_file`.
+> **Note**: the vision MCP reads files from disk, so always call `screenshot_to_file` (not `screenshot`) before a vision tool. Your agent can pass a file path to `screenshot_to_file`.
 
-### Example Workflow
+### Example flow
 
-1. Ask your AI agent: *"Take a screenshot of Minecraft, save it to `/tmp/mc.png`, then analyze what's on screen and tell me what button to click to start a new game."*
-2. The agent calls `minecraft-mcp` → `screenshot_to_file` → file saved
-3. The agent calls `zai-mcp-server` → `extract_text_from_screenshot` → reads UI text
-4. The agent tells you what it sees and what to do next
+1. Ask your agent: *"Take a screenshot of Minecraft, save it to `/tmp/mc.png`, then analyze what's on screen and tell me which button to click to start a new game."*
+2. Agent calls `minecraft-mod-mcp` → `screenshot_to_file` → file saved.
+3. Agent calls `zai-mcp-server` → `extract_text_from_screenshot` → reads UI text.
+4. Agent reports what it sees and the next step.
 
-### Other Vision Tools
+### Other vision tools
 
 | Tool | Description |
 |------|-------------|
-| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude natively understands images — simply paste or reference a screenshot file |
-| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAI vision models accessible via any OpenAI-compatible client |
+| [Claude built-in vision](https://docs.anthropic.com/en/docs/claude/vision) | Claude understands images natively — paste or reference the screenshot file |
+| [GPT-4o / GPT-4V](https://platform.openai.com/docs/guides/vision) | OpenAI vision models, usable via any OpenAI-compatible client |
 | [Gemini Vision](https://ai.google.dev/gemini-api/docs/vision) | Google's vision API, usable in Gemini-compatible tools |
-| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | Open-source vision-language model for self-hosted setups |
+| [Qwen-VL](https://github.com/QwenLM/Qwen-VL) | Open-source vision-language model for self-hosting |
 
-> Any vision-capable LLM or MCP server can be used in the same pipeline — the key is using `screenshot_to_file` to persist the screenshot to disk first.
+> Any vision-capable LLM or MCP server works with the same flow — the key is `screenshot_to_file` saving a frame to disk first.
 
 ---
 
 ## Troubleshooting
 
-1. **Connection refused**: Ensure the MCP daemon is running (`just daemon`) and a Minecraft client is launched.
-2. **SSE timeout**: Some tools may disconnect from SSE after a period of inactivity. Restart the tool or the SSE connection.
-3. **Port conflict**: If port 9876 is in use, configure a different port via the `MCP_PORT` environment variable or system property `mcp.server.port`.
-4. **Firewall**: Ensure your firewall allows connections to `localhost:9876`.
+1. **"Mod not connected" / no tools work**
+   Ensure a Minecraft client with the mod is running. Check with `npx -y minecraft-mod-mcp status`. The bridge scans ports 9876→9000 every tool call; if nothing answers, launch a client first (`launch_minecraft` tool or `npx minecraft-mod-mcp launch <version>`).
 
-> For issues or questions, please open an issue on the [GitHub repository](https://github.com/langyo/minecraft-mod-mcp).
+2. **Wrong port / "which client am I controlling?"**
+   You don't pick a port — the bridge does. It scans 9876→9000 and locks onto the first `/api/status` that returns `type:"minecraft-mod"`, reporting that client's `version`, `loader`, and `pid`. If multiple clients run, only the first-found one is controlled; stop extras or set a fixed port with `-Dmcp.port=<port>` / `MC_MCP_PORT`.
+
+3. **Configured `"type":"sse"` / `"url":"http://localhost:9876/api/events"` and nothing works**
+   That configuration is incorrect. The mod's `/api/events` is a debug event stream, not an MCP transport. Switch to the **stdio bridge** (`npx -y minecraft-mod-mcp`) shown in [Quick setup](#quick-setup).
+
+4. **npx not found / bridge won't start**
+   Install Node.js ≥ 20. Verify with `npx -y minecraft-mod-mcp --help`. On a fresh machine the first `npx` run downloads the package, so allow network access.
+
+5. **Client won't launch on headless Linux**
+   Minecraft needs a display. Run inside an X11/Wayland session (`export DISPLAY=:0`), or wrap the launch in Xvfb: `xvfb-run -a -s "-screen 0 1280x720x24" npx -y minecraft-mod-mcp launch <version>`. A dedicated server (`launch_server` / `server` command) needs no display.
+
+6. **Port conflict on 9876**
+   Not a problem for the bridge — it auto-falls back to 9875, 9874, … 9000. To pin a port, pass `-Dmcp.port=<port>` as a JVM arg or set `MC_MCP_PORT`.
+
+7. **Firewall**
+   The bridge and mod communicate over loopback only (`127.0.0.1`). No external firewall rule is needed unless you expose the mod's HTTP server on purpose.
+
+> For issues or questions, open an issue on the [GitHub repo](https://github.com/langyo/minecraft-mod-mcp).

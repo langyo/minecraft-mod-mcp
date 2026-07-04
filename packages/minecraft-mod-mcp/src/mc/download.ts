@@ -1,13 +1,17 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { versionsDir, assetsDir, librariesDir } from "./platform.js";
+import { spawnSync } from "node:child_process";
+import { versionsDir, assetsDir, librariesDir, mcDir } from "./platform.js";
 import { libraryMavenPath, loadVersionMerged } from "./versionJson.js";
 import type { VersionJson } from "./versionJson.js";
 import { loadVersionsData } from "./versionsData.js";
 import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 import { GAME, MCP, PATHS, DOWNLOAD } from "./defaults.js";
 import { fetchWithFallback, downloadWithNativeFallback } from "./proxy.js";
+import { runForgeProcessors } from "./forgeProcessor.js";
+import { findJavaForVersion } from "./platform.js";
+import { detectJavas } from "./javaDetect.js";
 
 export interface ForgeInstallProfileLegacy {
   install: {
@@ -201,6 +205,13 @@ export async function downloadVersion(
         if (!ok) onProgress?.(`  Warning: could not download ${lib.name}`);
       }
     }
+
+    // Native classifier jars. Modern MC (1.19.4+) ships natives as separate
+    // artifact libraries with OS rules (handled by the loop above). Legacy MC
+    // (<=1.19.3) declares natives via `natives` + `downloads.classifiers` — those
+    // classifier jars are NOT covered by the artifact branch above, so download
+    // them explicitly or the game fails at launch with UnsatisfiedLinkError.
+    await downloadNativeClassifiers(lib, onProgress);
   }
 
   onProgress?.(`Version ${versionId} download complete`);
@@ -298,7 +309,130 @@ export async function downloadForgeInstaller(
   if (profile.libraries) allLibs.push(...profile.libraries);
   await downloadLibraries(allLibs, onProgress);
 
+  // Produce the remapped+patched client artifacts the version JSON launches
+  // against. Try the fast headless processor replay first; on some modern
+  // Forge versions (1.21.11 etc.) our FART output diverges from the patch
+  // data's expected checksums and the binarypatcher fails. In that case fall
+  // back to the official installer jar, which is authoritative (but slow and
+  // can hang on very old Forge installers, so it's the fallback, not the
+  // primary path).
+  let processorsOk = false;
+  let replayErr = "";
+  try {
+    await runForgeInstallerProcessors(profile, installerPath, forgeVersion, "client", onProgress);
+    processorsOk = true;
+  } catch (err: any) {
+    replayErr = (err?.message ?? err).toString();
+    onProgress?.(`  Headless processor replay failed: ${replayErr.slice(0, 120)}`);
+  }
+  // Only fall back to the official installer when the replay hit the known
+  // binarypatcher checksum mismatch (modern Forge). Old Forge installers hang
+  // headless in the official jar, so don't try them — a different replay error
+  // there just means the version genuinely isn't installable by us.
+  const wantsOfficial = !processorsOk && /binarypatcher|checksum|Patch expected/i.test(replayErr);
+  if (wantsOfficial) {
+    onProgress?.(`Falling back to official installer jar (binarypatcher mismatch)...`);
+    const usedOfficial = await tryOfficialInstaller(installerPath, versionId, "client", mcDir(), onProgress);
+    if (!usedOfficial) {
+      throw new Error("Both headless processor replay and official installer failed");
+    }
+  } else if (!processorsOk) {
+    // Replay failed for a non-binarypatcher reason and the official installer
+    // isn't a safe fallback here — surface the original failure.
+    throw new Error(replayErr || "Forge processor replay failed");
+  }
+
   onProgress?.(`Forge ${versionId} install complete`);
+}
+
+/**
+ * Run the official Forge/NeoForge installer jar headlessly via
+ * `java -jar <installer> --installClient <mcDir>`. This is the authoritative
+ * way to produce the patched client artifacts — our processor replay diverges
+ * from the installer's FART on some versions (binarypatcher checksum mismatch).
+ * Returns true if the official installer ran and produced the expected client
+ * jar, false if it should fall back to the headless replay.
+ */
+async function tryOfficialInstaller(
+  installerPath: string,
+  versionId: string,
+  side: "client" | "server",
+  targetMcDir: string,
+  onProgress?: (msg: string) => void,
+): Promise<boolean> {
+  if (!existsSync(installerPath)) return false;
+  const javaExe = processorJavaExecutable();
+  const flag = side === "client" ? "--installClient" : "--installServer";
+
+  // The patched client jar the installer produces — presence signals success.
+  const versionLibBase = join(librariesDir(), "net", "minecraftforge", "forge");
+  const expectedClientJar = join(versionLibBase, versionId.replace(/^forge-/, "").replace("-forge", "-forge"),
+    `forge-${versionId.split("-").slice(-2).join("-") || versionId}-client.jar`);
+
+  onProgress?.(`Running official installer (${side})...`);
+  const r = spawnSync(javaExe, ["-jar", installerPath, flag, targetMcDir], {
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 32 * 1024 * 1024,
+    timeout: 600_000,
+  });
+  if (r.status !== 0) {
+    const tail = (r.stderr?.toString("utf-8") || r.stdout?.toString("utf-8") || "").trim().slice(-300);
+    onProgress?.(`  Official installer exited ${r.status}: ${tail}`);
+    return false;
+  }
+  // The installer prints "Successfully installed" on success; treat that + the
+  // patched jar existing as success. If the jar is missing, fall back.
+  const out = (r.stdout?.toString("utf-8") || "") + (r.stderr?.toString("utf-8") || "");
+  const ok = /Successfully installed|already installed/i.test(out);
+  if (!ok) {
+    onProgress?.(`  Official installer did not report success; falling back`);
+    return false;
+  }
+  onProgress?.(`  Official installer succeeded`);
+  return true;
+}
+
+/** Resolve a Java executable (any JDK 8+) for running installer processor tools. */
+function processorJavaExecutable(): string {
+  for (const v of [17, 21, 8, 16]) {
+    const exe = findJavaForVersion(v);
+    if (exe) return exe;
+  }
+  const all = detectJavas();
+  if (all.length > 0) return `${all[0].path}/bin/java`;
+  return "java";
+}
+
+async function runForgeInstallerProcessors(
+  profile: ForgeInstallProfileModern,
+  installerPath: string,
+  loaderVersion: string,
+  side: "client" | "server",
+  onProgress?: (msg: string) => void,
+): Promise<void> {
+  if (!profile.processors || profile.processors.length === 0) return;
+
+  const mcVersion = profile.minecraft
+    ?? (profile.install as { minecraft?: string })?.minecraft
+    ?? loaderVersion.split("-")[0];
+
+  const vanillaJar = join(versionsDir(), mcVersion, `${mcVersion}.jar`);
+  if (side === "client" && !existsSync(vanillaJar)) {
+    onProgress?.(`  Skipping processors: vanilla client jar not found at ${vanillaJar}`);
+    return;
+  }
+
+  onProgress?.(`Running ${profile.processors.length} installer processors (${side})...`);
+  await runForgeProcessors(
+    profile as unknown as Parameters<typeof runForgeProcessors>[0],
+    {
+      installerJar: installerPath,
+      side,
+      minecraftJar: vanillaJar,
+      javaExecutable: processorJavaExecutable(),
+    },
+    onProgress,
+  );
 }
 
 export async function downloadFabricLoader(
@@ -386,7 +520,49 @@ export async function downloadNeoforgeInstaller(
   if (profile.libraries) allLibs.push(...profile.libraries);
   await downloadLibraries(allLibs, onProgress);
 
+  // Try the fast headless processor replay first; fall back to the official
+  // installer jar only when the replay hit the known binarypatcher mismatch.
+  let processorsOk = false;
+  let replayErr = "";
+  try {
+    await runForgeInstallerProcessors(profile, installerPath, neoforgeVersion, "client", onProgress);
+    processorsOk = true;
+  } catch (err: any) {
+    replayErr = (err?.message ?? err).toString();
+    onProgress?.(`  Headless processor replay failed: ${replayErr.slice(0, 120)}`);
+  }
+  const wantsOfficial = !processorsOk && /binarypatcher|checksum|Patch expected|invalid file signature/i.test(replayErr);
+  if (wantsOfficial) {
+    onProgress?.(`Falling back to official installer jar (patch mismatch)...`);
+    const usedOfficial = await tryOfficialInstaller(installerPath, versionId, "client", mcDir(), onProgress);
+    if (!usedOfficial) {
+      throw new Error("Both headless processor replay and official installer failed");
+    }
+  } else if (!processorsOk) {
+    throw new Error(replayErr || "NeoForge processor replay failed");
+  }
+
   onProgress?.(`NeoForge ${versionId} install complete`);
+}
+
+async function downloadNativeClassifiers(
+  lib: VersionJson["libraries"][number],
+  onProgress?: (msg: string) => void,
+): Promise<void> {
+  if (!lib.natives || !lib.downloads?.classifiers) return;
+  for (const classifierName of Object.values(lib.natives)) {
+    const cl = lib.downloads.classifiers[classifierName] as
+      | { path?: string; url?: string; sha1?: string }
+      | undefined;
+    if (!cl?.path || !cl.url) continue;
+    const clPath = join(librariesDir(), cl.path);
+    if (existsSync(clPath)) continue;
+    try {
+      await downloadFile(cl.url, clPath, cl.sha1);
+    } catch {
+      onProgress?.(`  Warning: could not download native ${lib.name}:${classifierName}`);
+    }
+  }
 }
 
 async function downloadLibraries(
@@ -423,6 +599,9 @@ async function downloadLibraries(
         }
       }
     }
+
+    // Native classifier jars (legacy native format) — see downloadVersion.
+    await downloadNativeClassifiers(lib, onProgress);
   }
 }
 

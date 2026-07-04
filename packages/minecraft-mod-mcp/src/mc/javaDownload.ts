@@ -3,6 +3,7 @@ import { join, basename, dirname } from "node:path";
 import { isWindows, isMacos } from "../runtime/detector.js";
 import { launcherDir, jdkHome } from "./platform.js";
 import { JAVA, PATHS } from "./defaults.js";
+import { downloadWithNativeFallback } from "./proxy.js";
 
 function javaCacheDir(): string {
   return join(launcherDir(), PATHS.javaDirName);
@@ -65,11 +66,36 @@ async function fetchJdkUrl(javaVersion: number): Promise<{ url: string; name: st
 
 async function downloadFile(url: string, dest: string, expectedSize: number, onProgress?: (msg: string) => void): Promise<void> {
   onProgress?.(`Downloading ${basename(dest)}...`);
+  mkdirSync(dirname(dest), { recursive: true });
+
+  // Stream via Node fetch first (gives progress). JDK tarballs are served from
+  // CDNs that frequently reset mid-stream; on any failure fall back to the native
+  // downloader, which resumes (`curl -C -`) and retries across resets.
+  try {
+    await streamDownload(url, dest, expectedSize, onProgress);
+    return;
+  } catch (err: any) {
+    if (existsSync(dest)) try { rmSync(dest, { force: true }); } catch {}
+    onProgress?.(`  Node fetch failed (${err.cause?.code || err.message}), resuming via native download...`);
+    await downloadWithNativeFallback(url, dest);
+  }
+
+  // Validate after the fallback path too.
+  if (expectedSize > 0) {
+    const { statSync } = await import("node:fs");
+    try {
+      const got = statSync(dest).size;
+      if (got < expectedSize * 0.95) throw new Error(`Download incomplete: got ${got} bytes, expected ~${expectedSize}`);
+    } catch (e) {
+      throw e;
+    }
+  }
+}
+
+async function streamDownload(url: string, dest: string, expectedSize: number, onProgress?: (msg: string) => void): Promise<void> {
   const res = await fetch(url, { redirect: "follow" });
   if (!res.ok) throw new Error(`Download failed: ${res.status}`);
   if (!res.body) throw new Error("No response body");
-
-  mkdirSync(dirname(dest), { recursive: true });
 
   const total = parseInt(res.headers.get("content-length") ?? "0");
   let downloaded = 0;
@@ -96,8 +122,7 @@ async function downloadFile(url: string, dest: string, expectedSize: number, onP
   });
 
   if (expectedSize > 0 && downloaded < expectedSize * 0.95) {
-    const { unlinkSync } = await import("node:fs");
-    try { unlinkSync(dest); } catch {}
+    try { rmSync(dest, { force: true }); } catch {}
     throw new Error(`Download incomplete: got ${downloaded} bytes, expected ~${expectedSize}`);
   }
 }

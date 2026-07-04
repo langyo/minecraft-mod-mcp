@@ -1,5 +1,5 @@
-import { join, resolve } from "node:path";
-import { existsSync, readdirSync } from "node:fs";
+import { join, resolve, dirname } from "node:path";
+import { existsSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import { crossHomedir, isWindows, isMacos, classpathSeparator as cpSep } from "../runtime/detector.js";
 import { detectJavas } from "./javaDetect.js";
 import { PATHS, JAVA } from "./defaults.js";
@@ -65,6 +65,41 @@ export function modJarPath(mcVersion: string, loader: string): string | null {
   } catch {}
 
   return null;
+}
+
+/**
+ * Resolve a mod JAR for a version/loader, downloading it from GitHub Releases
+ * when no locally-built one exists. End users running via `npx` have no source
+ * checkout, so without this the game launches vanilla (no MCP HTTP server).
+ * Returns null if no JAR can be obtained (launch then proceeds without the mod).
+ */
+export async function ensureModJar(mcVersion: string, loader: string): Promise<string | null> {
+  const local = modJarPath(mcVersion, loader);
+  if (local) return local;
+
+  const cacheDir = join(launcherDir(), "modjars");
+  const cachePath = join(cacheDir, `minecraft-mcp-${mcVersion}-${loader}.jar`);
+  if (existsSync(cachePath)) return cachePath;
+
+  try {
+    const apiResp = await fetch("https://api.github.com/repos/langyo/minecraft-mod-mcp/releases/latest", {
+      headers: { "user-agent": "minecraft-mod-mcp", accept: "application/json" },
+    });
+    if (!apiResp.ok) return null;
+    const rel = (await apiResp.json()) as { assets?: Array<{ name: string; browser_download_url: string }> };
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`^minecraft-mcp-${esc(mcVersion)}-${esc(loader)}(-v[\\d.]+)?\\.jar$`);
+    const asset = rel.assets?.find((a) => pattern.test(a.name));
+    if (!asset) return null;
+
+    const dlResp = await fetch(asset.browser_download_url);
+    if (!dlResp.ok) return null;
+    if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(cachePath, Buffer.from(await dlResp.arrayBuffer()));
+    return cachePath;
+  } catch {
+    return null;
+  }
 }
 
 export function jdkHome(javaVersion: number): string | null {

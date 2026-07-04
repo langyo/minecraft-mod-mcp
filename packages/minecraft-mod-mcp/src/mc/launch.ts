@@ -57,8 +57,17 @@ function extractNatives(libraries: Library[], nDir: string): void {
         const relPath = (lib.downloads.classifiers[nativeClass] as Record<string, unknown>).path as string;
         if (relPath) nativePath = join(librariesDir(), relPath);
       }
+      // Legacy native format (<=1.19.3): the classifier jar may be on disk even
+      // when the classifier download metadata is absent on the merged entry.
+      // Reconstruct the path from the library name + classifier suffix.
+      if (!nativePath) {
+        const constructed = libraryPath(`${lib.name}:${nativeClass}`);
+        if (existsSync(constructed)) nativePath = constructed;
+      }
     }
 
+    // Modern native format (1.19.4+): natives are their own library entries,
+    // e.g. name "org.lwjgl:lwjgl:3.3.1:natives-linux".
     if (!nativePath && lib.name.includes("natives")) {
       nativePath = libraryPath(lib.name);
     }
@@ -160,6 +169,8 @@ const LEGACY_JVM_ARGS = [
 
 function inferJavaFromVersion(vj: VersionJson): number {
   const id = (vj.inheritsFrom ?? vj.id ?? "").replace(/-/g, ".");
+  // MC 26.x (the 2026 release line) requires Java 25.
+  if (/^26\./.test(id)) return 25;
   const m = id.match(/1\.(\d+)/);
   if (!m) return GAME.javaVersionFallback;
   const minor = parseInt(m[1]);
@@ -218,7 +229,11 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   const mcDir = config.mcDir ?? join(crossHomedir(), ".minecraft");
   ensureOptionsTxt(mcDir);
 
-  if (config.modJar && existsSync(config.modJar) && config.loader === "fabric") {
+  // Deploy the mod JAR into the instance's mods/ directory for every loader.
+  // Fabric loads from mods/ (deploy) AND we add it to the classpath below; Forge
+  // and NeoForge discover mods almost exclusively from mods/, so without this
+  // copy the in-game MCP HTTP server never starts on those loaders.
+  if (config.modJar && existsSync(config.modJar)) {
     deployModToModsDir(mcDir, config.modJar);
   }
 
@@ -277,7 +292,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     allArgs.push(`-Dmcp.port=${config.mcpPort}`);
   }
 
-  allArgs.push("-Dmcp.mod.version=0.4.0");
+  allArgs.push("-Dmcp.mod.version=0.2.1");
   allArgs.push(`-Dmcp.mod.loader=${config.loader ?? "forge"}`);
 
   if (targetJavaVersion >= 9) {

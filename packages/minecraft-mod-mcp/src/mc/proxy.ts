@@ -72,9 +72,15 @@ async function nativeDownload(url: string, destPath: string): Promise<void> {
     });
   }
   return new Promise<void>((resolve, reject) => {
-    execFile("curl", ["-fSL", "-o", destPath, "--connect-timeout", "60", url], {
-      timeout: 120_000,
-    }, (err) => {
+    // -C - resumes from a partial file; --retry/-all-errors/-delay survive the
+    // socket resets / throttling that hit large downloads (JDK tarballs, mod JARs)
+    // from international CDNs. curl skips cleanly when the file is already complete.
+    execFile("curl", [
+      "-fSL", "-C -",
+      "--retry", "5", "--retry-all-errors", "--retry-delay", "3",
+      "--connect-timeout", "60",
+      "-o", destPath, url,
+    ], { timeout: 600_000 }, (err) => {
       if (err) reject(err);
       else resolve();
     });
