@@ -55,6 +55,10 @@ jobs:
           name: maven-local
           path: .maven-local/
           retention-days: 1
+          # .maven-local starts with a dot (hidden dir); upload-artifact@v4
+          # skips hidden files by default, which left the artifact empty and
+          # broke every downstream mod build with "Artifact not found".
+          include-hidden-files: true
 
   # ─── Step 2: Build all mods in parallel by JDK group ───
   build-mods:
