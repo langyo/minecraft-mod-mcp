@@ -98,7 +98,7 @@ FG_ERAS = {
         "max_mc": "1.21.3",
     },
     "fg7": {
-        "fg_version": "[7.0.23,8)",
+        "fg_version": "7.0.23",
         "gradle": "9.3.0",
         "plugin_id": "net.minecraftforge.gradle",
         "apply_method": "buildscript",
