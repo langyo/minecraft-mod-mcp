@@ -51,13 +51,3 @@ jar {
         attributes 'Implementation-Version' : project.version
     }
 }
-
-// Force minecraft-mavenizer >= 0.5.20 to avoid the IBM_SEMERU field bug
-// (removed in Gradle 9; older mavenizer versions reference it via reflection).
-configurations.all {
-    resolutionStrategy.eachDependency { details ->
-        if (details.requested.group == "net.minecraftforge" && details.requested.name == "minecraft-mavenizer") {
-            details.useVersion "0.5.20"
-        }
-    }
-}
