@@ -215,7 +215,7 @@ jobs:
               if ($mod -match "/fabric$") {
                 $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
               } else {
-                $result = .\gradlew.bat clean jar --no-daemon --console=plain $extraArgs 2>&1
+                $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
               }
               if ($LASTEXITCODE -ne 0) {
                 $errFile = "build-error.log"
