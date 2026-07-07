@@ -215,7 +215,11 @@ jobs:
               if ($mod -match "/fabric$") {
                 $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
               } else {
-                $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
+                # 'clean compileJava jar' ensures the MCP setup pipeline (which
+                # compileJava depends on) fully runs before packaging — FG4's
+                # 'clean jar' alone can skip MCP setup on a fresh cache, leaving
+                # the remapped forge dependency unresolved.
+                $result = .\gradlew.bat clean compileJava jar --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
               }
               if ($LASTEXITCODE -ne 0) {
                 $errFile = "build-error.log"
