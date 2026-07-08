@@ -288,6 +288,8 @@ jobs:
     name: Create GitHub Release
     runs-on: windows-latest
     needs: build-mods
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
