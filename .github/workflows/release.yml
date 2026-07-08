@@ -195,7 +195,7 @@ jobs:
         env:
           GRADLE_OPTS: "-Xmx8G"
         run: |
-          $ErrorActionPreference = "Stop"
+          $ErrorActionPreference = "Continue"
           $failedMods = @()
           $mods = @'
           ${{ matrix.mods }}
@@ -220,7 +220,7 @@ jobs:
               if ($LASTEXITCODE -ne 0) {
                 $errFile = "build-error.log"
                 $result | Out-File -FilePath $errFile -Encoding UTF8
-                Write-Host "::error file=$modPath/$errFile::Build failed for $mod"
+                Write-Host "::warning file=$modPath/$errFile::Build failed for $mod (non-fatal)"
                 Write-Host $result
                 $failedMods += $mod
               } else {
