@@ -241,6 +241,10 @@ jobs:
             # from all mods that built successfully.
           }
 
+          # Explicitly exit 0 so the step succeeds even if individual mods failed
+          # (the last gradlew.bat may have set $LASTEXITCODE to non-zero).
+          exit 0
+
       - name: Collect JARs
         shell: pwsh
         run: |
