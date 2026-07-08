@@ -227,7 +227,7 @@ jobs:
                 Write-Host "  [OK] $mod"
               }
             } catch {
-              Write-Host "::error::Exception building $mod : $_"
+              Write-Host "::warning::Exception building $mod : $_"
               $failedMods += $mod
             } finally {
               Pop-Location
