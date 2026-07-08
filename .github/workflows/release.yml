@@ -323,14 +323,22 @@ jobs:
           else
             RANGE="HEAD"
           fi
+          # Write to a temp file and use the delimiter form of $GITHUB_OUTPUT
+          # (the heredoc style can fail on Windows Git Bash).
+          TMPFILE=$(mktemp)
           {
-            echo "body<<EOF"
             echo "## ${GITHUB_REF_NAME}"
             echo ""
             echo "### Commits"
             git log $RANGE --pretty=format:"- %s (%h)" --no-merges
             echo ""
+          } > "$TMPFILE"
+          {
+            echo "body<<RELEASE_NOTES_DELIMITER"
+            cat "$TMPFILE"
+            echo "RELEASE_NOTES_DELIMITER"
           } >> "$GITHUB_OUTPUT"
+          rm -f "$TMPFILE"
 
       - name: Detect prerelease
         id: pre
