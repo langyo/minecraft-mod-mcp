@@ -317,13 +317,19 @@ jobs:
         id: notes
         shell: bash
         run: |
-          # Generate a chronological commit log since the last release tag,
-          # matching the hand-written style of previous releases.
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          # Generate a chronological commit log of master squash commits
+          # since the last STABLE release tag (skip rc/beta/pre tags).
+          CURRENT="${GITHUB_REF_NAME#v}"
+          # Find the latest stable tag (exclude rc/beta/alpha/pre/snapshot)
+          PREV_TAG=$(git tag --sort=-version:refname | grep '^v[0-9]' | grep -vE '\-(rc|beta|alpha|pre|snapshot)' | head -1)
+          # If the current tag IS the latest stable, find the one before it
+          if [ "v${CURRENT}" = "$PREV_TAG" ] || [ "$CURRENT" = "${PREV_TAG#v}" ]; then
+            PREV_TAG=$(git tag --sort=-version:refname | grep '^v[0-9]' | grep -vE '\-(rc|beta|alpha|pre|snapshot)' | head -2 | tail -1)
+          fi
           if [ -n "$PREV_TAG" ]; then
-            RANGE="${PREV_TAG}..HEAD"
+            RANGE="${PREV_TAG}..origin/master"
           else
-            RANGE="HEAD"
+            RANGE="origin/master"
           fi
           # Write to a temp file and use the delimiter form of $GITHUB_OUTPUT
           # (the heredoc style can fail on Windows Git Bash).
