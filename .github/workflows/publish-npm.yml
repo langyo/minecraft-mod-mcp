@@ -12,12 +12,15 @@ defaults:
 jobs:
   publish:
     name: Build & Publish
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
+      # setup-node with registry-url + id-token:write enables npm Trusted
+      # Publishing (OIDC) — no NPM_TOKEN secret needed.
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -29,12 +32,6 @@ jobs:
       - name: Set published version from tag
         shell: bash
         run: |
-          # npm reads the version from package.json, not the git tag. For
-          # prerelease tags (v0.2.1-rc1) we must rewrite package.json to the
-          # full tag version, otherwise the rc would publish as the base
-          # version (0.2.1) and collide with the later stable release.
-          # For stable tags (v0.2.1), package.json already has the right
-          # version, so skip the rewrite (npm version errors if unchanged).
           TAG="${GITHUB_REF_NAME:-}"
           VERSION="${TAG#v}"
           CURRENT=$(node -p "require('./package.json').version")
@@ -54,9 +51,6 @@ jobs:
         shell: bash
         run: |
           TAG="${GITHUB_REF_NAME:-}"
-          # Prerelease tags (v1.2.3-rc1, -beta.2, etc.) publish under 'next'
-          # so they don't replace 'latest' — `npx minecraft-mod-mcp` still
-          # resolves to the last stable release.
           if [[ "$TAG" =~ -(rc|beta|alpha|pre|snapshot)[0-9]*$ ]]; then
             echo "disttag=next" >> "$GITHUB_OUTPUT"
           else
@@ -64,6 +58,4 @@ jobs:
           fi
 
       - name: Publish
-        run: npm publish --access public --tag ${{ steps.disttag.outputs.disttag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --tag ${{ steps.disttag.outputs.disttag }} --provenance
