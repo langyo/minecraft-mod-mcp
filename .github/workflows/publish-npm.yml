@@ -57,4 +57,8 @@ jobs:
 
       - name: Publish
         working-directory: packages/minecraft-mod-mcp
-        run: npm publish --access public --tag ${{ steps.disttag.outputs.disttag }} --provenance
+        # actions/setup-node writes NODE_AUTH_TOKEN into .npmrc, which breaks
+        # OIDC trusted publishing. Remove the authToken line so npm uses OIDC.
+        run: |
+          sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
+          npm publish --access public --tag ${{ steps.disttag.outputs.disttag }} --provenance
