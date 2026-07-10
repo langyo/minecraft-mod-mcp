@@ -15,10 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node >=22.14.0 and npm >=11.5.1 required for trusted publishing (OIDC).
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Verify npm version
+        run: npm --version
 
       - name: Install dependencies
         working-directory: packages/minecraft-mod-mcp
@@ -57,8 +61,7 @@ jobs:
 
       - name: Publish
         working-directory: packages/minecraft-mod-mcp
-        # actions/setup-node writes NODE_AUTH_TOKEN into .npmrc, which breaks
-        # OIDC trusted publishing. Remove the authToken line so npm uses OIDC.
-        run: |
-          sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
-          npm publish --access public --tag ${{ steps.disttag.outputs.disttag }} --provenance
+        # npm CLI auto-detects OIDC environments and uses them for auth.
+        # Do NOT set NODE_AUTH_TOKEN — it overrides OIDC. Do NOT use
+        # --provenance — it's automatic with trusted publishing.
+        run: npm publish --access public --tag ${{ steps.disttag.outputs.disttag }}
