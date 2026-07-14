@@ -10,7 +10,7 @@ import { detectJavas } from "./mc/javaDetect.js";
 import { ensureJavaInstalled } from "./mc/javaDownload.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "./mc/download.js";
-import { versionsDir, classpathSeparator, modJarPath } from "./mc/platform.js";
+import { versionsDir, classpathSeparator, ensureModJar } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync } from "node:fs";
@@ -208,7 +208,7 @@ Options:
     versionId,
     mcDir: typeof values["mc-dir"] === "string" ? values["mc-dir"] : gameDirPath(config),
     loader,
-    modJar: typeof values["mod-jar"] === "string" ? values["mod-jar"] : modJarPath(versionArg, loader) ?? undefined,
+    modJar: typeof values["mod-jar"] === "string" ? values["mod-jar"] : (await ensureModJar(versionArg, loader)) ?? undefined,
     mcpPort: typeof values.port === "string" ? parseInt(values.port, 10) : config.mcp_port ?? await findFreePort(),
     dryRun: values["dry-run"] === true,
     maxMemoryMb: parseInt(typeof values.memory === "string" ? values.memory : String(config.max_memory_mb), 10),
@@ -819,6 +819,13 @@ Resources:
   console.error(`  Type: ${setup.serverType}`);
   console.error(`  Dir: ${srv.dir}`);
   console.error(`Server launched successfully.`);
+
+  // Detach the server child so this CLI process can exit. Without unref() the
+  // Node event loop keeps a handle on the child and the CLI hangs forever on
+  // Windows (where spawn uses detached:false above). The server keeps running
+  // detached, logging to <serverDir>/logs/latest.log.
+  srv.process.unref();
+  process.exit(0);
 }
 
 function buildServerProperties(values: Record<string, unknown>): import("./mc/server.js").ServerProperties {
@@ -1085,7 +1092,7 @@ Client Options:
     return;
   }
 
-  const autoModJar = typeof values["mod-jar"] === "string" ? (values["mod-jar"] as string) : modJarPath(versionArg, loader);
+  const autoModJar = typeof values["mod-jar"] === "string" ? (values["mod-jar"] as string) : await ensureModJar(versionArg, loader);
   if (autoModJar && existsSync(autoModJar)) {
     const serverModsDir = join(setup.serverDir, SERVER.modsDirName);
     if (!existsSync(serverModsDir)) mkdirSync(serverModsDir, { recursive: true });

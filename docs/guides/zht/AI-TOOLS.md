@@ -8,14 +8,21 @@
 > {
 >   "mcpServers": {
 >     "minecraft-mcp": {
->       "type": "sse",
->       "url": "http://localhost:9876/api/events"
+>       "type": "local",
+>       "command": ["npx", "-y", "minecraft-mod-mcp"]
 >     }
 >   }
 > }
 > ```
 >
 > **致使用者**：你可以直接把本頁連結貼給你的 AI Agent，它會自行完成設定，無需手動操作。
+
+<!-- bridge-fix -->
+> ⚠️ **Important / 重要 / Важно**: Connect via the **stdio bridge** `npx -y minecraft-mod-mcp` (MCP `type: "local"`),
+> **not** by pointing `"type":"sse"` at `http://localhost:9876/api/events`. The mod's `/api/events` is a plain
+> debug SSE stream and is **not** an MCP transport — an SSE config will fail to list or call any tool.
+> The bridge is the only component that speaks MCP and auto-discovers which port the game is on (9876→9000).
+> See the [English guide](../en/AI-TOOLS.md) for the authoritative, up-to-date instructions.
 
 ---
 
@@ -27,8 +34,8 @@
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -60,7 +67,7 @@ Minecraft Mod MCP 伺服器提供以下 HTTP 端點（預設連接埠：**9876**
 | `/api/events` | GET | SSE（伺服器推送事件）串流，用於即時呼叫歷史記錄 |
 | `/api/calls` | GET | 回傳最近 50 筆呼叫事件為 JSON 陣列 |
 
-> **前置條件**：確保 Minecraft Mod MCP 守護程序正在執行，且已連接安裝 MCP 模組的 Minecraft 客戶端。執行 `just daemon` 然後 `just launch <version> <loader>`。
+> **前置條件**：確保 Minecraft Mod MCP 守護程序正在執行，且已連接安裝 MCP 模組的 Minecraft 客戶端。執行 `npx -y minecraft-mod-mcp` (the bridge auto-discovers the game) or launch a client via the `launch_minecraft` tool。
 
 ---
 
@@ -68,7 +75,7 @@ Minecraft Mod MCP 伺服器提供以下 HTTP 端點（預設連接埠：**9876**
 
 大多數 AI 編碼工具支援 **模型上下文協議（MCP）** 來連接外部伺服器。Minecraft Mod MCP 伺服器可透過以下方式連接：
 
-- **SSE 傳輸**：將工具的 MCP 客戶端指向 `http://localhost:9876/api/events`
+- **MCP (stdio bridge — required)**: run `npx -y minecraft-mod-mcp`. This is the only MCP-compatible transport; the bridge auto-discovers the game's port (9876→9000). The mod's `/api/events` is not an MCP transport.
 - **HTTP REST API**：直接發送 POST 請求至 `http://localhost:9876/api/cmd`
 
 以下章節提供各工具的設定說明。
@@ -87,14 +94,14 @@ Anthropic 的終端機 AI 編碼助手。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
-或者，使用 `claude mcp add minecraft-mcp --transport sse http://localhost:9876/api/events`。
+或者，使用 `claude mcp add minecraft-mod-mcp -- npx -y minecraft-mod-mcp`。
 
 ### Claude Desktop / Claude for IDE
 
@@ -109,8 +116,8 @@ Claude 的桌面應用程式以及 VS Code/JetBrains IDE 外掛版本。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -128,8 +135,8 @@ Claude 的桌面應用程式以及 VS Code/JetBrains IDE 外掛版本。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -145,14 +152,14 @@ Claude 的桌面應用程式以及 VS Code/JetBrains IDE 外掛版本。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
 ```
 
-或透過 UI 操作：**Cursor 設定 → MCP → 新增 MCP 伺服器**，傳輸類型設為 **SSE** 並輸入 URL。
+或透過 UI 操作：**Cursor 設定 → MCP → 新增 MCP 伺服器**，傳輸類型設為 **stdio**，命令輸入 `npx -y minecraft-mod-mcp`。
 
 ### Cline
 
@@ -164,8 +171,8 @@ VS Code AI 編碼擴充功能。
 {
   "cline.mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -181,8 +188,8 @@ VS Code AI 編碼擴充功能。
 {
   "roo.mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -198,8 +205,8 @@ VS Code AI 編碼擴充功能。
 {
   "kilo.mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -215,8 +222,8 @@ GitHub 在 VS Code 中的 AI 配對程式設計師。
 {
   "github.copilot.mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -229,7 +236,9 @@ GitHub 在 VS Code 中的 AI 配對程式設計師。
 **設定**：設定環境變數或使用 `gh copilot config`：
 
 ```bash
-export MCP_SERVER_URL="http://localhost:9876/api/events"
+# GitHub Copilot CLI does not load MCP servers from an env var.
+# Use a stdio-capable MCP host instead, e.g. Claude Code:
+#   claude mcp add minecraft-mod-mcp -- npx -y minecraft-mod-mcp
 ```
 
 ### CodeBuddy / WorkBuddy
@@ -242,8 +251,8 @@ AI 驅動的全端智慧型程式開發工具。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "url": "http://localhost:9876/api/events",
-      "transport": "sse"
+      "command": "npx",
+      "args": ["-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -256,8 +265,8 @@ AI 驅動的全端智慧型程式開發工具。
 **設定**：前往 **設定 → MCP 伺服器 → 新增伺服器**：
 
 - **名稱**：`minecraft-mcp`
-- **傳輸**：SSE
-- **URL**：`http://localhost:9876/api/events`
+- **傳輸**：stdio
+- **URL**：`npx -y minecraft-mod-mcp`
 
 ### ZCode
 
@@ -269,8 +278,8 @@ AI 驅動的全端智慧型程式開發工具。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -283,8 +292,8 @@ AI 驅動的全端智慧型程式開發工具。
 **設定**：前往 **設定 → MCP → 新增伺服器**：
 
 - **名稱**：`minecraft-mcp`
-- **傳輸**：SSE
-- **URL**：`http://localhost:9876/api/events`
+- **傳輸**：stdio
+- **URL**：`npx -y minecraft-mod-mcp`
 
 ### Qoder
 
@@ -296,8 +305,8 @@ AI 驅動的全端智慧型程式開發工具。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -313,8 +322,8 @@ AI 驅動的全端智慧型程式開發工具。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -330,8 +339,8 @@ AI 驅動的全端智慧型程式開發工具。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -347,8 +356,8 @@ AI 驅動的全端智慧型程式開發工具。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -364,8 +373,8 @@ DeepSeek 驅動的編碼助手。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -381,8 +390,8 @@ DeepSeek 驅動的編碼助手。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -397,8 +406,8 @@ DeepSeek 驅動的編碼助手。
 ```yaml
 mcp_servers:
   minecraft-mcp:
-    type: sse
-    url: http://localhost:9876/api/events
+    type: stdio
+    command: ["npx", "-y", "minecraft-mod-mcp"]
 ```
 
 ### Oh My Pi
@@ -411,8 +420,8 @@ mcp_servers:
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -428,8 +437,8 @@ mcp_servers:
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -449,8 +458,8 @@ mcp_servers:
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -463,8 +472,8 @@ mcp_servers:
 **設定**：前往 **設定 → MCP 伺服器 → 新增**：
 
 - **名稱**：`minecraft-mcp`
-- **傳輸**：SSE
-- **URL**：`http://localhost:9876/api/events`
+- **傳輸**：stdio
+- **URL**：`npx -y minecraft-mod-mcp`
 
 ### Hermes Agent
 
@@ -476,8 +485,8 @@ mcp_servers:
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -493,8 +502,8 @@ AI 驅動的機器人框架。
 {
   "mcp_servers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }
@@ -510,8 +519,8 @@ AI 驅動的機器人框架。
 {
   "mcpServers": {
     "minecraft-mcp": {
-      "type": "sse",
-      "url": "http://localhost:9876/api/events"
+      "type": "local",
+      "command": ["npx", "-y", "minecraft-mod-mcp"]
     }
   }
 }

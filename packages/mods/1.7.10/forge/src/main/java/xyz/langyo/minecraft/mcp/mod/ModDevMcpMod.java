@@ -19,7 +19,7 @@ import net.minecraft.util.MouseHelper;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
-@Mod(modid = "mcpmod", name = "ModDev MCP", version="0.2.0")
+@Mod(modid = "mcpmod", name = "ModDev MCP", version="0.2.1")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;
@@ -70,7 +70,7 @@ public class ModDevMcpMod {
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
-                try { Object mc = MinecraftClient.getInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
+                try { Object mc = ReflectionHelper.getMinecraftInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
                 ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
                 int port = McpConfig.getServerPort();
                 httpServer = new McpHttpServer(handler, port);

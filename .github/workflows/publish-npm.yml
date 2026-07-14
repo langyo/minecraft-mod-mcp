@@ -5,34 +5,66 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
-defaults:
-  run:
-    working-directory: packages/minecraft-mod-mcp
-
 jobs:
   publish:
     name: Build & Publish
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
+      # Node >=22.14.0 and npm >=11.5.1 required for trusted publishing (OIDC).
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Verify npm version
+        run: npm --version
+
       - name: Install dependencies
+        working-directory: packages/minecraft-mod-mcp
         run: npm install
 
+      - name: Set published version from tag
+        working-directory: packages/minecraft-mod-mcp
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME:-}"
+          VERSION="${TAG#v}"
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$CURRENT" ]; then
+            npm version "$VERSION" --no-git-tag-version
+          fi
+          echo "Publishing version: $(node -p "require('./package.json').version")"
+
       - name: Build
+        working-directory: packages/minecraft-mod-mcp
         run: npm run build
 
       - name: Test
+        working-directory: packages/minecraft-mod-mcp
         run: npm test --if-present
 
+      - name: Determine npm dist-tag
+        id: disttag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME:-}"
+          if [[ "$TAG" =~ -(rc|beta|alpha|pre|snapshot)[0-9]*$ ]]; then
+            echo "disttag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "disttag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: packages/minecraft-mod-mcp
+        # npm CLI auto-detects OIDC environments and uses them for auth.
+        # Do NOT set NODE_AUTH_TOKEN — it overrides OIDC. Do NOT use
+        # --provenance — it's automatic with trusted publishing.
+        run: npm publish --access public --tag ${{ steps.disttag.outputs.disttag }}

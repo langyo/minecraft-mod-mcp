@@ -652,12 +652,17 @@ export function launchServer(
   const prefix = `\n[${new Date().toISOString()}] Launching: ${launchCmd} ${args.join(" ")}\n`;
   writeFileSync(logFd, prefix);
 
+  // detached:true on ALL platforms. The CLI's runServer does process.exit(0)
+  // right after launch; on Windows a non-detached child is in the parent's
+  // process group and dies when the parent exits, so the server never runs.
+  // detached:true spawns it in its own group so it survives the CLI exit.
   const child = spawn(launchCmd, isRunScript ? [] : args, {
     cwd: setup.serverDir,
     stdio: ["ignore", logFd, logFd],
-    detached: process.platform !== "win32",
+    detached: true,
     shell: isRunScript,
   });
+  child.unref();
 
   child.on("error", (err) => {
     console.error(`[${SERVER.userAgent}] Server launch failed: ${err.message}`);

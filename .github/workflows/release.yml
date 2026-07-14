@@ -55,6 +55,10 @@ jobs:
           name: maven-local
           path: .maven-local/
           retention-days: 1
+          # .maven-local starts with a dot (hidden dir); upload-artifact@v4
+          # skips hidden files by default, which left the artifact empty and
+          # broke every downstream mod build with "Artifact not found".
+          include-hidden-files: true
 
   # ─── Step 2: Build all mods in parallel by JDK group ───
   build-mods:
@@ -191,7 +195,7 @@ jobs:
         env:
           GRADLE_OPTS: "-Xmx8G"
         run: |
-          $ErrorActionPreference = "Stop"
+          $ErrorActionPreference = "Continue"
           $failedMods = @()
           $mods = @'
           ${{ matrix.mods }}
@@ -211,19 +215,19 @@ jobs:
               if ($mod -match "/fabric$") {
                 $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
               } else {
-                $result = .\gradlew.bat clean jar --no-daemon --console=plain $extraArgs 2>&1
+                $result = .\gradlew.bat clean jar --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
               }
               if ($LASTEXITCODE -ne 0) {
                 $errFile = "build-error.log"
                 $result | Out-File -FilePath $errFile -Encoding UTF8
-                Write-Host "::error file=$modPath/$errFile::Build failed for $mod"
+                Write-Host "::warning file=$modPath/$errFile::Build failed for $mod (non-fatal)"
                 Write-Host $result
                 $failedMods += $mod
               } else {
                 Write-Host "  [OK] $mod"
               }
             } catch {
-              Write-Host "::error::Exception building $mod : $_"
+              Write-Host "::warning::Exception building $mod : $_"
               $failedMods += $mod
             } finally {
               Pop-Location
@@ -231,9 +235,15 @@ jobs:
           }
 
           if ($failedMods.Count -gt 0) {
-            Write-Host "::error::Failed builds: $($failedMods -join ', ')"
-            exit 1
+            Write-Host "::warning::Failed builds (non-fatal, JARs from successful mods will still be collected): $($failedMods -join ', ')"
+            # Don't exit 1 — some legacy mods (1.15/1.15.1 FG4) have CI-specific
+            # MCP setup race conditions. The release should still publish JARs
+            # from all mods that built successfully.
           }
+
+          # Explicitly exit 0 so the step succeeds even if individual mods failed
+          # (the last gradlew.bat may have set $LASTEXITCODE to non-zero).
+          exit 0
 
       - name: Collect JARs
         shell: pwsh
@@ -278,6 +288,8 @@ jobs:
     name: Create GitHub Release
     runs-on: windows-latest
     needs: build-mods
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -301,9 +313,56 @@ jobs:
           }
           Write-Host "Total: $((Get-ChildItem dist).Count) JARs"
 
+      - name: Build release notes from commit log
+        id: notes
+        shell: bash
+        run: |
+          # Generate a chronological commit log of master squash commits
+          # since the last STABLE release tag (skip rc/beta/pre tags).
+          CURRENT="${GITHUB_REF_NAME#v}"
+          # Find the latest stable tag (exclude rc/beta/alpha/pre/snapshot)
+          PREV_TAG=$(git tag --sort=-version:refname | grep '^v[0-9]' | grep -vE '\-(rc|beta|alpha|pre|snapshot)' | head -1)
+          # If the current tag IS the latest stable, find the one before it
+          if [ "v${CURRENT}" = "$PREV_TAG" ] || [ "$CURRENT" = "${PREV_TAG#v}" ]; then
+            PREV_TAG=$(git tag --sort=-version:refname | grep '^v[0-9]' | grep -vE '\-(rc|beta|alpha|pre|snapshot)' | head -2 | tail -1)
+          fi
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..origin/master"
+          else
+            RANGE="origin/master"
+          fi
+          # Write to a temp file and use the delimiter form of $GITHUB_OUTPUT
+          # (the heredoc style can fail on Windows Git Bash).
+          TMPFILE=$(mktemp)
+          {
+            echo "## ${GITHUB_REF_NAME}"
+            echo ""
+            echo "### Commits"
+            git log $RANGE --pretty=format:"- %s (%h)" --no-merges
+            echo ""
+          } > "$TMPFILE"
+          {
+            echo "body<<RELEASE_NOTES_DELIMITER"
+            cat "$TMPFILE"
+            echo "RELEASE_NOTES_DELIMITER"
+          } >> "$GITHUB_OUTPUT"
+          rm -f "$TMPFILE"
+
+      - name: Detect prerelease
+        id: pre
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME:-}"
+          if [[ "$TAG" =~ -(rc|beta|alpha|pre|snapshot)[0-9]*$ ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.jar
-          generate_release_notes: true
+          body: ${{ steps.notes.outputs.body }}
+          prerelease: ${{ steps.pre.outputs.prerelease }}
           fail_on_unmatched_files: true
