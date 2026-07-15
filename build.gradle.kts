@@ -7,7 +7,24 @@
 // a real `:jar` task (so tooling that reads `:jar.archiveFileName` works as expected).
 
 val neoforge2612 = layout.projectDirectory.dir("packages/mods/26.1.2/neoforge").asFile
-val subprojectJar = neoforge2612.resolve("build/libs/minecraft-moddev-mcp-neoforge-26.1.2-0.2.0.jar")
+
+/** Finds the JAR produced by the neoforge subproject build. */
+fun findSubprojectJar(): File {
+    val libsDir = neoforge2612.resolve("build/libs")
+    val jars = libsDir.listFiles()?.filter {
+        it.isFile && it.name.endsWith(".jar")
+            && !it.name.contains("-sources", ignoreCase = true)
+            && !it.name.contains("-dev", ignoreCase = true)
+            && !it.name.contains("-slim", ignoreCase = true)
+    }
+    if (jars.isNullOrEmpty()) {
+        throw GradleException("No JAR found in $libsDir — did the delegated build succeed?")
+    }
+    if (jars.size > 1) {
+        logger.warn("Multiple JARs found in $libsDir, using first: ${jars.first().name}")
+    }
+    return jars.first()
+}
 
 fun gradlewCommand(task: String): List<String> =
     if (System.getProperty("os.name").lowercase().contains("windows"))
@@ -50,10 +67,14 @@ val buildNeoforge by tasks.registering {
 tasks.register<Jar>("jar") {
     group = "build"
     description = "Expose the MC 26.1.2 neoforge mod JAR at the root project."
-    archiveFileName.set("minecraft-moddev-mcp-neoforge-26.1.2-0.2.0.jar")
+    // Fixed output name for the root project — the input comes from the
+    // subproject's JAR (discovered dynamically at execution time).
+    archiveFileName.set("minecraft-moddev-mcp-neoforge-26.1.2-0.2.1.jar")
     destinationDirectory.set(layout.buildDirectory.dir("libs"))
     dependsOn(buildNeoforge)
-    from(zipTree(subprojectJar))
+    // Use a Provider so zipTree is resolved lazily at execution time
+    // (buildNeoforge must complete first to produce the JAR).
+    from(provider { zipTree(findSubprojectJar()) })
     duplicatesStrategy = DuplicatesStrategy.FAIL
 }
 
