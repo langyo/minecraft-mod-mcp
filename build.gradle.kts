@@ -72,10 +72,13 @@ tasks.register<Jar>("jar") {
     archiveFileName.set("minecraft-moddev-mcp-neoforge-26.1.2-0.2.1.jar")
     destinationDirectory.set(layout.buildDirectory.dir("libs"))
     dependsOn(buildNeoforge)
-    // Use a Provider so zipTree is resolved lazily at execution time
-    // (buildNeoforge must complete first to produce the JAR).
-    from(provider { zipTree(findSubprojectJar()) })
     duplicatesStrategy = DuplicatesStrategy.FAIL
+    // Defer from() to doFirst so findSubprojectJar() only runs at execution time,
+    // after buildNeoforge has produced the JAR. Using a Provider causes the
+    // closure to be resolved during task dependency resolution, which is too early.
+    doFirst {
+        from(zipTree(findSubprojectJar()))
+    }
 }
 
 tasks.register("build") {
