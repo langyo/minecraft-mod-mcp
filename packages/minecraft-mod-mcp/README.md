@@ -13,7 +13,7 @@ Works with **OpenCode**, **Claude Code**, **Cursor**, and any MCP-compatible AI 
 ## Features
 
 - **35+ MCP tools**: screenshot, click, type, scroll, drag, hotkey, execute commands, query player/world state
-- **Multi-version**: Minecraft 1.8.9 through 26.1.2, Forge / Fabric / NeoForge
+- **Multi-version**: Minecraft 1.8.9 through 26.2, Forge / Fabric / NeoForge
 - **Zero-config port discovery**: mod and server auto-negotiate ports (9876–9000)
 - **Cross-runtime**: Node.js 20+, Deno, Bun
 - **MCP stdio transport**: the bridge speaks the Model Context Protocol over stdio and proxies every call to the in-game mod's HTTP API

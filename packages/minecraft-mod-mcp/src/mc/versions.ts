@@ -29,6 +29,7 @@ export interface VersionInfo {
   neoforge: string | null;
   mdg: string | null;
   fabric_yarn: string | null;
+  fabric_loader: string | null;
 }
 
 export interface VersionRaw {
@@ -40,6 +41,7 @@ export interface VersionRaw {
   neoforge?: string;
   mdg?: string;
   fabric_yarn?: string;
+  fabric_loader?: string;
 }
 
 interface VersionsData {
@@ -59,8 +61,13 @@ export function loaders(info: VersionInfo): Loader[] {
   const result: Loader[] = [];
   if (info.forge) result.push("forge");
   if (info.neoforge) result.push("neoforge");
-  if (info.fabric_yarn) result.push("fabric");
+  if (hasFabric(info)) result.push("fabric");
   return result;
+}
+
+/** Fabric is available with yarn mappings (obfuscated era) or a bare loader pin (unobfuscated MC 26.x). */
+export function hasFabric(info: VersionInfo): boolean {
+  return Boolean(info.fabric_yarn || info.fabric_loader);
 }
 
 export function isLegacy(info: VersionInfo, data: VersionsData): boolean {
@@ -78,6 +85,7 @@ export function getVersions(data: VersionsData): VersionInfo[] {
     neoforge: raw.neoforge ?? null,
     mdg: raw.mdg ?? null,
     fabric_yarn: raw.fabric_yarn ?? null,
+    fabric_loader: raw.fabric_loader ?? null,
   }));
 }
 
@@ -95,6 +103,7 @@ export function getVersion(data: VersionsData, mc: string): VersionInfo | null {
     neoforge: raw.neoforge ?? null,
     mdg: raw.mdg ?? null,
     fabric_yarn: raw.fabric_yarn ?? null,
+    fabric_loader: raw.fabric_loader ?? null,
   };
 }
 
@@ -111,6 +120,7 @@ export function getVersionById(data: VersionsData, versionId: string): VersionIn
         neoforge: raw.neoforge ?? null,
         mdg: raw.mdg ?? null,
         fabric_yarn: raw.fabric_yarn ?? null,
+        fabric_loader: raw.fabric_loader ?? null,
       };
     }
   }
@@ -131,6 +141,7 @@ export function getVersionById(data: VersionsData, versionId: string): VersionIn
         neoforge: raw.neoforge ?? null,
         mdg: raw.mdg ?? null,
         fabric_yarn: raw.fabric_yarn ?? null,
+        fabric_loader: raw.fabric_loader ?? null,
       };
     }
   }
@@ -143,7 +154,7 @@ export function getVersionForLoader(data: VersionsData, mc: string, loader: Load
   switch (loader) {
     case "forge": return discoverLoaderVersionId(mc, loader) ?? info.version_id;
     case "neoforge": return info.neoforge ? discoverLoaderVersionId(mc, loader, info.neoforge) : null;
-    case "fabric": return info.fabric_yarn ? discoverLoaderVersionId(mc, loader) : null;
+    case "fabric": return hasFabric(info) ? discoverLoaderVersionId(mc, loader) : null;
   }
 }
 

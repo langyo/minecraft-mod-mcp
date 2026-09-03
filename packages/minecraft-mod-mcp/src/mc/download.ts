@@ -690,7 +690,7 @@ export async function ensureVersionInstalled(
   let loaderVersion: string | undefined;
   if (loader === "forge" && vi.forge) loaderVersion = vi.forge;
   else if (loader === "neoforge" && vi.neoforge) loaderVersion = vi.neoforge;
-  else if (loader === "fabric") loaderVersion = DEFAULT_FABRIC_LOADER_VERSION;
+  else if (loader === "fabric") loaderVersion = vi.fabric_loader ?? DEFAULT_FABRIC_LOADER_VERSION;
 
   if (loaderVersion) {
     onProgress?.(`Installing ${loader} ${loaderVersion}...`);

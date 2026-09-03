@@ -165,6 +165,9 @@ jobs:
             mods: |
               26.1.2/forge
               26.1.2/neoforge
+              26.2/forge
+              26.2/neoforge
+              26.2/fabric
     steps:
       - uses: actions/checkout@v4
 

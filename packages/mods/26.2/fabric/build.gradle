@@ -1,5 +1,5 @@
 plugins {
-    id "fabric-loom" version "1.14-SNAPSHOT"
+    id "net.fabricmc.fabric-loom" version "1.17-SNAPSHOT"
 }
 
 version = "0.2.1"
@@ -19,17 +19,9 @@ repositories {
 }
 
 sourceSets.main.java.srcDir '../../../common/src/main/java'
-sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
-    minecraft "com.mojang:minecraft:26.1.2"
-    mappings "net.fabricmc:yarn:26.1.2+build.1:v2"
-    modImplementation "net.fabricmc:fabric-loader:0.16.0"
+    minecraft "com.mojang:minecraft:26.2"
+    implementation "net.fabricmc:fabric-loader:0.19.5"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
-}
-
-loom {
-    mixin {
-        defaultRefmapName = "mcpmod.refmap.json"
-    }
 }

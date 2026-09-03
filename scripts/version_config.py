@@ -249,10 +249,14 @@ ALL_VERSIONS = {
                "fabric_yarn": "1.21.11+build.6"},
     "26.1.2": {"forge": "26.1.2-64.0.8",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
                "version_id": "26.1.2-forge-64.0.8",
-               "neoforge": "26.1.2.36-beta", "mdg": "2.0.141", 'fabric_yarn': '26.1.2+build.1'},
-    "26.2":   {"forge": "26.2-65.0.3",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.2",
-               "version_id": "26.2-forge-65.0.3",
-               "neoforge": "26.2.0.7-beta", "mdg": "2.0.141"},
+               "neoforge": "26.1.2.36-beta", "mdg": "2.0.141"},
+    # MC 26.x ships unobfuscated (intermediary is a fixed "0.0.0"), so Fabric
+    # needs no yarn mappings there — only a loader pin. fabric_unobfuscated
+    # switches the generator to the no-mappings loom 1.17 template.
+    "26.2":   {"forge": "26.2-65.1.3",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.2",
+               "version_id": "26.2-forge-65.1.3",
+               "neoforge": "26.2.0.75", "mdg": "2.0.141",
+               "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
 }
 
 # ============================================================
@@ -309,6 +313,9 @@ def get_fabric_loom(mc):
         (["1.21", "1.21.1", "1.21.3"], "1.5-SNAPSHOT"),
         (["1.21.4", "1.21.5", "1.21.6", "1.21.7", "1.21.8"], "1.7-SNAPSHOT"),
         (["1.21.11"], "1.14-SNAPSHOT"),
+        # MC 26.x: unobfuscated jars need loom >= 1.17 (new plugin id
+        # net.fabricmc.fabric-loom, no mappings dependency).
+        (["26.2"], "1.17-SNAPSHOT"),
     ]
     for versions, loom in _MAP:
         if mc in versions:
@@ -343,7 +350,9 @@ def get_loaders(mc):
         loaders.append("forge")
     if "neoforge" in info:
         loaders.append("neoforge")
-    if "fabric_yarn" in info:
+    # fabric_yarn: obfuscated era (yarn mappings exist); fabric_loader:
+    # unobfuscated MC 26.x era (no yarn — just a loader pin).
+    if "fabric_yarn" in info or "fabric_loader" in info:
         loaders.append("fabric")
     return loaders
 

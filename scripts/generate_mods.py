@@ -113,6 +113,10 @@ def _gradle_ver_for_fabric(mc):
         return "7.6.4"
     if loom.startswith("1.14"):
         return "9.3.0"
+    # loom >= 1.15 needs modern Gradle; 1.17 (MC 26.x unobfuscated era)
+    # follows the official example (9.5.1) — reuse the fg7 pin 9.6.1.
+    if loom.startswith(("1.15", "1.16", "1.17")):
+        return "9.6.1"
     return "8.10"
 
 
@@ -788,7 +792,9 @@ def write_fabric_build(mc, info, path):
     yarn = info.get("fabric_yarn", "")
     depth = maven_local_depth()
     loom_ver = get_fabric_loom(mc)
-    loader_ver = FABRIC_LOADER_VERSIONS.get(mc, "0.16.0")
+    # Unobfuscated MC 26.x: per-version loader pin, no yarn mappings exist.
+    loader_ver = info.get("fabric_loader") or FABRIC_LOADER_VERSIONS.get(mc, "0.16.0")
+    unobfuscated = bool(info.get("fabric_unobfuscated"))
     if loom_ver.startswith("0."):
         mod_cfg = "modImplementation"
         yarn_suffix = ":v2"
@@ -807,7 +813,37 @@ def write_fabric_build(mc, info, path):
         java_block = f"""sourceCompatibility = "{java_str}"
 targetCompatibility = "{java_str}" """
 
-    content = f"""plugins {{
+    if unobfuscated:
+        # MC 26.x ships unobfuscated (intermediary pinned at 0.0.0): no
+        # mappings dependency, plugin renamed to net.fabricmc.fabric-loom,
+        # and no remapping means plain `implementation` replaces
+        # `modImplementation` (matches the official fabric-example-mod).
+        content = f"""plugins {{
+    id "net.fabricmc.fabric-loom" version "{loom_ver}"
+}}
+
+version = "0.1.1-SNAPSHOT"
+group = "xyz.langyo"
+
+{java_block}
+
+repositories {{
+    mavenCentral()
+    maven {{
+        url = "{depth}.maven-local"
+    }}
+}}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+
+dependencies {{
+    minecraft "com.mojang:minecraft:{mc}"
+    implementation "net.fabricmc:fabric-loader:{loader_ver}"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+}}
+"""
+    else:
+        content = f"""plugins {{
     id "fabric-loom" version "{loom_ver}"
 }}
 

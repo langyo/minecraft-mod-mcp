@@ -9,7 +9,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { findJavaForVersion, librariesDir, versionsDir } from "./platform.js";
 import { isWindows, isMacos } from "../runtime/detector.js";
 import { loadVersionsData } from "./versionsData.js";
-import { getVersion, getVersionForLoader, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
+import { getVersion, getVersionForLoader, hasFabric, DEFAULT_FABRIC_LOADER_VERSION, type Loader } from "./versions.js";
 import { DOWNLOAD, GAME, SERVER, FABRIC, BUILD, type ServerType, SERVER_TYPES } from "./defaults.js";
 import { fetchWithFallback, javaProxyArgs, gradleProxyEnv } from "./proxy.js";
 
@@ -702,7 +702,7 @@ export function getCompatPairs(version: string): CompatPair[] {
 
   const clientLoaders: Loader[] = [];
   if (vi.forge) clientLoaders.push("forge");
-  if (vi.fabric_yarn) clientLoaders.push("fabric");
+  if (hasFabric(vi)) clientLoaders.push("fabric");
   if (vi.neoforge) clientLoaders.push("neoforge");
 
   const parts = version.split(".").map(Number);
@@ -716,7 +716,7 @@ export function getCompatPairs(version: string): CompatPair[] {
   if (mcAtLeast(1, 8, 0)) serverTypes.push("spigot", "craftbukkit");
   if (mcAtLeast(1, 8, 0)) serverTypes.push("paper");
   if (vi.forge) serverTypes.push("forge");
-  if (vi.fabric_yarn) serverTypes.push("fabric");
+  if (hasFabric(vi)) serverTypes.push("fabric");
   if (vi.neoforge) serverTypes.push("neoforge");
 
   const pairs: CompatPair[] = [];

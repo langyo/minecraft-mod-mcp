@@ -60,6 +60,8 @@ def build() -> dict:
             entry["mappings"] = info["mappings"]
         if "fabric_yarn" in info:
             entry["fabric_yarn"] = info["fabric_yarn"]
+        if "fabric_loader" in info:
+            entry["fabric_loader"] = info["fabric_loader"]
         if "neoforge" in info:
             entry["neoforge"] = info["neoforge"]
         if "mdg" in info:
