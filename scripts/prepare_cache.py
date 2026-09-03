@@ -295,7 +295,10 @@ def main():
         if not mappings or "_" not in mappings:
             continue
         channel, datever = mappings.split("_", 1)
-        full_ver = f"{datever}-{mc}"
+        # Some mappings pins already carry the MC suffix (1.15.2 uses
+        # snapshot_20200224-1.15.1); appending -{mc} again yields a
+        # nonexistent artifact.
+        full_ver = datever if "-" in datever else f"{datever}-{mc}"
         artifact_name = f"mcp_{channel}"
         filename = f"{artifact_name}-{full_ver}.zip"
         rel_path = f"de/oceanlabs/mcp/{artifact_name}/{full_ver}/{filename}"
