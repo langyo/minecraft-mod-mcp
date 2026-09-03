@@ -196,6 +196,8 @@ jobs:
       - name: Prepare legacy build caches (FG 3/4.1)
         if: matrix.jdk == '8'
         shell: pwsh
+        env:
+          PYTHONUTF8: "1"
         run: python scripts/prepare_cache.py
 
       - name: Build mods

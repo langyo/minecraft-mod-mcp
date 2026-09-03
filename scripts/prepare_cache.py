@@ -42,7 +42,7 @@ DL_JAVA = os.path.join(TEMP_DIR, "Dl.java")
 # Preferred JDK for the Dl.java downloader (Java 9+ needed for
 # InputStream.transferTo). Falls back to auto-discovered JDKs; when no
 # JDK 9+ is reachable (e.g. CI runners that only installed JDK 8),
-# download_files() degrades to pure-Python urllib — no proxy support,
+# download_files() degrades to pure-Python urllib -- no proxy support,
 # but CI runners never need one.
 JDK21 = r"C:\Program Files\Amazon Corretto\jdk21.0.8_9"
 _DL_HOME = None  # resolved lazily; False means "use Python fallback"
@@ -279,9 +279,9 @@ def main():
     print("=" * 60)
 
     # ================================================================
-    # Phase 1: MCP snapshot mappings → FG mcp_repo (CRITICAL for FG 3/4.1)
+    # Phase 1: MCP snapshot mappings -> FG mcp_repo (CRITICAL for FG 3/4.1)
     # ================================================================
-    print("\n[Phase 1] MCP snapshot mappings → FG mcp_repo")
+    print("\n[Phase 1] MCP snapshot mappings -> FG mcp_repo")
     for mc, info in sorted(ALL_VERSIONS.items()):
         era_key = info.get("fg_era", "")
         if era_key not in ("fg3", "fg41"):
@@ -358,9 +358,9 @@ def main():
     print("  1.7.x decompiled cache: use 'node scripts/ensure-1.7x-cache.mjs' or 'just prepare-cache-1.7x'")
 
     # ================================================================
-    # Phase 4: MCP snapshot mappings (FG 3/4.1) → FG's own mcp_repo
+    # Phase 4: MCP snapshot mappings (FG 3/4.1) -> FG's own mcp_repo
     # ================================================================
-    print("\n[Phase 4] MCP snapshot mappings → FG mcp_repo")
+    print("\n[Phase 4] MCP snapshot mappings -> FG mcp_repo")
     for mc, info in sorted(ALL_VERSIONS.items()):
         era_key = info.get("fg_era", "")
         if era_key not in ("fg3", "fg41"):
