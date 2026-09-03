@@ -20,6 +20,7 @@ Usage:
   python scripts/prepare_cache.py
 """
 import subprocess
+import time
 import os
 import sys
 import hashlib
@@ -505,137 +506,76 @@ def main():
     import zipfile
     import io
 
-    fg41_versions = []
+    import re as _re
+
+    _config_versions = []
+    for _attempt in range(3):
+        for base_url in get_all_urls("maven_forge"):
+            try:
+                url = f"{base_url.rstrip('/')}/de/oceanlabs/mcp/mcp_config/maven-metadata.xml"
+                req = urllib.request.Request(url, headers={"User-Agent": "minecraft-mod-mcp/prepare-cache"})
+                data = urllib.request.urlopen(req, timeout=60).read().decode()
+                _config_versions = _re.findall(r"<version>([^<]+)</version>", data)
+                if _config_versions:
+                    break
+            except Exception:
+                continue
+        if _config_versions:
+            break
+        time.sleep(3)
+
+    # The mcp_config version each pinned Forge build uses, extracted from
+    # its userdev config.json (field "mcp": de.oceanlabs.mcp:mcp_config:<v>@zip).
+    # These are authoritative for the pinned builds; the maven metadata is
+    # only a fallback for versions not listed here.
+    MCP_CONFIG_PINS = {
+        "1.15": "1.15-20191212.203412",
+        "1.15.1": "1.15.1-20191217.105819",
+        "1.15.2": "1.15.2-20200515.085601",
+        "1.16.1": "1.16.1-20200625.160719",
+        "1.16.2": "1.16.2-20200812.004259",
+        "1.16.3": "1.16.3-20200911.084530",
+        "1.16.4": "1.16.4-20201102.104115",
+        "1.16.5": "1.16.5-20210115.111550",
+    }
+
+    tsrg_total = 0
     for mc, info in sorted(ALL_VERSIONS.items()):
-        era = info.get("fg_era", "")
-        if era != "fg41":
+        if info.get("fg_era", "") != "fg41":
             continue
         if "forge" not in get_loaders(mc):
             continue
         mappings = info.get("mappings", "")
         if not mappings.startswith("snapshot_"):
             continue
-        snapshot_id = mappings[len("snapshot_"):]
-        snapshot_dir_name = None
-        snap_base = os.path.join(
-            FG_CACHE, "maven_downloader", "de", "oceanlabs", "mcp", "mcp_snapshot",
-        )
-        for candidate in (snapshot_id, f"{snapshot_id}-{mc}"):
-            if os.path.isfile(os.path.join(snap_base, candidate, f"mcp_snapshot-{candidate}.zip")):
-                snapshot_dir_name = candidate
-                break
-        if not snapshot_dir_name:
-            continue
-        fg_ver = info["forge"]
-        mcp_config_dir = os.path.join(
-            FG_CACHE, "maven_downloader", "de", "oceanlabs", "mcp", "mcp_config",
-        )
-        mcp_config_ver = ""
-        if os.path.isdir(mcp_config_dir):
-            candidates = []
-            for d in os.listdir(mcp_config_dir):
-                if d.startswith(mc + "-") or d == mc:
-                    zip_path = os.path.join(mcp_config_dir, d, f"mcp_config-{d}.zip")
-                    if os.path.isfile(zip_path):
-                        candidates.append(d)
-            for c in candidates:
-                if "-" in c:
-                    mcp_config_ver = c
-                    break
-            if not mcp_config_ver and candidates:
-                mcp_config_ver = candidates[0]
-        if not mcp_config_ver:
-            continue
-        fg41_versions.append((mc, fg_ver, snapshot_dir_name, mcp_config_ver))
+        tsrg_total += 1
+        # FG 4.1's MinecraftUserRepo writes srg_to_snapshot_<map>.tsrg into
+        # mcp_repo/de/oceanlabs/mcp/mcp_config/<config_ver>/ using the version
+        # pinned by the Forge build's userdev config. With the directory
+        # present, FG generates the tsrg itself (its inputs are already in
+        # maven_downloader by then); on a cold cache the missing directory is
+        # what breaks the build (NoSuchFileException in findSrgToMcp).
+        vers = [MCP_CONFIG_PINS[mc]] if mc in MCP_CONFIG_PINS else [
+            v for v in _config_versions if v == mc or v.startswith(mc + "-")
+        ]
+        made = 0
+        for ver in vers:
+            os.makedirs(
+                os.path.join(FG_CACHE, "mcp_repo", "de", "oceanlabs", "mcp", "mcp_config", ver),
+                exist_ok=True,
+            )
+            made += 1
+        if made:
+            print(f"  [{mc}] prepared mcp_config dir(s): {', '.join(vers)}")
+        else:
+            print(f"  [{mc}] WARN: no mcp_config version known for this build")
 
-    tsrg_ok = 0
-    for mc, fg_ver, snapshot_dir_name, mcp_config_ver in fg41_versions:
-        mcp_config_zip = os.path.join(
-            FG_CACHE, "maven_downloader", "de", "oceanlabs", "mcp",
-            "mcp_config", mcp_config_ver, f"mcp_config-{mcp_config_ver}.zip",
-        )
-        snapshot_zip = os.path.join(
-            FG_CACHE, "maven_downloader", "de", "oceanlabs", "mcp",
-            "mcp_snapshot", snapshot_dir_name, f"mcp_snapshot-{snapshot_dir_name}.zip",
-        )
-        out_dir = os.path.join(
-            FG_CACHE, "minecraft_user_repo", "de", "oceanlabs", "mcp",
-            "mcp_config", mcp_config_ver,
-        )
-        tsrg_name = f"srg_to_{snapshot_dir_name}.tsrg"
-        tsrg_path = os.path.join(out_dir, tsrg_name)
-        input_path = tsrg_path + ".input"
-
-        if os.path.isfile(tsrg_path) and os.path.isfile(input_path):
-            tsrg_ok += 1
-            continue
-
-        if not os.path.isfile(mcp_config_zip) or not os.path.isfile(snapshot_zip):
-            print(f"  [{mc}] SKIP (missing mcp_config or snapshot zip)")
-            continue
-
-        try:
-            field_map = {}
-            method_map = {}
-            with zipfile.ZipFile(snapshot_zip) as sz:
-                with sz.open("fields.csv") as f:
-                    for row in csv.reader(io.TextIOWrapper(f, "utf-8")):
-                        if row and row[0] not in ("searge", ""):
-                            field_map[row[0]] = row[1]
-                with sz.open("methods.csv") as f:
-                    for row in csv.reader(io.TextIOWrapper(f, "utf-8")):
-                        if row and row[0] not in ("searge", ""):
-                            method_map[row[0]] = row[1]
-
-            lines_out = []
-            with zipfile.ZipFile(mcp_config_zip) as cz:
-                with cz.open("config/joined.tsrg") as f:
-                    for raw in io.TextIOWrapper(f, "utf-8"):
-                        line = raw.rstrip("\n\r")
-                        if not line:
-                            continue
-                        if line.startswith("\t"):
-                            parts = line.lstrip("\t").split(" ")
-                            if len(parts) >= 3:
-                                srg_name = parts[2]
-                                desc = parts[1]
-                                obf = parts[0]
-                                mcp_name = method_map.get(srg_name, srg_name)
-                                lines_out.append(f"\t{srg_name} {desc} {mcp_name}")
-                            elif len(parts) == 2:
-                                srg_name = parts[1]
-                                mcp_name = field_map.get(srg_name, srg_name)
-                                lines_out.append(f"\t{srg_name} {mcp_name}")
-                            else:
-                                lines_out.append(line)
-                        else:
-                            parts = line.split(" ")
-                            if len(parts) >= 2:
-                                srg_class = parts[1]
-                                lines_out.append(f"{srg_class} {srg_class}")
-                            else:
-                                lines_out.append(line)
-
-            os.makedirs(out_dir, exist_ok=True)
-            with open(tsrg_path, "w", encoding="utf-8", newline="\n") as f:
-                f.write("\n".join(lines_out) + "\n")
-
-            config_sha1 = hashlib.sha1(open(mcp_config_zip, "rb").read()).hexdigest()
-            snapshot_sha1 = hashlib.sha1(open(snapshot_zip, "rb").read()).hexdigest()
-            with open(input_path, "w", encoding="utf-8", newline="\n") as f:
-                f.write(f"mapping={config_sha1}\nmcp={snapshot_sha1}\n")
-
-            tsrg_ok += 1
-            print(f"  [{mc}] Generated {tsrg_name}")
-        except Exception as e:
-            print(f"  [{mc}] FAIL: {e}")
-
-    print(f"  Generated {tsrg_ok}/{len(fg41_versions)} tsrg files")
+    print(f"  Prepared mcp_config output dirs for {tsrg_total} FG 4.1 versions")
 
     # ================================================================
     # Phase 12: Shared dependencies (mcp-common, Java-WebSocket)
     # ================================================================
-    print("\n[Phase 11] Shared dependencies")
+    print("\n[Phase 12] Shared dependencies")
     shared = [
         ("xyz.langyo.minecraft.mcp", "mcp-common", "0.1.1-SNAPSHOT",
          "mcp-common-0.1.1-SNAPSHOT.jar", "maven-local"),
