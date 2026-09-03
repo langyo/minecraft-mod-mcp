@@ -273,6 +273,11 @@ def main():
 
     ok = 0
     fail = 0
+    # Phase 1 (MCP snapshot mappings) is the only phase whose misses break
+    # FG 3/4.1 builds; the other phases tolerate 404s (wrong-coordinate
+    # legacy artifacts, optional userdev jars) and the Gradle build itself
+    # remains the real gate.
+    critical_fail = 0
 
     print("=" * 60)
     print("Pre-populating ALL caches for ALL mod projects")
@@ -313,6 +318,7 @@ def main():
             ok += 1
         else:
             fail += 1
+            critical_fail += 1
 
     # ================================================================
     # Phase 2: ForgeGradle plugin jars (ALL eras)
@@ -642,7 +648,9 @@ def main():
     print(f"Cache population complete: {ok} OK, {fail} FAIL")
     print("=" * 60)
 
-    return 0 if fail == 0 else 1
+    if fail and not critical_fail:
+        print("(tolerated: non-critical artifacts were unavailable; downstream builds decide)")
+    return 1 if critical_fail else 0
 
 
 def _get_fabric_loader(mc):
