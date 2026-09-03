@@ -135,7 +135,7 @@ Use the [Feature Request](https://github.com/langyo/minecraft-mod-mcp/issues/new
 
 PRs target `dev` and are squash-merged, keeping `dev` history linear — one reviewed, gitmoji-formatted commit per change. The `master` branch receives periodic merges from `dev` (see [Commit Conventions](#commit-conventions)).
 
-> **Since 2026-09-03** all changes land through PRs, including maintainer and agent changes; direct pushes to `dev`/`master` are no longer part of the workflow, and CI flags non-compliant direct pushes to `dev`.
+> **Since 2026-09-03** all changes land through PRs, including maintainer and agent changes: `dev` is branch-protected (PR required, `lint` check required, no force-pushes), and CI additionally flags non-compliant direct pushes.
 
 ### Code Style
 
