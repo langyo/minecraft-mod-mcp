@@ -15,7 +15,7 @@ Rules:
 
 Usage:
   python scripts/commit_lint.py --subject "✨ Add a new tool."
-  python scripts/commit_lint.py --range origin/dev..HEAD
+  python scripts/commit_lint.py --range origin/master..HEAD
   python scripts/commit_lint.py --range A..B --check-merges
 """
 

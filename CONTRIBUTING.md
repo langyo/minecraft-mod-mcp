@@ -86,7 +86,7 @@ All commit subjects and PR titles follow one format:
 
 - **Gitmoji** — from the [gitmoji.dev](https://gitmoji.dev) canonical set (e.g. `✨` new feature, `🐛` bugfix, `📝` docs, `🔧` config, `👷` CI), followed by exactly one space
 - **Summary** — one plain English sentence: capitalized, ends with exactly one `.`, no CJK, **no conventional-commit prefix** (`feat:`, `fix:`, …), **no `Topic phrase:` colon-prefix shape**, **no version number**, **no filler**; detailed context belongs in the commit body
-- **PR titles follow the same rule** — PRs are squash-merged into `dev`, so the PR title becomes the permanent commit subject
+- **PR titles follow the same rule** — PRs are squash-merged into `master`, so the PR title becomes the permanent commit subject
 - `Revert "..."` subjects (from `git revert`) and squash suffixes ` (#123)` are exempt
 
 Examples:
@@ -102,10 +102,10 @@ Development commits on feature branches may still use a conventional-commit pref
 Check before pushing:
 
 ```bash
-just lint-commits   # validates origin/dev..HEAD
+just lint-commits   # validates origin/master..HEAD
 ```
 
-CI enforces the same rules on every PR title and on every new commit pushed to `dev` (see `scripts/commit_lint.py`). AI coding agents must additionally follow [AGENTS.md](AGENTS.md).
+CI enforces the same rules on every PR title and on every new commit pushed to `master`, merge-commit subjects included — master is squash-merge only (see `scripts/commit_lint.py`). AI coding agents must additionally follow [AGENTS.md](AGENTS.md).
 
 ---
 
@@ -126,16 +126,16 @@ Use the [Feature Request](https://github.com/langyo/minecraft-mod-mcp/issues/new
 
 ### Pull Requests
 
-1. Create a feature branch from `dev` (`feat/<name>` / `fix/<name>` / `chore/<name>`)
+1. Create a feature branch from `master` (`feat/<name>` / `fix/<name>` / `chore/<name>`)
 2. Make your changes, following existing code style
 3. Ensure `just full` builds successfully
 4. Run `just smoke <version>` on at least one Minecraft version
-5. Open a PR against `dev` using the [PR template](https://github.com/langyo/minecraft-mod-mcp/blob/dev/.github/PULL_REQUEST_TEMPLATE.md), with the title in the commit format above
-6. Once checks pass, the PR is **squash-merged** into `dev` and the branch deleted
+5. Open a PR against `master` using the [PR template](https://github.com/langyo/minecraft-mod-mcp/blob/master/.github/PULL_REQUEST_TEMPLATE.md), with the title in the commit format above
+6. Once checks pass, the PR is **squash-merged** into `master` and the branch deleted
 
-PRs target `dev` and are squash-merged, keeping `dev` history linear — one reviewed, gitmoji-formatted commit per change. The `master` branch receives periodic merges from `dev` (see [Commit Conventions](#commit-conventions)).
+PRs target `master` and are squash-merged, keeping its history linear — one reviewed, gitmoji-formatted commit per change. The `master` branch is protected: PRs are required (0 approvals — self-merge is fine), the `lint` check must pass, and force-pushes/deletions are blocked for everyone.
 
-> **Since 2026-09-03** all changes land through PRs, including maintainer and agent changes: `dev` is branch-protected (PR required, `lint` check required, no force-pushes), and CI additionally flags non-compliant direct pushes.
+> **Since 2026-09-03** all changes land through squash-merged PRs into `master`, including maintainer and agent changes. The former `dev` integration branch is retired (its history lives on in `master`, which was fast-forwarded to the final `dev` tip before deletion).
 
 ### Code Style
 

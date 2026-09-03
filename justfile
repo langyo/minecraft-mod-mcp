@@ -171,9 +171,9 @@ dry-run version loader="forge":
 # ============================================================
 
 # Lint commit messages against the AGENTS.md gitmoji format
-# Usage: just lint-commits                        (origin/dev..HEAD)
-#        just lint-commits origin/master..dev
-lint-commits range="origin/dev..HEAD":
+# Usage: just lint-commits                          (origin/master..HEAD)
+#        just lint-commits v0.2.0..master
+lint-commits range="origin/master..HEAD":
     python scripts/commit_lint.py --range {{ range }}
 
 # ============================================================
