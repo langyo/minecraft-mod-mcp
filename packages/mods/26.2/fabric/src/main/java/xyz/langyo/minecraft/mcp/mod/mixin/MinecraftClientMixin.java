@@ -4,19 +4,17 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
 import xyz.langyo.minecraft.mcp.mod.ModDevMcpMod;
 
+@Mixin(Minecraft.class)
+public abstract class MinecraftClientMixin {
 
-@Mixin(Screen.class)
-public abstract class ScreenMixin {
-
-    @Inject(method = "render", at = @At("TAIL"))
-    private void onRender(DrawContext ctx, int mouseX, int mouseY, float tickDelta, CallbackInfo ci) {
+    @Inject(method = "tick", at = @At("TAIL"))
+    private void onTick(CallbackInfo ci) {
         ModDevMcpMod mod = ModDevMcpMod.INSTANCE;
         if (mod != null) {
-            mod.onScreenRender(ctx, (Screen) (Object) this, mouseX, mouseY, tickDelta);
+            mod.onClientTick();
         }
     }
 }

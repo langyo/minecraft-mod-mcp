@@ -48,6 +48,7 @@ Minecraft Mod MCPは、**Mod開発者向け**のAI支援ツールです。`mods`
 
 | MC バージョン | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
+| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge.jar) |
 | 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge.jar) |
 | 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge.jar) |
 
@@ -132,7 +133,7 @@ MCバージョンとローダー情報はハンドシェイク時に `/api/statu
 flowchart LR
     A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
     B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
-    C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
+    C["🎮 Minecraft Client<br/>(1.8.9 – 26.2)"]
 
     A <-- "HTTP / SSE" --> B
     B -- "reflection" --> C

@@ -363,7 +363,7 @@ def main():
     print("\n[Phase 7] Fabric Loader jars")
     loader_versions = set()
     for mc, info in sorted(ALL_VERSIONS.items()):
-        if "fabric_yarn" not in info:
+        if "fabric_yarn" not in info and "fabric_loader" not in info:
             continue
         loom_ver = get_fabric_loom(mc)
         loader_ver = _get_fabric_loader(mc)
@@ -384,7 +384,7 @@ def main():
     print("\n[Phase 8] Fabric Loom plugin jars")
     loom_versions = set()
     for mc, info in sorted(ALL_VERSIONS.items()):
-        if "fabric_yarn" not in info:
+        if "fabric_yarn" not in info and "fabric_loader" not in info:
             continue
         loom_versions.add(get_fabric_loom(mc))
     for lv in sorted(loom_versions):
@@ -593,6 +593,10 @@ def main():
 
 
 def _get_fabric_loader(mc):
+    # Unobfuscated MC 26.x pins the loader in version_config directly.
+    pinned = ALL_VERSIONS.get(mc, {}).get("fabric_loader")
+    if pinned:
+        return pinned
     _MAP = {
         "1.14.4": "0.11.3", "1.15": "0.11.3", "1.15.2": "0.11.3",
         "1.16.1": "0.12.12", "1.16.3": "0.12.12",

@@ -356,8 +356,8 @@ async function runInstall(args: string[]) {
       loaderVersion = vi.forge;
     } else if (loader === "neoforge" && vi.neoforge) {
       loaderVersion = vi.neoforge;
-    } else if (loader === "fabric" && vi.fabric_yarn) {
-      loaderVersion = DEFAULT_FABRIC_LOADER_VERSION;
+    } else if (loader === "fabric" && (vi.fabric_yarn || vi.fabric_loader)) {
+      loaderVersion = vi.fabric_loader ?? DEFAULT_FABRIC_LOADER_VERSION;
     }
 
     if (loaderVersion) {

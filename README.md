@@ -48,6 +48,7 @@ Minecraft Mod MCP is a mod designed for **AI-assisted mod development**. It expo
 
 | MC Version | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
+| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge.jar) |
 | 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge.jar) |
 | 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge.jar) |
 
@@ -62,7 +63,7 @@ Minecraft Mod MCP is a mod designed for **AI-assisted mod development**. It expo
 Download the JAR from [GitHub Releases](https://github.com/langyo/minecraft-mod-mcp/releases) and place it in your Minecraft `mods` folder.
 
 - Requires **Forge**, **Fabric**, or **NeoForge** (see supported versions above)
-- Works with Minecraft **1.7.2** through **26.1.2**
+- Works with Minecraft **1.7.2** through **26.2**
 
 ### 2. Install the MCP Bridge
 
@@ -132,7 +133,7 @@ The version and loader (Forge/Fabric/NeoForge) are confirmed at handshake via `/
 flowchart LR
     A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
     B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
-    C["🎮 Minecraft Client<br/>(1.8.9 – 26.1.2)"]
+    C["🎮 Minecraft Client<br/>(1.8.9 – 26.2)"]
 
     A <-- "HTTP / SSE" --> B
     B -- "reflection" --> C

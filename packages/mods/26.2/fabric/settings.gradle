@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'minecraft-moddev-mcp-fabric-26.1.2'
+rootProject.name = 'minecraft-moddev-mcp-fabric-26.2'
