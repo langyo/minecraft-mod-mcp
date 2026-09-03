@@ -6,20 +6,18 @@ name: Commit & PR Lint
 #     <gitmoji> <Capitalized English one-sentence summary ending with a period.>
 #
 # - pull_request: validates the PR title — with squash merge it becomes the
-#   permanent dev commit subject.
-# - push (dev): validates every new non-merge commit, guarding the PR-based
-#   maintenance flow adopted on 2026-09-03 (direct pushes must still be
-#   gitmoji-formatted). Merge commits are allowed on dev (e.g. master→dev
-#   syncs); master pushes are not linted so legacy dev history can still be
-#   merged into master without false failures.
+#   permanent master commit subject.
+# - push (master): validates every new commit, merge-commit subjects included.
+#   master is squash-merge only, so a merge commit landing here means someone
+#   bypassed the PR flow — the linter rejects `Merge branch ...` subjects.
 # `Revert "..."` subjects are exempt; squash suffix ` (#N)` is allowed.
 
 on:
   pull_request:
-    branches: [master, dev]
+    branches: [master]
     types: [opened, edited, reopened, synchronize]
   push:
-    branches: [dev]
+    branches: [master]
 
 concurrency:
   group: commit-lint-${{ github.event_name }}-${{ github.ref }}
@@ -43,7 +41,7 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: python scripts/commit_lint.py --subject "$PR_TITLE"
 
-      - name: Lint pushed commits (dev)
+      - name: Lint pushed commits (master)
         if: github.event_name == 'push'
         run: |
           BEFORE="${{ github.event.before }}"
@@ -52,4 +50,4 @@ jobs:
             echo "New branch or unknown ancestor — nothing to diff."
             exit 0
           fi
-          python scripts/commit_lint.py --range "$BEFORE..$AFTER"
+          python scripts/commit_lint.py --range "$BEFORE..$AFTER" --check-merges

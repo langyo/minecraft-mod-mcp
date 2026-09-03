@@ -8,26 +8,25 @@
 > **this repo's conventions win**; every deliberate deviation is listed in §9.
 >
 > **Headline change (2026-09-03, maintainer directive): all changes now land
-> through pull requests — including agent-made changes. Do not push directly
-> to `dev` or `master`.**
+> through pull requests into `master` — including agent-made changes. The old
+> `dev` integration branch is retired; do not push directly to `master`.**
 
 ---
 
 ## 1. Branch model
 
-- `dev` — integration branch. **All feature branches and PRs target `dev`.**
-  PRs are **squash-merged** into `dev`, so `dev` stays linear and every commit
-  on it is one reviewed, gitmoji-formatted change. Since 2026-09-03 `dev` is
-  **branch-protected**: PRs are required (0 approvals — self-merge is fine),
-  the `lint` check is required, and force-pushes/deletions are blocked for
-  everyone including the maintainer.
-- `master` — release line. Receives periodic merges from `dev`; per
-  [CONTRIBUTING](CONTRIBUTING.md#commit-conventions) those merge commits carry
-  the same gitmoji one-sentence subject (never a raw `Merge branch ...` subject).
+- `master` — the only long-lived branch. **Protected since 2026-09-03**: PRs
+  are required (0 approvals — self-merge is fine), the `lint` check is
+  required, force-pushes/deletions are blocked for everyone including the
+  maintainer, and the repo only offers squash merge. Every `master` commit is
+  therefore one reviewed, gitmoji-formatted change — same model as the
+  Celestia workspace (their §5).
+- `dev` — **retired on 2026-09-03** (branch deleted). Before deletion,
+  `master` was fast-forwarded to the final `dev` tip, so no history was lost.
+  Do not recreate `dev`; old `dev`-based local branches should be rebased onto
+  `master`.
 - Feature branches: `feat/<name>`, `fix/<name>`, `chore/<name>`,
-  `refactor/<name>`, branched off `origin/dev`.
-- **Difference from Celestia:** the Celestia workspace deprecates `dev`; this
-  repo deliberately keeps it. Do not "fix" this.
+  `refactor/<name>`, branched off `origin/master`.
 
 ## 2. Commit message & PR title format (CI-enforced)
 
@@ -46,7 +45,7 @@
   correct). The gitmoji already conveys the change type. Detailed context
   belongs in the commit BODY (blank line + bullets), never in the subject.
 - **PR titles follow the exact same rule** — with squash merge, the PR title
-  *becomes* the permanent `dev` commit subject, so it is the single most
+  *becomes* the permanent `master` commit subject, so it is the single most
   important line you will write.
 - `Revert "..."` subjects produced by `git revert` are exempt.
 - Squash-merge suffix ` (#123)` is allowed.
@@ -54,14 +53,15 @@
   use conventional-commit prefixes for internal clarity — they are squashed
   away at merge time anyway. Gitmoji format is still preferred everywhere.
 - Local check before pushing: `just lint-commits` (validates
-  `origin/dev..HEAD`). CI runs the same linter (`scripts/commit_lint.py`) on
-  every PR title and on every new commit pushed to `dev`.
+  `origin/master..HEAD`). CI runs the same linter (`scripts/commit_lint.py`)
+  on every PR title and on every new commit pushed to `master` — including
+  merge-commit subjects, which are rejected: master is squash-merge only.
 
 ## 3. PR workflow (per task)
 
-1. **Create a feature branch** off `origin/dev`. If multiple agents share one
-   checkout, work in an isolated `git worktree` (never edit the main checkout
-   concurrently with another agent); remove the worktree after merge.
+1. **Create a feature branch** off `origin/master`. If multiple agents share
+   one checkout, work in an isolated `git worktree` (never edit the main
+   checkout concurrently with another agent); remove the worktree after merge.
 2. **3-round verify cycle** for each change: analyze → improve → verify, three
    rounds over; if any round fails, restart the count from zero. Use subagents
    for verification to keep the main context clean.
@@ -72,8 +72,8 @@
    minimum the touched package: `just mcp-build`, `just mcp-lint`, relevant
    `just build-mod`), `just lint-commits` always. Run `just smoke <version>`
    when behavior can only be proven in-game.
-5. **Push** the branch, **open a PR** against `dev` (via `gh pr create`) with
-   a compliant title and a filled-in PR template.
+5. **Push** the branch, **open a PR against `master`** (via `gh pr create`)
+   with a compliant title and a filled-in PR template.
 6. **Merge** once required checks are green: **squash merge**, subject = PR
    title, then **delete the branch**.
 7. **PR economy**: bundle one coherent feature/fix wave per PR; do not open a
@@ -97,8 +97,8 @@
   Never fall back to `--force`: fetch, inspect with
   `git log origin/<branch>..HEAD` and `git log HEAD..origin/<branch>`, and ask
   the maintainer if anything is unaccounted for.
-- Force-pushes of any kind to `dev`/`master` are forbidden; both branches only
-  advance forward.
+- Force-pushes of any kind to `master` are forbidden; it only advances
+  forward via squash merge.
 - This applies to all agents, subagents, and interactive sessions.
 
 ## 5. Sensitive information red line (hard rule)
@@ -134,10 +134,10 @@
 - Every workflow already sets `concurrency` + `cancel-in-progress`, so stale
   runs are cancelled automatically; do not add workflows without a
   `concurrency` group.
-- **What runs where**: on PRs — the build matrix (`ci.yml`) plus the fast
-  commit/PR-title lint (`commit-lint.yml`). On `push` to `dev`/`master` — the
-  full pipeline including smoke/screenshot/E2E tests, plus the dev push-format
-  guard.
+- **What runs where**: on PRs to `master` — the build matrix (`ci.yml`) plus
+  the fast commit/PR-title lint (`commit-lint.yml`). On `push` to `master` —
+  the full pipeline including smoke/screenshot/E2E tests, plus the
+  push-format guard.
 - **CI is a gate for code failures, not a tea ceremony**: for docs/config-only
   changes you may merge once the lint check is green and the relevant code
   checks pass, without waiting out the full Windows build matrix — record the
@@ -158,8 +158,8 @@
 ## 8. Local lint recipe
 
 ```bash
-just lint-commits                    # validate origin/dev..HEAD
-just lint-commits origin/master..dev # validate any range
+just lint-commits                     # validate origin/master..HEAD
+just lint-commits v0.2.0..master      # validate any range
 python scripts/commit_lint.py --subject "✨ Add a new tool."   # one subject
 ```
 
@@ -170,9 +170,10 @@ python scripts/commit_lint.py --subject "✨ Add a new tool."   # one subject
 | §0.6 large-download / sing-box proxy discipline | Specific to the yuzu-linux NAT/proxy network and its airport-quota incidents; this repo builds on GitHub-hosted runners and the maintainer's Windows machine. |
 | §1 node table, passwords, NFS layout | Workspace infrastructure — and per §5 above, its credentials must never be copied into this repo. |
 | §2 Celestia-island repo layout | Different family of repositories. |
-| §5 "`dev` is DEPRECATED" | This repo keeps `dev` as its integration branch (§1). |
-| §5 merge-commit subjects rejected | Reversed here: `master` receives `dev` via merge commits whose subjects follow §2 (CONTRIBUTING rule, kept). |
 | §7 Rust/pnpm/CARGO_HOME & self-hosted runner ops | This is a Gradle/npm/Python repo on hosted runners. |
 | §7 "CI 是参考不是门禁" waiver culture | Softened: hosted CI is the real gate here; only documented waivers for docs-only changes (§6). |
 | §8 node-2/3 deployment & malkuth supervision | No deployment fleet; releases are tag-driven GitHub Releases. |
 | §9 pnpm registry / sibling links / worktree symlink discipline | NFS multi-agent infra that does not exist here. |
+
+> The Celestia §5 model (master-only, squash-merge only, `dev` deprecated) is
+> **adopted** here as of 2026-09-03 — see §1.
