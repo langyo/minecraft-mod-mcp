@@ -430,7 +430,7 @@ jobs:
       - name: Build MCP CLI
         run: |
           cd packages/minecraft-mod-mcp
-          npm ci --no-audit --no-fund
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Run smoke test
@@ -515,7 +515,7 @@ jobs:
       - name: Build MCP CLI
         run: |
           cd packages/minecraft-mod-mcp
-          npm ci --no-audit --no-fund
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Run screenshot test
@@ -593,7 +593,7 @@ jobs:
       - name: Build MCP CLI
         run: |
           cd packages/minecraft-mod-mcp
-          npm ci --no-audit --no-fund
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Run E2E test
