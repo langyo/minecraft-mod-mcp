@@ -78,28 +78,34 @@ cd packages/minecraft-mod-mcp && npm test
 
 ## Commit Conventions
 
-### Merge into `master`
-
-All merges into `master` (PR merge, dev → master) must use a merge commit message following this format:
+All commit subjects and PR titles follow one format:
 
 ```
-{emoji} {English summary}
+<gitmoji> <Capitalized English one-sentence summary ending with a period.>
 ```
 
-- **Emoji** — must be one from [gitmoji.dev](https://gitmoji.dev) that matches the change (e.g. `🚀` for first release, `✨` for new feature, `🐛` for bugfix, `📝` for docs)
-- **Summary** — concise one-line English, **no conventional-commit prefix** (no `feat:`, `fix:`, `chore:`, etc.), **no version number**, **no filler**
+- **Gitmoji** — from the [gitmoji.dev](https://gitmoji.dev) canonical set (e.g. `✨` new feature, `🐛` bugfix, `📝` docs, `🔧` config, `👷` CI), followed by exactly one space
+- **Summary** — one plain English sentence: capitalized, ends with exactly one `.`, no CJK, **no conventional-commit prefix** (`feat:`, `fix:`, …), **no `Topic phrase:` colon-prefix shape**, **no version number**, **no filler**; detailed context belongs in the commit body
+- **PR titles follow the same rule** — PRs are squash-merged into `dev`, so the PR title becomes the permanent commit subject
+- `Revert "..."` subjects (from `git revert`) and squash suffixes ` (#123)` are exempt
 
 Examples:
 
 ```
-✨ AI-generated mod code can now control the game via MCP tools
-🐛 Fix crash when switching dimensions on Forge 1.21.7
-📝 Restructure documentation for modder-first experience
+✨ AI-generated mod code can now control the game via MCP tools.
+🐛 Fix crash when switching dimensions on Forge 1.21.7.
+📝 Restructure documentation for modder-first experience.
 ```
 
-### Development commits (non-master)
+Development commits on feature branches may still use a conventional-commit prefix for internal clarity (`feat:`, `fix:`, `docs:`, etc.) — they are squashed away at merge time anyway; the gitmoji format is preferred everywhere.
 
-Development commits on feature branches or `dev` may use a conventional-commit prefix for internal clarity (`feat:`, `fix:`, `docs:`, etc.) — the strict rules above apply only to `master` merges.
+Check before pushing:
+
+```bash
+just lint-commits   # validates origin/dev..HEAD
+```
+
+CI enforces the same rules on every PR title and on every new commit pushed to `dev` (see `scripts/commit_lint.py`). AI coding agents must additionally follow [AGENTS.md](AGENTS.md).
 
 ---
 
@@ -120,13 +126,16 @@ Use the [Feature Request](https://github.com/langyo/minecraft-mod-mcp/issues/new
 
 ### Pull Requests
 
-1. Create a feature branch from `dev`
+1. Create a feature branch from `dev` (`feat/<name>` / `fix/<name>` / `chore/<name>`)
 2. Make your changes, following existing code style
 3. Ensure `just full` builds successfully
 4. Run `just smoke <version>` on at least one Minecraft version
-5. Open a PR against `dev` using the [PR template](https://github.com/langyo/minecraft-mod-mcp/blob/dev/.github/PULL_REQUEST_TEMPLATE.md)
+5. Open a PR against `dev` using the [PR template](https://github.com/langyo/minecraft-mod-mcp/blob/dev/.github/PULL_REQUEST_TEMPLATE.md), with the title in the commit format above
+6. Once checks pass, the PR is **squash-merged** into `dev` and the branch deleted
 
-PRs should target `dev`. The `master` branch receives periodic merges from `dev` (see [Commit Conventions](#commit-conventions)).
+PRs target `dev` and are squash-merged, keeping `dev` history linear — one reviewed, gitmoji-formatted commit per change. The `master` branch receives periodic merges from `dev` (see [Commit Conventions](#commit-conventions)).
+
+> **Since 2026-09-03** all changes land through PRs, including maintainer and agent changes; direct pushes to `dev`/`master` are no longer part of the workflow, and CI flags non-compliant direct pushes to `dev`.
 
 ### Code Style
 
