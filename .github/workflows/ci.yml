@@ -292,6 +292,8 @@ jobs:
     runs-on: windows-latest
     needs: build-mods
     if: github.event_name == 'push'
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -425,6 +427,12 @@ jobs:
           echo "DISPLAY=:99" >> $GITHUB_ENV
           echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
           echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
+      - name: Build MCP CLI
+        run: |
+          cd packages/minecraft-mod-mcp
+          npm ci --no-audit --no-fund
+          npm run build
+
       - name: Run smoke test
         id: smoke
         run: |
@@ -504,6 +512,12 @@ jobs:
           echo "DISPLAY=:99" >> $GITHUB_ENV
           echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
           echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
+      - name: Build MCP CLI
+        run: |
+          cd packages/minecraft-mod-mcp
+          npm ci --no-audit --no-fund
+          npm run build
+
       - name: Run screenshot test
         run: |
           python scripts/ci_helper.py screenshot-test \
@@ -576,6 +590,12 @@ jobs:
           echo "DISPLAY=:99" >> $GITHUB_ENV
           echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
           echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
+      - name: Build MCP CLI
+        run: |
+          cd packages/minecraft-mod-mcp
+          npm ci --no-audit --no-fund
+          npm run build
+
       - name: Run E2E test
         id: e2e
         run: |
