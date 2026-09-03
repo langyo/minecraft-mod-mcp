@@ -25,11 +25,13 @@ import sys
 import hashlib
 import shutil
 import json
+import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import (
     ALL_VERSIONS, FG_ERAS, LEGACY_ERAS,
     is_legacy, get_loaders, get_fabric_loom,
+    get_jdk_home,
 )
 from mirrors import probe_all as probe_mirrors, get_url, download as mirror_download, get_all_urls
 
@@ -37,7 +39,31 @@ TEMP_DIR = os.path.join(os.environ.get("TEMP", "/tmp"), "opencode")
 DL_CLASS = os.path.join(TEMP_DIR, "Dl.class")
 DL_JAVA = os.path.join(TEMP_DIR, "Dl.java")
 
+# Preferred JDK for the Dl.java downloader (Java 9+ needed for
+# InputStream.transferTo). Falls back to auto-discovered JDKs; when no
+# JDK 9+ is reachable (e.g. CI runners that only installed JDK 8),
+# download_files() degrades to pure-Python urllib — no proxy support,
+# but CI runners never need one.
 JDK21 = r"C:\Program Files\Amazon Corretto\jdk21.0.8_9"
+_DL_HOME = None  # resolved lazily; False means "use Python fallback"
+
+
+def _resolve_dl_home():
+    global _DL_HOME
+    if _DL_HOME is not None:
+        return _DL_HOME
+    candidates = [JDK21]
+    for ver in (21, 25, 24, 17):
+        home = get_jdk_home(ver)
+        if home:
+            candidates.append(home)
+    for home in candidates:
+        if home and os.path.isfile(os.path.join(home, "bin", "javac.exe")):
+            _DL_HOME = home
+            return home
+    _DL_HOME = False
+    print("  [WARN] no JDK 9+ found for Dl.java downloader; using pure-Python downloads")
+    return False
 GRADLE_USER_HOME = os.path.join(os.path.expanduser("~"), ".gradle")
 MODULES_CACHE = os.path.join(GRADLE_USER_HOME, "caches", "modules-2", "files-2.1")
 FG_CACHE = os.path.join(GRADLE_USER_HOME, "caches", "forge_gradle")
@@ -48,6 +74,8 @@ PROXY_PORT = 7890
 
 def ensure_dl_class():
     if os.path.isfile(DL_CLASS):
+        return
+    if not _resolve_dl_home():
         return
     os.makedirs(TEMP_DIR, exist_ok=True)
     java_src = r"""
@@ -95,17 +123,42 @@ public class Dl {
 """
     with open(DL_JAVA, "w") as f:
         f.write(java_src)
-    javac = os.path.join(JDK21, "bin", "javac.exe")
+    javac = os.path.join(_resolve_dl_home(), "bin", "javac.exe")
     subprocess.run([javac, DL_JAVA], cwd=TEMP_DIR, check=True, capture_output=True)
     print(f"Compiled {DL_CLASS}")
 
 
+def _py_download(url, dest):
+    """Pure-Python download used when no JDK 9+ hosts the Dl helper."""
+    try:
+        if os.path.isfile(dest) and os.path.getsize(dest) > 0:
+            print(f"  SKIP {os.path.basename(dest)}")
+            return True
+        req = urllib.request.Request(url, headers={"User-Agent": "minecraft-mod-mcp/prepare-cache"})
+        with urllib.request.urlopen(req, timeout=300) as r, open(dest, "wb") as f:
+            shutil.copyfileobj(r, f)
+        size = os.path.getsize(dest)
+        print(f"  PY {'OK' if size else 'FAIL'} {os.path.basename(dest)} ({size} bytes)")
+        return size > 0
+    except Exception as e:
+        if os.path.isfile(dest):
+            os.remove(dest)
+        print(f"  PY FAIL {os.path.basename(url)} ({e})")
+        return False
+
+
 def download_files(url_path_pairs, use_proxy=False):
+    home = _resolve_dl_home()
+    if not home:
+        ok = True
+        for url, path in url_path_pairs:
+            ok = _py_download(url, path) and ok
+        return ok
     args = []
     for url, path in url_path_pairs:
         args.extend([url, path])
     cmd = [
-        os.path.join(JDK21, "bin", "java.exe"),
+        os.path.join(home, "bin", "java.exe"),
         f"-DuseProxy={str(use_proxy).lower()}",
         f"-DproxyHost={PROXY_HOST}",
         f"-DproxyPort={PROXY_PORT}",
