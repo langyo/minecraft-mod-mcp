@@ -77,10 +77,10 @@ jobs:
           fi
 
       - name: Type check
-        run: npx vue-tsc -b --noEmit
+        run: pnpm exec vue-tsc -b --noEmit
 
       - name: Build (Vite)
-        run: npx vite build --base "${{ steps.base.outputs.base }}"
+        run: pnpm exec vite build --base "${{ steps.base.outputs.base }}"
 
       - name: Generate favicons & copy assets
         run: python3 scripts/build.py --skip-deps --skip-typecheck --skip-vite
