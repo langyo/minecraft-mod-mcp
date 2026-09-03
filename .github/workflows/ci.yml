@@ -190,6 +190,14 @@ jobs:
             gradle-jdk${{ matrix.jdk }}-${{ runner.os }}-
             gradle-common-${{ runner.os }}-
 
+      # FG 3/4.1-era mods (all in the JDK 8 lane) cannot fetch MCP snapshot
+      # mappings through Cloudflare with Java 8's TLS stack on a cold cache —
+      # pre-populate the Gradle cache with Python (modern TLS) instead.
+      - name: Prepare legacy build caches (FG 3/4.1)
+        if: matrix.jdk == '8'
+        shell: pwsh
+        run: python scripts/prepare_cache.py
+
       - name: Build mods
         shell: pwsh
         env:
