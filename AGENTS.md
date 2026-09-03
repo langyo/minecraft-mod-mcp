@@ -17,7 +17,10 @@
 
 - `dev` — integration branch. **All feature branches and PRs target `dev`.**
   PRs are **squash-merged** into `dev`, so `dev` stays linear and every commit
-  on it is one reviewed, gitmoji-formatted change.
+  on it is one reviewed, gitmoji-formatted change. Since 2026-09-03 `dev` is
+  **branch-protected**: PRs are required (0 approvals — self-merge is fine),
+  the `lint` check is required, and force-pushes/deletions are blocked for
+  everyone including the maintainer.
 - `master` — release line. Receives periodic merges from `dev`; per
   [CONTRIBUTING](CONTRIBUTING.md#commit-conventions) those merge commits carry
   the same gitmoji one-sentence subject (never a raw `Merge branch ...` subject).
