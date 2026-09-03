@@ -95,6 +95,9 @@ jobs:
               1.16.3/forge
               1.16.4/forge
               1.16.5/forge
+          - jdk: "17"
+            mods: |
+              1.16.5/fabric
               1.14.2/fabric
               1.14.3/fabric
               1.14.4/fabric
@@ -105,9 +108,6 @@ jobs:
               1.16.2/fabric
               1.16.3/fabric
               1.16.4/fabric
-          - jdk: "17"
-            mods: |
-              1.16.5/fabric
               1.17.1/forge
               1.17.1/fabric
               1.18/forge

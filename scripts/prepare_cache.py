@@ -549,28 +549,30 @@ def main():
         if not mappings.startswith("snapshot_"):
             continue
         tsrg_total += 1
-        # FG 4.1's MinecraftUserRepo writes srg_to_snapshot_<map>.tsrg into
-        # mcp_repo/de/oceanlabs/mcp/mcp_config/<config_ver>/ using the version
-        # pinned by the Forge build's userdev config. With the directory
-        # present, FG generates the tsrg itself (its inputs are already in
-        # maven_downloader by then); on a cold cache the missing directory is
-        # what breaks the build (NoSuchFileException in findSrgToMcp).
-        vers = [MCP_CONFIG_PINS[mc]] if mc in MCP_CONFIG_PINS else [
-            v for v in _config_versions if v == mc or v.startswith(mc + "-")
-        ]
-        made = 0
-        for ver in vers:
+        cfg_ver = MCP_CONFIG_PINS.get(mc)
+        if not cfg_ver:
+            cfg_ver = next(
+                (v for v in reversed(_config_versions)
+                 if v.startswith(mc + "-") or v == mc), None)
+        if not cfg_ver:
+            print(f"  [{mc}] WARN: no mcp_config version known for this build")
+            continue
+        # FG 4.1's MinecraftUserRepo.findSrgToMcp generates the merged
+        # srg_to_snapshot_<map>.tsrg itself, but on a cold cache the target
+        # directory does not exist and it dies with NoSuchFileException
+        # before writing (machines with a Gradle-cache history have the
+        # directory, which is why this only breaks on fresh CI runners).
+        # Pre-create the directories under BOTH cache roots FG uses and let
+        # it write its own mapping file — generating one here risks feeding
+        # FG a subtly wrong tsrg (descriptor normalization differs).
+        for root in ("minecraft_user_repo", "mcp_repo"):
             os.makedirs(
-                os.path.join(FG_CACHE, "mcp_repo", "de", "oceanlabs", "mcp", "mcp_config", ver),
+                os.path.join(FG_CACHE, root, "de", "oceanlabs", "mcp", "mcp_config", cfg_ver),
                 exist_ok=True,
             )
-            made += 1
-        if made:
-            print(f"  [{mc}] prepared mcp_config dir(s): {', '.join(vers)}")
-        else:
-            print(f"  [{mc}] WARN: no mcp_config version known for this build")
+        print(f"  [{mc}] prepared mcp_config dir: {cfg_ver}")
 
-    print(f"  Prepared mcp_config output dirs for {tsrg_total} FG 4.1 versions")
+    print(f"  Prepared mcp_config dirs for {tsrg_total} FG 4.1 versions")
 
     # ================================================================
     # Phase 12: Shared dependencies (mcp-common, Java-WebSocket)
