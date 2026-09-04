@@ -678,6 +678,11 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
                                                        os.environ.get("JAVA_HOME", "")))
 
     extra_jvm = "-Djava.awt.headless=true"
+    # Forge >= 1.20.5 opens an early GL window that times out under
+    # Xvfb/llvmpipe ("Timed out trying to setup the Game Window");
+    # older loaders ignore the property.
+    if loader == "forge":
+        extra_jvm += " -Dforge.disableEarlyDisplay=true"
     if world_name:
         extra_jvm += f" -Dmcp.test.world={world_name}"
 
