@@ -709,17 +709,26 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
                                        os.environ.get(f"JAVA_HOME_{jdk_ver}",
                                                        os.environ.get("JAVA_HOME", "")))
 
-    # No -Djava.awt.headless=true: with Xvfb there IS a display, and the
-    # property breaks LWJGL2's X connection on pre-1.13 Minecraft
-    # ("LWJGLException: Could not open X display connection").
-    extra_jvm = ""
+    # -Djava.awt.headless=true is two-sided on Xvfb: LWJGL2 (MC <= 1.12)
+    # fails to open its X display with it ("Could not open X display
+    # connection"), while LWJGL3-era loads benefit (Forge >= 1.20.5 skips
+    # its EarlyDisplay window when AWT is headless). Apply it only to
+    # MC >= 1.13.
+    parts = []
+    try:
+        major = int(mc_ver.split(".")[0])
+    except ValueError:
+        major = 1
+    if major >= 13:
+        parts.append("-Djava.awt.headless=true")
     # Forge >= 1.20.5 opens an early GL window that times out under
     # Xvfb/llvmpipe ("Timed out trying to setup the Game Window");
     # older loaders ignore the property.
     if loader == "forge":
-        extra_jvm += "-Dforge.disableEarlyDisplay=true"
+        parts.append("-Dforge.disableEarlyDisplay=true")
     if world_name:
-        extra_jvm += f" -Dmcp.test.world={world_name}"
+        parts.append(f"-Dmcp.test.world={world_name}")
+    extra_jvm = " ".join(parts)
 
     launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
     try:
