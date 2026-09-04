@@ -411,7 +411,43 @@ def wait_for_mod(url="http://127.0.0.1:9876", timeout=180, start_port=None):
             last_log = now
         time.sleep(2)
 
+    _dump_launch_diagnostics()
     raise TimeoutError(f"Mod did not start within {timeout}s")
+
+
+def _dump_launch_diagnostics():
+    """On mod-wait timeout, surface why: MC log tail, deployed mods, java liveness."""
+    game_dir = Path(MC_DIR) / "mcp_launcher" / "game"
+    mods = game_dir / "mods"
+    if mods.is_dir():
+        _log(f"[diag] game mods: {sorted(p.name for p in mods.glob('*.jar'))}")
+    else:
+        _log(f"[diag] game mods dir missing: {mods}")
+    log = game_dir / "logs" / "latest.log"
+    if log.is_file():
+        try:
+            lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
+            tail = lines[-40:]
+            crash = [l for l in lines if "Exception" in l or "Error" in l or "CRASH" in l]
+            if crash:
+                _log("[diag] latest.log error lines:")
+                for l in crash[:12]:
+                    _log(f"  [MC] {l[:200]}")
+            _log("[diag] latest.log tail:")
+            for l in tail[-15:]:
+                _log(f"  [MC] {l[:200]}")
+        except Exception as e:
+            _log(f"[diag] failed reading latest.log: {e}")
+    else:
+        _log(f"[diag] no latest.log at {log}")
+    try:
+        out = subprocess.run(["pgrep", "-af", "java"], capture_output=True, text=True, timeout=10)
+        procs = [l for l in (out.stdout or "").splitlines() if l.strip()]
+        _log(f"[diag] java processes alive: {len(procs)}")
+        for l in procs[:3]:
+            _log(f"  [diag] {l[:160]}")
+    except Exception:
+        pass
 
 
 def api_call(mod_url, cmd, params=None, timeout=30):
