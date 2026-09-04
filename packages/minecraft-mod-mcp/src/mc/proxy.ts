@@ -72,15 +72,20 @@ async function nativeDownload(url: string, destPath: string): Promise<void> {
     });
   }
   return new Promise<void>((resolve, reject) => {
-    // -C - resumes from a partial file; --retry/-all-errors/-delay survive the
-    // socket resets / throttling that hit large downloads (JDK tarballs, mod JARs)
-    // from international CDNs. curl skips cleanly when the file is already complete.
-    execFile("curl", [
-      "-fSL", "-C -",
+    // --retry/-all-errors/-delay survive the socket resets / throttling that
+    // hit large downloads (JDK tarballs, mod JARs) from international CDNs.
+    // Resume (-C -) only when a partial file exists: curl >= 8 aborts with
+    // "option -C -: expected a proper numerical parameter" when the output
+    // file is missing, which killed every cold JDK download on CI runners.
+    const { existsSync } = require("node:fs") as typeof import("node:fs");
+    const curlArgs = ["-fSL"];
+    if (existsSync(destPath)) curlArgs.push("-C", "-");
+    curlArgs.push(
       "--retry", "5", "--retry-all-errors", "--retry-delay", "3",
       "--connect-timeout", "60",
       "-o", destPath, url,
-    ], { timeout: 600_000 }, (err) => {
+    );
+    execFile("curl", curlArgs, { timeout: 600_000 }, (err) => {
       if (err) reject(err);
       else resolve();
     });
