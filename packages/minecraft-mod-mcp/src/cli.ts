@@ -183,9 +183,20 @@ Options:
       "server-port": { type: "string", default: String(GAME.defaultServerPort) },
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
+      headless: { type: "boolean", default: false },
+      // multiple: "--extra-jvm -Da=x -Db=y" would otherwise be shredded by
+      // parseArgs when the value starts with "-" (strict:false treats the
+      // flag as boolean and explodes the value into one-char tokens).
+      "extra-jvm": { type: "string", multiple: true },
     },
     strict: false,
   });
+
+  // --extra-jvm may be passed multiple times (or hold several properties);
+  // normalize to one space-joined string.
+  const extraJvmFlags = Array.isArray(values["extra-jvm"])
+    ? (values["extra-jvm"] as string[]).join(" ")
+    : (values["extra-jvm"] as string | undefined);
 
   const versionArg = positionals[0];
   const loader = (values.loader ?? GAME.defaultLoader) as Loader;
@@ -203,6 +214,7 @@ Options:
   const extraJvmParts: string[] = [];
   if (config.java_args) extraJvmParts.push(config.java_args);
   if (typeof values["jvm-args"] === "string") extraJvmParts.push(values["jvm-args"]);
+  if (typeof extraJvmFlags === "string") extraJvmParts.push(extraJvmFlags);
 
   const launchConfig: LaunchConfig = {
     versionId,
