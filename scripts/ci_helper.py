@@ -683,6 +683,18 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
 
     launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
     try:
+        # Show exactly what will be executed: zero-output deaths leave no
+        # other trace on the runner.
+        dry = subprocess.run(
+            ["node", launcher, "launch", version_name, "--headless",
+             "--memory", "512",
+             "--extra-jvm", extra_jvm,
+             "--mod-jar", str(mod_jar), "--dry-run"],
+            env=env, capture_output=True, text=True, timeout=120,
+        )
+        _log("Dry-run launch plan:")
+        for line in ((dry.stdout or "") + (dry.stderr or "")).splitlines()[:14]:
+            _log(f"  [plan] {line[:220]}")
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name, "--headless",
              "--memory", "512",
