@@ -451,14 +451,15 @@ export async function downloadFabricLoader(
   if (!existsSync(vDir)) mkdirSync(vDir, { recursive: true });
 
   const jsonPath = join(vDir, `${versionId}.json`);
-  if (existsSync(jsonPath)) {
-    onProgress?.(`Fabric loader ${versionId} already installed.`);
-    return;
+  if (!existsSync(jsonPath)) {
+    writeFileSync(jsonPath, JSON.stringify(profileJson, null, 2), "utf-8");
+    onProgress?.(`Saved version JSON for ${versionId}`);
   }
 
-  writeFileSync(jsonPath, JSON.stringify(profileJson, null, 2), "utf-8");
-  onProgress?.(`Saved version JSON for ${versionId}`);
-
+  // Always ensure the profile libraries exist: the loader jar (KnotClient)
+  // and friends may be missing when the version json was written by an
+  // older install path — without them the JVM dies with
+  // ClassNotFoundException at launch.
   await downloadLibraries(profileJson.libraries, onProgress);
 
   onProgress?.(`Fabric ${versionId} install complete`);

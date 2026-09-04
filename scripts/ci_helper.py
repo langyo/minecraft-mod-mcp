@@ -76,7 +76,27 @@ def setup_mc_version(mc_ver, loader, mc_dir=None):
         return None
 
     elif loader == "fabric":
-        return _install_fabric_json(mc_ver, mc)
+        # Install through the CLI like forge/neoforge: it fetches the profile
+        # AND downloads the loader libraries (KnotClient et al.). Writing the
+        # profile json here directly used to skip the library downloads and
+        # the JVM then died with ClassNotFoundException.
+        mcp_cli = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
+        _log(f"Running MCP CLI install for {mc_ver} (fabric)...")
+        env_clean = {k: v for k, v in os.environ.items()
+                     if not k.lower().endswith("proxy") and k.lower() != "all_proxy"}
+        env_clean["HOME"] = str(Path(mc).parent)
+        env_clean["JAVA_HOME"] = os.environ.get("JAVA_HOME", "")
+        result = subprocess.run(
+            ["node", mcp_cli, "install", mc_ver, "--loader", "fabric"],
+            env=env_clean, capture_output=True, text=True, timeout=600)
+        if result.returncode != 0:
+            _log(f"MCP install stderr: {result.stderr[-500:]}")
+        installed = _find_installed(mc_ver, loader, mc)
+        if installed:
+            _log(f"Installed: {installed}")
+            return installed
+        _log(f"Install failed for {mc_ver}/fabric")
+        return None
 
     return None
 
@@ -136,6 +156,18 @@ _LEGACY_FABRIC_LOADERS = {
     "1.20.4": "0.16.14", "1.20.6": "0.16.14",
     "1.21.11": "0.16.14",
 }
+
+
+def _fabric_loader_pin(mc_ver: str) -> str | None:
+    """Loader version for a MC version: version_config pin, else the legacy table."""
+    try:
+        from version_config import ALL_VERSIONS
+        info = ALL_VERSIONS.get(mc_ver, {})
+        if info.get("fabric_loader"):
+            return info["fabric_loader"]
+    except Exception:
+        pass
+    return _LEGACY_FABRIC_LOADERS.get(mc_ver, "0.16.14")
 
 
 def _find_installed(mc_ver: str, loader: str, mc_dir: str | None = None) -> str | None:
@@ -677,12 +709,15 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
                                        os.environ.get(f"JAVA_HOME_{jdk_ver}",
                                                        os.environ.get("JAVA_HOME", "")))
 
-    extra_jvm = "-Djava.awt.headless=true"
+    # No -Djava.awt.headless=true: with Xvfb there IS a display, and the
+    # property breaks LWJGL2's X connection on pre-1.13 Minecraft
+    # ("LWJGLException: Could not open X display connection").
+    extra_jvm = ""
     # Forge >= 1.20.5 opens an early GL window that times out under
     # Xvfb/llvmpipe ("Timed out trying to setup the Game Window");
     # older loaders ignore the property.
     if loader == "forge":
-        extra_jvm += " -Dforge.disableEarlyDisplay=true"
+        extra_jvm += "-Dforge.disableEarlyDisplay=true"
     if world_name:
         extra_jvm += f" -Dmcp.test.world={world_name}"
 

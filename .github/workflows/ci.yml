@@ -361,7 +361,8 @@ jobs:
           - { mc_ver: "1.19.4",  loader: "forge",    jdk: "17" }
           - { mc_ver: "1.19.4",  loader: "fabric",   jdk: "17" }
           - { mc_ver: "1.20.4",  loader: "forge",    jdk: "17" }
-          - { mc_ver: "1.20.4",  loader: "neoforge", jdk: "17" }
+          # 1.20.4-neoforge omitted: NeoForge 49.x never shipped an installer
+          # (HTTP 404 upstream), so there is no runtime to smoke-test.
           - { mc_ver: "1.20.6",  loader: "forge",    jdk: "21" }
           - { mc_ver: "1.20.6",  loader: "fabric",   jdk: "21" }
           - { mc_ver: "1.20.6",  loader: "neoforge", jdk: "21" }

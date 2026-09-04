@@ -59,18 +59,42 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 async function nativeDownload(url: string, destPath: string): Promise<void> {
   const { execFile } = await import("node:child_process");
+  const { existsSync: fsExists } = await import("node:fs");
   if (process.platform === "win32") {
-    const ps = ["Invoke-WebRequest", "-Uri", url, "-OutFile", destPath, "-TimeoutSec", "60"];
-    return new Promise<void>((resolve, reject) => {
-      execFile("powershell", ["-NoProfile", "-Command", ...ps], {
-        timeout: 120_000,
-        windowsHide: true,
-      }, (err) => {
-        if (err) reject(err);
-        else resolve();
+    // Prefer the curl.exe shipped with Windows 10+ (resolved from PATH):
+    // it retries and keeps going through the connection resets that kill
+    // Invoke-WebRequest mid-download (large installer jars from CDNs).
+    // If curl is not on PATH this rejects with ENOENT and we fall back.
+    const curlArgs = [
+      "-fSL",
+      "--retry", "5", "--retry-all-errors", "--retry-delay", "3",
+      "--connect-timeout", "60",
+      "-o", destPath, url,
+    ];
+    try {
+      const { execFile: ef } = await import("node:child_process");
+      await new Promise<void>((resolve, reject) => {
+        ef("curl", curlArgs, { timeout: 900_000, windowsHide: true }, (err: unknown) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
-    });
+      return;
+    } catch (curlErr: any) {
+      if (curlErr?.code !== "ENOENT") throw curlErr;
+      const ps = ["Invoke-WebRequest", "-Uri", url, "-OutFile", destPath, "-TimeoutSec", "300"];
+      return new Promise<void>((resolve, reject) => {
+        execFile("powershell", ["-NoProfile", "-Command", ...ps], {
+          timeout: 360_000,
+          windowsHide: true,
+        }, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
   }
+
   return new Promise<void>((resolve, reject) => {
     // --retry/-all-errors/-delay survive the socket resets / throttling that
     // hit large downloads (JDK tarballs, mod JARs) from international CDNs.
