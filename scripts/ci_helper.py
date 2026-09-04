@@ -640,7 +640,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
             ["node", launcher, "launch", version_name, "--headless",
              "--memory", "512",
              "--extra-jvm", extra_jvm,
-             "--no-mod-sync"],
+             "--mod-jar", str(mod_jar)],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
         )
@@ -764,7 +764,7 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
 
     mc_proc = subprocess.Popen(
         ["node", launcher, "launch", version_name,
-         "--memory", "512"],
+         "--memory", "512", "--mod-jar", str(mod_jar)],
         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1,
     )
@@ -909,7 +909,7 @@ def main():
         launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name,
-             "--memory", "512"],
+             "--memory", "512", "--mod-jar", str(args.mod_jar)],
             env=os.environ.copy(),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
