@@ -220,7 +220,12 @@ Options:
     versionId,
     mcDir: typeof values["mc-dir"] === "string" ? values["mc-dir"] : gameDirPath(config),
     loader,
-    modJar: typeof values["mod-jar"] === "string" ? values["mod-jar"] : (await ensureModJar(versionArg, loader)) ?? undefined,
+    // The jar enters the classpath and is deployed into the isolated game
+    // dir; a relative path would resolve against the game dir at runtime
+    // and kill the JVM with "could not find main class".
+    modJar: typeof values["mod-jar"] === "string"
+      ? resolve(values["mod-jar"])
+      : (await ensureModJar(versionArg, loader)) ?? undefined,
     mcpPort: typeof values.port === "string" ? parseInt(values.port, 10) : config.mcp_port ?? await findFreePort(),
     dryRun: values["dry-run"] === true,
     maxMemoryMb: parseInt(typeof values.memory === "string" ? values.memory : String(config.max_memory_mb), 10),
