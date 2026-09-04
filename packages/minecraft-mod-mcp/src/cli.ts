@@ -13,7 +13,7 @@ import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledV
 import { versionsDir, classpathSeparator, ensureModJar } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync, openSync, closeSync } from "node:fs";
 import { gradleProxyEnv, setupGlobalProxy } from "./mc/proxy.js";
 import { join, resolve } from "node:path";
 import { GAME, MCP, PLAYER, SERVER, SERVER_TYPES, type ServerType } from "./mc/defaults.js";
@@ -273,12 +273,21 @@ Options:
   if (launchConfig.fullscreen) console.error(`  Fullscreen: true`);
   else console.error(`  Resolution: ${launchConfig.width}x${launchConfig.height}`);
 
+  // Keep the game's stderr on disk: a JVM that dies before logging
+  // (bad classpath, missing natives) otherwise vanishes without a trace,
+  // which made CI smoke failures undiagnosable.
+  const logsDir = join(mcDir_, "logs");
+  if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true });
+  const stderrFd = openSync(join(logsDir, "mc-stderr.log"), "a");
+  const stdoutFd = openSync(join(logsDir, "mc-stdout.log"), "a");
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
-    stdio: "ignore",
+    stdio: ["ignore", stdoutFd, stderrFd],
     detached: true,
   });
   child.unref();
+  // Close the parent's copies; the detached child keeps its own.
+  try { closeSync(stderrFd); closeSync(stdoutFd); } catch {}
 
   child.on("error", (err) => {
     console.error(`Launch failed: ${err.message}`);
