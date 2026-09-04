@@ -216,7 +216,7 @@ ALL_VERSIONS = {
                "neoforge": "49.0.51"},
     "1.20.6": {"forge": "1.20.6-50.2.8",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.20.6",
                "version_id": "1.20.6-forge-50.2.8",
-               "neoforge": "20.6.139", "mdg": "2.0.141",
+               "neoforge": "20.6.134", "mdg": "2.0.141",
                "fabric_yarn": "1.20.6+build.1"},
     "1.21":   {"forge": "1.21-51.0.33",                    "fg_era": "fg6",  "java": 21, "mappings": "official_1.21",
                "version_id": "1.21-Forge51.0.33", "fabric_yarn": "1.21+build.1"},

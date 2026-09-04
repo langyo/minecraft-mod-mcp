@@ -230,9 +230,9 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   ensureOptionsTxt(mcDir);
 
   // Deploy the mod JAR into the instance's mods/ directory for every loader.
-  // Fabric loads from mods/ (deploy) AND we add it to the classpath below; Forge
-  // and NeoForge discover mods almost exclusively from mods/, so without this
-  // copy the in-game MCP HTTP server never starts on those loaders.
+  // All three loaders discover mods from mods/ — the jar must NOT also enter
+  // the classpath: on module-aware Forge (1.17+) the duplicate Automatic-Module
+  // triggers "ResolutionException: module mcpmod contains package ..." at boot.
   if (config.modJar && existsSync(config.modJar)) {
     deployModToModsDir(mcDir, config.modJar);
   }
@@ -253,10 +253,6 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
 
   const versionJar = join(versionsDir(), config.versionId, `${config.versionId}.jar`);
   if (existsSync(versionJar) && versionJar !== baseJar) classpathPaths.push(versionJar);
-
-  if (config.modJar && existsSync(config.modJar)) {
-    classpathPaths.unshift(config.modJar);
-  }
 
   const needsSortFix = needsLegacySortFix(config.versionId, targetJavaVersion);
   let sortFixApplied = false;

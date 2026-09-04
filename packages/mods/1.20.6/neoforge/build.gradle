@@ -25,7 +25,7 @@ dependencies {
 }
 
 neoForge {
-    version = "20.6.139"
+    version = "20.6.134"
     runs {
         configureEach {
             gameDirectory = project.file('run')
