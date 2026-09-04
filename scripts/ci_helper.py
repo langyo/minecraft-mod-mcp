@@ -423,6 +423,17 @@ def _dump_launch_diagnostics():
         _log(f"[diag] game mods: {sorted(p.name for p in mods.glob('*.jar'))}")
     else:
         _log(f"[diag] game mods dir missing: {mods}")
+    for stderr_name in ("mc-stderr.log", "mc-stdout.log"):
+        stderr_log = game_dir / "logs" / stderr_name
+        if stderr_log.is_file() and stderr_log.stat().st_size > 0:
+            try:
+                lines = stderr_log.read_text(encoding="utf-8", errors="replace").splitlines()
+                if lines:
+                    _log(f"[diag] {stderr_name} (last 15 lines):")
+                    for l in lines[-15:]:
+                        _log(f"  [MC] {l[:200]}")
+            except Exception as e:
+                _log(f"[diag] failed reading {stderr_name}: {e}")
     log = game_dir / "logs" / "latest.log"
     if log.is_file():
         try:
