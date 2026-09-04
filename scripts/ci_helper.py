@@ -92,8 +92,23 @@ def _install_fabric_json(mc_ver, mc):
     if not versions:
         _log(f"No Fabric loader for {mc_ver}")
         return None
-    loader_info = versions[0]
-    loader_ver = loader_info["loader"]["version"]
+    # Pin the loader per version_config instead of blindly taking the newest
+    # from meta: 0.19.x dropped support for pre-26.x mixin layouts.
+    pinned = None
+    try:
+        from version_config import ALL_VERSIONS
+        info = ALL_VERSIONS.get(mc_ver, {})
+        pinned = info.get("fabric_loader")
+        if not pinned:
+            pinned = _LEGACY_FABRIC_LOADERS.get(mc_ver, "0.16.14")
+    except Exception:
+        pinned = "0.16.14"
+    loader_ver = pinned
+    loader_info = next((v for v in versions if v["loader"]["version"] == loader_ver), None)
+    if loader_info is None:
+        _log(f"Fabric loader {loader_ver} unavailable for {mc_ver}, falling back to {versions[0]['loader']['version']}")
+        loader_info = versions[0]
+        loader_ver = loader_info["loader"]["version"]
     version_name = f"fabric-loader-{loader_ver}-{mc_ver}"
 
     profile_url = (f"https://meta.fabricmc.net/v2/versions/loader/{mc_ver}"
@@ -108,6 +123,19 @@ def _install_fabric_json(mc_ver, mc):
 
     _log(f"Fabric version JSON: {version_name}")
     return version_name
+
+
+# Fabric loader pins for smoke tests on pre-26.x versions (matches the
+# builds' loader tables; newest 0.19.x cannot load these games).
+_LEGACY_FABRIC_LOADERS = {
+    "1.14.2": "0.16.14", "1.14.3": "0.16.14", "1.14.4": "0.16.14",
+    "1.15": "0.16.14", "1.15.1": "0.16.14", "1.15.2": "0.16.14",
+    "1.16.1": "0.16.14", "1.16.2": "0.16.14", "1.16.3": "0.16.14",
+    "1.16.4": "0.16.14", "1.16.5": "0.16.14",
+    "1.17.1": "0.16.14", "1.18.2": "0.16.14", "1.19.4": "0.16.14",
+    "1.20.4": "0.16.14", "1.20.6": "0.16.14",
+    "1.21.11": "0.16.14",
+}
 
 
 def _find_installed(mc_ver: str, loader: str, mc_dir: str | None = None) -> str | None:
@@ -133,7 +161,9 @@ def _find_installed(mc_ver: str, loader: str, mc_dir: str | None = None) -> str 
         mc_cls = (data.get("mainClass") or "").lower()
         if loader_lower == "neoforge" and "neoforged" in mc_cls:
             return d.name
-        if loader_lower == "forge" and ("minecraftforge" in mc_cls or "forgebootstrap" in mc_cls):
+        if loader_lower == "forge" and ("minecraftforge" in mc_cls or "forgebootstrap" in mc_cls
+                                        or "launchwrapper" in mc_cls or "bootstraplauncher" in mc_cls
+                                        or "modlauncher" in mc_cls):
             return d.name
         if loader_lower == "fabric" and "fabricmc" in mc_cls:
             return d.name
