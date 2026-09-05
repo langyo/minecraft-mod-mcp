@@ -191,7 +191,9 @@ def _find_installed(mc_ver: str, loader: str, mc_dir: str | None = None) -> str 
         if inherits != mc_ver:
             continue
         mc_cls = (data.get("mainClass") or "").lower()
-        if loader_lower == "neoforge" and "neoforged" in mc_cls:
+        # 20.6.x-era NeoForge ships a forge-style BootstrapLauncher
+        # mainClass, so also accept the conventional directory name.
+        if loader_lower == "neoforge" and ("neoforged" in mc_cls or d.name.lower().startswith("neoforge")):
             return d.name
         if loader_lower == "forge" and ("minecraftforge" in mc_cls or "forgebootstrap" in mc_cls
                                         or "launchwrapper" in mc_cls or "bootstraplauncher" in mc_cls
