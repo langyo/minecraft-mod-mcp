@@ -723,11 +723,13 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         major = 1
     if major >= 13:
         parts.append("-Djava.awt.headless=true")
-    # Forge >= 1.20.5 opens an early GL window that times out under
-    # Xvfb/llvmpipe ("Timed out trying to setup the Game Window");
-    # older loaders ignore the property.
-    if loader == "forge":
+    # Forge >= 1.20.5 and NeoForge >= 20.6 open an early GL window that
+    # times out under Xvfb/llvmpipe ("Timed out trying to setup the Game
+    # Window"); older loaders ignore the properties. NeoForge 20.6.x still
+    # reads the forge-prefixed switch, 21+ the neoforged one.
+    if loader in ("forge", "neoforge"):
         parts.append("-Dforge.disableEarlyDisplay=true")
+        parts.append("-Dneoforge.disableEarlyDisplay=true")
     if world_name:
         parts.append(f"-Dmcp.test.world={world_name}")
     extra_jvm = " ".join(parts)
@@ -872,9 +874,15 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
     env = os.environ.copy()
     launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
 
+    e2e_jvm = "-Dforge.disableEarlyDisplay=true -Dneoforge.disableEarlyDisplay=true"
+    try:
+        if int(mc_ver.split(".")[0]) < 13:
+            e2e_jvm = ""  # LWJGL2 eras need no early-display switch (and no headless)
+    except ValueError:
+        pass
     mc_proc = subprocess.Popen(
         ["node", launcher, "launch", version_name,
-         "--memory", "512", "--mod-jar", str(mod_jar)],
+         "--memory", "512", "--extra-jvm", e2e_jvm, "--mod-jar", str(mod_jar)],
         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1,
     )
