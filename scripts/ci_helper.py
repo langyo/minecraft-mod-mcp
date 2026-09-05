@@ -495,17 +495,28 @@ def _dump_launch_diagnostics():
         pass
 
 
-def api_call(mod_url, cmd, params=None, timeout=30):
-    """Call the mod HTTP API and return the response."""
+def api_call(mod_url, cmd, params=None, timeout=30, retries=4):
+    """Call the mod HTTP API and return the response.
+
+    Retries transient refusals: right after the HTTP bridge comes up the
+    render thread may still be settling under llvmpipe and drop requests.
+    """
     payload = json.dumps({"cmd": cmd, "params": params or {}}).encode()
-    req = urllib.request.Request(
-        f"{mod_url}/api/cmd",
-        data=payload,
-        headers={"Content-Type": "application/json", "User-Agent": "minecraft-mcp-ci"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode())
+    last_err = None
+    for attempt in range(retries):
+        req = urllib.request.Request(
+            f"{mod_url}/api/cmd",
+            data=payload,
+            headers={"Content-Type": "application/json", "User-Agent": "minecraft-mcp-ci"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode())
+        except Exception as e:
+            last_err = e
+            time.sleep(2 + attempt * 3)
+    raise last_err
 
 
 def get_screenshot(mod_url, timeout=60):
@@ -922,12 +933,21 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
     steps_to_screenshot = ["01_ingame", "02_inventory", "03_sign_placed"]
     for label in steps_to_screenshot:
         try:
-            png = get_screenshot(mod_url)
+            # Under llvmpipe the frame can stay black for a while after the
+            # mod handshake; retry until the shot is worth verifying.
+            png = None
+            ok, detail = False, "no frame"
+            for attempt in range(8):
+                png = get_screenshot(mod_url)
+                ok, detail = verify_screenshot(png, min_size_kb=1)
+                if ok:
+                    break
+                time.sleep(10)
             ss_path = SCREENSHOT_DIR / f"e2e_{mc_ver}_{loader}_{label}_{int(time.time())}.png"
             ss_path.parent.mkdir(parents=True, exist_ok=True)
             ss_path.write_bytes(png)
-            ok, detail = verify_screenshot(png)
             results[f"screenshot_{label}"] = {"passed": ok, "detail": detail}
+            _log(f"  E2E [screenshot {label}]: {'PASS' if ok else 'FAIL'} - {detail}")
 
             ref_path = REF_SCREENSHOT_DIR / f"ref_{mc_ver}_{loader}_{label}.png"
             if ref_path.exists():
