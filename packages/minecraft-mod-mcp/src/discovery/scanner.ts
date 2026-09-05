@@ -8,17 +8,17 @@ export async function probePort(port: number): Promise<ModStatus | null> {
     const resp = await fetch(`http://${MCP.bindAddress}:${port}${MOD.statusEndpoint}`, {
       signal: controller.signal,
     });
-    clearTimeout(timer);
     if (!resp.ok) return null;
     const body = await resp.json();
     return isModStatus(body) ? body : null;
   } catch {
-    clearTimeout(timer);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
-export async function findMod(startPort = PORT_START, endPort = PORT_END): Promise<ModStatus | null> {
+export async function findMod(startPort: number = PORT_START, endPort: number = PORT_END): Promise<ModStatus | null> {
   for (let port = startPort; port >= endPort; port--) {
     const status = await probePort(port);
     if (status) return status;
@@ -41,7 +41,7 @@ export async function waitForMod(
   return null;
 }
 
-export async function findFreePort(startPort = PORT_START, endPort = PORT_END): Promise<number> {
+export async function findFreePort(startPort: number = PORT_START, endPort: number = PORT_END): Promise<number> {
   const { createServer } = await import("node:net");
   for (let port = startPort; port >= endPort; port--) {
     const ok = await new Promise<boolean>((resolve) => {

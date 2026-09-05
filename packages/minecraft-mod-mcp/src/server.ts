@@ -1,6 +1,5 @@
 import { ModClient } from "./api/modClient.js";
 import { createMcpServer, connectStdio } from "./mcp/transport.js";
-import { findMod } from "./discovery/scanner.js";
 import { PORT_START, PORT_END } from "./consts.js";
 import { MCP, SERVER } from "./mc/defaults.js";
 
@@ -23,9 +22,8 @@ export async function startServer(opts: ServerOptions = {}): Promise<void> {
 function discoverInBackground(mod: ModClient, timeout?: number): void {
   (async () => {
     log(`Scanning for Minecraft mod (${PORT_START}-${PORT_END})...`);
-    const status = await findMod(PORT_START, PORT_END);
+    const status = await mod.discover(PORT_START, PORT_END);
     if (status) {
-      await mod.discover();
       log(`Found mod: ${status.version}-${status.loader} (pid ${status.pid}) on port ${status.port}`);
     } else {
       log("No mod found. Background scanning every 5s...");

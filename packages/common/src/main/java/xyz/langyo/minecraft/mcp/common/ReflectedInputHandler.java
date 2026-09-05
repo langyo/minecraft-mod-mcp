@@ -2,12 +2,25 @@ package xyz.langyo.minecraft.mcp.common;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ReflectedInputHandler extends McpMessageHandler implements McpProtocol.MinecraftInput {
 
     private final RenderThreadExecutor executor;
+    private final ScheduledExecutorService keyReleaser = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "mcp-key-release");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final ConcurrentHashMap<Integer, Long> keyPresses = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, ScheduledFuture<?>> keyReleases = new ConcurrentHashMap<>();
+    private final AtomicLong keyPressSequence = new AtomicLong();
 
     public ReflectedInputHandler(RenderThreadExecutor executor) {
         super();
@@ -149,15 +162,30 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     @Override
     public void pressKey(String key, float holdSeconds) {
         executor.executeOnRenderThread(() -> {
-            try {
-                int c = GlfwKeys.keyCode(key);
-                if (c < 0) return;
-                String result = ReflectionHelper.guiKeyPress(mc(), c, 0, 1, 0);
-                ReflectionHelper.dbg("guiKeyPress: " + result);
-                Thread.sleep(holdSeconds > 0 ? (long)(holdSeconds * 1000) : 30);
-                result = ReflectionHelper.guiKeyPress(mc(), c, 0, 0, 0);
-                ReflectionHelper.dbg("guiKeyPress release: " + result);
-            } catch (Exception e) { System.err.println("[Input] Key: " + e.getMessage()); }
+            int c = GlfwKeys.keyCode(key);
+            if (c < 0) {
+                System.err.println("[Input] Unknown key: " + key);
+                return;
+            }
+            if (!ReflectionHelper.isLwjgl3()) {
+                try {
+                    ReflectionHelper.guiKeyPress(mc(), c, 0, 1, 0);
+                    Thread.sleep(holdSeconds > 0 ? (long)(holdSeconds * 1000) : 30);
+                    ReflectionHelper.guiKeyPress(mc(), c, 0, 0, 0);
+                } catch (Exception e) { System.err.println("[Input] Key: " + e.getMessage()); }
+                return;
+            }
+            ReflectionHelper.sendKey(getWindowHandle(), c, 1);
+            long sequence = keyPressSequence.incrementAndGet();
+            keyPresses.put(c, sequence);
+            long delay = holdSeconds > 0 ? (long)(holdSeconds * 1000) : 30;
+            ScheduledFuture<?> release = keyReleaser.schedule(() -> {
+                executor.executeOnRenderThread(() -> {
+                    if (keyPresses.remove(c, sequence)) ReflectionHelper.sendKey(getWindowHandle(), c, 0);
+                });
+            }, delay, TimeUnit.MILLISECONDS);
+            ScheduledFuture<?> previous = keyReleases.put(c, release);
+            if (previous != null) previous.cancel(false);
         });
     }
 
@@ -226,6 +254,16 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 if (h == 0) return;
                 int[] codes = new int[keys.length];
                 for (int i = 0; i < keys.length; i++) codes[i] = GlfwKeys.keyCode(keys[i]);
+                for (int c : codes) {
+                    if (c < 0) {
+                        System.err.println("[Input] Unknown hotkey");
+                        return;
+                    }
+                    if (keyPresses.containsKey(c)) {
+                        System.err.println("[Input] Hotkey contains a held key");
+                        return;
+                    }
+                }
                 for (int c : codes) { ReflectionHelper.sendKey(h, c, 1); Thread.sleep(5); }
                 Thread.sleep(80);
                 for (int i = codes.length - 1; i >= 0; i--) ReflectionHelper.sendKey(h, codes[i], 0);

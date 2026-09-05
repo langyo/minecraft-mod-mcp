@@ -140,6 +140,8 @@ Minecraft is a GUI app. To run it on a headless Linux box you need one of:
 
 If `launch_minecraft` fails with a display/AWT error, set `DISPLAY` or wrap the launch in `xvfb-run`. The bridge inherits your environment, so `export DISPLAY=:0` (or running inside an XFCE session) is usually all that's needed.
 
+For native Wayland sessions, compositor-targeted input, external Prism instances, and process diagnostics, see the **[Wayland and Hyprland guide](./WAYLAND.md)**.
+
 ---
 
 ## Launching Minecraft

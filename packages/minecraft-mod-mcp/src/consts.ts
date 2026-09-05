@@ -18,7 +18,13 @@ export interface ModStatus {
 export function isModStatus(obj: unknown): obj is ModStatus {
   if (typeof obj !== "object" || obj === null) return false;
   const o = obj as Record<string, unknown>;
-  return o.ok === true && o.type === MOD.statusType && typeof o.port === "number";
+  return o.ok === true
+    && o.type === MOD.statusType
+    && typeof o.version === "string"
+    && typeof o.loader === "string"
+    && typeof o.pid === "number"
+    && typeof o.port === "number"
+    && typeof o.uptime === "number";
 }
 
 export interface ServerPorts {

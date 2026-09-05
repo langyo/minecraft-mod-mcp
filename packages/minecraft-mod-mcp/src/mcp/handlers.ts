@@ -140,8 +140,13 @@ async function handleTool(name: string, params: Record<string, unknown>, mod: Mo
       return await launchMinecraft(params, mod);
     }
     case "kill_minecraft": {
-      mod.killMc();
-      return { killed: true };
+      const mcProcess = mod.getMcProcess();
+      if (!mcProcess || mcProcess.exitCode !== null) {
+        return { killed: false, reason: "No managed Minecraft process is running." };
+      }
+      const killed = mod.killMc();
+      return killed ? { killed, signal: process.platform === "win32" ? "taskkill" : "SIGTERM" }
+        : { killed, reason: "Failed to signal the managed Minecraft process." };
     }
     case "get_minecraft_status": {
       await mod.checkAlive();

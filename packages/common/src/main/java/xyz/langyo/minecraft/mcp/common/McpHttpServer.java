@@ -74,13 +74,13 @@ public class McpHttpServer {
     public void start() throws IOException {
         int configuredPort = this.port;
         if (configuredPort > 0) {
-            server = HttpServer.create(new InetSocketAddress("0.0.0.0", configuredPort), 0);
+            server = HttpServer.create(new InetSocketAddress("127.0.0.1", configuredPort), 0);
             port = configuredPort;
         } else {
             IOException lastErr = null;
             for (int p = PORT_START; p >= PORT_END; p--) {
                 try {
-                    server = HttpServer.create(new InetSocketAddress("0.0.0.0", p), 0);
+                    server = HttpServer.create(new InetSocketAddress("127.0.0.1", p), 0);
                     port = p;
                     lastErr = null;
                     break;

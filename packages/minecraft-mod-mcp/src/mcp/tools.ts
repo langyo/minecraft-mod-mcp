@@ -272,12 +272,12 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: "kill_minecraft",
-    description: "Kill the running Minecraft process.",
+    description: "Kill the Minecraft process started by this bridge.",
     inputSchema: z.object({}),
   },
   {
     name: "get_minecraft_status",
-    description: "Get Minecraft process and mod connection status.",
+    description: "Probe the mod and report its PID, version, loader, uptime, port, and managed-process status.",
     inputSchema: z.object({}),
   },
   {

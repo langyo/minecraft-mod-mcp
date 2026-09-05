@@ -20,15 +20,11 @@ public final class InputInjectionHelper {
                 Object mc = ReflectionCache.getMinecraftInstance();
                 Object kbHandler = getKeyboardHandler(mc);
                 if (kbHandler != null) {
-                    for (java.lang.reflect.Method m : kbHandler.getClass().getDeclaredMethods()) {
-                        Class<?>[] pts = m.getParameterTypes();
-                        if (pts.length == 5 && pts[0] == long.class && pts[1] == int.class
-                                && pts[2] == int.class && pts[3] == int.class && pts[4] == int.class
-                                && !java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
-                            m.setAccessible(true);
-                            m.invoke(kbHandler, handle, key, 0, action, 0);
-                            return;
-                        }
+                    java.lang.reflect.Method method = findKeyboardMethod(kbHandler.getClass());
+                    if (method != null) {
+                        method.setAccessible(true);
+                        method.invoke(kbHandler, handle, key, 0, action, 0);
+                        return;
                     }
                 }
             } catch (Exception e) {
@@ -56,6 +52,23 @@ public final class InputInjectionHelper {
             }
         }
         return null;
+    }
+
+    private static java.lang.reflect.Method findKeyboardMethod(Class<?> type) {
+        java.lang.reflect.Method named = null;
+        java.lang.reflect.Method fallback = null;
+        boolean ambiguous = false;
+        for (java.lang.reflect.Method method : ReflectionCache.getAllMethods(type)) {
+            if (method.isSynthetic() || method.isBridge()) continue;
+            Class<?>[] pts = method.getParameterTypes();
+            if (pts.length != 5 || pts[0] != long.class || pts[1] != int.class
+                    || pts[2] != int.class || pts[3] != int.class || pts[4] != int.class
+                    || java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+            if (method.getName().equals("keyPress")) named = method;
+            else if (fallback == null) fallback = method;
+            else ambiguous = true;
+        }
+        return named != null ? named : ambiguous ? null : fallback;
     }
 
     private static Object getMouseHandlerField(Object mc) {
@@ -275,6 +288,9 @@ public final class InputInjectionHelper {
     private static int glfwToAwt(int glfwKey) {
         if (glfwKey >= 'A' && glfwKey <= 'Z') return KeyEvent.VK_A + (glfwKey - 'A');
         if (glfwKey >= '0' && glfwKey <= '9') return KeyEvent.VK_0 + (glfwKey - '0');
+        if (glfwKey == GlfwKeys.keyCode("left.shift") || glfwKey == GlfwKeys.keyCode("right.shift")) return KeyEvent.VK_SHIFT;
+        if (glfwKey == GlfwKeys.keyCode("left.control") || glfwKey == GlfwKeys.keyCode("right.control")) return KeyEvent.VK_CONTROL;
+        if (glfwKey == GlfwKeys.keyCode("left.alt") || glfwKey == GlfwKeys.keyCode("right.alt")) return KeyEvent.VK_ALT;
         switch (glfwKey) {
             case 0xFF0D: return KeyEvent.VK_ENTER;
             case 0xFF1B: return KeyEvent.VK_ESCAPE;
