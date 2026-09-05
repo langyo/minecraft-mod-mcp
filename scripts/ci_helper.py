@@ -914,8 +914,10 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
         try:
             resp = api_call(mod_url, cmd, params)
             results[step_name] = {"passed": validator(resp), "detail": str(resp)[:100]}
+            _log(f"  E2E [{step_name}]: {'PASS' if results[step_name]['passed'] else 'FAIL'}")
         except Exception as e:
             results[step_name] = {"passed": False, "detail": str(e)}
+            _log(f"  E2E [{step_name}]: ERROR - {e}")
 
     steps_to_screenshot = ["01_ingame", "02_inventory", "03_sign_placed"]
     for label in steps_to_screenshot:
@@ -933,6 +935,7 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
                 results[f"compare_{label}"] = {"passed": ok2, "detail": detail2}
         except Exception as e:
             results[f"screenshot_{label}"] = {"passed": False, "detail": str(e)}
+            _log(f"  E2E [screenshot {label}]: ERROR - {e}")
 
     kill_minecraft()
     if mc_proc and mc_proc.poll() is None:
