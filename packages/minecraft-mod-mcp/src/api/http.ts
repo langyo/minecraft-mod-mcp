@@ -11,6 +11,7 @@ export function createApiApp(mod: ModClient): Server {
 
     try {
       if (req.method === "GET" && path === "/api/status") {
+        await mod.checkAlive();
         const rt = typeof (globalThis as any).Deno !== "undefined" ? "deno" : typeof (globalThis as any).Bun !== "undefined" ? "bun" : "node";
         res.end(JSON.stringify({
           ok: true,
@@ -28,8 +29,14 @@ export function createApiApp(mod: ModClient): Server {
       }
 
       if (req.method === "POST" && path === "/api/kill") {
-        mod.killMc();
-        res.end(JSON.stringify({ killed: true }));
+        const mcProcess = mod.getMcProcess();
+        if (!mcProcess || mcProcess.exitCode !== null) {
+          res.end(JSON.stringify({ killed: false, reason: "No managed Minecraft process is running." }));
+          return;
+        }
+        const killed = mod.killMc();
+        res.end(JSON.stringify(killed ? { killed, signal: process.platform === "win32" ? "taskkill" : "SIGTERM" }
+          : { killed, reason: "Failed to signal the managed Minecraft process." }));
         return;
       }
 

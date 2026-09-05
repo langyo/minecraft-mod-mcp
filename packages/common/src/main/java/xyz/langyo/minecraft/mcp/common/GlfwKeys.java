@@ -13,8 +13,11 @@ public final class GlfwKeys {
     public static final int KEY_LEFT = 0xFF51;
     public static final int KEY_RIGHT = 0xFF53;
     public static final int KEY_LEFT_SHIFT = 0xFFE1;
+    public static final int KEY_RIGHT_SHIFT = 0xFFE2;
     public static final int KEY_LEFT_CONTROL = 0xFFE3;
+    public static final int KEY_RIGHT_CONTROL = 0xFFE4;
     public static final int KEY_LEFT_ALT = 0xFFE9;
+    public static final int KEY_RIGHT_ALT = 0xFFEA;
     public static final int KEY_F1 = 0xFFBE;
     public static final int KEY_A = 0x0041;
     public static final int KEY_0 = 0x0030;
@@ -31,8 +34,11 @@ public final class GlfwKeys {
     private static int GLFW_KEY_LEFT_R;
     private static int GLFW_KEY_RIGHT_R;
     private static int GLFW_KEY_LEFT_SHIFT_R;
+    private static int GLFW_KEY_RIGHT_SHIFT_R;
     private static int GLFW_KEY_LEFT_CONTROL_R;
+    private static int GLFW_KEY_RIGHT_CONTROL_R;
     private static int GLFW_KEY_LEFT_ALT_R;
+    private static int GLFW_KEY_RIGHT_ALT_R;
     private static int GLFW_KEY_F1_R;
     private static int GLFW_KEY_A_R;
     private static int GLFW_KEY_0_R;
@@ -62,8 +68,11 @@ public final class GlfwKeys {
             GLFW_KEY_LEFT_R = (int) glfw.getField("GLFW_KEY_LEFT").get(null);
             GLFW_KEY_RIGHT_R = (int) glfw.getField("GLFW_KEY_RIGHT").get(null);
             GLFW_KEY_LEFT_SHIFT_R = (int) glfw.getField("GLFW_KEY_LEFT_SHIFT").get(null);
+            GLFW_KEY_RIGHT_SHIFT_R = (int) glfw.getField("GLFW_KEY_RIGHT_SHIFT").get(null);
             GLFW_KEY_LEFT_CONTROL_R = (int) glfw.getField("GLFW_KEY_LEFT_CONTROL").get(null);
+            GLFW_KEY_RIGHT_CONTROL_R = (int) glfw.getField("GLFW_KEY_RIGHT_CONTROL").get(null);
             GLFW_KEY_LEFT_ALT_R = (int) glfw.getField("GLFW_KEY_LEFT_ALT").get(null);
+            GLFW_KEY_RIGHT_ALT_R = (int) glfw.getField("GLFW_KEY_RIGHT_ALT").get(null);
             GLFW_KEY_F1_R = (int) glfw.getField("GLFW_KEY_F1").get(null);
             GLFW_KEY_A_R = (int) glfw.getField("GLFW_KEY_A").get(null);
             GLFW_KEY_0_R = (int) glfw.getField("GLFW_KEY_0").get(null);
@@ -82,6 +91,7 @@ public final class GlfwKeys {
 
     public static int keyCode(String name) {
         String n = name.toLowerCase();
+        if (n.startsWith("key.keyboard.")) n = n.substring("key.keyboard.".length());
         resolve();
         if (ReflectionHelper.isLwjgl3()) {
             return resolveGlfw(n);
@@ -108,9 +118,12 @@ public final class GlfwKeys {
         if (n.equals("down")) return GLFW_KEY_DOWN_R;
         if (n.equals("left")) return GLFW_KEY_LEFT_R;
         if (n.equals("right")) return GLFW_KEY_RIGHT_R;
-        if (n.equals("shift")) return GLFW_KEY_LEFT_SHIFT_R;
-        if (n.equals("ctrl") || n.equals("control")) return GLFW_KEY_LEFT_CONTROL_R;
-        if (n.equals("alt")) return GLFW_KEY_LEFT_ALT_R;
+        if (n.equals("shift") || n.equals("left shift") || n.equals("left.shift")) return GLFW_KEY_LEFT_SHIFT_R;
+        if (n.equals("right shift") || n.equals("right.shift")) return GLFW_KEY_RIGHT_SHIFT_R;
+        if (n.equals("ctrl") || n.equals("control") || n.equals("left control") || n.equals("left.control")) return GLFW_KEY_LEFT_CONTROL_R;
+        if (n.equals("right control") || n.equals("right.control")) return GLFW_KEY_RIGHT_CONTROL_R;
+        if (n.equals("alt") || n.equals("left alt") || n.equals("left.alt")) return GLFW_KEY_LEFT_ALT_R;
+        if (n.equals("right alt") || n.equals("right.alt")) return GLFW_KEY_RIGHT_ALT_R;
         if (n.startsWith("f") && n.length() >= 2) {
             try {
                 int fn = Integer.parseInt(n.substring(1));
@@ -121,15 +134,6 @@ public final class GlfwKeys {
             char c = n.charAt(0);
             if (c >= 'a' && c <= 'z') return GLFW_KEY_A_R + (c - 'a');
             if (c >= '0' && c <= '9') return GLFW_KEY_0_R + (c - '0');
-        }
-        if (n.startsWith("key.keyboard.")) {
-            String suffix = n.substring("key.keyboard.".length());
-            if (suffix.length() == 1) {
-                char c = suffix.charAt(0);
-                if (c >= '0' && c <= '9') return GLFW_KEY_0_R + (c - '0');
-                if (c >= 'a' && c <= 'z') return GLFW_KEY_A_R + (c - 'a');
-                if (c >= 'A' && c <= 'Z') return GLFW_KEY_A_R + (c - 'A');
-            }
         }
         return -1;
     }
@@ -145,9 +149,12 @@ public final class GlfwKeys {
         if (n.equals("down")) return KEY_DOWN;
         if (n.equals("left")) return KEY_LEFT;
         if (n.equals("right")) return KEY_RIGHT;
-        if (n.equals("shift")) return KEY_LEFT_SHIFT;
-        if (n.equals("ctrl") || n.equals("control")) return KEY_LEFT_CONTROL;
-        if (n.equals("alt")) return KEY_LEFT_ALT;
+        if (n.equals("shift") || n.equals("left shift") || n.equals("left.shift")) return KEY_LEFT_SHIFT;
+        if (n.equals("right shift") || n.equals("right.shift")) return KEY_RIGHT_SHIFT;
+        if (n.equals("ctrl") || n.equals("control") || n.equals("left control") || n.equals("left.control")) return KEY_LEFT_CONTROL;
+        if (n.equals("right control") || n.equals("right.control")) return KEY_RIGHT_CONTROL;
+        if (n.equals("alt") || n.equals("left alt") || n.equals("left.alt")) return KEY_LEFT_ALT;
+        if (n.equals("right alt") || n.equals("right.alt")) return KEY_RIGHT_ALT;
         if (n.startsWith("f") && n.length() >= 2) {
             try {
                 int fn = Integer.parseInt(n.substring(1));
@@ -157,15 +164,7 @@ public final class GlfwKeys {
         if (n.length() == 1) {
             char c = n.charAt(0);
             if (c >= 'a' && c <= 'z') return KEY_A + (c - 'a');
-        }
-        if (n.startsWith("key.keyboard.")) {
-            String suffix = n.substring("key.keyboard.".length());
-            if (suffix.length() == 1) {
-                char c = suffix.charAt(0);
-                if (c >= '0' && c <= '9') return KEY_0 + (c - '0');
-                if (c >= 'a' && c <= 'z') return KEY_A + (c - 'a');
-                if (c >= 'A' && c <= 'Z') return KEY_A + (c - 'A');
-            }
+            if (c >= '0' && c <= '9') return KEY_0 + (c - '0');
         }
         return -1;
     }
