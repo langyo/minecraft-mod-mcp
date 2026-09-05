@@ -19,7 +19,7 @@ import net.minecraft.util.MouseHelper;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
-@Mod(modid = "mcpmod", name = "ModDev MCP", version="0.2.1")
+@Mod(modid = "mcpmod", name = "ModDev MCP", version="0.3.0")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;
