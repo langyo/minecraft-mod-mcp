@@ -305,6 +305,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Release notes walk the tag history; the default shallow
+          # checkout leaves `git tag` empty and origin/master missing,
+          # which made the log range "PREV..master" ambiguous.
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
@@ -334,15 +339,11 @@ jobs:
           # since the last STABLE release tag (skip rc/beta/pre tags).
           CURRENT="${GITHUB_REF_NAME#v}"
           # Find the latest stable tag (exclude rc/beta/alpha/pre/snapshot)
-          PREV_TAG=$(git tag --sort=-version:refname | grep '^v[0-9]' | grep -vE '\-(rc|beta|alpha|pre|snapshot)' | head -1)
-          # If the current tag IS the latest stable, find the one before it
-          if [ "v${CURRENT}" = "$PREV_TAG" ] || [ "$CURRENT" = "${PREV_TAG#v}" ]; then
-            PREV_TAG=$(git tag --sort=-version:refname | grep '^v[0-9]' | grep -vE '\-(rc|beta|alpha|pre|snapshot)' | head -2 | tail -1)
-          fi
-          if [ -n "$PREV_TAG" ]; then
-            RANGE="${PREV_TAG}..origin/master"
+          PREV_TAG=$(git tag --sort=-version:refname | grep '^v[0-9]' | grep -vE '\-(rc|beta|alpha|pre|snapshot)' | grep -v "^v${CURRENT}$" | head -1)
+          if [ -n "$PREV_TAG" ] && git rev-parse --verify -q "${PREV_TAG}" >/dev/null; then
+            RANGE="${PREV_TAG}..HEAD"
           else
-            RANGE="origin/master"
+            RANGE="HEAD"
           fi
           # Write to a temp file and use the delimiter form of $GITHUB_OUTPUT
           # (the heredoc style can fail on Windows Git Bash).
