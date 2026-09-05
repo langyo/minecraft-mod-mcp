@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-09-04T08:55:56.542Z",
+  "sessionId": "sess_a91ce23e-d43f-46db-a2ea-87be598b2e16",
+  "event": "PostToolUse",
+  "toolName": "Write",
+  "file": "D:\\源代码\\工程项目\\2026TeaCon\\minecraft-mcp\\.cache\\wsl-verify.sh",
+  "outcome": "inconclusive",
+  "coverage": "partial",
+  "findingCount": 0,
+  "durationMs": 13,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}
