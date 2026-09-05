@@ -412,7 +412,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri libx11-dev x11-xserver-utils 2>/dev/null || true
+          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri libx11-dev x11-xserver-utils libflite-dev 2>/dev/null || true
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &
