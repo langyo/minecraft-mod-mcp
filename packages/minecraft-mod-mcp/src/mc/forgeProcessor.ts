@@ -4,6 +4,7 @@ import { inflateRawSync } from "node:zlib";
 import { spawnSync } from "node:child_process";
 import { librariesDir } from "./platform.js";
 import { DOWNLOAD } from "./defaults.js";
+import { fetchWithFallback } from "./proxy.js";
 
 /**
  * Generic runner for the Forge/NeoForge installer `processors` pipeline.
@@ -106,7 +107,10 @@ async function ensureArtifact(coords: string, ext: string): Promise<string> {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   if (existsSync(filePath)) return filePath;
 
-  const mvnRel = artifactFilePath(coords, ext).slice(librariesDir().length + 1);
+  const mvnRel = artifactFilePath(coords, ext)
+    .slice(librariesDir().length + 1)
+    .split("\\")
+    .join("/"); // maven URLs are POSIX-shaped even on Windows
   const candidates = [
     `${DOWNLOAD.forgeMavenUrl}${mvnRel}`,
     `${DOWNLOAD.mavenLibrariesUrl}${mvnRel}`,
@@ -114,17 +118,61 @@ async function ensureArtifact(coords: string, ext: string): Promise<string> {
     ...DOWNLOAD.fallbackRepoUrls.map((u) => `${u}${mvnRel}`),
   ];
   for (const url of candidates) {
-    try {
-      const resp = await fetch(url);
-      if (!resp.ok) continue;
-      const ab = Buffer.from(await resp.arrayBuffer());
-      writeFileSync(filePath, ab);
-      return filePath;
-    } catch {
-      /* try next mirror */
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const resp = await fetchWithFallback(url);
+        if (!resp.ok) break; // try next mirror
+        const ab = Buffer.from(await resp.arrayBuffer());
+        writeFileSync(filePath, ab);
+        return filePath;
+      } catch {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
     }
   }
   return filePath; // may not exist yet — likely a processor output
+}
+
+/**
+ * Download an artifact plus the compile-scope dependencies of its POM.
+ * Some installer tools (e.g. NeoForge installertools 2.1.2) rely on
+ * transitive deps like gson that the profile's classpath list omits —
+ * the official installer resolves the POM, so we do one level of it.
+ */
+async function ensureArtifactWithDeps(coords: string, extra: string[]): Promise<void> {
+  let pomPath: string;
+  try {
+    pomPath = await ensureArtifact(coords, "pom");
+  } catch {
+    return;
+  }
+  if (!existsSync(pomPath)) return;
+  let pomText: string;
+  try {
+    pomText = readFileSync(pomPath, "utf-8");
+  } catch {
+    return;
+  }
+  const depRe = /<dependency>([\s\S]*?)<\/dependency>/g;
+  let m: RegExpExecArray | null;
+  while ((m = depRe.exec(pomText)) !== null) {
+    const block = m[1];
+    // Runtime-scope deps ARE needed: the processors are plain JVM mains, so
+    // their "runtime" dependencies (gson, srgutils, ...) belong on the
+    // classpath just like the official installer puts them.
+    if (/<scope>(test|system)<\/scope>/.test(block)) continue;
+    const g = block.match(/<groupId>([^<]+)<\/groupId>/);
+    const a = block.match(/<artifactId>([^<]+)<\/artifactId>/);
+    const v = block.match(/<version>([^<]+)<\/version>/);
+    if (!g || !a || !v) continue;
+    const depCoords = `${g[1]}:${a[1]}:${v[1]}`;
+    try {
+      const depJar = await ensureArtifact(depCoords, DEFAULT_EXT);
+      if (existsSync(depJar)) extra.push(depJar);
+    } catch {
+      /* optional dep — ignore */
+    }
+  }
 }
 
 /** Extract a `/data/…` entry from the installer jar to a stable cache path. */
@@ -202,7 +250,18 @@ export async function runForgeProcessors(
 
     const jarPath = await ensureArtifact(proc.jar, DEFAULT_EXT);
     const cpEntries = [jarPath];
-    for (const cp of proc.classpath ?? []) cpEntries.push(await ensureArtifact(cp, DEFAULT_EXT));
+    const transitiveExtra: string[] = [];
+    for (const cp of proc.classpath ?? []) {
+      // Profile classpath entries carry an "@jar" extension suffix
+      // ("group:artifact:version@jar"); artifactFilePath must not treat it
+      // as part of the version or every download 404s into a bogus
+      // "<version>@jar" directory and the classpath ends up empty.
+      const bareCoords = cp.split("@")[0];
+      const jar = await ensureArtifact(bareCoords, DEFAULT_EXT);
+      cpEntries.push(jar);
+      if (existsSync(jar)) await ensureArtifactWithDeps(bareCoords, transitiveExtra);
+    }
+    cpEntries.push(...new Set(transitiveExtra));
 
     const mainClass = readManifestMainClass(jarPath);
     if (!mainClass) {

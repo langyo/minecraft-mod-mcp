@@ -248,8 +248,15 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   const classpathPaths = resolveClasspath(vj.libraries);
 
   const inheritsFrom = vj.inheritsFrom ?? versionInfo?.mc_version ?? config.versionId;
+  // Forge 1.17-1.20.4 (bootstraplauncher layout) puts a patched Minecraft on
+  // the module path; adding the vanilla base jar to the classpath as well
+  // creates a second Automatic-Module (_1._17._1) and JPMS aborts with
+  // "Modules ... and minecraft export package net.minecraft...".
+  const bootstrapLayout = (vj.libraries ?? []).some(
+    (l) => typeof l.name === "string" && l.name.startsWith("cpw.mods:bootstraplauncher"),
+  );
   const baseJar = join(versionsDir(), inheritsFrom, `${inheritsFrom}.jar`);
-  if (existsSync(baseJar)) classpathPaths.push(baseJar);
+  if (existsSync(baseJar) && !bootstrapLayout) classpathPaths.push(baseJar);
 
   const versionJar = join(versionsDir(), config.versionId, `${config.versionId}.jar`);
   if (existsSync(versionJar) && versionJar !== baseJar) classpathPaths.push(versionJar);
