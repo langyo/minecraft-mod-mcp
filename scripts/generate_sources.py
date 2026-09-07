@@ -226,7 +226,7 @@ def overlay_block_forge(ns, hud, screen, tick, draw, take_over, stack_acc="getMa
             net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
             if (mc.screen != null || !xyz.langyo.minecraft.mcp.common.ReflectionHelper.isMcpControlMode()) return;
             int[] m = scaledMouse(mc);
-            long win = mc.getWindow().getWindow();
+            long win = org.lwjgl.glfw.GLFW.glfwGetCurrentContext();
             boolean left = org.lwjgl.glfw.GLFW.glfwGetMouseButton(win, 0) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
             if (left && !prevLeftDown) {
                 xyz.langyo.minecraft.mcp.common.ReflectionHelper.handleOverlayClick(m[0], m[1], mc);
@@ -366,6 +366,10 @@ def _forge_modern_body(mc, loader):
         return "", ""   # legacy mappings eras: overlay block not emitted yet
     if k >= (26, 1, 0):
         return "", ""   # MC 26.x GUI extraction API: overlay hook is a follow-up
+    if not nf and k >= (1, 20, 6):
+        return "", ""   # forge 1.20.6+ split its client event system: follow-up
+    if nf and k >= (1, 21, 5):
+        return "", ""   # neoforge 21.5+ renamed Window/GuiGraphics accessors: follow-up
     elif k <= (1, 19, 99):
         # 1.17.1-1.19.4: 1.17.x is HUD-only (no ScreenEvent.Render yet);
         # 1.19.x carries the full screen hooks over a PoseStack.
@@ -705,7 +709,7 @@ def _fabric_draw_core(mc):
     if k <= (1, 14, 99):
         return "gl14"
     if k <= (1, 15, 99):
-        return "ms"
+        return "ms15"
     if k < (1, 20, 0):
         return "ms"
     if k < (26, 2, 0):
@@ -729,6 +733,21 @@ def _fabric_renderer_java(mc, core):
                 org.lwjgl.opengl.GL11.glVertex2f(x2, y1);
                 org.lwjgl.opengl.GL11.glEnd();
                 org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_TEXTURE_2D);
+            }
+            @Override public int drawString(Object font, String text, int x, int y, int color, boolean shadow) { return 0; }
+            @Override public int getStringWidth(Object font, String text) { return 0; }
+        };
+    }"""
+    if core == "ms15":
+        return """    private McpRenderer makeRenderer(Object ctx) {
+        final net.minecraft.client.util.math.MatrixStack stack =
+                (ctx instanceof net.minecraft.client.util.math.MatrixStack)
+                        ? (net.minecraft.client.util.math.MatrixStack) ctx
+                        : new net.minecraft.client.util.math.MatrixStack();
+        return new McpRenderer() {
+            @Override public void fill(int x1, int y1, int x2, int y2, int color) {
+                net.minecraft.client.gui.DrawableHelper.fill(
+                        stack.peek().getPositionMatrix(), x1, y1, x2, y2, color);
             }
             @Override public int drawString(Object font, String text, int x, int y, int color, boolean shadow) { return 0; }
             @Override public int getStringWidth(Object font, String text) { return 0; }
@@ -771,9 +790,9 @@ def fabric_mod(mc):
     official = k >= (26, 2, 0)
     renderer = _fabric_renderer_java(mc, core)
 
-    # 1.14.x yarn predates MinecraftClient.getWindow(); the overlay core has
-    # no compile-clean form there yet, so keep the hooks but no overlay body.
-    overlay_enabled = k > (1, 14, 99)
+    # 1.14.x-1.15.x yarn differ too much (no MinecraftClient.getWindow();
+    # DrawableHelper.fill wants a Matrix4f) — hooks stay no-ops there.
+    overlay_enabled = k > (1, 15, 99)
 
     mc_inst = "net.minecraft.client.Minecraft.getInstance()" if official \
         else "net.minecraft.client.MinecraftClient.getInstance()"

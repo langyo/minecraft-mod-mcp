@@ -67,7 +67,7 @@ public class ModDevMcpMod {
             net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
             if (mc.screen != null || !xyz.langyo.minecraft.mcp.common.ReflectionHelper.isMcpControlMode()) return;
             int[] m = scaledMouse(mc);
-            long win = mc.getWindow().getWindow();
+            long win = org.lwjgl.glfw.GLFW.glfwGetCurrentContext();
             boolean left = org.lwjgl.glfw.GLFW.glfwGetMouseButton(win, 0) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
             if (left && !prevLeftDown) {
                 xyz.langyo.minecraft.mcp.common.ReflectionHelper.handleOverlayClick(m[0], m[1], mc);
