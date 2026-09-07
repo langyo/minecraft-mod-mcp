@@ -13,6 +13,7 @@ public class ModDevMcpMod {
     public ModDevMcpMod(IEventBus modBus) {
         INSTANCE = this;
         modBus.addListener(this::commonSetup);
+        
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
