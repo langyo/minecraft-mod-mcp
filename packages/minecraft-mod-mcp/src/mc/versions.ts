@@ -158,6 +158,23 @@ export function getVersionForLoader(data: VersionsData, mc: string, loader: Load
   }
 }
 
+function versionJsonMatchesLoader(vj: VersionJson, loader: Loader): boolean {
+  // Modern NeoForge (21.x+) launches via cpw.mods.bootstraplauncher, which
+  // carries no "neoforged" marker in mainClass — match the loader's own
+  // artifact group in the libraries list first, then fall back to mainClass.
+  const libs = vj.libraries ?? [];
+  const hasLib = (group: string) => libs.some(l => typeof l.name === "string" && l.name.startsWith(group));
+  if (loader === "neoforge" && hasLib("net.neoforged:")) return true;
+  if (loader === "forge" && hasLib("net.minecraftforge:")) return true;
+  if (loader === "fabric" && hasLib("net.fabricmc:")) return true;
+
+  const mc = vj.mainClass?.toLowerCase() ?? "";
+  if (loader === "neoforge" && mc.includes("neoforged")) return true;
+  if (loader === "fabric" && mc.includes("fabricmc")) return true;
+  if (loader === "forge" && (mc.includes("minecraftforge") || mc.includes("forgebootstrap") || mc.includes("modlauncher") || mc.includes("launchwrapper"))) return true;
+  return false;
+}
+
 function discoverLoaderVersionId(mcVersion: string, loader: Loader, loaderVer?: string | null): string | null {
   const vDir = versionsDir();
   if (!existsSync(vDir)) return null;
@@ -174,11 +191,7 @@ function discoverLoaderVersionId(mcVersion: string, loader: Loader, loaderVer?: 
         const vj = JSON.parse(raw) as VersionJson;
         const inherits = vj.inheritsFrom ?? vj.id;
         if (inherits !== mcVersion) continue;
-
-        const mc = vj.mainClass?.toLowerCase() ?? "";
-        if (loader === "neoforge" && mc.includes("neoforged")) return dirName;
-        if (loader === "fabric" && mc.includes("fabricmc")) return dirName;
-        if (loader === "forge" && (mc.includes("minecraftforge") || mc.includes("forgebootstrap") || mc.includes("modlauncher") || mc.includes("launchwrapper"))) return dirName;
+        if (versionJsonMatchesLoader(vj, loader)) return dirName;
       } catch {
         continue;
       }
