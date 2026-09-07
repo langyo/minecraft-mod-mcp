@@ -12,6 +12,7 @@ public class ModDevMcpMod {
     public ModDevMcpMod() {
         INSTANCE = this;
         net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
+        
     }
 
     private void setup(final FMLCommonSetupEvent event) {
@@ -21,7 +22,6 @@ public class ModDevMcpMod {
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
-                try { Object mc = ReflectionHelper.getMinecraftInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
                 httpServer.start();
             } catch (Exception e) {
                 System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());

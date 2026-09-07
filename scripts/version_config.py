@@ -223,6 +223,13 @@ ALL_VERSIONS = {
     "1.21.1": {"forge": "1.21.1-52.1.0",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.1",
                "version_id": "1.21.1-Forge52.1.0", "fabric_yarn": "1.21.1+build.3",
                "neoforge": "21.1.172", "mdg": "2.0.141"},
+    # Forge skipped MC 1.21.2 entirely (52.x = 1.21.1, 53.x = 1.21.3), so this
+    # version ships NeoForge + Fabric only. NeoForge 21.2.x never left beta,
+    # but 1.21.2 users exist and get full mod support like every other version.
+    "1.21.2": {                                            "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.2",
+               "version_id": "1.21.2-neoforge-21.2.1-beta",
+               "fabric_yarn": "1.21.2+build.1",
+               "neoforge": "21.2.1-beta", "mdg": "2.0.141"},
     "1.21.3": {"forge": "1.21.3-53.1.0",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.3",
                "version_id": "1.21.3-Forge53.1.0", "fabric_yarn": "1.21.3+build.1",
                "neoforge": "21.3.63", "mdg": "2.0.141"},
@@ -285,7 +292,7 @@ def get_api_group(mc):
         "1.19.3": "fg6", "1.19.4": "fg6",
         "1.20": "fg6", "1.20.1": "fg6", "1.20.2": "fg6", "1.20.3": "fg6",
         "1.20.4": "fg6", "1.20.6": "fg6",
-        "1.21": "fg6", "1.21.1": "fg6", "1.21.3": "fg6",
+        "1.21": "fg6", "1.21.1": "fg6", "1.21.2": "fg6", "1.21.3": "fg6",
         "1.21.4": "mc26", "1.21.5": "mc26", "1.21.6": "mc26",
         "1.21.7": "mc26", "1.21.8": "mc26", "1.21.9": "mc26",
         "1.21.10": "mc26", "1.21.11": "mc26",
@@ -310,7 +317,7 @@ def get_fabric_loom(mc):
         (["1.19.3", "1.19.4"], "1.3-SNAPSHOT"),
         (["1.20", "1.20.1", "1.20.2", "1.20.3", "1.20.4"], "1.3-SNAPSHOT"),
         (["1.20.6"], "1.5-SNAPSHOT"),
-        (["1.21", "1.21.1", "1.21.3"], "1.5-SNAPSHOT"),
+        (["1.21", "1.21.1", "1.21.2", "1.21.3"], "1.5-SNAPSHOT"),
         (["1.21.4", "1.21.5", "1.21.6", "1.21.7", "1.21.8"], "1.7-SNAPSHOT"),
         (["1.21.11"], "1.14-SNAPSHOT"),
         # MC 26.x: unobfuscated jars need loom >= 1.17 (new plugin id

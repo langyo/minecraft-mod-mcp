@@ -4,7 +4,7 @@ import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 
-@Mod(modid = "mcpmod", name = "ModDev MCP", version="0.3.0")
+@Mod(modid = "mcpmod", name = "ModDev MCP", version = "1.0")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;
@@ -21,7 +21,6 @@ public class ModDevMcpMod {
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
-                try { Object mc = ReflectionHelper.getMinecraftInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
                 httpServer.start();
             } catch (Exception e) {
                 System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());

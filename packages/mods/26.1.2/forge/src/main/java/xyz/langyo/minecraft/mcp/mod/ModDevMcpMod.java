@@ -22,5 +22,6 @@ public class ModDevMcpMod {
                 System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
             }
         }, "MCP-HTTP").start();
+        
     }
 }
