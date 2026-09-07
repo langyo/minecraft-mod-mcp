@@ -76,3 +76,5 @@ test-*-results.json
 # Build output tracked by mistake
 /packages/*/bin/
 
+# AI session state (hook status / screenshots)
+.mimosa/
