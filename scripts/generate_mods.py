@@ -512,6 +512,8 @@ jar {{
     }}
 }}
 """
+    if mc == "1.20.1":
+        content += "\napply from: 'client-overrides.gradle'\n"
     with open(os.path.join(path, "build.gradle"), "w") as f:
         f.write(content)
 

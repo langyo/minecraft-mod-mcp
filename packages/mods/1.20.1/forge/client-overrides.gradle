@@ -1,0 +1,16 @@
+// Compile mapped client helpers only for Forge 1.20.1, replacing shared fallbacks.
+base { archivesName = 'MCP-HELPER-1.20.1-forge' }
+
+['java', 'resources'].each { kind ->
+    def sharedRoot = file("../../../common/src/main/${kind}").toPath()
+    def localRoot = file("src/main/${kind}").toPath()
+    sourceSets.main."${kind}".setSrcDirs([localRoot.toFile(), sharedRoot.toFile()])
+    sourceSets.main."${kind}".exclude { entry ->
+        def path = entry.file.toPath()
+        !entry.directory && path.startsWith(sharedRoot) &&
+                localRoot.resolve(sharedRoot.relativize(path)).toFile().isFile()
+    }
+}
+
+// Direct official-mapped member references must be remapped for installed clients.
+jar.finalizedBy('reobfJar')

@@ -16,6 +16,7 @@ implementations live in packages/mods/1.7.x (see _read_ref_source).
 
 All version/group data comes from version_config.py — nothing is hardcoded here.
 """
+import json
 import os
 import sys
 
@@ -1060,7 +1061,7 @@ def _read_ref_source(mc):
 
 def get_forge_mod_template(mc):
     g = get_api_group(mc)
-    if g == "legacy17":
+    if g == "legacy17" or mc == "1.20.1":
         src = _read_ref_source(mc)
         if src:
             return src
@@ -1074,6 +1075,15 @@ def get_forge_mod_template(mc):
         "fg7": forge_mod_fg7,
         "mc26": forge_mod_mc26,
     }.get(g, forge_mod_fg6)(mc)
+
+
+def get_pack_mcmeta(mc):
+    if mc == "1.20.1":
+        return json.dumps({"pack": {
+            "pack_format": 15,
+            "description": {"translate": "pack.mcpmod.description"},
+        }}, indent=2) + "\n"
+    return PACK_MCMETA
 
 
 if __name__ == "__main__":
@@ -1094,12 +1104,13 @@ if __name__ == "__main__":
                     meta_dir = os.path.join(res_dir, "META-INF")
                     os.makedirs(meta_dir, exist_ok=True)
                     with open(os.path.join(meta_dir, "mods.toml"), "w") as f:
-                        f.write(MODS_TOML)
+                        f.write(MODS_TOML.replace('displayName="ModDev MCP"', 'displayName="MCP-HELPER"')
+                                if mc == "1.20.1" else MODS_TOML)
                 elif g in ("legacy", "legacy17"):
                     with open(os.path.join(res_dir, "mcmod.info"), "w") as f:
                         f.write(MCMOD_INFO)
                 with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:
-                    f.write(PACK_MCMETA)
+                    f.write(get_pack_mcmeta(mc))
                 total += 1
             elif loader == "neoforge":
                 nf_style = info.get("neoforge_style", "mdg")
@@ -1115,7 +1126,7 @@ if __name__ == "__main__":
                 with open(os.path.join(meta_dir, "neoforge.mods.toml"), "w") as f:
                     f.write(NEOFORGE_MODS_TOML)
                 with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:
-                    f.write(PACK_MCMETA)
+                    f.write(get_pack_mcmeta(mc))
                 total += 1
             elif loader == "fabric":
                 write_java(path, "ModDevMcpMod.java", fabric_mod(mc))

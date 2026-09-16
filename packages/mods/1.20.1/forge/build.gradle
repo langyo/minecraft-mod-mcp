@@ -34,6 +34,8 @@ repositories {
 sourceSets.main.java.srcDir '../../../common/src/main/java'
 sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
+apply from: 'client-overrides.gradle'
+
 dependencies {
     minecraft "net.minecraftforge:forge:1.20.1-47.4.10"
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
