@@ -508,6 +508,16 @@
       "fabric_loader": "0.19.5",
       "neoforge": "26.2.0.75",
       "mdg": "2.0.141"
+    },
+    "26_3": {
+      "forge": "26.3-66.0.6",
+      "fg_era": "fg7",
+      "java": 25,
+      "version_id": "26.3-forge-66.0.6",
+      "mappings": "official_26.3",
+      "fabric_loader": "0.19.5",
+      "neoforge": "26.3.0.26-beta",
+      "mdg": "2.0.147"
     }
   },
   "api_groups": {
@@ -563,7 +573,8 @@
     "1_21_10": "mc26",
     "1_21_11": "mc26",
     "26_1_2": "mc26",
-    "26_2": "mc26"
+    "26_2": "mc26",
+    "26_3": "mc26"
   },
   "fabric_loom": {
     "1.7.2": "1.7-SNAPSHOT",
@@ -618,7 +629,8 @@
     "1.21.10": "1.7-SNAPSHOT",
     "1.21.11": "1.14-SNAPSHOT",
     "26.1.2": "1.7-SNAPSHOT",
-    "26.2": "1.17-SNAPSHOT"
+    "26.2": "1.17-SNAPSHOT",
+    "26.3": "1.17-SNAPSHOT"
   },
   "neoforge_gradle": {
     "mdg_2_0_prefix": "2.0",

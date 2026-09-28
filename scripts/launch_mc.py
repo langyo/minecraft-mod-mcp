@@ -751,11 +751,39 @@ def get_arch():
     return "x86"
 
 
+def _extract_native_entries(zf, natives_dir, java_natives_dir):
+    """Extract native libraries from a jar: nested layout preserved plus flat
+    copies at the natives root and in the java/ subdir (see extract_natives)."""
+    for info in zf.infolist():
+        fn = info.filename
+        if fn.endswith((".dll", ".so", ".dylib", ".jnilib")):
+            if "META-INF" in fn:
+                continue
+            base = os.path.basename(fn)
+            target = os.path.join(natives_dir, base)
+            if not os.path.isfile(target):
+                zf.extract(info, natives_dir)
+                with zf.open(info) as src, open(target, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+            java_target = os.path.join(java_natives_dir, base)
+            if not os.path.isfile(java_target):
+                with zf.open(info) as src, open(java_target, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+
+
 def extract_natives(vj, mc_dir=None):
     mc_dir = mc_dir or MC_DIR
     version_id = vj.get("id") or vj.get("inheritsFrom", "unknown")
     natives_dir = os.path.join(mc_dir, "versions-natives", version_id)
     os.makedirs(natives_dir, exist_ok=True)
+    # MC 26.x points java.library.path at ${natives_directory}/java (the
+    # official launcher's flat-native layout), while older versions point it
+    # at the natives root. LWJGL 3.3.1+ nests natives inside the jars
+    # (windows/x64/...), so write flattened copies to both locations — the
+    # nested zf.extract output is kept for compatibility with anything that
+    # already relies on it.
+    java_natives_dir = os.path.join(natives_dir, "java")
+    os.makedirs(java_natives_dir, exist_ok=True)
     current_os = get_os_name()
     for lib in vj.get("libraries", []):
         name = lib.get("name", "")
@@ -779,15 +807,7 @@ def extract_natives(vj, mc_dir=None):
         if native_jar and os.path.isfile(native_jar):
             try:
                 with zipfile.ZipFile(native_jar, "r") as zf:
-                    for info in zf.infolist():
-                        fn = info.filename
-                        if fn.endswith((".dll", ".so", ".dylib", ".jnilib")):
-                            if "META-INF" in fn:
-                                continue
-                            base = os.path.basename(fn)
-                            target = os.path.join(natives_dir, base)
-                            if not os.path.isfile(target):
-                                zf.extract(info, natives_dir)
+                    _extract_native_entries(zf, natives_dir, java_natives_dir)
             except Exception:
                 pass
         if "natives-" in name and not native_jar:
@@ -798,15 +818,7 @@ def extract_natives(vj, mc_dir=None):
                 if os.path.isfile(native_jar):
                     try:
                         with zipfile.ZipFile(native_jar, "r") as zf:
-                            for info in zf.infolist():
-                                fn = info.filename
-                                if fn.endswith((".dll", ".so", ".dylib", ".jnilib")):
-                                    if "META-INF" in fn:
-                                        continue
-                                    base = os.path.basename(fn)
-                                    target = os.path.join(natives_dir, base)
-                                    if not os.path.isfile(target):
-                                        zf.extract(info, natives_dir)
+                            _extract_native_entries(zf, natives_dir, java_natives_dir)
                     except Exception:
                         pass
     return natives_dir
