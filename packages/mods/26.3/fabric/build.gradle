@@ -1,0 +1,27 @@
+plugins {
+    id "net.fabricmc.fabric-loom" version "1.17-SNAPSHOT"
+}
+
+version = "0.3.0"
+group = "xyz.langyo"
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = "../../../.maven-local"
+    }
+}
+
+sourceSets.main.java.srcDir '../../../common/src/main/java'
+
+dependencies {
+    minecraft "com.mojang:minecraft:26.3"
+    implementation "net.fabricmc:fabric-loader:0.19.5"
+    implementation "org.java-websocket:Java-WebSocket:1.5.4"
+}

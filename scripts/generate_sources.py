@@ -978,6 +978,21 @@ PACK_MCMETA = """{
 }
 """
 
+# MC 26.3 hardens the pack-description codec to a plain string (the old
+# object-with-translations form fatally aborts NeoForge 26.3 pack discovery
+# and warns on Forge), and bumps the resource pack format to 97.
+PACK_MCMETA_263 = """{
+  "pack": {
+    "description": "ModDev MCP resources",
+    "pack_format": 97
+  }
+}
+"""
+
+
+def _pack_mcmeta(mc):
+    return PACK_MCMETA_263 if mc_key(mc) >= (26, 3, 0) else PACK_MCMETA
+
 MODS_TOML = """modLoader="javafml"
 loaderVersion="[4,)"
 license="MIT"
@@ -1099,7 +1114,7 @@ if __name__ == "__main__":
                     with open(os.path.join(res_dir, "mcmod.info"), "w") as f:
                         f.write(MCMOD_INFO)
                 with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:
-                    f.write(PACK_MCMETA)
+                    f.write(_pack_mcmeta(mc))
                 total += 1
             elif loader == "neoforge":
                 nf_style = info.get("neoforge_style", "mdg")
@@ -1115,7 +1130,7 @@ if __name__ == "__main__":
                 with open(os.path.join(meta_dir, "neoforge.mods.toml"), "w") as f:
                     f.write(NEOFORGE_MODS_TOML)
                 with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:
-                    f.write(PACK_MCMETA)
+                    f.write(_pack_mcmeta(mc))
                 total += 1
             elif loader == "fabric":
                 write_java(path, "ModDevMcpMod.java", fabric_mod(mc))

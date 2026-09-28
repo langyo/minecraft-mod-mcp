@@ -165,6 +165,9 @@ jobs:
               26.2/forge
               26.2/neoforge
               26.2/fabric
+              26.3/forge
+              26.3/neoforge
+              26.3/fabric
     steps:
       - uses: actions/checkout@v4
 
@@ -374,6 +377,9 @@ jobs:
           - { mc_ver: "26.2",    loader: "forge",    jdk: "25" }
           - { mc_ver: "26.2",    loader: "neoforge", jdk: "25" }
           - { mc_ver: "26.2",    loader: "fabric",   jdk: "25" }
+          - { mc_ver: "26.3",    loader: "forge",    jdk: "25" }
+          - { mc_ver: "26.3",    loader: "neoforge", jdk: "25" }
+          - { mc_ver: "26.3",    loader: "fabric",   jdk: "25" }
     steps:
       - uses: actions/checkout@v4
       - name: Download all mod JARs
@@ -463,6 +469,7 @@ jobs:
           - { mc_ver: "1.21.11", loader: "forge",    jdk: "21" }
           - { mc_ver: "26.1.2",  loader: "forge",    jdk: "25" }
           - { mc_ver: "26.2",    loader: "forge",    jdk: "25" }
+          - { mc_ver: "26.3",    loader: "forge",    jdk: "25" }
     steps:
       - uses: actions/checkout@v4
       - name: Download all mod JARs

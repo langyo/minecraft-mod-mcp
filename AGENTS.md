@@ -83,6 +83,12 @@
    `packages/minecraft-mod-mcp/package.json` inside the feature/fix PR that
    warrants a release; never open standalone version-bump PRs. Releases are
    then tag-driven (`git tag vX.Y.Z && git push --tags`).
+   **Semver autonomy limit (maintainer directive, 2026-09-28): agents may
+   only bump the PATCH component on their own authority (e.g. 0.4.0 →
+   0.4.1). Advancing the MAJOR or MINOR version — or any release that
+   would change the public API surface — is strictly forbidden without
+   explicit maintainer authorization in the task brief or PR review; if a
+   change seems to warrant more than a patch, stop and ask.**
 9. Merging may be done autonomously by an agent once required checks pass and
    the title/body comply. Never merge over a genuine code-level failure;
    infra/environmental check failures may be waived only when documented in

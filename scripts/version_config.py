@@ -264,6 +264,12 @@ ALL_VERSIONS = {
                "version_id": "26.2-forge-65.1.3",
                "neoforge": "26.2.0.75", "mdg": "2.0.141",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
+    # NeoForge 26.3 is still beta-only upstream (26.3.0.x-beta); pin the
+    # newest build and revisit when the stable line lands.
+    "26.3":   {"forge": "26.3-66.0.6",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
+               "version_id": "26.3-forge-66.0.6",
+               "neoforge": "26.3.0.26-beta", "mdg": "2.0.147",
+               "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
 }
 
 # ============================================================
@@ -298,6 +304,7 @@ def get_api_group(mc):
         "1.21.10": "mc26", "1.21.11": "mc26",
         "26.1.2": "mc26",
         "26.2": "mc26",
+        "26.3": "mc26",
     }
     return _MAP.get(mc, "fg6")
 
@@ -322,7 +329,7 @@ def get_fabric_loom(mc):
         (["1.21.11"], "1.14-SNAPSHOT"),
         # MC 26.x: unobfuscated jars need loom >= 1.17 (new plugin id
         # net.fabricmc.fabric-loom, no mappings dependency).
-        (["26.2"], "1.17-SNAPSHOT"),
+        (["26.2", "26.3"], "1.17-SNAPSHOT"),
     ]
     for versions, loom in _MAP:
         if mc in versions:
