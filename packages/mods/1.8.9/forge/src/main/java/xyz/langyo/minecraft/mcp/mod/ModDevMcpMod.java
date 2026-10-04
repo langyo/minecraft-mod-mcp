@@ -4,7 +4,7 @@ import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 
-@Mod(modid = "mcpmod", name = "ModDev MCP", version = "0.4.1")
+@Mod(modid = "mcpmod", name = "ModDev MCP", version = "0.4.2")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;

@@ -4,7 +4,7 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.147'
 }
 
-version = '0.4.1'
+version = '0.4.2'
 group = 'xyz.langyo'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
