@@ -961,37 +961,64 @@ public class ModDevMcpMod implements ClientModInitializer {
 # WRITE TO PROJECTS
 # ============================================================
 
+# The description must stay a plain string: the locale-keyed object form used
+# earlier is not a valid text component, so vanilla logs "Couldn't load pack
+# metadata" on every version and Forge 26.1.x fails resource reload outright
+# (#36, #40). pack_format must match the target version or the mod pack is
+# flagged as incompatible; values from minecraft.wiki/w/w/Pack_format.
 PACK_MCMETA = """{
   "pack": {
-    "description": {
-      "en_us": "ModDev MCP resources",
-      "zh_cn": "ModDev MCP \\u8d44\\u6e90\\u5305",
-      "zh_tw": "ModDev MCP \\u8cc7\\u6e90\\u5305",
-      "ja_jp": "ModDev MCP \\u30ea\\u30bd\\u30fc\\u30b9\\u30d1\\u30c3\\u30af",
-      "ko_kr": "ModDev MCP \\ub9ac\\uc18c\\uc2a4\\ud329",
-      "fr_fr": "Pack de ressources ModDev MCP",
-      "es_es": "Paquete de recursos ModDev MCP",
-      "ru_ru": "WebSocket-\\u043c\\u043e\\u0441\\u0442 ModDev MCP"
-    },
-    "pack_format": 34
+    "description": "ModDev MCP resources",
+    "pack_format": __PACK_FORMAT__
   }
 }
 """
 
-# MC 26.3 hardens the pack-description codec to a plain string (the old
-# object-with-translations form fatally aborts NeoForge 26.3 pack discovery
-# and warns on Forge), and bumps the resource pack format to 97.
-PACK_MCMETA_263 = """{
-  "pack": {
-    "description": "ModDev MCP resources",
-    "pack_format": 97
-  }
-}
-"""
+# (min_version, max_version, resource pack_format) — inclusive ranges, in
+# ascending order. mc_key("26.1.2") == (26, 1, 2), so 26.x needs its own rows.
+RESOURCE_PACK_FORMATS = [
+    ((1, 7, 0), (1, 8, 9), 1),
+    ((1, 9, 0), (1, 10, 2), 2),
+    ((1, 11, 0), (1, 12, 2), 3),
+    ((1, 13, 0), (1, 14, 4), 4),
+    ((1, 15, 0), (1, 16, 1), 5),
+    ((1, 16, 2), (1, 16, 5), 6),
+    ((1, 17, 0), (1, 17, 1), 7),
+    ((1, 18, 0), (1, 18, 2), 8),
+    ((1, 19, 0), (1, 19, 2), 9),
+    ((1, 19, 3), (1, 19, 3), 12),
+    ((1, 19, 4), (1, 19, 4), 13),
+    ((1, 20, 0), (1, 20, 1), 15),
+    ((1, 20, 2), (1, 20, 2), 18),
+    ((1, 20, 3), (1, 20, 4), 22),
+    ((1, 20, 5), (1, 20, 6), 32),
+    ((1, 21, 0), (1, 21, 1), 34),
+    ((1, 21, 2), (1, 21, 3), 42),
+    ((1, 21, 4), (1, 21, 4), 46),
+    ((1, 21, 5), (1, 21, 5), 55),
+    ((1, 21, 6), (1, 21, 6), 63),
+    ((1, 21, 7), (1, 21, 8), 64),
+    ((1, 21, 9), (1, 21, 10), 69),
+    ((1, 21, 11), (1, 21, 11), 75),
+    ((26, 1, 0), (26, 1, 255), 84),
+    ((26, 2, 0), (26, 2, 255), 88),
+    ((26, 3, 0), (26, 3, 255), 97),
+]
+
+
+def _resource_pack_format(mc):
+    key = mc_key(mc)
+    for lo, hi, fmt in RESOURCE_PACK_FORMATS:
+        if lo <= key <= hi:
+            return fmt
+    raise SystemExit(
+        f"Unknown resource pack_format for MC {mc}; add it to RESOURCE_PACK_FORMATS "
+        "in scripts/generate_sources.py (see minecraft.wiki/w/w/Pack_format)."
+    )
 
 
 def _pack_mcmeta(mc):
-    return PACK_MCMETA_263 if mc_key(mc) >= (26, 3, 0) else PACK_MCMETA
+    return PACK_MCMETA.replace("__PACK_FORMAT__", str(_resource_pack_format(mc)))
 
 MODS_TOML = """modLoader="javafml"
 loaderVersion="[4,)"

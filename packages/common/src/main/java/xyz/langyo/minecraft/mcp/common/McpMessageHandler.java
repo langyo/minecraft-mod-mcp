@@ -144,10 +144,21 @@ public class McpMessageHandler {
             if (bytes != null) {
                 return "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(bytes);
             }
-            return "error: screenshot returned null";
+            return screenshotNullError();
         } catch (Exception e) {
             return "error: " + e.getMessage();
         }
+    }
+
+    private static String screenshotNullError() {
+        String reason = ScreenshotHelper.getLastFailureReason();
+        return "error: " + screenshotNullDetail(reason);
+    }
+
+    private static String screenshotNullDetail(String reason) {
+        return reason != null
+                ? "screenshot returned null (" + reason + ")"
+                : "screenshot returned null";
     }
 
     protected Object handleScreenshotToFile(java.util.Map<String, String> p) {
@@ -155,7 +166,11 @@ public class McpMessageHandler {
         if (filePath == null || filePath.isEmpty()) return "{\"error\":\"missing path\"}";
         try {
             byte[] bytes = minecraftInput != null ? minecraftInput.screenshot() : null;
-            if (bytes == null) return "{\"error\":\"screenshot returned null\"}";
+            if (bytes == null) {
+                String msg = screenshotNullDetail(ScreenshotHelper.getLastFailureReason())
+                        .replace("\\", "\\\\").replace("\"", "\\\"");
+                return "{\"error\":\"" + msg + "\"}";
+            }
             java.nio.file.Path fp = java.nio.file.Paths.get(filePath);
             java.nio.file.Files.createDirectories(fp.getParent());
             java.nio.file.Files.write(fp, bytes);

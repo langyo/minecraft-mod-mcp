@@ -15,6 +15,11 @@ public final class ScreenshotHelper {
 
     public static boolean isScreenshotInProgress() { return screenshotInProgress; }
 
+    private static volatile String lastFailureReason = null;
+
+    /** Reason the most recent screenshot attempt bailed out (null if none/unknown). */
+    public static String getLastFailureReason() { return lastFailureReason; }
+
     private static volatile byte[] cachedScreenshot = null;
     private static volatile long cachedScreenshotTime = 0;
     private static long lastCacheFrameLog = 0;
@@ -30,6 +35,7 @@ public final class ScreenshotHelper {
     private ScreenshotHelper() {}
 
     public static byte[] takeScreenshot(Object mc, int width, int height) {
+        lastFailureReason = null;
         screenshotInProgress = true;
         try {
             return takeScreenshot0(mc, width, height);
@@ -39,6 +45,45 @@ public final class ScreenshotHelper {
     }
 
     private static void forceRenderOneFrame(Object mc) {
+    }
+
+    /**
+     * True only when an OpenGL context is current on this thread. Calling any
+     * LWJGL GL binding without a context is not a catchable Java exception:
+     * LWJGL raises a native fatal error and aborts the whole JVM (seen with
+     * the Vitrail/Vulkan renderer, #41). Every GL call path must check this
+     * first. LWJGL2 (1.7.x-1.12.x) has no GL class, so absence of the class
+     * conservatively counts as "context present" — those versions have no
+     * pluggable non-GL renderer anyway.
+     */
+    private static volatile Method glGetCapabilities = null;
+    private static volatile boolean glGetCapabilitiesAbsent = false;
+
+    private static boolean hasCurrentGlContext() {
+        if (glGetCapabilitiesAbsent) return true;
+        try {
+            Method caps = glGetCapabilities;
+            if (caps == null) {
+                Class<?> gl = Class.forName("org.lwjgl.opengl.GL");
+                for (Method m : gl.getMethods()) {
+                    if (m.getName().equals("getCapabilities") && m.getParameterCount() == 0) {
+                        m.setAccessible(true);
+                        glGetCapabilities = caps = m;
+                        break;
+                    }
+                }
+            }
+            if (caps == null) { glGetCapabilitiesAbsent = true; return true; }
+            try {
+                return caps.invoke(null) != null;
+            } catch (Exception e) {
+                return false;
+            }
+        } catch (ClassNotFoundException ignored) {
+            glGetCapabilitiesAbsent = true;
+        } catch (Exception ignored) {
+        }
+        return true;
     }
 
     private static byte[] takeScreenshot0(Object mc, int width, int height) {
@@ -55,6 +100,13 @@ public final class ScreenshotHelper {
             public void run() {
                 try {
                     ReflectionHelper.dbg("takeScreenshot0: on thread " + Thread.currentThread().getName());
+                    if (!hasCurrentGlContext()) {
+                        lastFailureReason = "no OpenGL context on render thread (non-GL renderer, e.g. Vulkan/Vitrail); screenshot unsupported on this backend";
+                        ReflectionHelper.dbg("takeScreenshot0: " + lastFailureReason);
+                        resultHolder[0] = null;
+                        latch.countDown();
+                        return;
+                    }
                     forceRenderOneFrame(mc);
                     try { Thread.sleep(50); } catch (InterruptedException ignored) {}
                     suppressGlDebug(true);
@@ -495,6 +547,7 @@ public final class ScreenshotHelper {
     }
 
     private static void suppressGlDebug(boolean suppress) {
+        if (!hasCurrentGlContext()) return;
         try {
             Class<?> gl43 = Class.forName("org.lwjgl.opengl.GL43");
             int GL_DEBUG_OUTPUT = gl43.getDeclaredField("GL_DEBUG_OUTPUT").getInt(null);
@@ -762,6 +815,7 @@ public final class ScreenshotHelper {
                 if (f.getName().equals("height") && f.getType() == int.class) { try { h = f.getInt(rt); } catch (Exception ignored) {} }
             }
             if (w <= 0 || h <= 0) return;
+            if (!hasCurrentGlContext()) return;
             suppressGlDebug(true);
             byte[] result = null;
             try {
@@ -780,6 +834,7 @@ public final class ScreenshotHelper {
 
     public static byte[] captureFrameJpeg(Object mc) {
         try {
+            if (!hasCurrentGlContext()) return null;
             updateSkyColor(mc);
             int w = ReflectionHelper.getGlfwWindowSize(mc, true);
             int h = ReflectionHelper.getGlfwWindowSize(mc, false);
