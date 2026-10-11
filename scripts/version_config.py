@@ -254,21 +254,23 @@ ALL_VERSIONS = {
                "version_id": "1.21.11-forge-61.1.5",
                "neoforge": "21.11.42", "mdg": "2.0.141",
                "fabric_yarn": "1.21.11+build.6"},
-    "26.1.2": {"forge": "26.1.2-64.0.8",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
-               "version_id": "26.1.2-forge-64.0.8",
-               "neoforge": "26.1.2.36-beta", "mdg": "2.0.141"},
+    "26.1.2": {"forge": "26.1.2-64.1.0",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
+               "version_id": "26.1.2-forge-64.1.0",
+               "neoforge": "26.1.2.116", "mdg": "2.0.141"},
     # MC 26.x ships unobfuscated (intermediary is a fixed "0.0.0"), so Fabric
     # needs no yarn mappings there — only a loader pin. fabric_unobfuscated
     # switches the generator to the no-mappings loom 1.17 template.
     "26.2":   {"forge": "26.2-65.1.3",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.2",
                "version_id": "26.2-forge-65.1.3",
-               "neoforge": "26.2.0.75", "mdg": "2.0.141",
+               # 26.2.0.90 carries the same HolderSet.contents visibility
+               # change as 26.3, so it needs MDG >= 2.0.147 like 26.3.
+               "neoforge": "26.2.0.90", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
-    # NeoForge 26.3 is still beta-only upstream (26.3.0.x-beta); pin the
-    # newest build and revisit when the stable line lands.
-    "26.3":   {"forge": "26.3-66.0.6",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
-               "version_id": "26.3-forge-66.0.6",
-               "neoforge": "26.3.0.26-beta", "mdg": "2.0.147",
+    # NeoForge 26.3 is still beta-only upstream (26.3.0.x-beta, re-checked
+    # 2026-10-11); pin the newest build and revisit when the stable line lands.
+    "26.3":   {"forge": "26.3-66.0.10",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
+               "version_id": "26.3-forge-66.0.10",
+               "neoforge": "26.3.0.69-beta", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
 }
 
