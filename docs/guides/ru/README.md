@@ -38,7 +38,7 @@ Minecraft Mod MCP — инструмент ИИ-поддержки **для ра
 - **Видеть** — делать скриншоты с координатной сеткой
 - **Действовать** — кликать, вводить текст, прокручивать, перетаскивать и нажимать любые клавиши
 - **Знать** — запрашивать позицию игрока, информацию о мире, кнопки на экране и отладочные поля
-- **Записывать** — транслировать события в реальном времени через SSE, захватывать видеокадры
+- **Записывать** — транслировать события в реальном времени через SSE
 
 > Хотите, чтобы ИИ протестировал GUI вашего мода? Провёл smoke-тест? Проверил логику взаимодействия нового блока? Minecraft Mod MCP делает это возможным.
 
@@ -48,12 +48,12 @@ Minecraft Mod MCP — инструмент ИИ-поддержки **для ра
 
 | Версия MC | Forge | Fabric | NeoForge |
 |-----------|:-----:|:------:|:--------:|
-| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge.jar) |
-| 26.3 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-neoforge.jar) |
-| 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge.jar) |
-| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge.jar) |
+| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge-v0.4.3.jar) |
+| 26.3 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-neoforge-v0.4.3.jar) |
+| 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge-v0.4.3.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge-v0.4.3.jar) |
+| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge-v0.4.3.jar) |
 
-> Предыдущие версии (1.8.9 – 1.20.6) доступны на [странице releases](https://github.com/langyo/minecraft-mod-mcp/releases).
+> Предыдущие версии (1.7.2 – 1.21.10) доступны на [странице releases](https://github.com/langyo/minecraft-mod-mcp/releases).
 
 ---
 
@@ -64,7 +64,7 @@ Minecraft Mod MCP — инструмент ИИ-поддержки **для ра
 Скачайте JAR-файл из [GitHub Releases](https://github.com/langyo/minecraft-mod-mcp/releases) и поместите его в папку `mods` вашего Minecraft.
 
 - Требуется **Forge**, **Fabric** или **NeoForge** (см. поддерживаемые версии выше)
-- Работает с Minecraft от **1.8.9** до **26.1.2**
+- Работает с Minecraft от **1.7.2** до **26.3**
 
 ### 2. Установите MCP Bridge
 
@@ -112,8 +112,6 @@ https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/ru/AI-TOOLS.
 При загрузке игры мод запускает HTTP-сервер. По умолчанию он пытается занять порт **9876**; если порт занят, перебирает **9875 → 9874 → ... → 9000**, пока не найдёт свободный. Можно задать порт явно через `-Dmcp.port=XXXX` (аргумент JVM) или `MC_MCP_PORT` (переменная окружения).
 
 Как узнать, какой порт был выбран:
-- В консоль выводится `[MCP-MOD] Debug page: http://127.0.0.1:{port}/debug`
-- В игровой чат приходит кликабельное сообщение с URL отладочной страницы
 - `GET /api/status` возвращает `version`, `loader`, `port`, `pid`, `uptime` — Node.js-мост использует это для автоматического обнаружения
 - Откройте `http://localhost:{port}/debug` в браузере для интерактивной панели с MCP-логами, SSE-событиями и статусом соединения
 
@@ -132,15 +130,17 @@ https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/ru/AI-TOOLS.
 
 ```mermaid
 flowchart LR
-    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
-    B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
-    C["🎮 Minecraft Client<br/>(1.8.9 – 26.3)"]
+    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → stdio"]
+    B["🌉 minecraft-mod-mcp bridge<br/>(npm package via npx)<br/>speaks MCP over stdio"]
+    C["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    D["🎮 Minecraft Client<br/>(1.7.2 – 26.3)"]
 
-    A <-- "HTTP / SSE" --> B
-    B -- "reflection" --> C
+    A <-- "MCP / stdio" --> B
+    B -- "HTTP" --> C
+    C -- "reflection" --> D
 ```
 
-Мод запускает HTTP-сервер на порту 9876 внутри Minecraft. Ваш ИИ-инструмент подключается через стандартный протокол MCP (транспорт SSE), и каждая команда — клик, ввод текста, скриншот и т.д. — использует Java reflection для работы во всех версиях Minecraft без версионно-зависимого кода.
+Мод запускает HTTP-сервер на порту 9876 внутри Minecraft. Ваш ИИ-инструмент подключается к мосту `minecraft-mod-mcp` по протоколу MCP (транспорт stdio), а мост пересылает каждую команду — клик, ввод текста, скриншот и т.д. — моду; Java reflection обеспечивает работу во всех версиях Minecraft без версионно-зависимого кода.
 
 ---
 

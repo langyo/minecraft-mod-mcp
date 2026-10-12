@@ -433,6 +433,8 @@ interface VersionRow {
 }
 
 const versions: VersionRow[] = [
+  { version: '26.3', supported: ['forge', 'fabric', 'neoforge'] },
+  { version: '26.2', supported: ['forge', 'fabric', 'neoforge'] },
   { version: '26.1.2', supported: ['forge', 'neoforge'] },
   { version: '1.21.11', supported: ['forge', 'fabric', 'neoforge'] },
   { version: '1.21.x', supported: ['forge', 'fabric', 'neoforge'] },

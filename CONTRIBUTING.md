@@ -15,9 +15,6 @@ Thanks for your interest in contributing! This guide covers the development setu
 ### Build
 
 ```bash
-# Install dependencies
-pip install -r scripts/requirements.txt
-
 # Build everything (mods + MCP bridge)
 just full
 ```
@@ -42,7 +39,7 @@ minecraft-mcp/
 ├── packages/
 │   ├── common/                  # Shared Java library (HTTP server, reflection, input injection)
 │   │   └── src/main/java/xyz/langyo/minecraft/mcp/common/
-│   ├── mods/<version>/          # Per-version mod entry points (1.8.9 – 26.1.2)
+│   ├── mods/<version>/          # Per-version mod entry points (1.7.2 – 26.3)
 │   └── minecraft-mod-mcp/       # TypeScript MCP bridge (npm package)
 │       └── src/                 # MCP server, port discovery, transport handlers
 ├── scripts/                     # Python build/test/launch scripts
@@ -55,9 +52,9 @@ minecraft-mcp/
 ## How It Works
 
 1. The Java mod runs an HTTP server on port 9876 inside Minecraft
-2. Java reflection handles cross-version compatibility (same code works for 1.8.9 through 26.1.2)
-3. The TypeScript MCP bridge discovers the mod on the network and exposes MCP tools
-4. AI tools connect via standard SSE-based MCP protocol
+2. Java reflection handles cross-version compatibility (same code works for 1.7.2 through 26.3)
+3. The TypeScript MCP bridge discovers the mod on localhost and exposes MCP tools
+4. AI tools connect to the MCP bridge over stdio
 
 ## Testing
 

@@ -38,7 +38,7 @@ Minecraft Mod MCPは、**Mod開発者向け**のAI支援ツールです。`mods`
 - **見る** — 座標グリッド付きのスクリーンショットを撮影
 - **操作する** — クリック、入力、スクロール、ドラッグ、任意のキー入力
 - **知る** — プレイヤーの位置、ワールド情報、画面ボタン、デバッグフィールドの照会
-- **記録する** — SSEによるリアルタイムイベントのストリーミング、動画フレームのキャプチャ
+- **記録する** — SSEによるリアルタイムイベントのストリーミング
 
 > AIにModのGUIをテストさせたい？スモークテストを実行したい？新しいブロックの動作を検証したい？Minecraft Mod MCPなら可能です。
 
@@ -48,12 +48,12 @@ Minecraft Mod MCPは、**Mod開発者向け**のAI支援ツールです。`mods`
 
 | MC バージョン | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
-| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge.jar) |
-| 26.3 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-neoforge.jar) |
-| 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge.jar) |
-| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge.jar) |
+| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge-v0.4.3.jar) |
+| 26.3 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-neoforge-v0.4.3.jar) |
+| 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge-v0.4.3.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge-v0.4.3.jar) |
+| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge-v0.4.3.jar) |
 
-> 古いバージョン（1.8.9 – 1.20.6）は [Releases ページ](https://github.com/langyo/minecraft-mod-mcp/releases) をご覧ください。
+> 古いバージョン（1.7.2 – 1.21.10）は [Releases ページ](https://github.com/langyo/minecraft-mod-mcp/releases) をご覧ください。
 
 ---
 
@@ -64,7 +64,7 @@ Minecraft Mod MCPは、**Mod開発者向け**のAI支援ツールです。`mods`
 [GitHub Releases](https://github.com/langyo/minecraft-mod-mcp/releases)からJARファイルをダウンロードし、Minecraftの`mods`フォルダに配置してください。
 
 - **Forge**、**Fabric**、または**NeoForge**が必要です（上記の対応バージョンをご確認ください）
-- Minecraft **1.8.9**から**26.1.2**まで対応
+- Minecraft **1.7.2**から**26.3**まで対応
 
 ### 2. MCPブリッジをインストール
 
@@ -112,8 +112,6 @@ https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/ja/AI-TOOLS.
 ゲーム起動時に、ModはHTTPサーバーを起動します。デフォルトではポート **9876** を試行し、使用中の場合は **9875 → 9874 → ... → 9000** まで空きポートを探してフォールバックします。JVM引数 `-Dmcp.port=XXXX` または環境変数 `MC_MCP_PORT` で固定ポートを指定できます。
 
 選択されたポートの確認方法：
-- コンソールに `[MCP-MOD] Debug page: http://127.0.0.1:{port}/debug` が表示されます
-- ゲーム内チャットにクリック可能なデバッグページURLが表示されます
 - `GET /api/status` が `version`、`loader`、`port`、`pid`、`uptime` を返します——Node.jsブリッジはこれで自動検出します
 - ブラウザで `http://localhost:{port}/debug` を開くと、MCPログやSSEイベント、接続状態を表示するライブダッシュボードが確認できます
 
@@ -132,15 +130,17 @@ MCバージョンとローダー情報はハンドシェイク時に `/api/statu
 
 ```mermaid
 flowchart LR
-    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
-    B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
-    C["🎮 Minecraft Client<br/>(1.8.9 – 26.3)"]
+    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → stdio"]
+    B["🌉 minecraft-mod-mcp bridge<br/>(npm package via npx)<br/>speaks MCP over stdio"]
+    C["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    D["🎮 Minecraft Client<br/>(1.7.2 – 26.3)"]
 
-    A <-- "HTTP / SSE" --> B
-    B -- "reflection" --> C
+    A <-- "MCP / stdio" --> B
+    B -- "HTTP" --> C
+    C -- "reflection" --> D
 ```
 
-このModはMinecraft内でポート9876のHTTPサーバーを実行します。お使いのAIツールは標準のMCPプロトコル（SSEトランスポート）で接続し、クリック、入力、スクリーンショットなどのすべてのコマンドはJavaリフレクションを使用して、バージョン固有のコードなしですべてのMinecraftバージョンで動作します。
+このModはMinecraft内でポート9876のHTTPサーバーを実行します。お使いのAIツールはMCPプロトコル（stdioトランスポート）で `minecraft-mod-mcp` ブリッジに接続し、ブリッジがクリック、入力、スクリーンショットなどのすべてのコマンドをModへ転送します。Javaリフレクションにより、バージョン固有のコードなしですべてのMinecraftバージョンで動作します。
 
 ---
 

@@ -6,7 +6,7 @@
 >
 > Connect to Minecraft through the **`minecraft-mod-mcp` stdio bridge**, NOT by pointing an MCP/SSE client at a port directly. The bridge is the only component that speaks the MCP protocol; it also auto-discovers which port the running game is on, so you never have to guess.
 >
-> Add this MCP server config (stdio, launched via `npx`), then use the 45 tools the bridge exposes:
+> Add this MCP server config (stdio, launched via `npx`), then use the 46 tools the bridge exposes:
 >
 > ```json
 > {

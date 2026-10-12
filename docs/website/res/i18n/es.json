@@ -72,7 +72,7 @@
     "kicker": "Cómo se mantiene abierto el bucle",
     "heading": "Agente ⇄ Puente ⇄ Juego",
     "intro": "La superposición de liberación es lo que hace posible un bucle de desarrollo real: tu herramienta de IA y el juego coexisten en vez de pelear por el foco.",
-    "mcp": "MCP / SSE",
+    "mcp": "MCP / stdio",
     "reflect": "reflexión",
     "ai": {
       "title": "Agente IA",
@@ -84,7 +84,7 @@
     },
     "game": {
       "title": "Minecraft",
-      "sub": "1.7.2 – 26.1.2"
+      "sub": "1.7.2 – 26.3"
     },
     "tip": {
       "detach": "Clic en la superposición superior derecha para liberar el cursor",
