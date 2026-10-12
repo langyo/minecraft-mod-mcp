@@ -40,7 +40,7 @@ Minecraft Mod MCP is a mod designed for **AI-assisted mod development**. It expo
 - **See** — capture screenshots with coordinate grids
 - **Act** — click, type, scroll, drag, and press any key
 - **Know** — query player position, world info, screen buttons, and debug fields
-- **Record** — stream events in real time via SSE, capture video frames
+- **Record** — stream events in real time via SSE
 
 ---
 
@@ -48,12 +48,12 @@ Minecraft Mod MCP is a mod designed for **AI-assisted mod development**. It expo
 
 | MC Version | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
-| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge.jar) |
-| 26.3 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-neoforge.jar) |
-| 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge.jar) |
-| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge.jar) |
+| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge-v0.4.3.jar) |
+| 26.3 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-neoforge-v0.4.3.jar) |
+| 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge-v0.4.3.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge-v0.4.3.jar) |
+| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge-v0.4.3.jar) |
 
-> Older versions (1.7.2 – 1.20.6) are available on the [releases page](https://github.com/langyo/minecraft-mod-mcp/releases).
+> Older versions (1.7.2 – 1.21.10) are available on the [releases page](https://github.com/langyo/minecraft-mod-mcp/releases).
 
 ---
 
@@ -112,8 +112,6 @@ Normally, switching away from Minecraft opens the pause screen, which can interr
 The mod starts an HTTP server when the game loads. It tries port **9876** first; if occupied it falls back through **9875 → 9874 → ... → 9000** until it finds a free one. Set a fixed port with `-Dmcp.port=XXXX` (JVM arg) or `MC_MCP_PORT` (env).
 
 To confirm which port the mod chose:
-- The game prints `[MCP-MOD] Debug page: http://127.0.0.1:{port}/debug` to the console
-- A clickable chat message with the debug page URL appears in-game
 - `GET /api/status` returns `version`, `loader`, `port`, `pid`, `uptime` — the Node.js bridge uses this to auto-discover the mod on any port
 - Open `http://localhost:{port}/debug` in your browser for a live dashboard with MCP logs, SSE events, and connection status
 
@@ -132,15 +130,17 @@ The version and loader (Forge/Fabric/NeoForge) are confirmed at handshake via `/
 
 ```mermaid
 flowchart LR
-    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
-    B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
-    C["🎮 Minecraft Client<br/>(1.8.9 – 26.3)"]
+    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → stdio"]
+    B["🌉 minecraft-mod-mcp bridge<br/>(npm package via npx)<br/>speaks MCP over stdio"]
+    C["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    D["🎮 Minecraft Client<br/>(1.7.2 – 26.3)"]
 
-    A <-- "HTTP / SSE" --> B
-    B -- "reflection" --> C
+    A <-- "MCP / stdio" --> B
+    B -- "HTTP" --> C
+    C -- "reflection" --> D
 ```
 
-The mod runs an HTTP server on port 9876 inside Minecraft. Your AI tool connects via the standard MCP protocol (SSE transport), and every command — click, type, screenshot, etc. — uses Java reflection to work across all Minecraft versions without version-specific code.
+The mod runs an HTTP server on port 9876 inside Minecraft. Your AI tool talks MCP over stdio to the `minecraft-mod-mcp` bridge, which forwards every command — click, type, screenshot, etc. — to the mod; Java reflection makes it work across all Minecraft versions without version-specific code.
 
 ---
 

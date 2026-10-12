@@ -72,7 +72,7 @@
     "kicker": "Comment garder la boucle ouverte",
     "heading": "Agent ⇄ Pont ⇄ Jeu",
     "intro": "La superposition de libération rend une vraie boucle de dev possible : votre outil IA et le jeu coexistent au lieu de se disputer le focus.",
-    "mcp": "MCP / SSE",
+    "mcp": "MCP / stdio",
     "reflect": "réflexion",
     "ai": {
       "title": "Agent IA",
@@ -84,7 +84,7 @@
     },
     "game": {
       "title": "Minecraft",
-      "sub": "1.7.2 – 26.1.2"
+      "sub": "1.7.2 – 26.3"
     },
     "tip": {
       "detach": "Cliquez sur la superposition en haut à droite pour libérer le curseur",

@@ -38,7 +38,7 @@ Minecraft Mod MCP 是一個**面向模組開發**的 AI 輔助工具。放入你
 - **觀察** —— 擷取帶有座標網格的螢幕截圖
 - **操作** —— 點擊、輸入、滾動、拖曳及按下任意按鍵
 - **了解** —— 查詢玩家位置、世界資訊、畫面按鈕及除錯欄位
-- **記錄** —— 透過 SSE 即時串流事件、擷取影片幀
+- **記錄** —— 透過 SSE 即時串流事件
 
 > 想要讓你的 AI 測試你的模組 GUI？跑一遍煙霧測試？驗證新方塊的互動邏輯？Minecraft Mod MCP 讓這一切成為可能。
 
@@ -48,12 +48,12 @@ Minecraft Mod MCP 是一個**面向模組開發**的 AI 輔助工具。放入你
 
 | MC 版本 | Forge | Fabric | NeoForge |
 |------------|:-----:|:------:|:--------:|
-| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge.jar) |
-| 26.3 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-neoforge.jar) |
-| 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge.jar) |
-| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge.jar) |
+| 26.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.2-neoforge-v0.4.3.jar) |
+| 26.3 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.3-neoforge-v0.4.3.jar) |
+| 26.1.2 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-forge-v0.4.3.jar) | — | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-26.1.2-neoforge-v0.4.3.jar) |
+| 1.21.11 | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-forge-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-fabric-v0.4.3.jar) | [⬇](https://github.com/langyo/minecraft-mod-mcp/releases/latest/download/minecraft-mcp-1.21.11-neoforge-v0.4.3.jar) |
 
-> 早期版本（1.8.9 – 1.20.6）請前往 [Releases 頁面](https://github.com/langyo/minecraft-mod-mcp/releases) 下載。
+> 早期版本（1.7.2 – 1.21.10）請前往 [Releases 頁面](https://github.com/langyo/minecraft-mod-mcp/releases) 下載。
 
 ---
 
@@ -64,7 +64,7 @@ Minecraft Mod MCP 是一個**面向模組開發**的 AI 輔助工具。放入你
 從 [GitHub Releases](https://github.com/langyo/minecraft-mod-mcp/releases) 下載 JAR 檔案，放入你的 Minecraft `mods` 資料夾。
 
 - 需要 **Forge** / **Fabric** / **NeoForge**（見上方支援版本）
-- 相容 Minecraft **1.8.9** 至 **26.1.2**
+- 相容 Minecraft **1.7.2** 至 **26.3**
 
 ### 2. 安裝 MCP 橋接
 
@@ -112,8 +112,6 @@ https://github.com/langyo/minecraft-mod-mcp/blob/master/docs/guides/zht/AI-TOOLS
 模組啟動時會在遊戲內開啟一個 HTTP 伺服器。預設嘗試 **9876** 連接埠，若被佔用則依次回退到 **9875 → 9874 → ... → 9000** 直到找到空閒連接埠。可透過 JVM 參數 `-Dmcp.port=XXXX` 或環境變數 `MC_MCP_PORT` 指定固定連接埠。
 
 確認模組選擇的連接埠：
-- 主控台會輸出 `[MCP-MOD] Debug page: http://127.0.0.1:{port}/debug`
-- 遊戲內聊天欄會出現可點擊的除錯頁面連結
 - `GET /api/status` 回傳 `version`、`loader`、`port`、`pid`、`uptime` 等欄位——Node.js 橋接器據此自動發現模組
 - 在瀏覽器開啟 `http://localhost:{port}/debug` 可看到即時儀表板，包含 MCP 日誌、SSE 事件和連線狀態
 
@@ -132,15 +130,17 @@ MC 版本和模組載入器資訊在握手階段透過 `/api/status` 確認，�
 
 ```mermaid
 flowchart LR
-    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → port 9876"]
-    B["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
-    C["🎮 Minecraft Client<br/>(1.8.9 – 26.3)"]
+    A["🧠 AI Tool<br/>(Claude Code, Cursor, etc.)<br/>.mcp.json → stdio"]
+    B["🌉 minecraft-mod-mcp bridge<br/>(npm package via npx)<br/>speaks MCP over stdio"]
+    C["🔌 Minecraft Mod MCP<br/>(in-game mod)<br/>HTTP + SSE server"]
+    D["🎮 Minecraft Client<br/>(1.7.2 – 26.3)"]
 
-    A <-- "HTTP / SSE" --> B
-    B -- "reflection" --> C
+    A <-- "MCP / stdio" --> B
+    B -- "HTTP" --> C
+    C -- "reflection" --> D
 ```
 
-此模組在 Minecraft 內部於連接埠 9876 執行一個 HTTP 伺服器。你的 AI 工具透過標準的 MCP 協定（SSE 傳輸）連接，而每個指令——點擊、輸入、截圖等——都使用 Java 反射技術，無需針對特定版本編寫程式碼即可在所有 Minecraft 版本上運作。
+此模組在 Minecraft 內部於連接埠 9876 執行一個 HTTP 伺服器。你的 AI 工具透過 MCP 協定（stdio 傳輸）連接 `minecraft-mod-mcp` 橋接器，橋接器將每個指令——點擊、輸入、截圖等——轉發給模組；藉助 Java 反射技術，無需針對特定版本編寫程式碼即可在所有 Minecraft 版本上運作。
 
 ---
 

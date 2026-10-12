@@ -72,7 +72,7 @@
     "kicker": "How the loop stays open",
     "heading": "Agent ⇄ Bridge ⇄ Game",
     "intro": "The detach overlay is what makes a real dev loop possible — your AI tool and the game coexist instead of fighting for focus.",
-    "mcp": "MCP / SSE",
+    "mcp": "MCP / stdio",
     "reflect": "reflection",
     "ai": {
       "title": "AI Agent",
@@ -84,7 +84,7 @@
     },
     "game": {
       "title": "Minecraft",
-      "sub": "1.7.2 – 26.1.2"
+      "sub": "1.7.2 – 26.3"
     },
     "tip": {
       "detach": "Click the top-right overlay to free the cursor",
