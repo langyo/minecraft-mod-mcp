@@ -266,11 +266,12 @@ ALL_VERSIONS = {
                # change as 26.3, so it needs MDG >= 2.0.147 like 26.3.
                "neoforge": "26.2.0.90", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
-    # NeoForge 26.3 is still beta-only upstream (26.3.0.x-beta, re-checked
-    # 2026-10-11); pin the newest build and revisit when the stable line lands.
+    # The NeoForge 26.3 stable line landed upstream (26.3.0.76, re-checked
+    # 2026-10-13); the pin tracks it and still needs MDG >= 2.0.147 for the
+    # HolderSet.contents visibility change.
     "26.3":   {"forge": "26.3-66.0.10",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
                "version_id": "26.3-forge-66.0.10",
-               "neoforge": "26.3.0.69-beta", "mdg": "2.0.147",
+               "neoforge": "26.3.0.76", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
 }
 
