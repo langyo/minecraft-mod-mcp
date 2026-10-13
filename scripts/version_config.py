@@ -250,9 +250,9 @@ ALL_VERSIONS = {
                "version_id": "1.21.9-Forge59.0.5", 'fabric_yarn': '1.21.9+build.1'},
     "1.21.10": {"forge": "1.21.10-60.1.0",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.10",
                "version_id": "1.21.10-Forge60.1.0", 'fabric_yarn': '1.21.10+build.1'},
-    "1.21.11": {"forge": "1.21.11-61.1.5",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.11",
-               "version_id": "1.21.11-forge-61.1.5",
-               "neoforge": "21.11.42", "mdg": "2.0.141",
+    "1.21.11": {"forge": "1.21.11-61.2.0",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.11",
+               "version_id": "1.21.11-forge-61.2.0",
+               "neoforge": "21.11.45", "mdg": "2.0.141",
                "fabric_yarn": "1.21.11+build.6"},
     "26.1.2": {"forge": "26.1.2-64.1.0",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
                "version_id": "26.1.2-forge-64.1.0",
@@ -260,17 +260,17 @@ ALL_VERSIONS = {
     # MC 26.x ships unobfuscated (intermediary is a fixed "0.0.0"), so Fabric
     # needs no yarn mappings there — only a loader pin. fabric_unobfuscated
     # switches the generator to the no-mappings loom 1.17 template.
-    "26.2":   {"forge": "26.2-65.1.3",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.2",
-               "version_id": "26.2-forge-65.1.3",
+    "26.2":   {"forge": "26.2-65.1.4",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.2",
+               "version_id": "26.2-forge-65.1.4",
                # 26.2.0.90 carries the same HolderSet.contents visibility
                # change as 26.3, so it needs MDG >= 2.0.147 like 26.3.
                "neoforge": "26.2.0.90", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
     # The NeoForge 26.3 stable line landed upstream (26.3.0.76, re-checked
-    # 2026-10-13); the pin tracks it and still needs MDG >= 2.0.147 for the
+    # 2026-10-14); the pin tracks it and still needs MDG >= 2.0.147 for the
     # HolderSet.contents visibility change.
-    "26.3":   {"forge": "26.3-66.0.10",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
-               "version_id": "26.3-forge-66.0.10",
+    "26.3":   {"forge": "26.3-66.0.11",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
+               "version_id": "26.3-forge-66.0.11",
                "neoforge": "26.3.0.76", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
 }
