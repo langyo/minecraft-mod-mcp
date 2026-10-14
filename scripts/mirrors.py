@@ -50,6 +50,10 @@ MIRROR_GROUPS = {
         "desc": "NeoForge Maven",
         "urls": [
             "https://maven.neoforged.net/releases",
+            # Official CloudFront-backed complete mirror of the releases repo.
+            # Keeps local builds working on networks where maven.neoforged.net
+            # itself is unreachable (e.g. SNI-filtered DNS-poisoned links).
+            "https://neoforged.forgecdn.net/releases",
         ],
     },
     "gradle_dist": {
@@ -229,6 +233,7 @@ def generate_init_gradle():
 
     lines = [
         "// Auto-generated mirror config for local development. Safe to delete.",
+        "import org.gradle.api.artifacts.repositories.MavenArtifactRepository",
         "allprojects {",
         "    repositories {",
         f"        maven {{ url = '{central}' }}",
@@ -241,10 +246,38 @@ def generate_init_gradle():
         "}",
     ]
 
+    # When the official NeoForge maven is unreachable but a mirror probed OK,
+    # rewrite every maven.neoforged.net repository URL to the mirror host.
+    # Registered via RepositoryHandler.all() so repositories that ModDevGradle
+    # adds in afterEvaluate get rewritten as well. Note: switching the repo URL
+    # changes Gradle's per-repository cache key, so neoforged-hosted artifacts
+    # are re-downloaded once from the mirror.
+    nf = get_url("maven_neoforge")
+    nf_official = MIRROR_GROUPS["maven_neoforge"]["urls"][0]
+    mirror_host = None
+    if nf and nf.rstrip("/").split("//", 1)[-1] != nf_official.rstrip("/").split("//", 1)[-1]:
+        mirror_host = nf.split("//", 1)[1].split("/", 1)[0]
+        lines += [
+            "def rewriteNeoForge = { repo ->",
+            "    if (repo instanceof MavenArtifactRepository) {",
+            "        def u = repo.url?.toString()",
+            "        if (u != null && u.startsWith('https://maven.neoforged.net')) {",
+            f"            repo.url = u.replaceFirst('https://maven\\\\.neoforged\\\\.net', 'https://{mirror_host}')",
+            "        }",
+            "    }",
+            "}",
+            "allprojects {",
+            "    buildscript.repositories.all(rewriteNeoForge)",
+            "    repositories.all(rewriteNeoForge)",
+            "}",
+        ]
+
     with open(init_path, "w") as f:
         f.write("\n".join(lines) + "\n")
 
     print(f"  Generated {init_path}")
+    if mirror_host:
+        print(f"  NeoForge maven unreachable; repo URLs rewritten to {mirror_host}")
     return init_path
 
 
