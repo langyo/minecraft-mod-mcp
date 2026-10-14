@@ -2,7 +2,7 @@ plugins {
     id 'java'
     id 'idea'
     id 'eclipse'
-    id 'net.minecraftforge.gradle' version '7.0.23'
+    id 'net.minecraftforge.gradle' version '7.0.40'
 }
 
 version = '0.4.5'
