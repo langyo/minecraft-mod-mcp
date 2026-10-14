@@ -256,7 +256,7 @@ ALL_VERSIONS = {
                "fabric_yarn": "1.21.11+build.6"},
     "26.1.2": {"forge": "26.1.2-64.1.0",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
                "version_id": "26.1.2-forge-64.1.0",
-               "neoforge": "26.1.2.116", "mdg": "2.0.141"},
+               "neoforge": "26.1.2.117", "mdg": "2.0.141"},
     # MC 26.x ships unobfuscated (intermediary is a fixed "0.0.0"), so Fabric
     # needs no yarn mappings there — only a loader pin. fabric_unobfuscated
     # switches the generator to the no-mappings loom 1.17 template.
@@ -266,12 +266,12 @@ ALL_VERSIONS = {
                # change as 26.3, so it needs MDG >= 2.0.147 like 26.3.
                "neoforge": "26.2.0.90", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
-    # The NeoForge 26.3 stable line landed upstream (26.3.0.76, re-checked
-    # 2026-10-14); the pin tracks it and still needs MDG >= 2.0.147 for the
+    # The NeoForge 26.3 stable line landed upstream (26.3.0.77, re-checked
+    # 2026-10-15); the pin tracks it and still needs MDG >= 2.0.147 for the
     # HolderSet.contents visibility change.
     "26.3":   {"forge": "26.3-66.0.11",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
                "version_id": "26.3-forge-66.0.11",
-               "neoforge": "26.3.0.76", "mdg": "2.0.147",
+               "neoforge": "26.3.0.77", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
 }
 
