@@ -252,26 +252,27 @@ ALL_VERSIONS = {
                "version_id": "1.21.10-Forge60.1.0", 'fabric_yarn': '1.21.10+build.1'},
     "1.21.11": {"forge": "1.21.11-61.2.0",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.11",
                "version_id": "1.21.11-forge-61.2.0",
-               "neoforge": "21.11.45", "mdg": "2.0.141",
+               "neoforge": "21.11.48", "mdg": "2.0.141",
                "fabric_yarn": "1.21.11+build.6"},
     "26.1.2": {"forge": "26.1.2-64.1.0",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
                "version_id": "26.1.2-forge-64.1.0",
-               "neoforge": "26.1.2.117", "mdg": "2.0.141"},
+               "neoforge": "26.1.2.122", "mdg": "2.0.141"},
     # MC 26.x ships unobfuscated (intermediary is a fixed "0.0.0"), so Fabric
     # needs no yarn mappings there — only a loader pin. fabric_unobfuscated
     # switches the generator to the no-mappings loom 1.17 template.
-    "26.2":   {"forge": "26.2-65.1.4",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.2",
-               "version_id": "26.2-forge-65.1.4",
+    "26.2":   {"forge": "26.2-65.1.5",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.2",
+               "version_id": "26.2-forge-65.1.5",
                # 26.2.0.90 carries the same HolderSet.contents visibility
                # change as 26.3, so it needs MDG >= 2.0.147 like 26.3.
-               "neoforge": "26.2.0.90", "mdg": "2.0.147",
+               "neoforge": "26.2.0.93", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
     # The NeoForge 26.3 stable line landed upstream (26.3.0.77, re-checked
     # 2026-10-15); the pin tracks it and still needs MDG >= 2.0.147 for the
-    # HolderSet.contents visibility change.
-    "26.3":   {"forge": "26.3-66.0.11",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
-               "version_id": "26.3-forge-66.0.11",
-               "neoforge": "26.3.0.77", "mdg": "2.0.147",
+    # HolderSet.contents visibility change. Refreshed to 26.3.0.84 on
+    # 2026-10-16 (newest stable at re-check).
+    "26.3":   {"forge": "26.3-66.0.12",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
+               "version_id": "26.3-forge-66.0.12",
+               "neoforge": "26.3.0.84", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
 }
 
