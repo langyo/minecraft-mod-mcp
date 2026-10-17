@@ -269,10 +269,11 @@ ALL_VERSIONS = {
     # The NeoForge 26.3 stable line landed upstream (26.3.0.77, re-checked
     # 2026-10-15); the pin tracks it and still needs MDG >= 2.0.147 for the
     # HolderSet.contents visibility change. Refreshed to 26.3.0.84 on
-    # 2026-10-16 and to 26.3.0.86 on 2026-10-17 (newest stable at re-check).
-    "26.3":   {"forge": "26.3-66.0.12",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
-               "version_id": "26.3-forge-66.0.12",
-               "neoforge": "26.3.0.86", "mdg": "2.0.147",
+    # 2026-10-16, to 26.3.0.86 on 2026-10-17 and to 26.3.0.89 on 2026-10-18
+    # (newest stable at re-check).
+    "26.3":   {"forge": "26.3-66.0.13",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
+               "version_id": "26.3-forge-66.0.13",
+               "neoforge": "26.3.0.89", "mdg": "2.0.147",
                "fabric_loader": "0.19.5", "fabric_unobfuscated": True},
 }
 
