@@ -395,11 +395,32 @@ jobs:
           ls -la dist/
       - name: Find mod JAR
         id: find-jar
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          MOD_JAR=$(find dist -name "minecraft-mcp-${{ matrix.mc_ver }}-${{ matrix.loader }}-*.jar" 2>/dev/null | head -1)
+          JAR_GLOB="minecraft-mcp-${{ matrix.mc_ver }}-${{ matrix.loader }}-*.jar"
+          MOD_JAR=$(find dist -name "$JAR_GLOB" 2>/dev/null | head -1 || true)
           if [ -z "$MOD_JAR" ]; then
-            echo "::error::No JAR found for ${{ matrix.mc_ver }}-${{ matrix.loader }}"
-            ls dist/ || true
+            # The artifact listing GitHub serves is eventually consistent: a
+            # build-mods leg that just finished may briefly be missing from
+            # actions/download-artifact's listing, leaving this JAR absent
+            # (issue #44). Re-download the artifacts with backoff first.
+            for attempt in 1 2 3 4 5; do
+              echo "::warning::${{ matrix.mc_ver }}-${{ matrix.loader }} JAR missing, re-downloading artifacts (attempt $attempt/5)"
+              sleep $((attempt * 15))
+              gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --pattern 'mods-jdk*' --dir release-jars/ || true
+              find release-jars -name "*.jar" -exec cp {} dist/ \; || true
+              MOD_JAR=$(find dist -name "$JAR_GLOB" 2>/dev/null | head -1 || true)
+              [ -n "$MOD_JAR" ] && break
+            done
+          fi
+          if [ -z "$MOD_JAR" ]; then
+            echo "::error::No JAR found for ${{ matrix.mc_ver }}-${{ matrix.loader }} after 5 retries"
+            echo "--- artifacts reported by the API for this run ---"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+              --jq '.artifacts[] | "\(.name) \(.size_in_bytes) bytes (\(.state))"' || true
+            echo "--- dist contents ---"
+            ls -la dist/ || true
             exit 1
           fi
           echo "mod_jar=$MOD_JAR" >> $GITHUB_OUTPUT
@@ -483,8 +504,32 @@ jobs:
           find release-jars -name "*.jar" -exec cp {} dist/ \;
       - name: Find mod JAR
         id: find-jar
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          MOD_JAR=$(find dist -name "minecraft-mcp-${{ matrix.mc_ver }}-${{ matrix.loader }}-*.jar" 2>/dev/null | head -1)
+          JAR_GLOB="minecraft-mcp-${{ matrix.mc_ver }}-${{ matrix.loader }}-*.jar"
+          MOD_JAR=$(find dist -name "$JAR_GLOB" 2>/dev/null | head -1 || true)
+          if [ -z "$MOD_JAR" ]; then
+            # Artifact listing is eventually consistent on GitHub's side
+            # (issue #44): retry the download with backoff before failing.
+            for attempt in 1 2 3 4 5; do
+              echo "::warning::${{ matrix.mc_ver }}-${{ matrix.loader }} JAR missing, re-downloading artifacts (attempt $attempt/5)"
+              sleep $((attempt * 15))
+              gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --pattern 'mods-jdk*' --dir release-jars/ || true
+              find release-jars -name "*.jar" -exec cp {} dist/ \; || true
+              MOD_JAR=$(find dist -name "$JAR_GLOB" 2>/dev/null | head -1 || true)
+              [ -n "$MOD_JAR" ] && break
+            done
+          fi
+          if [ -z "$MOD_JAR" ]; then
+            echo "::error::No JAR found for ${{ matrix.mc_ver }}-${{ matrix.loader }} after 5 retries"
+            echo "--- artifacts reported by the API for this run ---"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+              --jq '.artifacts[] | "\(.name) \(.size_in_bytes) bytes (\(.state))"' || true
+            echo "--- dist contents ---"
+            ls -la dist/ || true
+            exit 1
+          fi
           echo "mod_jar=$MOD_JAR" >> $GITHUB_OUTPUT
       - uses: actions/setup-java@v4
         with:
@@ -561,8 +606,32 @@ jobs:
           find release-jars -name "*.jar" -exec cp {} dist/ \;
       - name: Find mod JAR
         id: find-jar
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          MOD_JAR=$(find dist -name "minecraft-mcp-1.21.7-forge-*.jar" 2>/dev/null | head -1)
+          JAR_GLOB="minecraft-mcp-1.21.7-forge-*.jar"
+          MOD_JAR=$(find dist -name "$JAR_GLOB" 2>/dev/null | head -1 || true)
+          if [ -z "$MOD_JAR" ]; then
+            # Artifact listing is eventually consistent on GitHub's side
+            # (issue #44): retry the download with backoff before failing.
+            for attempt in 1 2 3 4 5; do
+              echo "::warning::1.21.7-forge JAR missing, re-downloading artifacts (attempt $attempt/5)"
+              sleep $((attempt * 15))
+              gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" --pattern 'mods-jdk*' --dir release-jars/ || true
+              find release-jars -name "*.jar" -exec cp {} dist/ \; || true
+              MOD_JAR=$(find dist -name "$JAR_GLOB" 2>/dev/null | head -1 || true)
+              [ -n "$MOD_JAR" ] && break
+            done
+          fi
+          if [ -z "$MOD_JAR" ]; then
+            echo "::error::No JAR found for 1.21.7-forge after 5 retries"
+            echo "--- artifacts reported by the API for this run ---"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+              --jq '.artifacts[] | "\(.name) \(.size_in_bytes) bytes (\(.state))"' || true
+            echo "--- dist contents ---"
+            ls -la dist/ || true
+            exit 1
+          fi
           echo "mod_jar=$MOD_JAR" >> $GITHUB_OUTPUT
       - uses: actions/setup-java@v4
         with:
