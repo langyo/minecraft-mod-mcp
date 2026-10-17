@@ -67,6 +67,10 @@ public class McpMessageHandler {
         }
         if (method.equals("click")) return handleClick(params);
         if (method.equals("press_key")) return handlePressKey(params);
+        if (method.equals("press_enter")) {
+            params.put("key", "enter");
+            return handlePressKey(params);
+        }
         if (method.equals("type_text")) return handleTypeText(params);
         if (method.equals("scroll")) return handleScroll(params);
         if (method.equals("scroll_at")) return handleScrollAt(params);

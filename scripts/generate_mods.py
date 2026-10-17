@@ -256,6 +256,13 @@ sourceSets.main.java.srcDir '../../../common/src/main/java'
 dependencies {{
     compile "org.java-websocket:Java-WebSocket:1.5.4"
 }}
+
+jar {{
+    manifest {{
+        attributes 'Implementation-Title': 'minecraft-moddev-mcp-mod'
+        attributes 'Implementation-Version': project.version
+    }}
+}}
 """
     with open(os.path.join(path, "build.gradle"), "w") as f:
         f.write(content)

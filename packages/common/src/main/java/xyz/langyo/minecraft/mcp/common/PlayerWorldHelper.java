@@ -45,7 +45,7 @@ public final class PlayerWorldHelper {
                 if (m.getParameterCount() == 0 && m.getReturnType() == String.class) {
                     String mn = m.getName();
                     ReflectionHelper.dbg("name: checking " + mn + " ret=String");
-                    if (mn.contains("74861") || mn.contains("5820") || mn.contains("5477") || mn.contains("56017") || mn.contains("5776") || mn.equals("getName") || mn.equals("getNameForScoreboard") || mn.equals("getStringifiedName") || mn.equals("asString")) {
+                    if (mn.contains("74861") || mn.contains("5820") || mn.contains("5477") || mn.contains("56017") || mn.contains("5776") || mn.contains("70005") || mn.equals("getName") || mn.equals("getNameForScoreboard") || mn.equals("getStringifiedName") || mn.equals("asString")) {
                         try { m.setAccessible(true); Object r = m.invoke(player); if (r != null && !r.toString().isEmpty()) { ReflectionHelper.dbg("name: matched " + mn + "=" + r); return r.toString(); } } catch (Exception ignored) {}
                     }
                 }
@@ -80,7 +80,7 @@ public final class PlayerWorldHelper {
             for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
                 if (m.getParameterCount() == 0 && (m.getReturnType() == float.class || m.getReturnType() == double.class)) {
                     String mn = m.getName();
-                    if (mn.contains("6032") || mn.contains("6033") || mn.equals("getHealth")) {
+                    if (mn.contains("6032") || mn.contains("6033") || mn.contains("110143") || mn.equals("getHealth")) {
                         m.setAccessible(true);
                         double val = ((Number) m.invoke(player)).doubleValue();
                         ReflectionHelper.dbg("health: " + mn + "()=" + val);
@@ -105,15 +105,29 @@ public final class PlayerWorldHelper {
     private static double[] getPlayerPosition(Object player) {
         double x = 0, y = 0, z = 0;
         try {
-            for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
-                if (m.getParameterCount() != 0 || m.getReturnType() != double.class) continue;
-                String mn = m.getName();
+            // 1.12.2 SRG keeps position as fields (field_70165_t/u/v), no getX()
+            // methods exist on the entity hierarchy in that era.
+            for (Field f : ReflectionCache.getAllFields(player.getClass())) {
+                String fn = f.getName();
+                if (f.getType() != double.class) continue;
                 try {
-                    m.setAccessible(true);
-                    if (mn.contains("23317")) x = ((Number) m.invoke(player)).doubleValue();
-                    else if (mn.contains("23318")) y = ((Number) m.invoke(player)).doubleValue();
-                    else if (mn.contains("23321")) z = ((Number) m.invoke(player)).doubleValue();
+                    f.setAccessible(true);
+                    if (fn.equals("field_70165_t") || fn.equals("posX")) x = f.getDouble(player);
+                    else if (fn.equals("field_70163_u") || fn.equals("posY")) y = f.getDouble(player);
+                    else if (fn.equals("field_70161_v") || fn.equals("posZ")) z = f.getDouble(player);
                 } catch (Exception ignored) {}
+            }
+            if (x == 0 && y == 0 && z == 0) {
+                for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                    if (m.getParameterCount() != 0 || m.getReturnType() != double.class) continue;
+                    String mn = m.getName();
+                    try {
+                        m.setAccessible(true);
+                        if (mn.contains("23317")) x = ((Number) m.invoke(player)).doubleValue();
+                        else if (mn.contains("23318")) y = ((Number) m.invoke(player)).doubleValue();
+                        else if (mn.contains("23321")) z = ((Number) m.invoke(player)).doubleValue();
+                    } catch (Exception ignored) {}
+                }
             }
             if (x == 0 && y == 0 && z == 0) {
                 for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
@@ -135,15 +149,29 @@ public final class PlayerWorldHelper {
     private static float[] getPlayerRotation(Object player) {
         float yaw = 0, pitch = 0;
         try {
+            // Exact SRG/MCP names first: the fuzzy fragments below
+            // ("126"/"125") also collide with field_70126_B
+            // (prevRotationYaw) on 1.12.2 SRG runtimes.
             for (Field f : ReflectionCache.getAllFields(player.getClass())) {
-                if (f.getType() != float.class) continue;
                 String fn = f.getName();
-                try {
-                    f.setAccessible(true);
-                    float val = f.getFloat(player);
-                    if (fn.contains("126") || fn.equals("yRot") || fn.equals("yaw")) yaw = val;
-                    else if (fn.contains("125") || fn.equals("xRot") || fn.equals("pitch")) pitch = val;
-                } catch (Exception ignored) {}
+                if (f.getType() != float.class) continue;
+                if (fn.equals("field_70177_z") || fn.equals("rotationYaw")) {
+                    try { f.setAccessible(true); yaw = f.getFloat(player); } catch (Exception ignored) {}
+                } else if (fn.equals("field_70125_A") || fn.equals("rotationPitch")) {
+                    try { f.setAccessible(true); pitch = f.getFloat(player); } catch (Exception ignored) {}
+                }
+            }
+            if (yaw == 0 && pitch == 0) {
+                for (Field f : ReflectionCache.getAllFields(player.getClass())) {
+                    if (f.getType() != float.class) continue;
+                    String fn = f.getName();
+                    try {
+                        f.setAccessible(true);
+                        float val = f.getFloat(player);
+                        if (fn.contains("126") || fn.equals("yRot") || fn.equals("yaw")) yaw = val;
+                        else if (fn.contains("125") || fn.equals("xRot") || fn.equals("pitch")) pitch = val;
+                    } catch (Exception ignored) {}
+                }
             }
         } catch (Exception ignored) {}
         return new float[]{yaw, pitch};
@@ -211,13 +239,24 @@ public final class PlayerWorldHelper {
             String weather = "clear";
 
             Object server = findMethodOrNull(level, "getServer");
-            if (server != null) {
-                Object wd = findMethodOrNull(server, "getWorldData");
-                if (wd != null) {
-                    for (Method m : ReflectionCache.getAllMethods(wd.getClass())) {
-                        if (m.getParameterCount() == 0 && m.getReturnType() == String.class) {
-                            try { m.setAccessible(true); worldName = (String) m.invoke(wd); break; } catch (Exception ignored) {}
-                        }
+            Object wd = server != null ? findMethodOrNull(server, "getWorldData") : null;
+            if (wd == null) {
+                // 1.12.2 SRG runtimes name the accessors func_*/field_*, so
+                // find the WorldInfo holder by its readable SRG class name
+                // instead of guessing method names.
+                for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
+                    if (m.getParameterCount() == 0 && !m.getReturnType().isPrimitive()
+                            && !m.getReturnType().isArray()
+                            && m.getReturnType().getName().contains("WorldInfo")) {
+                        try { m.setAccessible(true); wd = m.invoke(level); } catch (Exception ignored) {}
+                        if (wd != null) break;
+                    }
+                }
+            }
+            if (wd != null) {
+                for (Method m : ReflectionCache.getAllMethods(wd.getClass())) {
+                    if (m.getParameterCount() == 0 && m.getReturnType() == String.class) {
+                        try { m.setAccessible(true); worldName = (String) m.invoke(wd); break; } catch (Exception ignored) {}
                     }
                 }
             }
@@ -345,7 +384,11 @@ public final class PlayerWorldHelper {
                     try { server = mc.getClass().getMethod("getIntegratedServer").invoke(mc); } catch (Exception ignored) {}
                 }
                 if (server == null) {
+                    try { server = mc.getClass().getMethod("func_71401_C").invoke(mc); } catch (Exception ignored) {}
+                }
+                if (server == null) {
                     Object f = fieldOrNull(mc, "singleplayerServer");
+                    if (f == null) f = fieldOrNull(mc, "field_71437_Z");
                     if (f != null) server = f;
                 }
                 if (server == null) {
@@ -931,14 +974,14 @@ public final class PlayerWorldHelper {
             Object server = null;
             for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
                 String mn = m.getName();
-                if ((mn.equals("getSingleplayerServer") || mn.equals("getServer") || mn.equals("getIntegratedServer")) && m.getParameterCount() == 0) {
+                if ((mn.equals("getSingleplayerServer") || mn.equals("getServer") || mn.equals("getIntegratedServer") || mn.equals("func_71401_C")) && m.getParameterCount() == 0) {
                     try { server = m.invoke(mc); if (server != null) break; } catch (Exception ignored) {}
                 }
             }
             if (server == null) {
                 for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
                     String n = f.getName();
-                    if (n.equals("singleplayerServer") || n.contains("integratedServer")) {
+                    if (n.equals("singleplayerServer") || n.contains("integratedServer") || n.equals("field_71437_Z")) {
                         try { f.setAccessible(true); server = f.get(mc); if (server != null) break; } catch (Exception ignored) {}
                     }
                 }

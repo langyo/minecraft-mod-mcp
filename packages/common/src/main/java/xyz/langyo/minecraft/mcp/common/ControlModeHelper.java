@@ -21,6 +21,7 @@ public final class ControlModeHelper {
 
     private static volatile boolean mouseReleaseActive = false;
     private static volatile boolean waitingForRelease = false;
+    private static volatile boolean tickHookActive = false;
 
     private static int GLFW_CURSOR_VAL = -1;
     private static int GLFW_CURSOR_NORMAL_VAL = -1;
@@ -65,8 +66,10 @@ public final class ControlModeHelper {
             mouseReleaseActive = false;
             forceCursorAndReleaseMouse(mc);
             logModEvent("enter_control_mode", "MCP took control");
-            ReflectionHelper.dbg("enterMcpControlMode: cursor forced to NORMAL, no hook");
-            return JsonHelper.builder().put("control_mode", true).put("platform", "internal").put("hook", false).build();
+            ReflectionHelper.dbg(tickHookActive
+                ? "enterMcpControlMode: cursor forced to NORMAL"
+                : "enterMcpControlMode: cursor forced to NORMAL, no tick hook observed yet");
+            return JsonHelper.builder().put("control_mode", true).put("platform", "internal").put("hook", tickHookActive).build();
         } catch (Exception e) { return JsonHelper.error(e.getMessage()); }
     }
 
@@ -201,6 +204,9 @@ public final class ControlModeHelper {
     public static boolean isMouseReleaseActive() { return mouseReleaseActive; }
 
     public static void tickMcpControlMode(Object mc) {
+        // Latches once the era entry's client-tick handler has actually run,
+        // so the control-mode status reports a real hook state (issue #45).
+        tickHookActive = true;
         // In background input mode the un-grab guard also runs outside MCP
         // control mode: vanilla re-grabs the cursor on screen open/close and
         // would confine the user's desktop cursor via GLFW (issue #54).

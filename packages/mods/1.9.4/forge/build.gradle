@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: "net.minecraftforge.gradle.forge"
 
-version = "0.4.9"
+version = "0.4.10"
 group = "xyz.langyo"
 archivesBaseName = "minecraft-moddev-mcp-mod"
 
@@ -34,4 +34,11 @@ sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
     compile "org.java-websocket:Java-WebSocket:1.5.4"
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'minecraft-moddev-mcp-mod'
+        attributes 'Implementation-Version': project.version
+    }
 }

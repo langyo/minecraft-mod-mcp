@@ -258,6 +258,30 @@ def _is_mc_jar(path: str, mc_dir: Path) -> bool:
     return False
 
 
+def _loader_from_version(version: str) -> str:
+    # Accepts every version_id shape in version_config.py: dashed
+    # ("1.8-forge-11.14.4.1563"), glued ("1.12.2-forge1.12.2-14.23.5.2847")
+    # and capitalized ("1.21.1-Forge52.1.0").
+    v = version.lower()
+    if "-neoforge" in v:
+        return "neoforge"
+    if "-forge" in v:
+        return "forge"
+    if "-fabric" in v:
+        return "fabric"
+    return "vanilla"
+
+
+def _loader_ver_from_version(version: str, loader: str):
+    import re
+    parts = re.split(rf"-{loader}", version, maxsplit=1, flags=re.IGNORECASE)
+    if len(parts) < 2:
+        return None
+    tail = parts[1].lstrip("-")
+    numeric = [p for p in tail.split("-") if p and p[0].isdigit()]
+    return numeric[-1] if numeric else None
+
+
 def _start_mc(version: str) -> subprocess.Popen:
     from launch_mc import merge_version_json, build_classpath, extract_natives, build_jvm_args, build_game_args, find_java, download_libraries, ensure_version_jar, ensure_asset_index
     vj = merge_version_json(version, mc_dir=str(MC_DIR))
@@ -287,7 +311,15 @@ def _start_mc(version: str) -> subprocess.Popen:
 
     extra_jars = _ensure_websocket_deps(MC_DIR, version)
 
-    cmd = [java_exe, "-Xmx4G", "-Xms1G", "-Dmcp.server=ws://127.0.0.1:9876"]
+    # Surface the runtime identity via /api/status (issue #45): without these
+    # the daemon-launched clients report version/loader "unknown".
+    loader = _loader_from_version(version)
+    cmd = [java_exe, "-Xmx4G", "-Xms1G", "-Dmcp.server=ws://127.0.0.1:9876",
+           f"-Dmcp.mod.version={mc_key}", f"-Dmcp.mod.loader={loader}"]
+    if loader in ("forge", "neoforge"):
+        loader_ver = _loader_ver_from_version(version, loader)
+        if loader_ver:
+            cmd.append(f"-Dmcp.mod.forge.version={loader_ver}")
     cmd.extend(jvm_args)
 
     if uses_module_path:
