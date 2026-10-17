@@ -117,6 +117,16 @@ To confirm which port the mod chose:
 
 The version and loader (Forge/Fabric/NeoForge) are confirmed at handshake via `/api/status` so both the bridge and the debug page know exactly which mod environment they're talking to.
 
+### Background input mode (driving a client in the background)
+
+On Windows, a Minecraft window launched by a background process still counts as "focused" to GLFW, so while an agent drives the client the mod's cursor moves (`glfwSetCursorPos`) and cursor locking (`GLFW_CURSOR_DISABLED`) would move and confine **your real desktop cursor**, even though the game window stays behind your other windows.
+
+If an agent or CI drives the client while you keep working, enable background input mode with `-Dmcp.background_input=true` (JVM arg) or `MC_MCP_BACKGROUND_INPUT=1` (env). In this mode the mod:
+
+- only edits Minecraft-internal mouse state (window-local `xpos`/`ypos`) instead of calling `glfwSetCursorPos`;
+- never locks or confines the OS cursor when entering/leaving MCP control mode, and releases any confinement vanilla itself applies;
+- never falls back to `java.awt.Robot`, whose injected clicks/keystrokes would land on whatever window is actually in front.
+
 ---
 
 ## How It Works
