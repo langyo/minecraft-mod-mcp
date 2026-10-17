@@ -510,13 +510,13 @@
       "mdg": "2.0.147"
     },
     "26_3": {
-      "forge": "26.3-66.0.12",
+      "forge": "26.3-66.0.13",
       "fg_era": "fg7",
       "java": 25,
-      "version_id": "26.3-forge-66.0.12",
+      "version_id": "26.3-forge-66.0.13",
       "mappings": "official_26.3",
       "fabric_loader": "0.19.5",
-      "neoforge": "26.3.0.86",
+      "neoforge": "26.3.0.89",
       "mdg": "2.0.147"
     }
   },
