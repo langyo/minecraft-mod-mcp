@@ -77,14 +77,28 @@ public final class ControlModeHelper {
             logModEvent("exit_control_mode", "Manual control restored");
             mouseReleaseActive = false;
             waitingForRelease = true;
-            if (ReflectionCache.LWJGL3) {
+            if (McpConfig.isBackgroundInputMode()) {
+                // Background input mode: never lock or confine the OS cursor
+                // (issue #54) - GLFW would centre and ClipCursor the user's
+                // desktop cursor even though the window is in the background.
+                try {
+                    Object mh = ReflectionCache.getMouseHandler(mc);
+                    if (mh != null) {
+                        initMouseFields(mh);
+                        if (mouseGrabbedField != null) {
+                            mouseGrabbedField.setBoolean(mh, false);
+                        }
+                    }
+                } catch (Exception ignored) {}
+                ReflectionHelper.dbg("exitMcpControlMode: background input mode, OS cursor untouched");
+            } else if (ReflectionCache.LWJGL3) {
                 try {
                     Object mh = ReflectionCache.getMouseHandler(mc);
                     if (mh != null) {
                         initMouseFields(mh);
                         for (Method m : mh.getClass().getMethods()) {
                             String n = m.getName();
-                            if (m.getParameterCount() == 0 && (n.equals("lockCursor") || n.equals("method_1611") || n.equals("func_224798_b"))) {
+                            if (m.getParameterCount() == 0 && (n.equals("lockCursor") || n.equals("method_1611") || n.equals("func_224798_b") || n.equals("grabMouse"))) {
                                 m.setAccessible(true);
                                 m.invoke(mh);
                                 break;
@@ -187,10 +201,15 @@ public final class ControlModeHelper {
     public static boolean isMouseReleaseActive() { return mouseReleaseActive; }
 
     public static void tickMcpControlMode(Object mc) {
-        if (!mcpControlMode) return;
+        // In background input mode the un-grab guard also runs outside MCP
+        // control mode: vanilla re-grabs the cursor on screen open/close and
+        // would confine the user's desktop cursor via GLFW (issue #54).
+        if (!mcpControlMode && !McpConfig.isBackgroundInputMode()) return;
         try {
-            if (ReflectionCache.LWJGL3) {
+            if (ReflectionCache.LWJGL3 && mcpControlMode) {
                 forceCursorAndReleaseMouse(mc);
+            } else if (ReflectionCache.LWJGL3) {
+                releaseConfinedCursorIfDisabled(mc);
             }
             Object mouseHandler = ReflectionCache.getMouseHandler(mc);
             if (mouseHandler != null) {
@@ -269,6 +288,36 @@ public final class ControlModeHelper {
         GLFW_CURSOR_VAL = ReflectionCache.getGlfwCursor();
         GLFW_CURSOR_NORMAL_VAL = ReflectionCache.getGlfwCursorNormal();
         cursorCacheInit = true;
+    }
+
+    /**
+     * Background input mode only: if vanilla put the GLFW cursor into
+     * DISABLED (which centres and ClipCursor-confines the user's desktop
+     * cursor even for a background window, issue #54), flip it back to
+     * NORMAL so the user keeps control of their cursor.
+     */
+    private static void releaseConfinedCursorIfDisabled(Object mc) {
+        try {
+            long handle = WindowHelper.getWindowHandle(mc);
+            if (handle == 0) return;
+            initCursorCache();
+            int mode;
+            try {
+                java.lang.reflect.Method getMode = ReflectionCache.getGlfwClass().getMethod("glfwGetInputMode", long.class, int.class);
+                mode = (Integer) getMode.invoke(null, handle, GLFW_CURSOR_VAL);
+            } catch (Exception e) {
+                return;
+            }
+            if (mode == ReflectionCache.getGlfwCursorDisabled()) {
+                Method setMode = ReflectionCache.getGlfwSetInputModeMethod();
+                if (setMode != null) {
+                    setMode.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+                    ReflectionHelper.dbg("background mode: released vanilla cursor confinement");
+                }
+            }
+        } catch (Exception e) {
+            ReflectionHelper.dbg("releaseConfinedCursorIfDisabled: " + e.getMessage());
+        }
     }
 
     private static void initMouseFields(Object mouseHandler) throws Exception {

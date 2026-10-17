@@ -35,6 +35,7 @@ public final class InputInjectionHelper {
                 System.err.println("[Input] sendKey GLFW: " + e.getMessage());
             }
         }
+        if (McpConfig.isBackgroundInputMode()) return;
         try {
             Robot r = awtRobot;
             if (r == null) return;
@@ -89,6 +90,7 @@ public final class InputInjectionHelper {
                 ReflectionHelper.dbg("sendMouseButton GLFW: " + e.getMessage());
             }
         }
+        if (McpConfig.isBackgroundInputMode()) return;
         try {
             Robot r = awtRobot;
             if (r == null) return;
@@ -166,6 +168,7 @@ public final class InputInjectionHelper {
                 System.err.println("[Input] sendScroll GLFW: " + e.getMessage());
             }
         }
+        if (McpConfig.isBackgroundInputMode()) return;
         try {
             Robot r = awtRobot;
             if (r == null) return;
@@ -215,14 +218,17 @@ public final class InputInjectionHelper {
 
     public static void setCursorPos(long handle, double x, double y) {
         ReflectionCache.initClassCache();
+        boolean background = McpConfig.isBackgroundInputMode();
         if (ReflectionCache.LWJGL3) {
             try {
-                java.lang.reflect.Method glfwSetCursorPosMethod = ReflectionCache.getGlfwSetCursorPosMethod();
-                if (glfwSetCursorPosMethod != null) {
-                    glfwSetCursorPosMethod.invoke(null, handle, x, y);
-                } else {
-                    java.lang.reflect.Method setPos = ReflectionCache.getGlfwClass().getMethod("glfwSetCursorPos", long.class, double.class, double.class);
-                    setPos.invoke(null, handle, x, y);
+                if (!background) {
+                    java.lang.reflect.Method glfwSetCursorPosMethod = ReflectionCache.getGlfwSetCursorPosMethod();
+                    if (glfwSetCursorPosMethod != null) {
+                        glfwSetCursorPosMethod.invoke(null, handle, x, y);
+                    } else {
+                        java.lang.reflect.Method setPos = ReflectionCache.getGlfwClass().getMethod("glfwSetCursorPos", long.class, double.class, double.class);
+                        setPos.invoke(null, handle, x, y);
+                    }
                 }
 
                 Object mc = ReflectionCache.getMinecraftInstance();
@@ -249,6 +255,7 @@ public final class InputInjectionHelper {
                 System.err.println("[Input] setCursorPos GLFW: " + e.getMessage());
             }
         }
+        if (background) return;
         try {
             Robot r = awtRobot;
             if (r == null) return;
