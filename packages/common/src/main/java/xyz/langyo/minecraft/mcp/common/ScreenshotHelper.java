@@ -123,11 +123,14 @@ public final class ScreenshotHelper {
             }
         };
         boolean isSameThread = false;
-        for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
-            if (m.getName().equals("isSameThread") && m.getParameterCount() == 0) {
-                try { m.setAccessible(true); isSameThread = (boolean) m.invoke(mc); } catch (Exception ignored) {}
-                break;
+        for (String threadCheck : new String[]{"isSameThread", "func_152345_ab"}) {
+            for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
+                if (m.getName().equals(threadCheck) && m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
+                    try { m.setAccessible(true); isSameThread = (boolean) m.invoke(mc); } catch (Exception ignored) {}
+                    break;
+                }
             }
+            if (isSameThread) break;
         }
         if (!isSameThread) {
             isSameThread = Thread.currentThread().getName().contains("Render") || Thread.currentThread().getName().contains("Client");
@@ -136,13 +139,24 @@ public final class ScreenshotHelper {
             task.run();
         } else {
             boolean scheduled = false;
-            for (Method m : mc.getClass().getMethods()) {
-                if ((m.getName().equals("execute") || m.getName().equals("addScheduledTask")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) {
-                    try { m.setAccessible(true); m.invoke(mc, task); scheduled = true; } catch (Exception e) { ReflectionHelper.dbg("takeScreenshot0: schedule failed: " + e.getMessage()); }
-                    break;
+            // Mojang "execute", MCP "addScheduledTask", 1.12.2 SRG
+            // "func_152344_a" (issue #45).
+            for (String name : new String[]{"execute", "addScheduledTask", "func_152344_a"}) {
+                for (Method m : mc.getClass().getMethods()) {
+                    if (m.getName().equals(name) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == Runnable.class) {
+                        try { m.setAccessible(true); m.invoke(mc, task); scheduled = true; } catch (Exception e) { ReflectionHelper.dbg("takeScreenshot0: schedule failed: " + e.getMessage()); }
+                        break;
+                    }
                 }
+                if (scheduled) break;
             }
-            if (!scheduled) task.run();
+            // Never run the GL read inline on the calling (HTTP) thread: it has
+            // no OpenGL context (issue #45, #41). Leave the result unset and
+            // let the latch time out instead.
+            if (!scheduled) {
+                ReflectionHelper.dbg("takeScreenshot0: could not schedule on the render thread");
+                return null;
+            }
         }
         try { latch.await(10, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
         return resultHolder[0];

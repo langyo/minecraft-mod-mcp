@@ -411,7 +411,8 @@ public final class ReflectionCache {
         try { return mc.getClass().getMethod("world").invoke(mc); } catch (NoSuchMethodException ignored) {}
         for (Field f : getAllFields(mc.getClass())) {
             String n = f.getName();
-            if (n.equals("theWorld") || n.equals("field_71441_f") || n.equals("level") || n.equals("world")) {
+            // field_71441_e = theWorld in 1.12.2 and world in 1.13-1.16 SRG
+            if (n.equals("theWorld") || n.equals("field_71441_f") || n.equals("field_71441_e") || n.equals("level") || n.equals("world")) {
                 try { f.setAccessible(true); Object v = f.get(mc); if (v != null) return v; } catch (Exception ignored) {}
             }
         }

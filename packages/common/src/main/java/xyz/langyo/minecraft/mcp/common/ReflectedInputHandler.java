@@ -272,26 +272,25 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
             final byte[][] holder = {null};
             final Exception[] err = {null};
             final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+            Runnable task = () -> {
+                try { holder[0] = doScreenshot(); }
+                catch (Exception e) { err[0] = e; }
+                latch.countDown();
+            };
             boolean scheduled = false;
             try {
                 Object mc = mc();
-                try {
-                    java.lang.reflect.Method execute = mc.getClass().getMethod("execute", Runnable.class);
-                    execute.invoke(mc, (Runnable) () -> {
-                        try { holder[0] = doScreenshot(); }
-                        catch (Exception e) { err[0] = e; }
-                        latch.countDown();
-                    });
-                    scheduled = true;
-                } catch (NoSuchMethodException e) {
+                // Mojang "execute", MCP "addScheduledTask", 1.12.2 SRG
+                // "func_152344_a" (issue #45): try each in turn.
+                for (String name : new String[]{"execute", "addScheduledTask", "func_152344_a"}) {
                     try {
-                        mc.getClass().getMethod("addScheduledTask", Runnable.class).invoke(mc, (Runnable) () -> {
-                            try { holder[0] = doScreenshot(); }
-                            catch (Exception ex) { err[0] = ex; }
-                            latch.countDown();
-                        });
+                        mc.getClass().getMethod(name, Runnable.class).invoke(mc, task);
                         scheduled = true;
-                    } catch (Exception ignored) {}
+                        break;
+                    } catch (NoSuchMethodException ignored) {
+                    } catch (Exception e) {
+                        System.err.println("[Input] screenshot schedule via " + name + ": " + e.getMessage());
+                    }
                 }
             } catch (Exception ignored) {}
             if (scheduled) {
@@ -299,7 +298,11 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 if (holder[0] != null) return holder[0];
                 if (err[0] != null) System.err.println("[Input] screenshot: " + err[0].getMessage());
             }
-            return doScreenshot();
+            // Never run doScreenshot() inline here: the HTTP thread has no
+            // OpenGL context and the GL call aborts the JVM on some backends
+            // (issue #45, #41).
+            System.err.println("[Input] screenshot: could not schedule on the render thread");
+            return null;
         } catch (RuntimeException e) {
             System.err.println("[Input] screenshot: " + e.getMessage());
             return null;
@@ -316,6 +319,12 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
                 Method m = mc.getClass().getMethod("isSameThread");
                 return (Boolean) m.invoke(mc);
             } catch (NoSuchMethodException e) {
+                // 1.12.2 SRG isCallingFromMinecraftThread
+                try {
+                    Method m = mc.getClass().getMethod("func_152345_ab");
+                    return (Boolean) m.invoke(mc);
+                } catch (NoSuchMethodException ignored) {
+                }
                 return Thread.currentThread().getName().toLowerCase().contains("client")
                     || Thread.currentThread().getName().toLowerCase().contains("render")
                     || Thread.currentThread().getName().toLowerCase().contains("main");

@@ -311,37 +311,299 @@ def overlay_block_forge(ns, hud, screen, tick, draw, take_over, stack_acc="getMa
 # ============================================================
 
 def forge_mod_legacy(mc):
-    return """package xyz.langyo.minecraft.mcp.mod;
+    k = mc_key(mc)
+    # The pinned MCP snapshots renamed theWorld -> world at 1.11
+    # (snapshot_20170111) and fontRendererObj -> fontRenderer at 1.12;
+    # both boundaries confirmed by the CI JDK 8 build lane.
+    font = "fontRenderer" if k >= (1, 12, 0) else "fontRendererObj"
+    world = "world" if k >= (1, 11, 0) else "theWorld"
+    # Forge's client events exposed plain public fields up to the 1.8.x
+    # branches; accessors (getType()/getGui()/getButton()/isButtonstate())
+    # first appear in the 1.9.4-era branches (verified on GitHub).
+    ev_type = "getType()" if k >= (1, 9, 4) else "type"
+    ev_gui = "getGui()" if k >= (1, 9, 4) else "gui"
+    ev_button = "getButton()" if k >= (1, 9, 4) else "button"
+    ev_bstate = "isButtonstate()" if k >= (1, 9, 4) else "buttonstate"
+    # ScaledResolution took (mc, w, h) in 1.8 exactly; from 1.8.8 on it is
+    # ScaledResolution(mc) (verified against GuiIngameForge per branch).
+    sr_ctor = ("new ScaledResolution(mc)" if k >= (1, 8, 8)
+               else "new ScaledResolution(mc, mc.displayWidth, mc.displayHeight)")
+    t = """package xyz.langyo.minecraft.mcp.mod;
 
 import xyz.langyo.minecraft.mcp.common.*;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.client.event.RenderGameOverlayEvent;
+import net.minecraftforge.client.event.GuiScreenEvent;
+import net.minecraftforge.client.event.MouseEvent;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiIngameMenu;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.util.MouseHelper;
+import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.GL11;
 
-@Mod(modid = "mcpmod", name = "ModDev MCP", version = "1.0")
+@Mod(modid = "mcpmod", name = "ModDev MCP")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;
+    volatile String debugUrl = null;
+    private static boolean prevMouseButton0 = false;
+    private static boolean waitingForRelease = false;
 
     @Mod.Instance("mcpmod")
     public static ModDevMcpMod instance;
 
+    private static McpRenderer wrapRenderer(final Minecraft mc) {
+        return new McpRenderer() {
+            @Override public void fill(int x1, int y1, int x2, int y2, int color) {
+                net.minecraft.client.gui.Gui.drawRect(x1, y1, x2, y2, color);
+            }
+            @Override public int drawString(Object font, String text, int x, int y, int color, boolean shadow) {
+                if (shadow) {
+                    return mc.__FONT__.drawStringWithShadow(text, x, y, color);
+                } else {
+                    return mc.__FONT__.drawString(text, x, y, color);
+                }
+            }
+            @Override public int getStringWidth(Object font, String text) {
+                return mc.__FONT__.getStringWidth(text);
+            }
+        };
+    }
+
+    private static int getMouseX(Minecraft mc) {
+        ScaledResolution sr = __SRCTOR__;
+        return Mouse.getX() * sr.getScaledWidth() / mc.displayWidth;
+    }
+
+    private static int getMouseY(Minecraft mc) {
+        ScaledResolution sr = __SRCTOR__;
+        return sr.getScaledHeight() - Mouse.getY() * sr.getScaledHeight() / mc.displayHeight - 1;
+    }
+
+    private static boolean isPauseMenu(GuiScreen screen) {
+        return screen instanceof GuiIngameMenu;
+    }
+
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         INSTANCE = this;
-        ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
-        int port = McpConfig.getServerPort();
-        httpServer = new McpHttpServer(handler, port);
+
         new Thread(() -> {
             try {
                 Thread.sleep(5000);
+                try { Object mc = ReflectionHelper.getMinecraftInstance(); if (mc != null) ReflectionHelper.setMinecraftInstance(mc); } catch (Exception ignored) {}
+                ReflectedInputHandler handler = new ReflectedInputHandler(ReflectedInputHandler::executeOnRenderThread);
+                int port = McpConfig.getServerPort();
+                httpServer = new McpHttpServer(handler, port);
                 httpServer.start();
+                debugUrl = "http://127.0.0.1:" + port + "/debug";
+                System.out.println("[MCP-MOD] Debug page: " + debugUrl);
             } catch (Exception e) {
                 System.err.println("[MCP-MOD] HTTP server failed: " + e.getMessage());
+            } catch (Error e) {
+                System.err.println("[MCP-MOD] HTTP server error: " + e.getMessage());
             }
         }, "MCP-HTTP").start();
+
+        MinecraftForge.EVENT_BUS.register(this);
+    }
+
+    @SubscribeEvent
+    public void onGuiInitPre(GuiScreenEvent.InitGuiEvent.Pre event) {
+        if (ReflectionHelper.isMcpControlMode() && isPauseMenu(event.__EVGUI__)) {
+            event.setCanceled(true);
+            try { Minecraft.getMinecraft().currentScreen = null; } catch (Exception ignored) {}
+        }
+    }
+
+    private static MouseHelper originalMouseHelper;
+    private static NoGrabMouseHelper noGrabMouseHelper;
+    private static boolean noGrabInstalled = false;
+
+    private static class NoGrabMouseHelper extends MouseHelper {
+        @Override
+        public void grabMouseCursor() {}
+        @Override
+        public void ungrabMouseCursor() {}
+        @Override
+        public void mouseXYChange() {
+            deltaX = 0;
+            deltaY = 0;
+        }
+    }
+
+    private static void installNoGrabMouseHelper() {
+        if (noGrabInstalled) return;
+        try {
+            Minecraft mc = Minecraft.getMinecraft();
+            if (mc.mouseHelper != null && !(mc.mouseHelper instanceof NoGrabMouseHelper)) {
+                originalMouseHelper = mc.mouseHelper;
+                if (noGrabMouseHelper == null) noGrabMouseHelper = new NoGrabMouseHelper();
+                mc.mouseHelper = noGrabMouseHelper;
+            }
+            if (Mouse.isGrabbed()) {
+                Mouse.setGrabbed(false);
+            }
+            noGrabInstalled = true;
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] installNoGrab error: " + e.getMessage());
+        }
+    }
+
+    private static void restoreOriginalMouseHelper() {
+        if (!noGrabInstalled) return;
+        try {
+            Minecraft mc = Minecraft.getMinecraft();
+            if (originalMouseHelper != null) {
+                mc.mouseHelper = originalMouseHelper;
+                originalMouseHelper = null;
+            }
+            noGrabInstalled = false;
+            prevMouseButton0 = true;
+            waitingForRelease = true;
+        } catch (Exception e) {
+            System.err.println("[MCP-MOD] restoreMouse error: " + e.getMessage());
+        }
+    }
+
+    @SubscribeEvent
+    public void onRenderOverlay(RenderGameOverlayEvent.Post event) {
+        if (event.__EVTYPE__ != RenderGameOverlayEvent.ElementType.CHAT) return;
+        if (debugUrl == null && !ReflectionHelper.isMouseReleaseActive() && !ReflectionHelper.isMcpControlMode()) return;
+        try {
+            Minecraft mc = Minecraft.getMinecraft();
+            ReflectionHelper.tickMouseRelease(mc);
+            ReflectionHelper.tickMcpControlMode(mc);
+
+            if (mc.currentScreen == null) {
+                if (!ReflectionHelper.isScreenshotInProgress()) {
+                    ReflectionHelper.cacheFrameFromRenderThread(mc);
+                }
+
+                if (ReflectionHelper.isMcpControlMode() && !ReflectionHelper.isScreenshotInProgress()) {
+                    ScaledResolution sr = __SRCTOR__;
+                    int w = sr.getScaledWidth();
+                    int h = sr.getScaledHeight();
+                    int mx = getMouseX(mc);
+                    int my = getMouseY(mc);
+                    boolean mouse0 = Mouse.isButtonDown(0);
+                    if (mouse0 && !prevMouseButton0) {
+                        ReflectionHelper.handleOverlayClick(mx, my, mc);
+                    }
+                    prevMouseButton0 = mouse0;
+                    McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.__FONT__, net.minecraft.client.resources.I18n.format("mcpmod.control.resume"), w, h, mx, my);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @SubscribeEvent
+    public void onDrawScreen(GuiScreenEvent.DrawScreenEvent.Post event) {
+        if (ReflectionHelper.isScreenshotInProgress()) return;
+        try {
+            Minecraft mc = Minecraft.getMinecraft();
+            GuiScreen screen = event.__EVGUI__;
+            ScaledResolution sr = __SRCTOR__;
+            int w = sr.getScaledWidth();
+            int h = sr.getScaledHeight();
+            if (httpServer != null) {
+                int port = httpServer.getPort();
+                String portText = "MCP Port at " + port;
+                int y = h - 12 - mc.__FONT__.FONT_HEIGHT * 2;
+                mc.__FONT__.drawStringWithShadow(portText, 2, y, 0xFFCCCCCC);
+            }
+            int mx = getMouseX(mc);
+            int my = getMouseY(mc);
+
+            if (ReflectionHelper.isMcpControlMode()) {
+                GL11.glScissor(0, 0, mc.displayWidth, mc.displayHeight);
+                GL11.glEnable(GL11.GL_SCISSOR_TEST);
+                ReflectionHelper.cacheFrameFromRenderThread(mc);
+                McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.__FONT__, net.minecraft.client.resources.I18n.format("mcpmod.control.resume"), w, h, mx, my);
+            } else if (mc.__WORLD__ != null && screen != null) {
+                GL11.glScissor(0, 0, mc.displayWidth, mc.displayHeight);
+                GL11.glEnable(GL11.GL_SCISSOR_TEST);
+                McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.__FONT__, "", w, h, mx, my);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @SubscribeEvent
+    public void onMouseInput(MouseEvent event) {
+        if (event.__EVBUTTON__ != 0 || !event.__EVBSTATE__) return;
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.currentScreen == null) return;
+        int mx = getMouseX(mc);
+        int my = getMouseY(mc);
+        if (ReflectionHelper.isMcpControlMode()) {
+            String result = ReflectionHelper.handleOverlayClick(mx, my, mc);
+            if (!"blocked".equals(result) && !"cooldown".equals(result) && !"not_in_control_mode".equals(result)) {
+                event.setCanceled(true);
+            }
+        } else if (mc.__WORLD__ != null) {
+            String result = ReflectionHelper.handleTransferOverlayClick(mx, my, mc);
+            if ("transfer_to_mcp".equals(result)) {
+                event.setCanceled(true);
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (INSTANCE == null) return;
+
+        if (ReflectionHelper.isMcpControlMode()) {
+            if (event.phase == TickEvent.Phase.START) {
+                installNoGrabMouseHelper();
+            } else {
+                Minecraft mc = Minecraft.getMinecraft();
+                ReflectionHelper.tickMouseRelease(mc);
+                ReflectionHelper.tickMcpControlMode(mc);
+                ReflectionHelper.tickVideoCapture(mc);
+            }
+            return;
+        }
+
+        if (event.phase == TickEvent.Phase.START) {
+            restoreOriginalMouseHelper();
+            if (waitingForRelease) {
+                while (Mouse.next()) {}
+                Mouse.setGrabbed(false);
+                if (!Mouse.isButtonDown(0)) {
+                    waitingForRelease = false;
+                    Minecraft mc = Minecraft.getMinecraft();
+                    if (mc.currentScreen == null) {
+                        mc.mouseHelper.grabMouseCursor();
+                    }
+                }
+                return;
+            }
+        }
+
+        if (event.phase != TickEvent.Phase.END) return;
+        try {
+            Minecraft mc = Minecraft.getMinecraft();
+            ReflectionHelper.tickMouseRelease(mc);
+            ReflectionHelper.tickMcpControlMode(mc);
+            ReflectionHelper.tickVideoCapture(mc);
+        } catch (Exception ignored) {}
     }
 }
 """
+    return (t
+            .replace("__FONT__", font)
+            .replace("__WORLD__", world)
+            .replace("__EVTYPE__", ev_type)
+            .replace("__EVGUI__", ev_gui)
+            .replace("__EVBUTTON__", ev_button)
+            .replace("__EVBSTATE__", ev_bstate)
+            .replace("__SRCTOR__", sr_ctor))
 
 
 

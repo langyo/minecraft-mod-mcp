@@ -1483,6 +1483,17 @@ def main():
         f"-Dmcp.mod.version={mc_ver}",
         f"-Dmcp.mod.loader={loader}",
     ])
+    if loader in ("forge", "neoforge"):
+        # Accept dashed ("1.8-forge-11.14.4.1563"), glued
+        # ("1.12.2-forge1.12.2-14.23.5.2847") and capitalized
+        # ("1.21.1-Forge52.1.0") version_id shapes.
+        import re as _re
+        parts = _re.split(rf"-{loader}", version_name, maxsplit=1, flags=_re.IGNORECASE)
+        if len(parts) > 1:
+            tail = parts[1].lstrip("-")
+            numeric = [seg for seg in tail.split("-") if seg and seg[0].isdigit()]
+            if numeric:
+                cmd.append(f"-Dmcp.mod.forge.version={numeric[-1]}")
     if args.extra_jvm:
         cmd.extend(args.extra_jvm.split())
     cmd.extend(jvm_args)

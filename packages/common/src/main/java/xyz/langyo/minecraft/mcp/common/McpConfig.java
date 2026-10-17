@@ -25,12 +25,27 @@ public final class McpConfig {
     public static String getModVersion() {
         String v = System.getProperty("mcp.mod.version");
         if (v != null && !v.isEmpty()) return v;
+        // Launchers that don't pass -Dmcp.mod.version (e.g. a user dropping
+        // the jar into a vanilla-launched mods folder): fall back to the
+        // Implementation-Version stamped into the mod jar's manifest.
+        try {
+            String mv = McpConfig.class.getPackage().getImplementationVersion();
+            if (mv != null && !mv.isEmpty()) return mv;
+        } catch (Exception ignored) {}
         return "unknown";
     }
 
     public static String getModLoader() {
         String l = System.getProperty("mcp.mod.loader");
         if (l != null && !l.isEmpty()) return l;
+        // Fallback for launchers that don't pass -Dmcp.mod.loader: detect
+        // the loader from its classes (issue #45). Loaded without running
+        // static initializers so a broken class can't take the status down.
+        ClassLoader cl = McpConfig.class.getClassLoader();
+        try { Class.forName("net.neoforged.fml.common.Mod", false, cl); return "neoforge"; } catch (Throwable ignored) {}
+        try { Class.forName("net.minecraftforge.fml.common.Mod", false, cl); return "forge"; } catch (Throwable ignored) {}
+        try { Class.forName("cpw.mods.fml.common.Mod", false, cl); return "forge"; } catch (Throwable ignored) {}
+        try { Class.forName("net.fabricmc.api.ModInitializer", false, cl); return "fabric"; } catch (Throwable ignored) {}
         return "unknown";
     }
 
