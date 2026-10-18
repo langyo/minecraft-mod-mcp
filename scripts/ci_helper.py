@@ -706,8 +706,16 @@ def _dump_game_diagnostics(reason, tail_lines=80):
     (the runner is destroyed right after).
     """
     _log(f"  GAME DIAGNOSTICS ({reason}):")
-    for name in ("mcp-launch-stderr.log", "mcp-launch-stdout.log"):
-        path = GAME_DIR / name
+    # The node CLI writes logs/mc-stdout.log + logs/mc-stderr.log into the
+    # game dir; the legacy Python launcher wrote mcp-launch-*.log directly
+    # into it. Cover both so the dump works under either launcher.
+    candidates = [
+        GAME_DIR / "logs" / "mc-stderr.log",
+        GAME_DIR / "logs" / "mc-stdout.log",
+        GAME_DIR / "mcp-launch-stderr.log",
+        GAME_DIR / "mcp-launch-stdout.log",
+    ]
+    for path in candidates:
         if not path.is_file():
             continue
         try:
@@ -716,7 +724,7 @@ def _dump_game_diagnostics(reason, tail_lines=80):
             continue
         if not lines:
             continue
-        _log(f"    --- tail of {name} ({len(lines)} lines) ---")
+        _log(f"    --- tail of {path.name} ({len(lines)} lines) ---")
         for line in lines[-tail_lines:]:
             _log(f"    {line.rstrip()[:220]}")
     # Crash reports and JVM hs_err logs live in the game dir (the run dir).
