@@ -445,11 +445,14 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          # mesa-vulkan-drivers: MC 26.3+ (Render Pearl) probes a Vulkan
-          # backend after OpenGL; lavapipe gives it a working software
-          # VK_KHR_surface on the headless runners. mesa-utils/vulkan-tools
-          # only feed the graphics-env dump below.
-          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri libx11-dev x11-xserver-utils libflite-dev mesa-vulkan-drivers mesa-utils vulkan-tools 2>/dev/null || true
+          # NOTE: no libgl1-mesa-glx here - that package no longer exists on
+          # Ubuntu 24.04, and one unknown package makes apt abort the WHOLE
+          # install (which is how this step silently installed nothing for
+          # weeks). mesa-vulkan-drivers matters: MC 26.3+ (Render Pearl)
+          # probes a Vulkan backend after OpenGL, and lavapipe gives it a
+          # working software VK_KHR_surface on the headless runners.
+          # mesa-utils/vulkan-tools only feed the graphics-env dump below.
+          sudo apt-get install -y xvfb libgl1 libgl1-mesa-dri libglx-mesa0 libx11-dev x11-xserver-utils libflite-dev mesa-vulkan-drivers mesa-utils vulkan-tools 2>&1 | tail -3 || true
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &
@@ -562,8 +565,10 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          # mesa-vulkan-drivers: same Render Pearl fallback as headless-smoke.
-          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri x11-xserver-utils mesa-vulkan-drivers 2>/dev/null || true
+          # Same as headless-smoke: no libgl1-mesa-glx (gone from Ubuntu
+          # 24.04 - one unknown package aborts the whole install), and
+          # mesa-vulkan-drivers for the MC 26.3+ Render Pearl Vulkan fallback.
+          sudo apt-get install -y xvfb libgl1 libgl1-mesa-dri libglx-mesa0 x11-xserver-utils mesa-vulkan-drivers 2>&1 | tail -3 || true
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &
