@@ -769,13 +769,25 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         major = int(mc_ver.split(".")[0])
     except ValueError:
         major = 1
-    if major >= 13:
+    try:
+        vtuple = tuple(int(x) for x in mc_ver.split("."))
+    except ValueError:
+        vtuple = (1, 0)
+    # MC 26.3+ (Render Pearl) on Forge/NeoForge: BOTH the AWT-headless trick
+    # and the disableEarlyDisplay flags suppress FML's early GLFW window,
+    # which forces Render Pearl to create its own GLX/Vulkan window - and
+    # that dies on the runner's llvmpipe stack ("Couldn't find matching GLX
+    # visual" + "no VK_KHR_surface"), fatally on NeoForge-patched init.
+    # Letting FML open its (working, GLFW-based) early window lets Render
+    # Pearl adopt that context instead. Older lanes keep the original flags.
+    renderpearl = loader in ("forge", "neoforge") and vtuple >= (26, 3)
+    if major >= 13 and not renderpearl:
         parts.append("-Djava.awt.headless=true")
     # Forge >= 1.20.5 and NeoForge >= 20.6 open an early GL window that
     # times out under Xvfb/llvmpipe ("Timed out trying to setup the Game
     # Window"); older loaders ignore the properties. NeoForge 20.6.x still
     # reads the forge-prefixed switch, 21+ the neoforged one.
-    if loader in ("forge", "neoforge"):
+    if loader in ("forge", "neoforge") and not renderpearl:
         parts.append("-Dforge.disableEarlyDisplay=true")
         parts.append("-Dneoforge.disableEarlyDisplay=true")
     if world_name:
