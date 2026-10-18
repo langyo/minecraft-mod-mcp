@@ -225,11 +225,14 @@ jobs:
               $gradleVer = if (Test-Path "gradle/wrapper/gradle-wrapper.properties") { (Get-Content "gradle/wrapper/gradle-wrapper.properties" | Select-String "distributionUrl" | Select-Object -First 1) -replace '.*gradle-', '' -replace '-bin.*', '' } else { "8.0" }
               $majorVer = $gradleVer.Split('.')[0]
               $extraArgs = if ([int]$majorVer -ge 5) { "--warning-mode=summary" } else { "" }
-              if ($mod -match "/fabric$") {
-                $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
-              } else {
-                $result = .\gradlew.bat clean jar --no-daemon --console=plain $extraArgs 2>&1
-              }
+              # Every lane builds with `build`, never bare `jar`: FG5/FG6
+              # (MC 1.17.1-1.20.4) wire their reobfJar task into the build
+              # lifecycle, so a bare `jar` ships official-mappings bytecode
+              # that dies on the SRG-named production runtime with
+              # NoSuchMethodError on the first MC call. `build` produces the
+              # reobfuscated jar in place in build/libs (same path the local
+              # build_all.py / local_release.py pipelines use).
+              $result = .\gradlew.bat clean build -x test --no-daemon --console=plain "-Dorg.gradle.jvmargs=-Xmx4G" $extraArgs 2>&1
               if ($LASTEXITCODE -ne 0) {
                 $errFile = "build-error.log"
                 $result | Out-File -FilePath $errFile -Encoding UTF8
@@ -442,7 +445,16 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri libx11-dev x11-xserver-utils libflite-dev 2>/dev/null || true
+          # Install one package per apt call: a single name that is gone
+          # from the current LTS (libgl1-mesa-glx, libflite-dev on 24.04)
+          # must not abort the whole batch - that is how this step silently
+          # installed nothing for weeks. mesa-vulkan-drivers matters most:
+          # MC 26.3+ (Render Pearl) probes a Vulkan backend after OpenGL,
+          # and lavapipe gives it a working software VK_KHR_surface on the
+          # headless runners. mesa-utils/vulkan-tools feed the env dump.
+          for p in xvfb libgl1 libgl1-mesa-dri libglx-mesa0 libx11-dev x11-xserver-utils flite1-dev mesa-vulkan-drivers mesa-utils vulkan-tools; do
+            sudo apt-get install -y -qq "$p" 2>&1 | tail -1 || true
+          done
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &
@@ -452,6 +464,11 @@ jobs:
           echo "DISPLAY=:99" >> $GITHUB_ENV
           echo "LIBGL_ALWAYS_SOFTWARE=true" >> $GITHUB_ENV
           echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
+      - name: Dump graphics environment
+        run: |
+          echo "--- Vulkan ICDs ---"; ls /usr/share/vulkan/icd.d/ 2>/dev/null || echo "(none installed)"
+          echo "--- vulkaninfo ---"; vulkaninfo --summary 2>&1 | sed -n '1,12p' || true
+          echo "--- glxinfo ---"; glxinfo -B 2>&1 | sed -n '1,10p' || true
       - name: Build MCP CLI
         run: |
           cd packages/minecraft-mod-mcp
@@ -550,7 +567,12 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri x11-xserver-utils 2>/dev/null || true
+          # Same per-package pattern as headless-smoke: one bad package name
+          # must not abort the rest, and mesa-vulkan-drivers feeds the MC
+          # 26.3+ Render Pearl Vulkan fallback.
+          for p in xvfb libgl1 libgl1-mesa-dri libglx-mesa0 x11-xserver-utils flite1-dev mesa-vulkan-drivers; do
+            sudo apt-get install -y -qq "$p" 2>&1 | tail -1 || true
+          done
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &
@@ -652,7 +674,11 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1-mesa-glx libgl1-mesa-dri x11-xserver-utils 2>/dev/null || true
+          # Per-package like headless-smoke/screenshot-test: libgl1-mesa-glx
+          # is gone from Ubuntu 24.04 and one unknown name aborts the batch.
+          for p in xvfb libgl1 libgl1-mesa-dri libglx-mesa0 x11-xserver-utils; do
+            sudo apt-get install -y -qq "$p" 2>&1 | tail -1 || true
+          done
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &

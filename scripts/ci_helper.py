@@ -29,6 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 MC_DIR = Path(os.environ.get("HOME", os.path.expanduser("~"))) / ".minecraft"
+GAME_DIR = MC_DIR / "mcp_launcher" / "game"
 
 TEST_WORLD_DIR = ROOT / "tests" / "reference-screenshots"
 SCREENSHOT_DIR = ROOT / "screenshots" / "ci"
@@ -696,6 +697,50 @@ def generate_options_txt(mc_dir=None, settings=None):
     return str(opts_path)
 
 
+def _dump_game_diagnostics(reason, tail_lines=80):
+    """Dump the game's stdout/stderr logs, crash reports and JVM fatal-error
+    logs into the job log.
+
+    The launcher writes the game JVM's output to files inside the game dir;
+    without this dump a smoke failure leaves no trace of WHY the game died
+    (the runner is destroyed right after).
+    """
+    _log(f"  GAME DIAGNOSTICS ({reason}):")
+    # The node CLI writes logs/mc-stdout.log + logs/mc-stderr.log into the
+    # game dir; the legacy Python launcher wrote mcp-launch-*.log directly
+    # into it. Cover both so the dump works under either launcher.
+    candidates = [
+        GAME_DIR / "logs" / "mc-stderr.log",
+        GAME_DIR / "logs" / "mc-stdout.log",
+        GAME_DIR / "mcp-launch-stderr.log",
+        GAME_DIR / "mcp-launch-stdout.log",
+    ]
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        if not lines:
+            continue
+        _log(f"    --- tail of {path.name} ({len(lines)} lines) ---")
+        for line in lines[-tail_lines:]:
+            _log(f"    {line.rstrip()[:220]}")
+    # Crash reports and JVM hs_err logs live in the game dir (the run dir).
+    for pattern in ("crash-reports/*.txt", "hs_err_pid*.log", "crash-*.txt"):
+        for f in sorted(GAME_DIR.glob(pattern))[-2:]:
+            if not f.is_file():
+                continue
+            _log(f"    --- {f.name} (head) ---")
+            try:
+                with open(f, "r", errors="replace") as fh:
+                    for line in fh.readlines()[:50]:
+                        _log(f"    {line.rstrip()[:220]}")
+            except OSError:
+                pass
+
+
 def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=None, timeout=300):
     """Run a full smoke test: launch MC, test APIs, verify screenshot.
 
@@ -732,13 +777,25 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         major = int(mc_ver.split(".")[0])
     except ValueError:
         major = 1
-    if major >= 13:
+    try:
+        vtuple = tuple(int(x) for x in mc_ver.split("."))
+    except ValueError:
+        vtuple = (1, 0)
+    # MC 26.3+ (Render Pearl) on Forge/NeoForge: BOTH the AWT-headless trick
+    # and the disableEarlyDisplay flags suppress FML's early GLFW window,
+    # which forces Render Pearl to create its own GLX/Vulkan window - and
+    # that dies on the runner's llvmpipe stack ("Couldn't find matching GLX
+    # visual" + "no VK_KHR_surface"), fatally on NeoForge-patched init.
+    # Letting FML open its (working, GLFW-based) early window lets Render
+    # Pearl adopt that context instead. Older lanes keep the original flags.
+    renderpearl = loader in ("forge", "neoforge") and vtuple >= (26, 3)
+    if major >= 13 and not renderpearl:
         parts.append("-Djava.awt.headless=true")
     # Forge >= 1.20.5 and NeoForge >= 20.6 open an early GL window that
     # times out under Xvfb/llvmpipe ("Timed out trying to setup the Game
     # Window"); older loaders ignore the properties. NeoForge 20.6.x still
     # reads the forge-prefixed switch, 21+ the neoforged one.
-    if loader in ("forge", "neoforge"):
+    if loader in ("forge", "neoforge") and not renderpearl:
         parts.append("-Dforge.disableEarlyDisplay=true")
         parts.append("-Dneoforge.disableEarlyDisplay=true")
     if world_name:
@@ -751,7 +808,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         # other trace on the runner.
         dry = subprocess.run(
             ["node", launcher, "launch", version_name, "--headless",
-             "--memory", "512",
+             "--memory", "2048",
              "--extra-jvm", extra_jvm,
              "--mod-jar", str(mod_jar), "--dry-run"],
             env=env, capture_output=True, text=True, timeout=120,
@@ -761,7 +818,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
             _log(f"  [plan] {line[:220]}")
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name, "--headless",
-             "--memory", "512",
+             "--memory", "2048",
              "--extra-jvm", extra_jvm,
              "--mod-jar", str(mod_jar)],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -788,13 +845,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         results["mod_ready"] = {"passed": True, "detail": mod_url}
     except TimeoutError:
         results["mod_ready"] = {"passed": False, "detail": "HTTP server not found"}
-        crash_dir = MC_DIR / "crash-reports"
-        if crash_dir.is_dir():
-            for f in sorted(crash_dir.glob("*.txt"))[-1:]:
-                _log(f"  CRASH REPORT ({f.name}):")
-                with open(f, "r", errors="replace") as fh:
-                    for line in fh.readlines()[:40]:
-                        _log(f"    {line.rstrip()[:200]}")
+        _dump_game_diagnostics("mod never became ready")
         kill_minecraft()
         return results
 
@@ -850,6 +901,9 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         _log(f"  TEST [screenshot]: SKIP ({e})")
         results["screenshot"] = {"passed": True, "detail": f"skipped: {e}"}
 
+    if any(not v.get("passed") for v in results.values()):
+        _dump_game_diagnostics("at least one API test failed")
+
     _log("Tests done, killing MC")
     kill_minecraft()
     if mc_proc and mc_proc.poll() is None:
@@ -893,7 +947,7 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
         pass
     mc_proc = subprocess.Popen(
         ["node", launcher, "launch", version_name,
-         "--memory", "512", "--extra-jvm", e2e_jvm, "--mod-jar", str(mod_jar)],
+         "--memory", "2048", "--extra-jvm", e2e_jvm, "--mod-jar", str(mod_jar)],
         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1,
     )
@@ -1050,7 +1104,7 @@ def main():
         launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name,
-             "--memory", "512", "--mod-jar", str(args.mod_jar)],
+             "--memory", "2048", "--mod-jar", str(args.mod_jar)],
             env=os.environ.copy(),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
