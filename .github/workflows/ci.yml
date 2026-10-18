@@ -445,14 +445,16 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          # NOTE: no libgl1-mesa-glx here - that package no longer exists on
-          # Ubuntu 24.04, and one unknown package makes apt abort the WHOLE
-          # install (which is how this step silently installed nothing for
-          # weeks). mesa-vulkan-drivers matters: MC 26.3+ (Render Pearl)
-          # probes a Vulkan backend after OpenGL, and lavapipe gives it a
-          # working software VK_KHR_surface on the headless runners.
-          # mesa-utils/vulkan-tools only feed the graphics-env dump below.
-          sudo apt-get install -y xvfb libgl1 libgl1-mesa-dri libglx-mesa0 libx11-dev x11-xserver-utils libflite-dev mesa-vulkan-drivers mesa-utils vulkan-tools 2>&1 | tail -3 || true
+          # Install one package per apt call: a single name that is gone
+          # from the current LTS (libgl1-mesa-glx, libflite-dev on 24.04)
+          # must not abort the whole batch - that is how this step silently
+          # installed nothing for weeks. mesa-vulkan-drivers matters most:
+          # MC 26.3+ (Render Pearl) probes a Vulkan backend after OpenGL,
+          # and lavapipe gives it a working software VK_KHR_surface on the
+          # headless runners. mesa-utils/vulkan-tools feed the env dump.
+          for p in xvfb libgl1 libgl1-mesa-dri libglx-mesa0 libx11-dev x11-xserver-utils flite1-dev mesa-vulkan-drivers mesa-utils vulkan-tools; do
+            sudo apt-get install -y -qq "$p" 2>&1 | tail -1 || true
+          done
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &
@@ -565,10 +567,12 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq
-          # Same as headless-smoke: no libgl1-mesa-glx (gone from Ubuntu
-          # 24.04 - one unknown package aborts the whole install), and
-          # mesa-vulkan-drivers for the MC 26.3+ Render Pearl Vulkan fallback.
-          sudo apt-get install -y xvfb libgl1 libgl1-mesa-dri libglx-mesa0 x11-xserver-utils mesa-vulkan-drivers 2>&1 | tail -3 || true
+          # Same per-package pattern as headless-smoke: one bad package name
+          # must not abort the rest, and mesa-vulkan-drivers feeds the MC
+          # 26.3+ Render Pearl Vulkan fallback.
+          for p in xvfb libgl1 libgl1-mesa-dri libglx-mesa0 x11-xserver-utils flite1-dev mesa-vulkan-drivers; do
+            sudo apt-get install -y -qq "$p" 2>&1 | tail -1 || true
+          done
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR +extension GLX -nolisten tcp &
