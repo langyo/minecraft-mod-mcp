@@ -2,7 +2,7 @@ plugins {
     id "net.fabricmc.fabric-loom" version "1.17-SNAPSHOT"
 }
 
-version = "0.4.12"
+version = "0.4.13"
 group = "xyz.langyo"
 
 java {
@@ -22,6 +22,6 @@ sourceSets.main.java.srcDir '../../../common/src/main/java'
 
 dependencies {
     minecraft "com.mojang:minecraft:26.3"
-    implementation "net.fabricmc:fabric-loader:0.20.0"
+    implementation "net.fabricmc:fabric-loader:0.20.1"
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }

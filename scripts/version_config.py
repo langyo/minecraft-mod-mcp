@@ -265,16 +265,20 @@ ALL_VERSIONS = {
                # 26.2.0.90 carries the same HolderSet.contents visibility
                # change as 26.3, so it needs MDG >= 2.0.147 like 26.3.
                "neoforge": "26.2.0.93", "mdg": "2.0.147",
-               "fabric_loader": "0.20.0", "fabric_unobfuscated": True},
+               "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
     # The NeoForge 26.3 stable line landed upstream (26.3.0.77, re-checked
     # 2026-10-15); the pin tracks it and still needs MDG >= 2.0.147 for the
     # HolderSet.contents visibility change. Refreshed to 26.3.0.84 on
-    # 2026-10-16, to 26.3.0.86 on 2026-10-17, to 26.3.0.89 on 2026-10-18 and
-    # to 26.3.0.92 on 2026-10-19 (newest stable at re-check).
+    # 2026-10-16, to 26.3.0.86 on 2026-10-17, to 26.3.0.89 on 2026-10-18,
+    # to 26.3.0.92 on 2026-10-19 and to 26.3.0.94 on 2026-10-20 (newest
+    # stable at re-check; .93 removes the dead ArrowLooseEvent#hasAmmo
+    # parameter, unused by this mod). Fabric loader 0.20.1 (2026-10-19)
+    # reverts the ASM 9.11 update that 0.20.0 shipped, so the 26.2/26.3
+    # fabric pins take the hotfix.
     "26.3":   {"forge": "26.3-66.0.13",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
                "version_id": "26.3-forge-66.0.13",
-               "neoforge": "26.3.0.92", "mdg": "2.0.147",
-               "fabric_loader": "0.20.0", "fabric_unobfuscated": True},
+               "neoforge": "26.3.0.94", "mdg": "2.0.147",
+               "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
 }
 
 # ============================================================
