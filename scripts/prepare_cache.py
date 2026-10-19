@@ -267,6 +267,8 @@ def place_in_fg_mcp_repo(channel, full_ver, src_file):
 
 
 def main():
+    from wrapper_jars import ensure_wrapper_jars
+    ensure_wrapper_jars()
     probe_mirrors()
 
     ensure_dl_class()

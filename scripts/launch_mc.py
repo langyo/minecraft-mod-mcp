@@ -1142,6 +1142,8 @@ def _launch_neoforge_gradlew(mc_version, args):
     if jvm_opts:
         env["GRADLE_OPTS"] = (env.get("GRADLE_OPTS", "") + " " + " ".join(jvm_opts)).strip()
 
+    from wrapper_jars import ensure_wrapper_jars
+    ensure_wrapper_jars()
     cmd = [gradlew] + gradle_args
     cmd_str = " ".join(cmd)
 
@@ -1261,6 +1263,8 @@ def main():
                 proxy_host = "127.0.0.1"
                 proxy_port = "7890"
                 build_env["GRADLE_OPTS"] = f"-Dhttp.proxyHost={proxy_host} -Dhttp.proxyPort={proxy_port} -Dhttps.proxyHost={proxy_host} -Dhttps.proxyPort={proxy_port}"
+                from wrapper_jars import ensure_wrapper_jars
+                ensure_wrapper_jars()
                 build_cmd = [gradlew, "clean", "build", "--no-daemon"]
                 print(f"[BUILD] Running: {' '.join(build_cmd)}")
                 print(f"[BUILD]   cwd: {mod_dir}")
