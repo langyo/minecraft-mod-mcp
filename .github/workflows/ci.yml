@@ -348,7 +348,7 @@ jobs:
       matrix:
         include:
           # Legacy forge lanes (1.7.10-1.16.5) are covered by the build matrix and
-          # verified end-to-end on Windows and WSL Linux (see WIN-TEST-REPORT.md);
+          # verified end-to-end on Windows and WSL Linux;
           # GitHub runners cannot replay their installers / init their early
           # LWJGL display under llvmpipe, so they stay out of smoke scope.
           - { mc_ver: "1.14.4",  loader: "fabric",   jdk: "8"  }
