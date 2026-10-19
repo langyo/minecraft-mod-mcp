@@ -33,6 +33,7 @@ from version_config import (
     get_loaders, get_fg_era, get_jdk_home, find_jdk17, is_legacy, JDK_PATHS,
 )
 from mirrors import probe_all as probe_mirrors, patch_all_wrappers_local, generate_init_gradle
+from wrapper_jars import ensure_wrapper_jars
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS_DIR_ACTUAL = MODS_DIR
@@ -327,6 +328,7 @@ def main():
 
     probe_mirrors()
 
+    ensure_wrapper_jars()
     wrapper_snapshot = snapshot_wrapper_properties()
     patched = patch_all_wrappers_local(BASE)
     if patched > 0:

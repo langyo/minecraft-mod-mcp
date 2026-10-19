@@ -7,6 +7,8 @@ out/
 neoform-cache/
 run/
 release-jars/
+# Module wrapper jars are copied from gradle/wrapper by scripts/wrapper_jars.py
+packages/mods/**/gradle/wrapper/gradle-wrapper.jar
 
 *.class
 *.hprof

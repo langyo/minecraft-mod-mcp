@@ -9,6 +9,9 @@ from __future__ import annotations
 import os, sys, subprocess, time, glob
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from wrapper_jars import ensure_wrapper_jars  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS = os.path.join(ROOT, "packages", "mods")
 JAVA_HOME = os.environ.get("JAVA_HOME", "/home/lab/.gradle/jdks/eclipse_adoptium-21")
@@ -58,6 +61,7 @@ def build_one(ver: str) -> tuple[str, bool, str]:
 
 
 def main():
+    ensure_wrapper_jars()
     versions = fabric_versions()
     todo = [v for v in versions if not has_jar(v)]
     skip = [v for v in versions if has_jar(v)]

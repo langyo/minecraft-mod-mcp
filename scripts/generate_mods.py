@@ -95,7 +95,8 @@ FABRIC_LOADER_VERSIONS = {
 }
 
 WRAPPER_JAR = os.path.join(
-    os.environ.get("TEMP", "/tmp"), "opencode", "gradle-wrapper.jar"
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "gradle", "wrapper", "gradle-wrapper.jar",
 )
 
 

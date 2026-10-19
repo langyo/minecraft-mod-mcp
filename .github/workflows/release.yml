@@ -206,6 +206,9 @@ jobs:
           PYTHONUTF8: "1"
         run: python scripts/prepare_cache.py
 
+      - name: Provision module Gradle wrapper jars
+        run: python scripts/wrapper_jars.py
+
       - name: Build mods
         shell: pwsh
         env:
