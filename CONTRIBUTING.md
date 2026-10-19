@@ -66,6 +66,12 @@ just smoke 1.21.7
 cd packages/minecraft-mod-mcp && npm test
 ```
 
+### CI build scope
+
+Pull requests only build the mod modules they touch (`scripts/select_mods.py`).
+Changes to shared inputs (`packages/common/`, `gradle/`, `scripts/modgen/`, the
+CI workflow, ...) and every push to `master` build all modules.
+
 ## Release Process
 
 1. Update version in `packages/minecraft-mod-mcp/package.json`
