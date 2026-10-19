@@ -171,18 +171,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # PRs only build the modules they touch (see scripts/select_mods.py);
+      # pushes and manual runs build the full lane.
+      - name: Select mods to build
+        id: select
+        shell: pwsh
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          @'
+          ${{ matrix.mods }}
+          '@ -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" } | Set-Content -Path all-mods.txt -Encoding utf8
+          python scripts/select_mods.py --event "${{ github.event_name }}" --base "${{ github.event.pull_request.base.sha }}" --mods-file all-mods.txt --out selected-mods.txt
+          $count = @(Get-Content selected-mods.txt | Where-Object { $_.Trim() -ne "" }).Count
+          "count=$count" >> $env:GITHUB_OUTPUT
+
       - name: Restore .maven-local
+        if: steps.select.outputs.count != '0'
         uses: actions/download-artifact@v4
         with:
           name: maven-local
           path: .maven-local/
 
       - uses: actions/setup-java@v4
+        if: steps.select.outputs.count != '0'
         with:
           distribution: temurin
           java-version: ${{ matrix.jdk }}
 
       - uses: actions/cache@v4
+        if: steps.select.outputs.count != '0'
         with:
           path: |
             ~/.gradle/caches
@@ -197,25 +215,25 @@ jobs:
       # mappings through Cloudflare with Java 8's TLS stack on a cold cache —
       # pre-populate the Gradle cache with Python (modern TLS) instead.
       - name: Prepare legacy build caches (FG 3/4.1)
-        if: matrix.jdk == '8'
+        if: matrix.jdk == '8' && steps.select.outputs.count != '0'
         shell: pwsh
         env:
           PYTHONUTF8: "1"
         run: python scripts/prepare_cache.py
 
       - name: Provision module Gradle wrapper jars
+        if: steps.select.outputs.count != '0'
         run: python scripts/wrapper_jars.py
 
       - name: Build mods
+        if: steps.select.outputs.count != '0'
         shell: pwsh
         env:
           GRADLE_OPTS: "-Xmx8G"
         run: |
           $ErrorActionPreference = "Stop"
           $failedMods = @()
-          $mods = @'
-          ${{ matrix.mods }}
-          '@ -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+          $mods = @(Get-Content selected-mods.txt | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
 
           foreach ($mod in $mods) {
             $modPath = "packages/mods/$mod"
@@ -265,9 +283,7 @@ jobs:
           $outDir = "release-jars"
           New-Item -ItemType Directory -Path $outDir -Force
 
-          $mods = @'
-          ${{ matrix.mods }}
-          '@ -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+          $mods = @(Get-Content selected-mods.txt | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
 
           foreach ($mod in $mods) {
             $parts = $mod -split '/'
