@@ -52,3 +52,5 @@ jar {
     }
 }
 
+
+// ci selective-build probe
