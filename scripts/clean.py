@@ -41,6 +41,11 @@ TEMP_FILES = [
     ("project logs/",               PROJECT / "logs"),
 ]
 
+# Generated per-module files (git-ignored); wrapper jars are kept on purpose.
+MODULE_FILES = ["gradle.properties"]
+
+ROOT_LOG_PATTERNS = ["*.log", "hs_err_pid*.log", "build-report.json", "test_results.json"]
+
 MC_TEMP = [
     ("MC logs/",                    MC_DIR / "logs"),
     ("MC crash-reports/",           MC_DIR / "crash-reports"),
@@ -137,6 +142,23 @@ def find_mod_build_dirs():
                 p = loader / sub
                 if p.exists():
                     items.append((f"mods/{mc_ver.name}/{loader.name}/{sub}/", p))
+            for name in MODULE_FILES:
+                p = loader / name
+                if p.is_file():
+                    items.append((f"mods/{mc_ver.name}/{loader.name}/{name}", p))
+            items.extend(
+                (f"mods/{mc_ver.name}/{loader.name}/{p.name}", p) for p in loader.glob("*.log")
+            )
+    return items
+
+
+def find_root_logs():
+    """Untracked logs/reports that scripts and crashed JVMs leave in the repo root."""
+    items = []
+    for pattern in ROOT_LOG_PATTERNS:
+        for p in sorted(PROJECT.glob(pattern)):
+            if p.is_file():
+                items.append((f"project {p.name}", p))
     return items
 
 
@@ -175,6 +197,7 @@ def collect_all(include_worlds):
     worlds_possible = []
 
     safe.extend(find_mod_build_dirs())
+    safe.extend(find_root_logs())
 
     for label, path in BUILD_CACHE:
         if os.path.exists(str(path)):
