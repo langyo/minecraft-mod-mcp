@@ -9,6 +9,12 @@ Usage:
   python scripts/build_all.py --era fg51
   python scripts/build_all.py --loader forge
   python scripts/build_all.py --mc 1.20.1
+  python scripts/build_all.py --force           # ignore up-to-date fingerprints
+  python scripts/build_all.py --rerun-tasks     # also pass --rerun-tasks to Gradle
+
+By default a module whose inputs (its own files, shared common sources and the
+build JDK) are unchanged since its last successful build is skipped, and Gradle
+is allowed to reuse its task outputs.
 """
 import subprocess
 import sys
@@ -32,6 +38,13 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS_DIR_ACTUAL = MODS_DIR
 
 BUILD_TIMEOUT = 1200
+COMMON_SRC = os.path.join(BASE, "packages", "common", "src")
+FINGERPRINT_NAME = ".build-fingerprint"
+GRADLE_PROPS = "org.gradle.jvmargs=-Xmx3G\n"
+_FP_SKIP_DIRS = {"build", ".gradle", ".idea", "bin", "out", ".kotlin"}
+_FP_SKIP_FILES = {"gradle.properties", "build.log", "build-error.log"}
+_RERUN_TASKS = False
+_FORCE = False
 TEMP_DIR = os.path.join(os.environ.get("TEMP", "C:\\Temp"), "opencode")
 GRADLE_USER_HOME = os.path.join(os.path.expanduser("~"), ".gradle")
 MODULES_CACHE = os.path.join(GRADLE_USER_HOME, "caches", "modules-2", "files-2.1")
@@ -46,6 +59,73 @@ def sha1_file(path):
 
 
 _http_server_proc = None
+
+
+def _hash_tree(h, root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in _FP_SKIP_DIRS)
+        for name in sorted(filenames):
+            if name in _FP_SKIP_FILES:
+                continue
+            full = os.path.join(dirpath, name)
+            h.update(os.path.relpath(full, root).replace(os.sep, "/").encode())
+            with open(full, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    h.update(chunk)
+
+
+_common_fp_cache = []
+
+
+def _common_fingerprint():
+    if not _common_fp_cache:
+        h = hashlib.sha1()
+        if os.path.isdir(COMMON_SRC):
+            _hash_tree(h, COMMON_SRC)
+        _common_fp_cache.append(h.hexdigest())
+    return _common_fp_cache[0]
+
+
+def module_fingerprint(path, jdk):
+    h = hashlib.sha1()
+    _hash_tree(h, path)
+    h.update(_common_fingerprint().encode())
+    h.update(os.path.basename(jdk or "").encode())
+    return h.hexdigest()
+
+
+def _has_jar(path):
+    libs = os.path.join(path, "build", "libs")
+    return os.path.isdir(libs) and any(n.endswith(".jar") for n in os.listdir(libs))
+
+
+def snapshot_wrapper_properties():
+    """Remember tracked wrapper files so local-mirror patching never leaks into git."""
+    snap = {}
+    roots = [os.path.join(BASE, "gradle"), MODS_DIR_ACTUAL]
+    for root in roots:
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in _FP_SKIP_DIRS]
+            if "gradle-wrapper.properties" in filenames:
+                full = os.path.join(dirpath, "gradle-wrapper.properties")
+                with open(full, "rb") as f:
+                    snap[full] = f.read()
+    return snap
+
+
+def restore_wrapper_properties(snap):
+    for full, data in snap.items():
+        with open(full, "rb") as f:
+            if f.read() == data:
+                continue
+        with open(full, "wb") as f:
+            f.write(data)
+
+
+def gradle_command():
+    if os.name == "nt":
+        return ["cmd", "/c", "gradlew.bat"]
+    return ["sh", "./gradlew"]
 
 
 def ensure_mcp_stable_in_fg_cache(mc, info):
@@ -126,7 +206,7 @@ def _build_one(task_info):
     if not os.path.isdir(path):
         return key, "skip", {"key": key, "reason": "no project dir"}
 
-    gradlew = os.path.join(path, "gradlew.bat")
+    gradlew = os.path.join(path, "gradlew.bat" if os.name == "nt" else "gradlew")
     if not os.path.isfile(gradlew):
         return key, "skip", {"key": key, "reason": "no gradlew"}
 
@@ -136,17 +216,31 @@ def _build_one(task_info):
         env["JAVA_HOME"] = jdk
 
     gp = os.path.join(path, "gradle.properties")
-    with open(gp, "w") as f:
-        f.write("org.gradle.jvmargs=-Xmx3G\n")
+    current = None
+    if os.path.isfile(gp):
+        with open(gp, "r") as f:
+            current = f.read()
+    if current != GRADLE_PROPS:
+        with open(gp, "w") as f:
+            f.write(GRADLE_PROPS)
     env.pop("JAVA_TOOL_OPTIONS", None)
     env["GRADLE_OPTS"] = "-Xmx3G"
+
+    fp = module_fingerprint(path, jdk)
+    fp_path = os.path.join(path, "build", FINGERPRINT_NAME)
+    if not _FORCE and _has_jar(path) and os.path.isfile(fp_path):
+        with open(fp_path, "r") as f:
+            if f.read().strip() == fp:
+                return key, "uptodate", {"key": key, "reason": "inputs unchanged"}
 
     log_path = os.path.join(path, "build.log")
     start = time.time()
     with _print_lock:
         print(f"  START {key} (JDK={jdk})")
 
-    cmd = ["cmd", "/c", "gradlew.bat", "build", "--no-daemon", "--rerun-tasks"]
+    cmd = gradle_command() + ["build", "--no-daemon"]
+    if _RERUN_TASKS:
+        cmd.append("--rerun-tasks")
     try:
         with open(log_path, "w", encoding="utf-8") as logf:
             proc = subprocess.run(
@@ -164,6 +258,9 @@ def _build_one(task_info):
 
         if proc.returncode == 0 and "BUILD SUCCESSFUL" in out:
             os.remove(log_path)
+            os.makedirs(os.path.dirname(fp_path), exist_ok=True)
+            with open(fp_path, "w") as f:
+                f.write(fp)
             return key, "success", {"key": key, "time": round(elapsed, 1)}
         else:
             err_msg = out[-2000:] if len(out) > 2000 else out
@@ -173,10 +270,6 @@ def _build_one(task_info):
             return key, "fail", {"key": key, "time": round(elapsed, 1), "error": err_msg}
     except subprocess.TimeoutExpired:
         elapsed = time.time() - start
-        try:
-            proc.kill()
-        except Exception:
-            pass
         out = ""
         if os.path.isfile(log_path):
             with open(log_path, "r", encoding="utf-8", errors="replace") as f:
@@ -203,10 +296,6 @@ def _ensure_jdks(tasks):
         print(f"  Auto-provisioning JDK {ver}...")
         try:
             ret = subprocess.run(
-                [sys.executable, "-m", "subprocess"],
-                capture_output=True, text=True, timeout=300,
-            )
-            ret = subprocess.run(
                 ["node", script, str(ver)],
                 cwd=BASE, capture_output=True, text=True, timeout=300,
             )
@@ -229,10 +318,16 @@ def main():
     parser.add_argument("--mc", help="Only build specific MC version")
     parser.add_argument("--no-cache", action="store_true", help="Skip prepare_cache step")
     parser.add_argument("-j", "--jobs", type=int, default=4, help="Parallel workers (default: 4)")
+    parser.add_argument("--force", action="store_true", help="Rebuild even if inputs are unchanged")
+    parser.add_argument("--rerun-tasks", action="store_true", help="Pass --rerun-tasks to Gradle")
     args = parser.parse_args()
+    global _FORCE, _RERUN_TASKS
+    _FORCE = args.force or args.rerun_tasks
+    _RERUN_TASKS = args.rerun_tasks
 
     probe_mirrors()
 
+    wrapper_snapshot = snapshot_wrapper_properties()
     patched = patch_all_wrappers_local(BASE)
     if patched > 0:
         print(f"  Patched {patched} gradle-wrapper.properties with local cache\n")
@@ -249,7 +344,7 @@ def main():
             print("WARNING: prepare_cache had failures, continuing anyway...")
         print()
 
-    results = {"success": [], "fail": [], "skip": []}
+    results = {"success": [], "fail": [], "skip": [], "uptodate": []}
     tasks = []
 
     for mc, info in sorted(ALL_VERSIONS.items()):
@@ -292,21 +387,24 @@ def main():
     ht = threading.Thread(target=_heartbeat, daemon=True)
     ht.start()
 
-    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        future_map = {pool.submit(_build_one, t): t for t in tasks}
-        for future in as_completed(future_map):
-            done += 1
-            key, status, entry = future.result()
-            elapsed = entry.get("time", 0)
-            with _print_lock:
-                tag = {"success": "OK", "fail": "FAIL", "skip": "SKIP"}[status]
-                print(f"[{done}/{total}] {tag} {key} ({elapsed:.1f}s)")
-            results[status].append(entry)
+    try:
+        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            future_map = {pool.submit(_build_one, t): t for t in tasks}
+            for future in as_completed(future_map):
+                done += 1
+                key, status, entry = future.result()
+                elapsed = entry.get("time", 0)
+                with _print_lock:
+                    tag = {"success": "OK", "fail": "FAIL", "skip": "SKIP", "uptodate": "UP-TO-DATE"}[status]
+                    print(f"[{done}/{total}] {tag} {key} ({elapsed:.1f}s)")
+                results[status].append(entry)
+    finally:
+        restore_wrapper_properties(wrapper_snapshot)
 
     total_time = time.time() - start_all
     print(f"\n{'=' * 60}")
-    s, f, sk = len(results["success"]), len(results["fail"]), len(results["skip"])
-    print(f"Results: {s} OK, {f} FAIL, {sk} SKIP / {total} total")
+    s, f, sk, ut = (len(results[k]) for k in ("success", "fail", "skip", "uptodate"))
+    print(f"Results: {s} OK, {ut} UP-TO-DATE, {f} FAIL, {sk} SKIP / {total} total")
     print(f"Total time: {total_time:.0f}s ({total_time / 60:.1f}min) with {args.jobs} workers")
     print(f"{'=' * 60}")
 
