@@ -275,9 +275,10 @@ ALL_VERSIONS = {
     # BootstrapContext#holderLookup not resolving currently-building
     # registries). Fabric loader 0.20.1 (2026-10-19) reverts the ASM 9.11
     # update that 0.20.0 shipped, so the 26.2/26.3 fabric pins take the
-    # hotfix.
-    "26.3":   {"forge": "26.3-66.0.13",                    "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
-               "version_id": "26.3-forge-66.0.13",
+    # hotfix. The Forge pin moved to 66.1.0 on 2026-10-22, the day it
+    # became the recommended 26.3 build.
+    "26.3":   {"forge": "26.3-66.1.0",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
+               "version_id": "26.3-forge-66.1.0",
                "neoforge": "26.3.0.95", "mdg": "2.0.147",
                "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
 }
