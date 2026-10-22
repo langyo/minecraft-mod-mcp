@@ -250,12 +250,17 @@ ALL_VERSIONS = {
                "version_id": "1.21.9-Forge59.0.5", 'fabric_yarn': '1.21.9+build.1'},
     "1.21.10": {"forge": "1.21.10-60.1.0",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.10",
                "version_id": "1.21.10-Forge60.1.0", 'fabric_yarn': '1.21.10+build.1'},
-    "1.21.11": {"forge": "1.21.11-61.2.0",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.11",
-               "version_id": "1.21.11-forge-61.2.0",
+    "1.21.11": {"forge": "1.21.11-61.2.4",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.11",
+               "version_id": "1.21.11-forge-61.2.4",
                "neoforge": "21.11.48", "mdg": "2.0.141",
                "fabric_yarn": "1.21.11+build.6"},
-    "26.1.2": {"forge": "26.1.2-64.1.0",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
-               "version_id": "26.1.2-forge-64.1.0",
+    # 2026-10-23 re-check: Forge promoted 64.1.5 (26.1.2) and 61.2.4
+    # (1.21.11) to recommended; everything else in the tracked wave — MC
+    # latest release 26.3 (26.4 snapshot-only), Forge 66.1.0/65.1.5/59.0.5,
+    # NeoForge 26.3.0.95/26.2.0.93/26.1.2.122/21.11.48, fabric loader 0.20.1,
+    # FG7 7.0.40, MDG 2.0.148-but-2.0.147-still-suffices — is current.
+    "26.1.2": {"forge": "26.1.2-64.1.5",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
+               "version_id": "26.1.2-forge-64.1.5",
                "neoforge": "26.1.2.122", "mdg": "2.0.141"},
     # MC 26.x ships unobfuscated (intermediary is a fixed "0.0.0"), so Fabric
     # needs no yarn mappings there — only a loader pin. fabric_unobfuscated
