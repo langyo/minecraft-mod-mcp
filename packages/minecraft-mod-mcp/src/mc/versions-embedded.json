@@ -481,20 +481,20 @@
       "fabric_yarn": "1.21.10+build.1"
     },
     "1_21_11": {
-      "forge": "1.21.11-61.2.0",
+      "forge": "1.21.11-61.2.4",
       "fg_era": "fg7",
       "java": 21,
-      "version_id": "1.21.11-forge-61.2.0",
+      "version_id": "1.21.11-forge-61.2.4",
       "mappings": "official_1.21.11",
       "fabric_yarn": "1.21.11+build.6",
       "neoforge": "21.11.48",
       "mdg": "2.0.141"
     },
     "26_1_2": {
-      "forge": "26.1.2-64.1.0",
+      "forge": "26.1.2-64.1.5",
       "fg_era": "fg7",
       "java": 25,
-      "version_id": "26.1.2-forge-64.1.0",
+      "version_id": "26.1.2-forge-64.1.5",
       "mappings": "official_26.1.2",
       "neoforge": "26.1.2.122",
       "mdg": "2.0.141"
