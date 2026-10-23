@@ -5,7 +5,7 @@ plugins {
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
 }
 
-version = '0.4.16'
+version = '0.4.17'
 group = 'xyz.langyo'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
@@ -35,7 +35,7 @@ sourceSets.main.java.srcDir '../../../common/src/main/java'
 sourceSets.main.resources.srcDir '../../../common/src/main/resources'
 
 dependencies {
-    minecraft "net.minecraftforge:forge:1.20.4-49.2.0"
+    minecraft "net.minecraftforge:forge:1.20.4-49.2.13"
     implementation 'org.java-websocket:Java-WebSocket:1.5.4'
 }
 

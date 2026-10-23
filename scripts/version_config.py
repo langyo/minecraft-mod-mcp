@@ -115,6 +115,15 @@ FG_ERAS = {
 #                              neoforge?, mdg?, fabric_yarn?}
 
 ALL_VERSIONS = {
+    # 2026-10-23 fleet-wide Forge sweep (maintainer directive): every
+    # line moved to its current recommended build — 1.20.1,
+    # 1.20.4, 1.20.6, 1.21.1, 1.21.3, 1.21.4, 1.21.5, 1.21.8 and
+    # 1.21.10; every other line was already at its recommended build.
+    # Exceptions: 1.7.2 stays on 10.12.1.1109 — the whole 10.12.2.* line
+    # (up to the promoted 10.12.2.1161) was never published to
+    # maven.minecraftforge.net — and 1.12.2 stays on 14.23.5.2847 —
+    # the newer 14.23.5.2859/2864 builds ship no -userdev.jar, which
+    # ForgeGradle 2.3 needs to set up the dev environment.
     # --- FG 1.2 GTNH (MC 1.7.x) ---
     "1.7.2":  {"forge": "1.7.2-10.12.1.1109",           "fg_era": "fg12_gtnh", "java": 8,
                "version_id": "1.7.2-Forge10.12.1.1109"},
@@ -204,24 +213,24 @@ ALL_VERSIONS = {
                "fabric_yarn": "1.19.4+build.1"},
     "1.20":   {"forge": "1.20-46.0.14",                    "fg_era": "fg6",  "java": 17, "mappings": "official_1.20",
                "version_id": "1.20-Forge46.0.14", "fabric_yarn": "1.20+build.1"},
-    "1.20.1": {"forge": "1.20.1-47.4.10",                  "fg_era": "fg6",  "java": 17, "mappings": "official_1.20.1",
-               "version_id": "1.20.1-forge-47.4.10",
+    "1.20.1": {"forge": "1.20.1-47.4.28",                  "fg_era": "fg6",  "java": 17, "mappings": "official_1.20.1",
+               "version_id": "1.20.1-forge-47.4.28",
                "fabric_yarn": "1.20.1+build.10"},
     "1.20.2": {"forge": "1.20.2-48.1.0",                   "fg_era": "fg6",  "java": 17, "mappings": "official_1.20.2",
                "version_id": "1.20.2-Forge48.1.0", "fabric_yarn": "1.20.2+build.1"},
     "1.20.3": {"forge": "1.20.3-49.0.2",                   "fg_era": "fg6",  "java": 17, "mappings": "official_1.20.3",
                "version_id": "1.20.3-Forge49.0.2", "fabric_yarn": "1.20.3+build.1"},
-    "1.20.4": {"forge": "1.20.4-49.2.0",                   "fg_era": "fg6",  "java": 17, "mappings": "official_1.20.4",
-               "version_id": "1.20.4-Forge49.2.0", "fabric_yarn": "1.20.4+build.3",
+    "1.20.4": {"forge": "1.20.4-49.2.13",                   "fg_era": "fg6",  "java": 17, "mappings": "official_1.20.4",
+               "version_id": "1.20.4-Forge49.2.13", "fabric_yarn": "1.20.4+build.3",
                "neoforge": "49.0.51"},
-    "1.20.6": {"forge": "1.20.6-50.2.8",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.20.6",
-               "version_id": "1.20.6-forge-50.2.8",
+    "1.20.6": {"forge": "1.20.6-50.2.14",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.20.6",
+               "version_id": "1.20.6-forge-50.2.14",
                "neoforge": "20.6.134", "mdg": "2.0.141",
                "fabric_yarn": "1.20.6+build.1"},
     "1.21":   {"forge": "1.21-51.0.33",                    "fg_era": "fg6",  "java": 21, "mappings": "official_1.21",
                "version_id": "1.21-Forge51.0.33", "fabric_yarn": "1.21+build.1"},
-    "1.21.1": {"forge": "1.21.1-52.1.0",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.1",
-               "version_id": "1.21.1-Forge52.1.0", "fabric_yarn": "1.21.1+build.3",
+    "1.21.1": {"forge": "1.21.1-52.1.20",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.1",
+               "version_id": "1.21.1-Forge52.1.20", "fabric_yarn": "1.21.1+build.3",
                "neoforge": "21.1.172", "mdg": "2.0.141"},
     # Forge skipped MC 1.21.2 entirely (52.x = 1.21.1, 53.x = 1.21.3), so this
     # version ships NeoForge + Fabric only. NeoForge 21.2.x never left beta,
@@ -230,26 +239,26 @@ ALL_VERSIONS = {
                "version_id": "1.21.2-neoforge-21.2.1-beta",
                "fabric_yarn": "1.21.2+build.1",
                "neoforge": "21.2.1-beta", "mdg": "2.0.141"},
-    "1.21.3": {"forge": "1.21.3-53.1.0",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.3",
-               "version_id": "1.21.3-Forge53.1.0", "fabric_yarn": "1.21.3+build.1",
+    "1.21.3": {"forge": "1.21.3-53.1.16",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.3",
+               "version_id": "1.21.3-Forge53.1.16", "fabric_yarn": "1.21.3+build.1",
                "neoforge": "21.3.63", "mdg": "2.0.141"},
 
     # --- FG 7.x (MC 1.21.4+) ---
-    "1.21.4": {"forge": "1.21.4-54.1.14",                  "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.4",
-               "version_id": "1.21.4-Forge54.1.14",
+    "1.21.4": {"forge": "1.21.4-54.1.22",                  "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.4",
+               "version_id": "1.21.4-Forge54.1.22",
                "neoforge": "21.4.0-beta", "mdg": "2.0.141", 'fabric_yarn': '1.21.4+build.1'},
-    "1.21.5": {"forge": "1.21.5-55.1.0",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.5",
-               "version_id": "1.21.5-Forge55.1.0", 'fabric_yarn': '1.21.5+build.1'},
+    "1.21.5": {"forge": "1.21.5-55.1.18",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.5",
+               "version_id": "1.21.5-Forge55.1.18", 'fabric_yarn': '1.21.5+build.1'},
     "1.21.6": {"forge": "1.21.6-56.0.9",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.6",
                "version_id": "1.21.6-Forge56.0.9", 'fabric_yarn': '1.21.6+build.1'},
     "1.21.7": {"forge": "1.21.7-57.0.3",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.7",
                "version_id": "1.21.7-Forge57.0.3", 'fabric_yarn': '1.21.7+build.1'},
-    "1.21.8": {"forge": "1.21.8-58.1.0",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.8",
-               "version_id": "1.21.8-Forge58.1.0", 'fabric_yarn': '1.21.8+build.1'},
+    "1.21.8": {"forge": "1.21.8-58.1.26",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.8",
+               "version_id": "1.21.8-Forge58.1.26", 'fabric_yarn': '1.21.8+build.1'},
     "1.21.9": {"forge": "1.21.9-59.0.5",                   "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.9",
                "version_id": "1.21.9-Forge59.0.5", 'fabric_yarn': '1.21.9+build.1'},
-    "1.21.10": {"forge": "1.21.10-60.1.0",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.10",
-               "version_id": "1.21.10-Forge60.1.0", 'fabric_yarn': '1.21.10+build.1'},
+    "1.21.10": {"forge": "1.21.10-60.1.18",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.10",
+               "version_id": "1.21.10-Forge60.1.18", 'fabric_yarn': '1.21.10+build.1'},
     "1.21.11": {"forge": "1.21.11-61.2.4",                 "fg_era": "fg7",  "java": 21, "mappings": "official_1.21.11",
                "version_id": "1.21.11-forge-61.2.4",
                "neoforge": "21.11.48", "mdg": "2.0.141",

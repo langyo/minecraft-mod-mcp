@@ -10,21 +10,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vueuse/core": "^11",
-    "marked": "^18",
-    "pinia": "^2",
-    "vue": "^3",
-    "vue-i18n": "^11",
-    "vue-router": "^4"
+    "@vueuse/core": "^*",
+    "marked": "^*",
+    "pinia": "^*",
+    "vue": "^*",
+    "vue-i18n": "^*",
+    "vue-router": "^*"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "^1.2.110",
-    "@unocss/reset": "^0.65",
-    "@vitejs/plugin-vue": "^5",
-    "sass": "^1",
-    "typescript": "^5.6",
-    "unocss": "^0.65",
-    "vite": "^6",
-    "vue-tsc": "^2"
+    "@iconify-json/lucide": "^*",
+    "@unocss/reset": "^*",
+    "@vitejs/plugin-vue": "^*",
+    "sass": "^*",
+    "typescript": "^6.0.3",
+    "unocss": "^*",
+    "vite": "^*",
+    "vue-tsc": "^*"
   }
 }

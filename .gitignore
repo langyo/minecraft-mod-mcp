@@ -80,3 +80,6 @@ test-*-results.json
 
 # AI session state (hook status / screenshots)
 .mimosa/
+
+# The CLI package floats on ^* specifiers; CI installs fresh without a lockfile.
+packages/minecraft-mod-mcp/package-lock.json
