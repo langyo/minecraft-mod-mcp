@@ -45,7 +45,10 @@ export default defineConfig([
   {
     entry: ["src/index.ts"],
     format: ["esm", "cjs"],
-    dts: true,
+    // tsup 9.0.0's dts pipeline calls the TypeScript JS compiler API for
+    // config parsing, which typescript 7 no longer ships — declarations are
+    // emitted by `tsc --emitDeclarationOnly` in the build script instead.
+    dts: false,
     clean: false,
     shims: true,
     platform: "node",
