@@ -187,7 +187,7 @@
       "java": 8,
       "version_id": "1.14.3-Forge27.0.60",
       "mappings": "snapshot_20190716",
-      "fabric_yarn": "1.14.3+build.9"
+      "fabric_yarn": "1.14.3+build.13"
     },
     "1_14_4": {
       "forge": "1.14.4-28.2.28",
@@ -211,7 +211,7 @@
       "java": 8,
       "version_id": "1.15.1-Forge30.0.51",
       "mappings": "snapshot_20200224",
-      "fabric_yarn": "1.15.1+build.10"
+      "fabric_yarn": "1.15.1+build.37"
     },
     "1_15_2": {
       "forge": "1.15.2-31.2.60",
@@ -227,7 +227,7 @@
       "java": 8,
       "version_id": "1.16.1-Forge32.0.108",
       "mappings": "snapshot_20200723",
-      "fabric_yarn": "1.16.1+build.10"
+      "fabric_yarn": "1.16.1+build.21"
     },
     "1_16_2": {
       "forge": "1.16.2-33.0.61",
@@ -235,7 +235,7 @@
       "java": 8,
       "version_id": "1.16.2-Forge33.0.61",
       "mappings": "snapshot_20200916",
-      "fabric_yarn": "1.16.2+build.1"
+      "fabric_yarn": "1.16.2+build.47"
     },
     "1_16_3": {
       "forge": "1.16.3-34.1.0",
@@ -243,7 +243,7 @@
       "java": 8,
       "version_id": "1.16.3-Forge34.1.0",
       "mappings": "snapshot_20200514",
-      "fabric_yarn": "1.16.3+build.7"
+      "fabric_yarn": "1.16.3+build.47"
     },
     "1_16_4": {
       "forge": "1.16.4-35.1.4",
@@ -251,7 +251,7 @@
       "java": 8,
       "version_id": "1.16.4-Forge35.1.4",
       "mappings": "snapshot_20210309",
-      "fabric_yarn": "1.16.4+build.1"
+      "fabric_yarn": "1.16.4+build.9"
     },
     "1_16_5": {
       "forge": "1.16.5-36.2.42",
@@ -283,7 +283,7 @@
       "java": 17,
       "version_id": "1.18.1-Forge39.1.0",
       "mappings": "official_1.18.1",
-      "fabric_yarn": "1.18.1+build.8"
+      "fabric_yarn": "1.18.1+build.22"
     },
     "1_18_2": {
       "forge": "1.18.2-40.3.12",
@@ -307,7 +307,7 @@
       "java": 17,
       "version_id": "1.19.1-Forge42.0.9",
       "mappings": "official_1.19.1",
-      "fabric_yarn": "1.19.1+build.4"
+      "fabric_yarn": "1.19.1+build.6"
     },
     "1_19_2": {
       "forge": "1.19.2-43.5.0",
@@ -323,7 +323,7 @@
       "java": 17,
       "version_id": "1.19.3-Forge44.1.0",
       "mappings": "official_1.19.3",
-      "fabric_yarn": "1.19.3+build.2"
+      "fabric_yarn": "1.19.3+build.5"
     },
     "1_19_4": {
       "forge": "1.19.4-45.4.3",
@@ -331,7 +331,7 @@
       "java": 17,
       "version_id": "1.19.4-forge-45.4.3",
       "mappings": "official_1.19.4",
-      "fabric_yarn": "1.19.4+build.1"
+      "fabric_yarn": "1.19.4+build.2"
     },
     "1_20": {
       "forge": "1.20-46.0.14",
@@ -355,7 +355,7 @@
       "java": 17,
       "version_id": "1.20.2-Forge48.1.0",
       "mappings": "official_1.20.2",
-      "fabric_yarn": "1.20.2+build.1"
+      "fabric_yarn": "1.20.2+build.4"
     },
     "1_20_3": {
       "forge": "1.20.3-49.0.2",
@@ -372,7 +372,8 @@
       "version_id": "1.20.4-Forge49.2.13",
       "mappings": "official_1.20.4",
       "fabric_yarn": "1.20.4+build.3",
-      "neoforge": "49.0.51"
+      "neoforge": "20.4.251",
+      "mdg": "1.0.24"
     },
     "1_20_6": {
       "forge": "1.20.6-50.2.14",
@@ -380,8 +381,8 @@
       "java": 21,
       "version_id": "1.20.6-forge-50.2.14",
       "mappings": "official_1.20.6",
-      "fabric_yarn": "1.20.6+build.1",
-      "neoforge": "20.6.134",
+      "fabric_yarn": "1.20.6+build.3",
+      "neoforge": "20.6.144",
       "mdg": "2.0.141"
     },
     "1_21": {
@@ -390,7 +391,7 @@
       "java": 21,
       "version_id": "1.21-Forge51.0.33",
       "mappings": "official_1.21",
-      "fabric_yarn": "1.21+build.1"
+      "fabric_yarn": "1.21+build.9"
     },
     "1_21_1": {
       "forge": "1.21.1-52.1.20",
@@ -399,7 +400,7 @@
       "version_id": "1.21.1-Forge52.1.20",
       "mappings": "official_1.21.1",
       "fabric_yarn": "1.21.1+build.3",
-      "neoforge": "21.1.172",
+      "neoforge": "21.1.264",
       "mdg": "2.0.141"
     },
     "1_21_2": {
@@ -418,8 +419,8 @@
       "java": 21,
       "version_id": "1.21.3-Forge53.1.16",
       "mappings": "official_1.21.3",
-      "fabric_yarn": "1.21.3+build.1",
-      "neoforge": "21.3.63",
+      "fabric_yarn": "1.21.3+build.2",
+      "neoforge": "21.3.100",
       "mdg": "2.0.141"
     },
     "1_21_4": {
@@ -428,8 +429,8 @@
       "java": 21,
       "version_id": "1.21.4-Forge54.1.22",
       "mappings": "official_1.21.4",
-      "fabric_yarn": "1.21.4+build.1",
-      "neoforge": "21.4.0-beta",
+      "fabric_yarn": "1.21.4+build.8",
+      "neoforge": "21.4.161",
       "mdg": "2.0.141"
     },
     "1_21_5": {
@@ -454,7 +455,7 @@
       "java": 21,
       "version_id": "1.21.7-Forge57.0.3",
       "mappings": "official_1.21.7",
-      "fabric_yarn": "1.21.7+build.1"
+      "fabric_yarn": "1.21.7+build.8"
     },
     "1_21_8": {
       "forge": "1.21.8-58.1.26",
@@ -478,7 +479,7 @@
       "java": 21,
       "version_id": "1.21.10-Forge60.1.18",
       "mappings": "official_1.21.10",
-      "fabric_yarn": "1.21.10+build.1"
+      "fabric_yarn": "1.21.10+build.3"
     },
     "1_21_11": {
       "forge": "1.21.11-61.2.4",
