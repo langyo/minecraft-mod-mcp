@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "mcpmod",
-  "version": "0.4.18",
+  "version": "0.4.19",
   "name": {
     "en_us": "ModDev MCP",
     "zh_cn": "ModDev MCP",
