@@ -400,7 +400,7 @@
       "version_id": "1.21.1-Forge52.1.20",
       "mappings": "official_1.21.1",
       "fabric_yarn": "1.21.1+build.3",
-      "neoforge": "21.1.264",
+      "neoforge": "21.1.265",
       "mdg": "2.0.141"
     },
     "1_21_2": {
@@ -497,7 +497,7 @@
       "java": 25,
       "version_id": "26.1.2-forge-64.1.5",
       "mappings": "official_26.1.2",
-      "neoforge": "26.1.2.122",
+      "neoforge": "26.1.2.124",
       "mdg": "2.0.141"
     },
     "26_2": {
@@ -517,7 +517,7 @@
       "version_id": "26.3-forge-66.1.0",
       "mappings": "official_26.3",
       "fabric_loader": "0.20.1",
-      "neoforge": "26.3.0.97",
+      "neoforge": "26.3.0.99",
       "mdg": "2.0.147"
     }
   },
