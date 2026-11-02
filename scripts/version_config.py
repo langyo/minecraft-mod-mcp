@@ -299,19 +299,19 @@ ALL_VERSIONS = {
     # HolderSet.contents visibility change. Refreshed to 26.3.0.84 on
     # 2026-10-16, to 26.3.0.86 on 2026-10-17, to 26.3.0.89 on 2026-10-18,
     # to 26.3.0.92 on 2026-10-19, to 26.3.0.94 on 2026-10-20, to
-    # 26.3.0.95 on 2026-10-21, to 26.3.0.97 on 2026-10-25 and to
-    # 26.3.0.99 on 2026-10-26 (newest stable at re-check; .95 fixes
+    # 26.3.0.95 on 2026-10-21, to 26.3.0.97 on 2026-10-25, to 26.3.0.99 on 2026-10-26 and to
+    # 26.3.0.101 on 2026-11-02 (newest stable at re-check; .95 fixes
     # BootstrapContext#holderLookup not resolving currently-building
     # registries, .96 makes the collision game test flaky and JVM-session
     # independent, .97 adds context to the enchanted loot events, .98 adds
     # a few recipe book helpers #3687, .99 scopes recipe outputs for
-    # namespaces and conditions #3643). Fabric loader 0.20.1 (2026-10-19)
+    # namespaces and conditions #3643, .100 adds Game Session Attachments #3679 and .101 fixes registryFriendlyLengthPrefixed dropping the connection type #3712). Fabric loader 0.20.1 (2026-10-19)
     # reverts the ASM 9.11 update that 0.20.0 shipped, so the 26.2/26.3
     # fabric pins take the hotfix. The Forge pin moved to 66.1.0 on
     # 2026-10-22, the day it became the recommended 26.3 build.
     "26.3":   {"forge": "26.3-66.1.0",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
                "version_id": "26.3-forge-66.1.0",
-               "neoforge": "26.3.0.99", "mdg": "2.0.147",
+               "neoforge": "26.3.0.101", "mdg": "2.0.147",
                "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
 }
 
