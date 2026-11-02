@@ -34,6 +34,7 @@ from version_config import (
 )
 from mirrors import probe_all as probe_mirrors, patch_all_wrappers_local, generate_init_gradle
 from wrapper_jars import ensure_wrapper_jars
+from netsec import safe_join
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS_DIR_ACTUAL = MODS_DIR
@@ -108,7 +109,7 @@ def snapshot_wrapper_properties():
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [d for d in dirnames if d not in _FP_SKIP_DIRS]
             if "gradle-wrapper.properties" in filenames:
-                full = os.path.join(dirpath, "gradle-wrapper.properties")
+                full = safe_join(dirpath, "gradle-wrapper.properties")
                 with open(full, "rb") as f:
                     snap[full] = f.read()
     return snap
@@ -136,23 +137,23 @@ def ensure_mcp_stable_in_fg_cache(mc, info):
     channel, ver = mappings.split("_", 1)
     forge_ver = info.get("forge", "")
     mcp_full_ver = f"{ver}-{mc}"
-    src_dir = os.path.join(MODULES_CACHE, "de.oceanlabs.mcp", f"mcp_{channel}", mcp_full_ver)
+    src_dir = safe_join(MODULES_CACHE, "de.oceanlabs.mcp", f"mcp_{channel}", mcp_full_ver)
     src_zip = None
     if os.path.isdir(src_dir):
         for d in os.listdir(src_dir):
-            candidate = os.path.join(src_dir, d, f"mcp_{channel}-{mcp_full_ver}.zip")
+            candidate = safe_join(src_dir, d, f"mcp_{channel}-{mcp_full_ver}.zip")
             if os.path.isfile(candidate):
                 src_zip = candidate
                 break
     if not src_zip:
         return
-    cache_dir = os.path.join(
+    cache_dir = safe_join(
         GRADLE_USER_HOME, "caches", "minecraft", "net", "minecraftforge", "forge",
         forge_ver, channel, ver,
     )
     os.makedirs(cache_dir, exist_ok=True)
     for name in (f"mcp_{channel}-{mcp_full_ver}.zip", "mcp_stable.zip"):
-        dst = os.path.join(cache_dir, name)
+        dst = safe_join(cache_dir, name)
         if not os.path.isfile(dst):
             shutil.copy2(src_zip, dst)
 
@@ -201,7 +202,7 @@ _print_lock = threading.Lock()
 
 def _build_one(task_info):
     mc, loader, info = task_info
-    path = os.path.join(MODS_DIR_ACTUAL, mc, loader)
+    path = safe_join(MODS_DIR_ACTUAL, mc, loader)
     key = f"{mc}/{loader}"
 
     if not os.path.isdir(path):
@@ -216,7 +217,7 @@ def _build_one(task_info):
     if jdk:
         env["JAVA_HOME"] = jdk
 
-    gp = os.path.join(path, "gradle.properties")
+    gp = safe_join(path, "gradle.properties")
     current = None
     if os.path.isfile(gp):
         with open(gp, "r") as f:
@@ -228,13 +229,13 @@ def _build_one(task_info):
     env["GRADLE_OPTS"] = "-Xmx3G"
 
     fp = module_fingerprint(path, jdk)
-    fp_path = os.path.join(path, "build", FINGERPRINT_NAME)
+    fp_path = safe_join(path, "build", FINGERPRINT_NAME)
     if not _FORCE and _has_jar(path) and os.path.isfile(fp_path):
         with open(fp_path, "r") as f:
             if f.read().strip() == fp:
                 return key, "uptodate", {"key": key, "reason": "inputs unchanged"}
 
-    log_path = os.path.join(path, "build.log")
+    log_path = safe_join(path, "build.log")
     start = time.time()
     with _print_lock:
         print(f"  START {key} (JDK={jdk})")
@@ -265,7 +266,7 @@ def _build_one(task_info):
             return key, "success", {"key": key, "time": round(elapsed, 1)}
         else:
             err_msg = out[-2000:] if len(out) > 2000 else out
-            error_log = os.path.join(path, "build-error.log")
+            error_log = safe_join(path, "build-error.log")
             with open(error_log, "w", encoding="utf-8") as lf:
                 lf.write(out)
             return key, "fail", {"key": key, "time": round(elapsed, 1), "error": err_msg}
@@ -417,7 +418,7 @@ def main():
             safe = err_text.encode('ascii', errors='replace').decode('ascii')
             print(f"  {entry['key']}: {safe}")
 
-    report_path = os.path.join(BASE, "build-report.json")
+    report_path = safe_join(BASE, "build-report.json")
     with open(report_path, "w") as fp:
         json.dump(results, fp, indent=2)
     print(f"\nReport saved to {report_path}")

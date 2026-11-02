@@ -21,10 +21,11 @@ from version_config import (  # noqa: E402
     ALL_VERSIONS, FG_ERAS, get_api_group, get_fabric_loom,
     get_neoforge_gradle, LEGACY_ERAS,
 )
+from netsec import safe_join  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "packages", "minecraft-mod-mcp", "src", "mc",
-                   "versions-embedded.json")
+OUT = safe_join(ROOT, "packages", "minecraft-mod-mcp", "src", "mc",
+                "versions-embedded.json")
 
 
 def _key(mc: str) -> str:

@@ -4,6 +4,7 @@ import { isWindows, isMacos } from "../runtime/detector.js";
 import { launcherDir, jdkHome } from "./platform.js";
 import { JAVA, PATHS } from "./defaults.js";
 import { downloadWithNativeFallback } from "./proxy.js";
+import { assertSafeUrl } from "./urlGuard.js";
 
 function javaCacheDir(): string {
   return join(launcherDir(), PATHS.javaDirName);
@@ -54,7 +55,7 @@ async function fetchJdkUrl(javaVersion: number): Promise<{ url: string; name: st
 
   const apiUrl = `${JAVA.adoptiumApiUrl}/${javaVersion}/hotspot?architecture=${arch}&image_type=jdk&os=${platform}&vendor=eclipse`;
 
-  const res = await fetch(apiUrl);
+  const res = await fetch(assertSafeUrl(apiUrl));
   if (!res.ok) throw new Error(`Adoptium API error: ${res.status} ${res.statusText}`);
 
   const assets = (await res.json()) as AdoptiumAsset[];
@@ -65,6 +66,7 @@ async function fetchJdkUrl(javaVersion: number): Promise<{ url: string; name: st
 }
 
 async function downloadFile(url: string, dest: string, expectedSize: number, onProgress?: (msg: string) => void): Promise<void> {
+  assertSafeUrl(url);
   onProgress?.(`Downloading ${basename(dest)}...`);
   mkdirSync(dirname(dest), { recursive: true });
 
@@ -140,8 +142,8 @@ async function extractArchive(archive: string, outDir: string): Promise<void> {
       timeout: JAVA.extractTimeoutMs,
     });
   } else {
-    const { execSync } = await import("node:child_process");
-    execSync(`tar -xzf "${archive}" -C "${outDir}"`, { stdio: "pipe", timeout: JAVA.extractTimeoutMs });
+    const { execFileSync } = await import("node:child_process");
+    execFileSync("tar", ["-xzf", archive, "-C", outDir], { stdio: "pipe", timeout: JAVA.extractTimeoutMs });
   }
 }
 

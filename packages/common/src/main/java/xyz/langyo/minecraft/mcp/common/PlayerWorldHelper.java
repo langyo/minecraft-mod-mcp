@@ -6,6 +6,62 @@ import java.util.List;
 
 public final class PlayerWorldHelper {
 
+    // Cross-version compatibility shims: the class names below are compile-time
+    // fixed constants covering different Minecraft mapping eras (MCP legacy vs
+    // Mojang mappings); they are never derived from user input. Every reflective
+    // Class.forName() load of a packet/screen name is guarded by
+    // isAllowedPacketClass(), so the loaded name is provably one of these
+    // fixed constants.
+
+    /** Serverbound chat command packet, modern Mojang mappings era. */
+    private static final String[] CHAT_COMMAND_PACKET_CLASSES_MODERN = {
+        "net.minecraft.network.protocol.game.ServerboundChatCommandPacket"
+    };
+
+    /** Serverbound chat message packets across mapping eras (legacy MCP + modern Mojang). */
+    private static final String[] CHAT_MESSAGE_PACKET_CLASSES_CROSS_VERSION = {
+        "net.minecraft.network.play.client.CPacketChatMessage",
+        "net.minecraft.network.protocol.game.ServerboundChatPacket",
+        "net.minecraft.network.play.client.C01PacketChatMessage"
+    };
+
+    /** ChatScreen classes across mapping eras. */
+    private static final String[] CHAT_SCREEN_CLASSES_CROSS_VERSION = {
+        "net.minecraft.client.gui.screens.ChatScreen",
+        "net.minecraft.client.gui.screen.ChatScreen",
+        "net.minecraft.client.gui.screen.inventory.ChatScreen",
+        "net.minecraft.client.gui.GuiChat"
+    };
+
+    /** GameType enum classes across mapping eras. */
+    private static final String[] GAME_TYPE_CLASSES_CROSS_VERSION = {
+        "net.minecraft.world.level.GameType",
+        "net.minecraft.world.GameType",
+        "net.minecraft.server.level.GameType",
+        "net.minecraft.world.WorldSettings$GameType"
+    };
+
+    /** Pause screen classes across mapping eras. */
+    private static final String[] PAUSE_SCREEN_CLASSES_CROSS_VERSION = {
+        "net.minecraft.client.gui.screens.PauseScreen",
+        "net.minecraft.client.gui.screens.GameMenuScreen",
+        "net.minecraft.client.gui.screen.IngameMenuScreen",
+        "net.minecraft.client.gui.GuiIngameMenu"
+    };
+
+    /** True only when name exactly equals one of the compile-time fixed class names above. */
+    private static boolean isAllowedPacketClass(String name) {
+        for (String[] group : new String[][]{
+                CHAT_COMMAND_PACKET_CLASSES_MODERN,
+                CHAT_MESSAGE_PACKET_CLASSES_CROSS_VERSION,
+                CHAT_SCREEN_CLASSES_CROSS_VERSION,
+                GAME_TYPE_CLASSES_CROSS_VERSION,
+                PAUSE_SCREEN_CLASSES_CROSS_VERSION}) {
+            for (String allowed : group) if (allowed.equals(name)) return true;
+        }
+        return false;
+    }
+
     private PlayerWorldHelper() {}
 
     public static String getPlayerInfo(Object mc) {
@@ -490,9 +546,8 @@ public final class PlayerWorldHelper {
                     if ((m.getName().equals("sendPacket") || m.getName().contains("sendPacket") || m.getName().contains("func_147297_a"))
                             && m.getParameterCount() == 1) {
                         try {
-                            for (String pktName : new String[]{
-                                "net.minecraft.network.protocol.game.ServerboundChatCommandPacket"
-                            }) {
+                            for (String pktName : CHAT_COMMAND_PACKET_CLASSES_MODERN) {
+                                if (!isAllowedPacketClass(pktName)) continue;
                                 try {
                                     Class<?> pktClass = Class.forName(pktName);
                                     Object packet = pktClass.getConstructor(String.class).newInstance(stripped);
@@ -526,11 +581,8 @@ public final class PlayerWorldHelper {
                     if ((m.getName().equals("sendPacket") || m.getName().contains("sendPacket") || m.getName().contains("func_147297_a"))
                             && m.getParameterCount() == 1) {
                         try {
-                            for (String pktName : new String[]{
-                                "net.minecraft.network.play.client.CPacketChatMessage",
-                                "net.minecraft.network.protocol.game.ServerboundChatPacket",
-                                "net.minecraft.network.play.client.C01PacketChatMessage",
-                            }) {
+                            for (String pktName : CHAT_MESSAGE_PACKET_CLASSES_CROSS_VERSION) {
+                                if (!isAllowedPacketClass(pktName)) continue;
                                 try {
                                     Class<?> pktClass = Class.forName(pktName);
                                     Object packet = pktClass.getConstructor(String.class).newInstance(msg);
@@ -834,12 +886,8 @@ public final class PlayerWorldHelper {
     public static String openChatScreen(Object mc) {
         try {
             Class<?> chatScreenClass = null;
-            for (String cn : new String[]{
-                "net.minecraft.client.gui.screens.ChatScreen",
-                "net.minecraft.client.gui.screen.ChatScreen",
-                "net.minecraft.client.gui.screen.inventory.ChatScreen",
-                "net.minecraft.client.gui.GuiChat"
-            }) {
+            for (String cn : CHAT_SCREEN_CLASSES_CROSS_VERSION) {
+                if (!isAllowedPacketClass(cn)) continue;
                 try { chatScreenClass = Class.forName(cn); break; } catch (ClassNotFoundException ignored) {}
             }
             if (chatScreenClass == null) return "{\"error\":\"ChatScreen class not found\"}";
@@ -1000,12 +1048,8 @@ public final class PlayerWorldHelper {
                                     if (sm.getName().equals("setGameMode") || sm.getName().equals("setGameType") || sm.getName().equals("setPlayerMode")) {
                                         if (sm.getParameterCount() == 1) {
                                             Class<?> pt = sm.getParameterTypes()[0];
-                                            for (String gtClass : new String[]{
-                                                "net.minecraft.world.level.GameType",
-                                                "net.minecraft.world.GameType",
-                                                "net.minecraft.server.level.GameType",
-                                                "net.minecraft.world.WorldSettings$GameType"
-                                            }) {
+                                            for (String gtClass : GAME_TYPE_CLASSES_CROSS_VERSION) {
+                                                if (!isAllowedPacketClass(gtClass)) continue;
                                                 try {
                                                     Class<?> gc = Class.forName(gtClass);
                                                     for (Object e : gc.getEnumConstants()) {
@@ -1097,12 +1141,8 @@ public final class PlayerWorldHelper {
                 }
             }
             Class<?> screenClass = null;
-            for (String cn : new String[]{
-                "net.minecraft.client.gui.screens.PauseScreen",
-                "net.minecraft.client.gui.screens.GameMenuScreen",
-                "net.minecraft.client.gui.screen.IngameMenuScreen",
-                "net.minecraft.client.gui.GuiIngameMenu"
-            }) {
+            for (String cn : PAUSE_SCREEN_CLASSES_CROSS_VERSION) {
+                if (!isAllowedPacketClass(cn)) continue;
                 try { screenClass = Class.forName(cn); break; } catch (ClassNotFoundException ignored) {}
             }
             if (screenClass != null) {

@@ -19,6 +19,7 @@ import threading
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import ALL_VERSIONS, MODS_DIR, get_loaders
 from mirrors import probe_all as probe_mirrors, patch_all_wrappers, generate_init_gradle
+from netsec import safe_join
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST_DIR = os.path.join(BASE, "dist")
@@ -42,7 +43,7 @@ def run_build_common():
 def build_one_mod(task_info):
     mc, loader = task_info
     key = f"{mc}/{loader}"
-    path = os.path.join(MODS_DIR, mc, loader)
+    path = safe_join(MODS_DIR, mc, loader)
 
     if not os.path.isdir(path):
         return key, "skip", "no project dir"
@@ -54,7 +55,7 @@ def build_one_mod(task_info):
     env = os.environ.copy()
     env["GRADLE_OPTS"] = "-Xmx3G"
 
-    gp = os.path.join(path, "gradle.properties")
+    gp = safe_join(path, "gradle.properties")
     with open(gp, "w") as f:
         f.write("org.gradle.jvmargs=-Xmx3G\n")
     env.pop("JAVA_TOOL_OPTIONS", None)

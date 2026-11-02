@@ -19,6 +19,9 @@ import sys
 import tempfile
 import zipfile
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from netsec import safe_join, safe_urlopen  # noqa: E402
+
 MC_DIR = os.path.join(
     os.environ.get("APPDATA", os.path.expanduser("~")),
     ".minecraft" if platform.system() == "Windows" else ".minecraft",
@@ -53,7 +56,8 @@ def _patch_lwjgl2_headless_impl(cp):
     if not lwjgl_jar:
         print(f"[LAUNCH] LWJGL patch: no lwjgl jar found in classpath ({len(cp)} entries)", flush=True)
         return
-    patched_marker = lwjgl_jar + ".headless-patched"
+    patched_marker = safe_join(os.path.dirname(lwjgl_jar),
+                               os.path.basename(lwjgl_jar) + ".headless-patched")
     if os.path.isfile(patched_marker):
         print(f"[LAUNCH] LWJGL patch: already patched ({os.path.basename(lwjgl_jar)})", flush=True)
         return
@@ -418,15 +422,12 @@ def download_libraries(vj, mc_dir=None):
         path = artifact.get("path")
         url = artifact.get("url", "")
         if path and url:
-            full = os.path.join(lib_dir, path)
+            full = safe_join(lib_dir, path)
             if not os.path.isfile(full):
                 missing += 1
                 try:
                     os.makedirs(os.path.dirname(full), exist_ok=True)
-                    req = urllib.request.Request(url, headers={
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                    })
-                    with urllib.request.urlopen(req, timeout=60) as resp:
+                    with safe_urlopen(url, timeout=60) as resp:
                         data = resp.read()
                     with open(full, "wb") as f:
                         f.write(data)
@@ -439,14 +440,11 @@ def download_libraries(vj, mc_dir=None):
             npath = native.get("path")
             nurl = native.get("url", "")
             if npath and nurl:
-                nfull = os.path.join(lib_dir, npath)
+                nfull = safe_join(lib_dir, npath)
                 if not os.path.isfile(nfull):
                     try:
                         os.makedirs(os.path.dirname(nfull), exist_ok=True)
-                        req = urllib.request.Request(nurl, headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                        })
-                        with urllib.request.urlopen(req, timeout=60) as resp:
+                        with safe_urlopen(nurl, timeout=60) as resp:
                             data = resp.read()
                         with open(nfull, "wb") as f:
                             f.write(data)
@@ -458,8 +456,8 @@ def download_libraries(vj, mc_dir=None):
             group, artifact_id, ver = parts[0], parts[1], parts[2]
             group_path = group.replace(".", "/")
             jar_name = f"{artifact_id}-{ver}.jar"
-            jar_dir = os.path.join(lib_dir, group_path, artifact_id, ver)
-            jar_path = os.path.join(jar_dir, jar_name)
+            jar_dir = safe_join(lib_dir, group_path, artifact_id, ver)
+            jar_path = safe_join(jar_dir, jar_name)
             if os.path.isfile(jar_path):
                 continue
             is_forge = "minecraftforge" in group or "net.minecraftforge" in group
@@ -477,7 +475,7 @@ def download_libraries(vj, mc_dir=None):
                 if found:
                     break
                 candidate_name = f"{artifact_id}-{ver}{suffix}.jar"
-                candidate_path = os.path.join(jar_dir, candidate_name)
+                candidate_path = safe_join(jar_dir, candidate_name)
                 if os.path.isfile(candidate_path):
                     found = True
                     break
@@ -485,11 +483,10 @@ def download_libraries(vj, mc_dir=None):
                     jar_url = f"{base_url}{group_path}/{artifact_id}/{ver}/{candidate_name}"
                     try:
                         os.makedirs(jar_dir, exist_ok=True)
-                        req = urllib.request.Request(jar_url, headers={
+                        with safe_urlopen(jar_url, timeout=60, headers={
                             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                            "AppleWebKit/537.36",
-                        })
-                        with urllib.request.urlopen(req, timeout=60) as resp:
+                        }) as resp:
                             data = resp.read()
                         with open(candidate_path, "wb") as f:
                             f.write(data)
@@ -514,10 +511,10 @@ def ensure_version_jar(vj, mc_dir=None):
     if version_name and version_name not in targets:
         targets.append(version_name)
     for ver_name in targets:
-        jar_path = os.path.join(mc_dir, "versions", ver_name, f"{ver_name}.jar")
+        jar_path = safe_join(mc_dir, "versions", ver_name, f"{ver_name}.jar")
         if os.path.isfile(jar_path):
             continue
-        json_path = os.path.join(mc_dir, "versions", ver_name, f"{ver_name}.json")
+        json_path = safe_join(mc_dir, "versions", ver_name, f"{ver_name}.json")
         if not os.path.isfile(json_path):
             continue
         with open(json_path, "r", encoding="utf-8") as f:
@@ -528,10 +525,7 @@ def ensure_version_jar(vj, mc_dir=None):
             continue
         print(f"  Downloading {ver_name}.jar ...", flush=True)
         os.makedirs(os.path.dirname(jar_path), exist_ok=True)
-        req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        })
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with safe_urlopen(url, timeout=120) as resp:
             data = resp.read()
         with open(jar_path, "wb") as f:
             f.write(data)
@@ -547,8 +541,8 @@ def ensure_asset_index(vj, mc_dir=None):
     aid = vj.get("assets", ai.get("id", ""))
     if not aid:
         return
-    indexes_dir = os.path.join(mc_dir, "assets", "indexes")
-    index_path = os.path.join(indexes_dir, f"{aid}.json")
+    indexes_dir = safe_join(mc_dir, "assets", "indexes")
+    index_path = safe_join(indexes_dir, f"{aid}.json")
     if os.path.isfile(index_path):
         return
     url = ai.get("url", "")
@@ -556,10 +550,7 @@ def ensure_asset_index(vj, mc_dir=None):
         return
     print(f"  Downloading asset index {aid}.json ...", flush=True)
     os.makedirs(indexes_dir, exist_ok=True)
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    })
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with safe_urlopen(url, timeout=60) as resp:
         data = resp.read()
     with open(index_path, "wb") as f:
         f.write(data)
@@ -577,7 +568,7 @@ def download_missing_assets(vj, mc_dir=None):
     aid = vj.get("assets", ai.get("id", ""))
     if not aid:
         return
-    index_path = os.path.join(mc_dir, "assets", "indexes", f"{aid}.json")
+    index_path = safe_join(mc_dir, "assets", "indexes", f"{aid}.json")
     if not os.path.isfile(index_path):
         return
     with open(index_path, "r", encoding="utf-8") as f:
@@ -585,14 +576,14 @@ def download_missing_assets(vj, mc_dir=None):
     objects = idx.get("objects", {})
     if not objects:
         return
-    objects_dir = os.path.join(mc_dir, "assets", "objects")
+    objects_dir = safe_join(mc_dir, "assets", "objects")
     missing = []
     for name, info in objects.items():
         h = info.get("hash", "")
         sz = info.get("size", 0)
         if not h:
             continue
-        obj_path = os.path.join(objects_dir, h[:2], h)
+        obj_path = safe_join(objects_dir, h[:2], h)
         if os.path.isfile(obj_path) and os.path.getsize(obj_path) == sz:
             continue
         missing.append((name, h, sz))
@@ -604,13 +595,12 @@ def download_missing_assets(vj, mc_dir=None):
 
     def dl_one(item):
         name, h, sz = item
-        obj_path = os.path.join(objects_dir, h[:2], h)
+        obj_path = safe_join(objects_dir, h[:2], h)
         os.makedirs(os.path.dirname(obj_path), exist_ok=True)
         url = f"https://resources.download.minecraft.net/{h[:2]}/{h}"
         for attempt in range(3):
             try:
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=30) as resp:
+                with safe_urlopen(url, timeout=30) as resp:
                     data = resp.read()
                 if len(data) == sz:
                     with open(obj_path, "wb") as f:
@@ -760,12 +750,12 @@ def _extract_native_entries(zf, natives_dir, java_natives_dir):
             if "META-INF" in fn:
                 continue
             base = os.path.basename(fn)
-            target = os.path.join(natives_dir, base)
+            target = safe_join(natives_dir, base)
             if not os.path.isfile(target):
                 zf.extract(info, natives_dir)
                 with zf.open(info) as src, open(target, "wb") as dst:
                     shutil.copyfileobj(src, dst)
-            java_target = os.path.join(java_natives_dir, base)
+            java_target = safe_join(java_natives_dir, base)
             if not os.path.isfile(java_target):
                 with zf.open(info) as src, open(java_target, "wb") as dst:
                     shutil.copyfileobj(src, dst)
@@ -1549,8 +1539,8 @@ def main():
     if args.no_mod_sync:
         print(f"  Mod sync: skipped")
 
-    log_out = os.path.join(mc_dir, "mcp-launch-stdout.log")
-    log_err = os.path.join(mc_dir, "mcp-launch-stderr.log")
+    log_out = safe_join(mc_dir, "mcp-launch-stdout.log")
+    log_err = safe_join(mc_dir, "mcp-launch-stderr.log")
     fout = open(log_out, "w", encoding="utf-8", errors="replace")
     ferr = open(log_err, "w", encoding="utf-8", errors="replace")
 

@@ -15,6 +15,7 @@ import { findFreePort } from "./discovery/scanner.js";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync, openSync, closeSync } from "node:fs";
 import { gradleProxyEnv, setupGlobalProxy } from "./mc/proxy.js";
+import { assertAllowedProgram, JAVA_ALLOWLIST, GRADLEW_ALLOWLIST } from "./mc/spawnGuard.js";
 import { join, resolve } from "node:path";
 import { GAME, MCP, PLAYER, SERVER, SERVER_TYPES, type ServerType } from "./mc/defaults.js";
 
@@ -285,6 +286,7 @@ Options:
   if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true });
   const stderrFd = openSync(join(logsDir, "mc-stderr.log"), "a");
   const stdoutFd = openSync(join(logsDir, "mc-stdout.log"), "a");
+  assertAllowedProgram(cmd.java, JAVA_ALLOWLIST);
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
     stdio: ["ignore", stdoutFd, stderrFd],
@@ -1176,7 +1178,10 @@ function runGradle(
   return new Promise((resolve_) => {
     const proxyEnv = gradleProxyEnv();
     const env = { ...process.env, ...proxyEnv, JAVA_HOME: resolve(javaExe, "..", "..") };
-    const proc = spawn(join(cwd, gradlew), args, {
+    const gradlewCmd = join(cwd, gradlew);
+    assertAllowedProgram(gradlewCmd, GRADLEW_ALLOWLIST);
+    for (const a of args) if (typeof a !== "string" || a.length === 0) throw new Error(`Invalid gradlew argument: ${JSON.stringify(a)}`);
+    const proc = spawn(gradlewCmd, args, {
       cwd,
       env,
       stdio: ["ignore", "pipe", "pipe"],

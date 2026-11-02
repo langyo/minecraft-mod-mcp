@@ -4,6 +4,7 @@ import os
 import shutil
 
 from version_config import BASE_DIR, FG_ERAS, get_fabric_loom, get_neoforge_gradle
+from netsec import safe_join
 
 WRAPPER_JAR = os.path.join(BASE_DIR, "gradle", "wrapper", "gradle-wrapper.jar")
 
@@ -35,9 +36,9 @@ def _gradle_ver_for_neoforge(mc):
 
 
 def copy_wrapper(path, gradle_ver):
-    gw = os.path.join(path, "gradle", "wrapper")
+    gw = safe_join(path, "gradle", "wrapper")
     os.makedirs(gw, exist_ok=True)
-    dst = os.path.join(gw, "gradle-wrapper.jar")
+    dst = safe_join(gw, "gradle-wrapper.jar")
     try:
         shutil.copy2(WRAPPER_JAR, dst)
     except (OSError, PermissionError):
@@ -46,7 +47,7 @@ def copy_wrapper(path, gradle_ver):
         except OSError:
             pass
         shutil.copy2(WRAPPER_JAR, dst)
-    with open(os.path.join(gw, "gradle-wrapper.properties"), "w") as f:
+    with open(safe_join(gw, "gradle-wrapper.properties"), "w") as f:
         f.write("distributionBase=GRADLE_USER_HOME\n")
         f.write("distributionPath=wrapper/dists\n")
         f.write(
@@ -59,6 +60,6 @@ def copy_wrapper(path, gradle_ver):
     for name in ("gradlew", "gradlew.bat"):
         src = os.path.join(BASE_DIR, "packages", "mods", "1.8.9", "forge", name)
         if os.path.isfile(src):
-            dst_gw = os.path.join(path, name)
+            dst_gw = safe_join(path, name)
             if not os.path.isfile(dst_gw):
                 shutil.copy2(src, dst_gw)

@@ -27,6 +27,7 @@ from version_config import (
     get_loaders,
 )
 from mirrors import probe_all as probe_mirrors, patch_all_wrappers, generate_init_gradle
+from netsec import safe_join
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD_TIMEOUT = 1200
@@ -142,7 +143,7 @@ def build_common(tag):
 
 def _build_one(task_info):
     mc, loader, info = task_info
-    path = os.path.join(MODS_DIR, mc, loader)
+    path = safe_join(MODS_DIR, mc, loader)
     key = f"{mc}/{loader}"
 
     if not os.path.isdir(path):
@@ -159,7 +160,7 @@ def _build_one(task_info):
     else:
         env.pop("JAVA_HOME", None)
 
-    gp = os.path.join(path, "gradle.properties")
+    gp = safe_join(path, "gradle.properties")
     with open(gp, "w") as f:
         f.write("org.gradle.jvmargs=-Xmx3G\n")
     env.pop("JAVA_TOOL_OPTIONS", None)
@@ -189,7 +190,7 @@ def _build_one(task_info):
             return key, "success", {"key": key, "time": round(elapsed, 1)}
         else:
             err_msg = out[-2000:] if len(out) > 2000 else out
-            log_path = os.path.join(path, "build-error.log")
+            log_path = safe_join(path, "build-error.log")
             with open(log_path, "w", encoding="utf-8") as lf:
                 lf.write(out)
             return key, "fail", {"key": key, "time": round(elapsed, 1), "error": err_msg}
@@ -209,7 +210,7 @@ def collect_jars(dist_dir, tag):
         for loader in get_loaders(mc):
             new_name = f"minecraft-mcp-{mc}-{loader}.jar"
             found = False
-            libs_dir = os.path.join(MODS_DIR, mc, loader, "build", "libs")
+            libs_dir = safe_join(MODS_DIR, mc, loader, "build", "libs")
             if os.path.isdir(libs_dir):
                 for jar in os.listdir(libs_dir):
                     if not jar.endswith(".jar"):
@@ -217,7 +218,7 @@ def collect_jars(dist_dir, tag):
                     if any(s in jar for s in ("-sources", "-dev", "-slim")):
                         continue
                     src = os.path.join(libs_dir, jar)
-                    dst = os.path.join(dist_dir, new_name)
+                    dst = safe_join(dist_dir, new_name)
                     shutil.copy2(src, dst)
                     size_kb = os.path.getsize(src) / 1024
                     print(f"  {new_name} ({size_kb:.1f} KB)")
@@ -226,13 +227,13 @@ def collect_jars(dist_dir, tag):
                     break
             if found:
                 continue
-            devlibs_dir = os.path.join(MODS_DIR, mc, loader, "build", "devlibs")
+            devlibs_dir = safe_join(MODS_DIR, mc, loader, "build", "devlibs")
             if os.path.isdir(devlibs_dir):
                 for jar in os.listdir(devlibs_dir):
                     if not jar.endswith(".jar") or "-sources" in jar or "-slim" in jar:
                         continue
                     src = os.path.join(devlibs_dir, jar)
-                    dst = os.path.join(dist_dir, new_name)
+                    dst = safe_join(dist_dir, new_name)
                     shutil.copy2(src, dst)
                     size_kb = os.path.getsize(src) / 1024
                     print(f"  {new_name} ({size_kb:.1f} KB) [dev]")
@@ -295,7 +296,7 @@ def create_release(tag, dist_dir, dry_run=False):
     jar_paths = [os.path.join(dist_dir, jar) for jar in jars]
     notes = _generate_release_notes(tag)
 
-    notes_file = os.path.join(dist_dir, "_release_notes.md")
+    notes_file = safe_join(dist_dir, "_release_notes.md")
     with open(notes_file, "w", encoding="utf-8") as f:
         f.write(notes)
 

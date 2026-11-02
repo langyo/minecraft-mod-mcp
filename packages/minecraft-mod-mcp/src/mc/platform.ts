@@ -3,6 +3,7 @@ import { existsSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import { crossHomedir, isWindows, isMacos, classpathSeparator as cpSep } from "../runtime/detector.js";
 import { detectJavas } from "./javaDetect.js";
 import { PATHS, JAVA } from "./defaults.js";
+import { assertSafeUrl } from "./urlGuard.js";
 
 function homedir(): string {
   return crossHomedir();
@@ -92,7 +93,7 @@ export async function ensureModJar(mcVersion: string, loader: string): Promise<s
     const asset = rel.assets?.find((a) => pattern.test(a.name));
     if (!asset) return null;
 
-    const dlResp = await fetch(asset.browser_download_url);
+    const dlResp = await fetch(assertSafeUrl(asset.browser_download_url));
     if (!dlResp.ok) return null;
     if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true });
     writeFileSync(cachePath, Buffer.from(await dlResp.arrayBuffer()));

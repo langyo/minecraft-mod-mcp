@@ -21,6 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import ALL_VERSIONS, MODS_DIR, get_api_group, get_loaders
+from netsec import safe_join
 
 PKG = "xyz/langyo/minecraft/mcp/mod"
 MOD_ID = "mcpmod"
@@ -1349,13 +1350,13 @@ ru_ru = "WebSocket-\\u043c\\u043e\\u0441\\u0442 \\u0434\\u043b\\u044f \\u0432\\u
 """
 
 def write_java(path, filename, content):
-    pkg_dir = os.path.join(path, "src", "main", "java", PKG)
+    pkg_dir = safe_join(path, "src", "main", "java", PKG)
     os.makedirs(pkg_dir, exist_ok=True)
-    with open(os.path.join(pkg_dir, filename), "w", encoding="utf-8") as f:
+    with open(safe_join(pkg_dir, filename), "w", encoding="utf-8") as f:
         f.write(content)
 
 def _read_ref_source(mc):
-    ref = os.path.join(MODS_DIR, mc, "forge", "src", "main", "java", PKG, "ModDevMcpMod.java")
+    ref = safe_join(MODS_DIR, mc, "forge", "src", "main", "java", PKG, "ModDevMcpMod.java")
     if os.path.isfile(ref):
         with open(ref, encoding="utf-8") as f:
             return f.read()
@@ -1384,7 +1385,7 @@ if __name__ == "__main__":
     total = 0
     for mc, info in ALL_VERSIONS.items():
         for loader in get_loaders(mc):
-            path = os.path.join(MODS_DIR, mc, loader)
+            path = safe_join(MODS_DIR, mc, loader)
             if not os.path.isdir(path):
                 print(f"  SKIP (no project): {mc}/{loader}")
                 continue
@@ -1392,17 +1393,17 @@ if __name__ == "__main__":
             if loader == "forge":
                 write_java(path, "ModDevMcpMod.java", get_forge_mod_template(mc))
                 g = get_api_group(mc)
-                res_dir = os.path.join(path, "src", "main", "resources")
+                res_dir = safe_join(path, "src", "main", "resources")
                 os.makedirs(res_dir, exist_ok=True)
                 if g in ("fg3","fg4","fg5","fg6","fg7","mc26"):
-                    meta_dir = os.path.join(res_dir, "META-INF")
+                    meta_dir = safe_join(res_dir, "META-INF")
                     os.makedirs(meta_dir, exist_ok=True)
-                    with open(os.path.join(meta_dir, "mods.toml"), "w") as f:
+                    with open(safe_join(meta_dir, "mods.toml"), "w") as f:
                         f.write(MODS_TOML)
                 elif g in ("legacy", "legacy17"):
-                    with open(os.path.join(res_dir, "mcmod.info"), "w") as f:
+                    with open(safe_join(res_dir, "mcmod.info"), "w") as f:
                         f.write(MCMOD_INFO)
-                with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:
+                with open(safe_join(res_dir, "pack.mcmeta"), "w") as f:
                     f.write(_pack_mcmeta(mc))
                 total += 1
             elif loader == "neoforge":
@@ -1413,12 +1414,12 @@ if __name__ == "__main__":
                     write_java(path, "ModDevMcpMod.java", neoforge_mod_1204(mc))
                 else:
                     write_java(path, "ModDevMcpMod.java", neoforge_mod(mc))
-                res_dir = os.path.join(path, "src", "main", "resources")
-                meta_dir = os.path.join(res_dir, "META-INF")
+                res_dir = safe_join(path, "src", "main", "resources")
+                meta_dir = safe_join(res_dir, "META-INF")
                 os.makedirs(meta_dir, exist_ok=True)
-                with open(os.path.join(meta_dir, "neoforge.mods.toml"), "w") as f:
+                with open(safe_join(meta_dir, "neoforge.mods.toml"), "w") as f:
                     f.write(NEOFORGE_MODS_TOML)
-                with open(os.path.join(res_dir, "pack.mcmeta"), "w") as f:
+                with open(safe_join(res_dir, "pack.mcmeta"), "w") as f:
                     f.write(_pack_mcmeta(mc))
                 total += 1
             elif loader == "fabric":
