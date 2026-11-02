@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from wrapper_jars import ensure_wrapper_jars  # noqa: E402
+from netsec import safe_join  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS = os.path.join(ROOT, "packages", "mods")
@@ -35,12 +36,12 @@ def has_jar(ver: str) -> bool:
 
 
 def build_one(ver: str) -> tuple[str, bool, str]:
-    proj = os.path.join(MODS, ver, "fabric")
+    proj = safe_join(MODS, ver, "fabric")
     gradlew = os.path.join(proj, "gradlew")
     if not os.path.isfile(gradlew):
         return ver, False, "no gradlew"
     os.chmod(gradlew, 0o755)
-    with open(os.path.join(proj, "gradle.properties"), "w") as f:
+    with open(safe_join(proj, "gradle.properties"), "w") as f:
         f.write("org.gradle.jvmargs=-Xmx3g\norg.gradle.daemon=false\n")
     env = dict(os.environ)
     env["JAVA_HOME"] = JAVA_HOME

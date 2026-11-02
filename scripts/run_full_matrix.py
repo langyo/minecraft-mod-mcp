@@ -10,6 +10,7 @@ from dataclasses import dataclass, asdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import ALL_VERSIONS, get_loaders
+from netsec import safe_join
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CLI = os.path.join(ROOT, "packages", "minecraft-mod-mcp", "dist", "cli.js")
@@ -231,6 +232,7 @@ def main():
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(2)
 
+    out_path = args.output if os.path.isabs(args.output) else safe_join(os.getcwd(), args.output)
     for i, (kind, ver, loader, stype) in enumerate(todo):
         sys.stdout.write(f"[{i+1}/{len(todo)}] {kind} {ver} {loader}{' '+stype if stype else ''} ")
         sys.stdout.flush()
@@ -243,7 +245,7 @@ def main():
             "PARTIAL" if r.get("launch_ok") or r.get("server_ready") else "FAIL"
         err = r.get("error","")[:40]
         print(f"\r[{i+1}/{len(todo)}] {kind} {ver} {loader} → {v} ({r['elapsed_s']:.0f}s) {err}")
-        with open(args.output, "w") as f:
+        with open(out_path, "w") as f:
             json.dump(results, f, indent=2)
 
     passed = sum(1 for r in results if r.get("mod_http_ok") and r.get("screenshot_ok"))

@@ -1,6 +1,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { ModClient } from "./modClient.js";
 import { PLAYER, GAME, MOD, MCP } from "../mc/defaults.js";
+import { assertAllowedProgram, JAVA_ALLOWLIST } from "../mc/spawnGuard.js";
 
 export function createApiApp(mod: ModClient): Server {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -71,6 +72,7 @@ export function createApiApp(mod: ModClient): Server {
 
           const mcDir_ = gameDirPath(config);
           if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
+          assertAllowedProgram(cmd.java, JAVA_ALLOWLIST);
           const child = spawn(cmd.java, cmd.args, { cwd: mcDir_, stdio: "ignore", detached: process.platform !== "win32" });
           mod.setMcProcess(child);
           res.end(JSON.stringify({ launched: true, version: versionId, loader, pid: child.pid }));

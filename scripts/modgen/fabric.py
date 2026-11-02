@@ -3,6 +3,7 @@
 import os
 
 from version_config import get_fabric_loom
+from netsec import safe_join
 
 from .gradle import _gradle_ver_for_fabric, maven_local_depth
 
@@ -153,9 +154,9 @@ dependencies {{
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w") as f:
+    with open(safe_join(path, "build.gradle"), "w") as f:
         f.write(content)
-    with open(os.path.join(path, "gradle.properties"), "w") as f:
+    with open(safe_join(path, "gradle.properties"), "w") as f:
         f.write("org.gradle.jvmargs=-Xmx4g\n")
 
 
@@ -174,7 +175,7 @@ def write_fabric_settings(mc, info, path):
 
 rootProject.name = 'minecraft-moddev-mcp-fabric-{mc}'
 """
-    with open(os.path.join(path, "settings.gradle"), "w") as f:
+    with open(safe_join(path, "settings.gradle"), "w") as f:
         f.write(content)
 
 
@@ -210,8 +211,8 @@ def write_fabric_mod_json(mc, info, path):
   }
 }
 """
-    os.makedirs(os.path.join(path, "src", "main", "resources"), exist_ok=True)
+    os.makedirs(safe_join(path, "src", "main", "resources"), exist_ok=True)
     with open(
-        os.path.join(path, "src", "main", "resources", "fabric.mod.json"), "w"
+        safe_join(path, "src", "main", "resources", "fabric.mod.json"), "w"
     ) as f:
         f.write(content)

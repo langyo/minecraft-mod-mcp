@@ -2,6 +2,7 @@ import { TOOLS } from "./tools.js";
 import type { ModClient } from "../api/modClient.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { GAME, PLAYER, SERVER } from "../mc/defaults.js";
+import { assertAllowedProgram, JAVA_ALLOWLIST } from "../mc/spawnGuard.js";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { loadVersionsData } from "../mc/versionsData.js";
@@ -248,6 +249,7 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   const mcDir_ = gameDirPath(config);
   if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
 
+  assertAllowedProgram(cmd.java, JAVA_ALLOWLIST);
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
     stdio: "ignore",
@@ -445,6 +447,7 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   const mcDir_ = gameDirPath(config);
   if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
 
+  assertAllowedProgram(cmd.java, JAVA_ALLOWLIST);
   const child = spawn(cmd.java, cmd.args, {
     cwd: mcDir_,
     stdio: "ignore",

@@ -15,6 +15,9 @@ import os
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from netsec import safe_join  # noqa: E402
+
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SHARED_PREFIXES = (
@@ -70,7 +73,8 @@ def main():
         except (subprocess.CalledProcessError, OSError) as e:
             print(f"select_mods: could not diff against base ({e}); building all")
 
-    with open(args.out, "w", encoding="utf-8", newline="\n") as f:
+    out_path = args.out if os.path.isabs(args.out) else safe_join(os.getcwd(), args.out)
+    with open(out_path, "w", encoding="utf-8", newline="\n") as f:
         f.write("".join(m + "\n" for m in selected))
     print(f"Selected {len(selected)}/{len(mods)} mod(s)")
     for m in selected:

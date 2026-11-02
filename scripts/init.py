@@ -22,6 +22,9 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from netsec import safe_join  # noqa: E402
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = Path(__file__).resolve().parent
 NEOFORGE_DEV = PROJECT_ROOT / "neoforge-dev"
@@ -192,7 +195,7 @@ def download_mdk(version="21.1.228"):
                         continue
                     if parts[0] in ("src", "gradle", "build", "settings", ".gitkeep"):
                         out = "/".join(parts[1:]) if parts[0] == "src" else member
-                        op = NEOFORGE_DEV / out
+                        op = Path(safe_join(NEOFORGE_DEV, out))
                         op.parent.mkdir(parents=True, exist_ok=True)
                         with zf.open(member) as src, open(op, "wb") as dst:
                             shutil.copyfileobj(src, dst)

@@ -14,12 +14,17 @@ Usage:
   ok = download("maven_forge", "de/oceanlabs/mcp/...", "/tmp/file.zip")
 """
 
+import urllib.parse
 import urllib.request
 import urllib.error
 import os
 import re
+import sys
 import threading
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from netsec import assert_no_traversal, safe_join, safe_urlopen, register_hosts  # noqa: E402
 
 PROBE_TIMEOUT = 8
 DL_TIMEOUT = 180
@@ -67,14 +72,16 @@ MIRROR_GROUPS = {
     },
 }
 
+# Keep the netsec download allowlist in sync with every mirror group host.
+register_hosts(urllib.parse.urlsplit(u).hostname for g in MIRROR_GROUPS.values() for u in g["urls"])
+
 _working = {}
 _lock = threading.Lock()
 
 
 def _probe_url(url, timeout=PROBE_TIMEOUT):
     try:
-        req = urllib.request.Request(url, method="HEAD")
-        resp = urllib.request.urlopen(req, timeout=timeout)
+        resp = safe_urlopen(url, timeout=timeout, method="HEAD")
         return resp.status < 400
     except Exception:
         return False
@@ -170,6 +177,7 @@ _GRADLE_VER_RE = re.compile(r"gradle-(\d[\d.]+\d)-bin\.zip")
 
 def patch_wrapper(properties_path):
     """Patch gradle-wrapper.properties to use the working Gradle dist mirror."""
+    assert_no_traversal(properties_path)
     with open(properties_path, "r") as f:
         content = f.read()
 
@@ -207,11 +215,11 @@ def patch_all_wrappers(base_dir):
 
     for root, dirs, files in os.walk(mods_dir):
         if "gradle-wrapper.properties" in files:
-            path = os.path.join(root, "gradle-wrapper.properties")
+            path = safe_join(root, "gradle-wrapper.properties")
             if patch_wrapper(path):
                 patched += 1
 
-    root_wrapper = os.path.join(base_dir, "gradle", "wrapper", "gradle-wrapper.properties")
+    root_wrapper = safe_join(base_dir, "gradle", "wrapper", "gradle-wrapper.properties")
     if os.path.isfile(root_wrapper):
         if patch_wrapper(root_wrapper):
             patched += 1
@@ -227,7 +235,7 @@ _GRADLE_INIT_DIR = os.path.join(
 def generate_init_gradle():
     """Generate ~/.gradle/init.d/mirrors.gradle with working mirror repos."""
     os.makedirs(_GRADLE_INIT_DIR, exist_ok=True)
-    init_path = os.path.join(_GRADLE_INIT_DIR, "mirrors.gradle")
+    init_path = safe_join(_GRADLE_INIT_DIR, "mirrors.gradle")
 
     central = get_url("maven_central")
 
@@ -293,10 +301,9 @@ def probe_gradle_speed(version, sample_size=256 * 1024):
     def _test(base):
         url = f"{base.rstrip('/')}/{filename}"
         try:
-            req = urllib.request.Request(url, method="GET")
-            req.add_header("Range", f"bytes=0-{sample_size - 1}")
             t0 = time.time()
-            resp = urllib.request.urlopen(req, timeout=PROBE_TIMEOUT)
+            resp = safe_urlopen(url, timeout=PROBE_TIMEOUT, method="GET",
+                                headers={"Range": f"bytes=0-{sample_size - 1}"})
             data = resp.read(sample_size)
             elapsed = time.time() - t0
             speed = len(data) / elapsed if elapsed > 0 else 0
@@ -387,6 +394,7 @@ def patch_wrapper_local(properties_path):
     Downloads the zip via speed-tested mirror first, then sets distributionUrl
     to file:/// so the wrapper never hits the network.
     """
+    assert_no_traversal(properties_path)
     version = _extract_gradle_version(properties_path)
     if not version:
         return False
@@ -426,7 +434,7 @@ def patch_all_wrappers_local(base_dir):
     if os.path.isdir(mods_dir):
         for root, dirs, files in os.walk(mods_dir):
             if "gradle-wrapper.properties" in files:
-                path = os.path.join(root, "gradle-wrapper.properties")
+                path = safe_join(root, "gradle-wrapper.properties")
                 version = _extract_gradle_version(path)
                 if not version:
                     continue
@@ -434,7 +442,7 @@ def patch_all_wrappers_local(base_dir):
                     seen_versions[version] = []
                 seen_versions[version].append(path)
 
-    root_wrapper = os.path.join(
+    root_wrapper = safe_join(
         base_dir, "gradle", "wrapper", "gradle-wrapper.properties"
     )
     if os.path.isfile(root_wrapper):
@@ -476,6 +484,6 @@ def patch_all_wrappers_local(base_dir):
 
 def remove_init_gradle():
     """Remove the auto-generated mirrors.gradle."""
-    init_path = os.path.join(_GRADLE_INIT_DIR, "mirrors.gradle")
+    init_path = safe_join(_GRADLE_INIT_DIR, "mirrors.gradle")
     if os.path.isfile(init_path):
         os.remove(init_path)

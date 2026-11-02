@@ -23,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import ALL_VERSIONS, get_loaders, get_fg_era  # noqa: E402
+from netsec import safe_join  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS = os.path.join(ROOT, "packages", "mods")
@@ -110,14 +111,14 @@ def projects(loader: str | None, filter_patterns: list[str]) -> list[tuple[str, 
         for ld in get_loaders(mc):
             if loader and ld != loader:
                 continue
-            proj = os.path.join(MODS, mc, ld)
+            proj = safe_join(MODS, mc, ld)
             if os.path.isfile(os.path.join(proj, "build.gradle")):
                 out.append((mc, ld))
     return out
 
 
 def build_one(mc: str, loader: str, force: bool) -> tuple[str, str, bool, str]:
-    proj = os.path.join(MODS, mc, loader)
+    proj = safe_join(MODS, mc, loader)
     gradlew = os.path.join(proj, "gradlew.bat")
     if not os.path.isfile(gradlew):
         gradlew = os.path.join(proj, "gradlew")
@@ -143,7 +144,7 @@ def build_one(mc: str, loader: str, force: bool) -> tuple[str, str, bool, str]:
 
     # gradle.properties: tame memory + disable daemon so parallel builds don't OOM.
     try:
-        with open(os.path.join(proj, "gradle.properties"), "w") as f:
+        with open(safe_join(proj, "gradle.properties"), "w") as f:
             f.write("org.gradle.jvmargs=-Xmx2g\norg.gradle.daemon=false\norg.gradle.console=plain\n")
     except Exception:
         pass
@@ -161,7 +162,6 @@ def build_one(mc: str, loader: str, force: bool) -> tuple[str, str, bool, str]:
         r = subprocess.run(
             [gradlew, "build", "--no-daemon", "--console=plain"],
             cwd=proj, env=env, capture_output=True, timeout=1200,
-            shell=True,
         )
         # Decode bytes with errors="replace" — Gradle on Windows emits the
         # local console codepage (GBK on zh-CN), not UTF-8, so str-mode
@@ -186,6 +186,7 @@ def build_one(mc: str, loader: str, force: bool) -> tuple[str, str, bool, str]:
 
 
 def main():
+    global PROXY_URL
     import argparse
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -202,7 +203,6 @@ def main():
 
     # Apply proxy globally so build_one()'s env inherits it.
     if args.proxy:
-        global PROXY_URL
         PROXY_URL = args.proxy
         for k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
             os.environ[k] = args.proxy

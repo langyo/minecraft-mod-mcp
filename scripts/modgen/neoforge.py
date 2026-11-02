@@ -3,6 +3,7 @@
 import os
 
 from version_config import FG_ERAS
+from netsec import safe_join
 
 from .gradle import maven_local_depth
 
@@ -74,7 +75,7 @@ jar {{
     }}
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w") as f:
+    with open(safe_join(path, "build.gradle"), "w") as f:
         f.write(content)
 
 
@@ -142,7 +143,7 @@ jar {{
     }}
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w") as f:
+    with open(safe_join(path, "build.gradle"), "w") as f:
         f.write(content)
 
 
@@ -165,5 +166,5 @@ plugins {{
 
 rootProject.name = 'minecraft-moddev-mcp-neoforge-{mc}'
 """
-    with open(os.path.join(path, "settings.gradle"), "w") as f:
+    with open(safe_join(path, "settings.gradle"), "w") as f:
         f.write(content)

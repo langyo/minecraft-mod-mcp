@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, copyFileSync, readdirSync, symlinkSync, statSync, rmSync, realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { serverDir } from "./settings.js";
+import { assertAllowedProgram, JAVA_ALLOWLIST, SERVER_SCRIPT_ALLOWLIST } from "./spawnGuard.js";
 import { downloadFile, downloadForgeInstaller, downloadFabricLoader, downloadNeoforgeInstaller } from "./download.js";
 import { loadVersion } from "./versionJson.js";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -224,7 +225,8 @@ function findSystemGitDir(): string | null {
   const candidates: string[] = [];
 
   try {
-    const which = execSync(`${isWindows() ? "where" : "which"} ${gitExe}`, { encoding: "utf-8", timeout: 5000 }).trim();
+    const prog = isWindows() ? "where" : "which";
+    const which = execFileSync(prog, [gitExe], { encoding: "utf-8", timeout: 5000 }).trim();
     const first = which.split(/\r?\n/)[0].trim();
     if (first) {
       const gitDir = dirname(dirname(first));
@@ -305,6 +307,7 @@ async function runBuildTools(mcVersion: string, sDir: string, javaPath: string, 
   const args = [...proxyArgs, ...sslArgs, "-jar", buildToolsJar, "--rev", mcVersion, ...targets.map(t => `--compile ${t}`).flatMap(s => s.split(" "))];
 
   return new Promise((resolve, reject) => {
+    assertAllowedProgram(javaPath, JAVA_ALLOWLIST);
     const child = spawn(javaPath, args, { cwd: workDir, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...gradleProxyEnv() } });
     let stderr = "";
     child.stdout?.on("data", (c: Buffer) => { const msg = c.toString().trim(); if (msg) onProgress?.(msg); });
@@ -381,6 +384,7 @@ async function installForgeServer(mcVersion: string, forgeVersion: string, sDir:
   onProgress?.(`Running Forge server installer...`);
   await new Promise<void>((resolve, reject) => {
     const proxyArgs = javaProxyArgs();
+    assertAllowedProgram(javaPath, JAVA_ALLOWLIST);
     const child = spawn(javaPath, [...proxyArgs, "-jar", installerPath, "--installServer", sDir], {
       cwd: sDir,
       stdio: ["ignore", "pipe", "pipe"],
@@ -448,6 +452,7 @@ async function installFabricServer(mcVersion: string, sDir: string, javaPath: st
 
   onProgress?.(`Running Fabric server installer (loader ${loaderVer})...`);
   await new Promise<void>((resolve, reject) => {
+    assertAllowedProgram(javaPath, JAVA_ALLOWLIST);
     const child = spawn(javaPath, [
       "-jar", installerPath, "server",
       "-mcversion", mcVersion,
@@ -489,6 +494,7 @@ async function installNeoForgeServer(neoforgeVersion: string, mcVersion: string,
   onProgress?.(`Running NeoForge server installer...`);
   const proxyArgs = javaProxyArgs();
   await new Promise<void>((resolve, reject) => {
+    assertAllowedProgram(javaPath, JAVA_ALLOWLIST);
     const child = spawn(javaPath, [...proxyArgs, "-jar", installerPath, "--installServer", sDir], {
       cwd: sDir,
       stdio: ["ignore", "pipe", "pipe"],
@@ -649,6 +655,7 @@ export function launchServer(
   const logPath = join(setup.serverDir, "server-launch.log");
   const logFd = openSync(logPath, "a");
   const launchCmd = isRunScript ? setup.jarPath : java;
+  assertAllowedProgram(launchCmd, isRunScript ? SERVER_SCRIPT_ALLOWLIST : JAVA_ALLOWLIST);
   const prefix = `\n[${new Date().toISOString()}] Launching: ${launchCmd} ${args.join(" ")}\n`;
   writeFileSync(logFd, prefix);
 

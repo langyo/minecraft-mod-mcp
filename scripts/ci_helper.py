@@ -24,7 +24,20 @@ import sys
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from netsec import safe_join, safe_urlopen  # noqa: E402
+
+
+def _assert_local_mod_url(url):
+    """The mod HTTP API is only ever reachable on loopback (CI runs the
+    game and the checker on the same host); refuse anything else."""
+    host = urllib.parse.urlsplit(str(url)).hostname or ""
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        raise ValueError(f"mod API URL must be loopback, got {url!r}")
+    return url
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
@@ -107,8 +120,7 @@ def _install_fabric_json(mc_ver, mc):
     import urllib.request, json
 
     meta_url = f"https://meta.fabricmc.net/v2/versions/loader/{mc_ver}"
-    req = urllib.request.Request(meta_url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with safe_urlopen(meta_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"}) as resp:
         versions = json.loads(resp.read())
     if not versions:
         _log(f"No Fabric loader for {mc_ver}")
@@ -134,8 +146,7 @@ def _install_fabric_json(mc_ver, mc):
 
     profile_url = (f"https://meta.fabricmc.net/v2/versions/loader/{mc_ver}"
                    f"/{loader_ver}/profile/json")
-    req2 = urllib.request.Request(profile_url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req2, timeout=30) as resp2:
+    with safe_urlopen(profile_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"}) as resp2:
         profile = json.loads(resp2.read())
 
     ver_dir = Path(mc) / "versions" / version_name
@@ -401,12 +412,12 @@ def _generate_level_dat(save_dir, world_name):
 
     _gen()
 
-    level_dat = os.path.join(save_dir, "level.dat")
+    level_dat = safe_join(save_dir, "level.dat")
     os.makedirs(save_dir, exist_ok=True)
     with gzip.open(level_dat, "wb") as f:
         f.write(buf.getvalue())
 
-    session_lock = os.path.join(save_dir, "session.lock")
+    session_lock = safe_join(save_dir, "session.lock")
     with open(session_lock, "wb") as f:
         f.write(b"\x00" * 8)
 
@@ -417,6 +428,7 @@ def wait_for_mod(url="http://127.0.0.1:9876", timeout=180, start_port=None):
     Scans ports from start_port down to 9000.
     Returns the URL of the found mod, or raises TimeoutError.
     """
+    _assert_local_mod_url(url)
     ports = list(range(int(start_port), 8999, -1)) if start_port else list(range(9876, 8999, -1))
 
     deadline = time.time() + timeout
@@ -497,6 +509,7 @@ def _dump_launch_diagnostics():
 
 
 def api_call(mod_url, cmd, params=None, timeout=30, retries=4):
+    _assert_local_mod_url(mod_url)
     """Call the mod HTTP API and return the response.
 
     Retries transient refusals: right after the HTTP bridge comes up the
@@ -522,6 +535,7 @@ def api_call(mod_url, cmd, params=None, timeout=30, retries=4):
 
 def get_screenshot(mod_url, timeout=60):
     """Get a screenshot from the mod and return raw PNG bytes."""
+    _assert_local_mod_url(mod_url)
     req = urllib.request.Request(
         f"{mod_url}/api/screenshot",
         headers={"User-Agent": "minecraft-mcp-ci"},
@@ -646,7 +660,7 @@ def generate_options_txt(mc_dir=None, settings=None):
     Sets fixed: FOV=70, renderDistance=4, graphics=fast, brightness=100.
     """
     mc = mc_dir or str(MC_DIR)
-    opts_path = Path(mc) / "options.txt"
+    opts_path = Path(safe_join(mc, "options.txt"))
 
     default_settings = {
         "fov": "0.8",

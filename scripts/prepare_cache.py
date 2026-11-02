@@ -29,6 +29,9 @@ import json
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from netsec import safe_join, safe_urlopen  # noqa: E402
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from version_config import (
     ALL_VERSIONS, FG_ERAS, LEGACY_ERAS,
     is_legacy, get_loaders, get_fabric_loom,
@@ -36,9 +39,9 @@ from version_config import (
 )
 from mirrors import probe_all as probe_mirrors, get_url, download as mirror_download, get_all_urls
 
-TEMP_DIR = os.path.join(os.environ.get("TEMP", "/tmp"), "opencode")
+TEMP_DIR = safe_join(os.environ.get("TEMP", "/tmp"), "opencode")
 DL_CLASS = os.path.join(TEMP_DIR, "Dl.class")
-DL_JAVA = os.path.join(TEMP_DIR, "Dl.java")
+DL_JAVA = safe_join(TEMP_DIR, "Dl.java")
 
 # Preferred JDK for the Dl.java downloader (Java 9+ needed for
 # InputStream.transferTo). Falls back to auto-discovered JDKs; when no
@@ -135,8 +138,7 @@ def _py_download(url, dest):
         if os.path.isfile(dest) and os.path.getsize(dest) > 0:
             print(f"  SKIP {os.path.basename(dest)}")
             return True
-        req = urllib.request.Request(url, headers={"User-Agent": "minecraft-mod-mcp/prepare-cache"})
-        with urllib.request.urlopen(req, timeout=300) as r, open(dest, "wb") as f:
+        with safe_urlopen(url, timeout=300, headers={"User-Agent": "minecraft-mod-mcp/prepare-cache"}) as r, open(dest, "wb") as f:
             shutil.copyfileobj(r, f)
         size = os.path.getsize(dest)
         print(f"  PY {'OK' if size else 'FAIL'} {os.path.basename(dest)} ({size} bytes)")
@@ -198,7 +200,7 @@ def place_in_gradle_cache(group, artifact, version, filename, src_file):
 
 
 def download_and_cache(rel_path, group, artifact, version, filename, mirror_group, use_proxy=False):
-    staging = os.path.join(TEMP_DIR, "forge_staging", artifact, version)
+    staging = safe_join(TEMP_DIR, "forge_staging", artifact, version)
     os.makedirs(staging, exist_ok=True)
     tmp_file = os.path.join(staging, filename)
 
@@ -217,7 +219,7 @@ def download_and_cache(rel_path, group, artifact, version, filename, mirror_grou
 
 
 def download_mc_jar(mc_ver):
-    staging = os.path.join(TEMP_DIR, "mc_jars", mc_ver)
+    staging = safe_join(TEMP_DIR, "mc_jars", mc_ver)
     os.makedirs(staging, exist_ok=True)
     tmp_file = os.path.join(staging, f"{mc_ver}.jar")
     if os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 0:
@@ -225,13 +227,13 @@ def download_mc_jar(mc_ver):
     try:
         import urllib.request
         manifest_url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
-        resp = urllib.request.urlopen(manifest_url, timeout=30)
+        resp = safe_urlopen(manifest_url, timeout=30)
         manifest = json.loads(resp.read())
         ver_entry = next((v for v in manifest["versions"] if v["id"] == mc_ver), None)
         if not ver_entry:
             print(f"  FAIL {mc_ver} not in version manifest")
             return None
-        ver_resp = urllib.request.urlopen(ver_entry["url"], timeout=30)
+        ver_resp = safe_urlopen(ver_entry["url"], timeout=30)
         ver_data = json.loads(ver_resp.read())
         dl = ver_data.get("downloads", {}).get("client", {})
         dl_url = dl.get("url", "")
@@ -239,7 +241,8 @@ def download_mc_jar(mc_ver):
             print(f"  FAIL no client download for {mc_ver}")
             return None
         print(f"  Downloading {mc_ver}...")
-        urllib.request.urlretrieve(dl_url, tmp_file)
+        with safe_urlopen(dl_url, timeout=300) as _r, open(tmp_file, "wb") as _f:
+            shutil.copyfileobj(_r, _f)
         print(f"  OK {mc_ver}.jar ({os.path.getsize(tmp_file)} bytes)")
         return tmp_file
     except Exception as e:
@@ -254,7 +257,7 @@ def place_in_fg_mcp_repo(channel, full_ver, src_file):
     )
     os.makedirs(dest_dir, exist_ok=True)
     filename = f"mcp_{channel}-{full_ver}.zip"
-    dest = os.path.join(dest_dir, filename)
+    dest = safe_join(dest_dir, filename)
     if os.path.exists(dest) and os.path.getsize(dest) > 0:
         return True
     shutil.copy2(src_file, dest)
@@ -306,7 +309,7 @@ def main():
         filename = f"{artifact_name}-{full_ver}.zip"
         rel_path = f"de/oceanlabs/mcp/{artifact_name}/{full_ver}/{filename}"
         print(f"  [{mc}] {artifact_name}/{full_ver}")
-        staging = os.path.join(TEMP_DIR, "mcp_staging", artifact_name, full_ver)
+        staging = safe_join(TEMP_DIR, "mcp_staging", artifact_name, full_ver)
         os.makedirs(staging, exist_ok=True)
         tmp_file = os.path.join(staging, filename)
         downloaded = False
@@ -385,7 +388,7 @@ def main():
         filename = f"{channel}-{full_ver}.zip"
         rel_path = f"de/oceanlabs/mcp/mcp_{channel}/{full_ver}/{channel}-{full_ver}.zip"
         print(f"  [{mc}] mcp_{channel}/{full_ver}")
-        staging = os.path.join(TEMP_DIR, "mcp_staging", f"mcp_{channel}", full_ver)
+        staging = safe_join(TEMP_DIR, "mcp_staging", f"mcp_{channel}", full_ver)
         os.makedirs(staging, exist_ok=True)
         tmp_file = os.path.join(staging, filename)
         downloaded = False
@@ -515,8 +518,7 @@ def main():
         for base_url in get_all_urls("maven_forge"):
             try:
                 url = f"{base_url.rstrip('/')}/de/oceanlabs/mcp/mcp_config/maven-metadata.xml"
-                req = urllib.request.Request(url, headers={"User-Agent": "minecraft-mod-mcp/prepare-cache"})
-                data = urllib.request.urlopen(req, timeout=60).read().decode()
+                data = safe_urlopen(url, timeout=60, headers={"User-Agent": "minecraft-mod-mcp/prepare-cache"}).read().decode()
                 _config_versions = _re.findall(r"<version>([^<]+)</version>", data)
                 if _config_versions:
                     break

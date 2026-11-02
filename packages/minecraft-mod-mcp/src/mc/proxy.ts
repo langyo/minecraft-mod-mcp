@@ -1,4 +1,6 @@
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
+
+import { assertSafeUrl } from "./urlGuard.js";
 
 export interface ProxySettings {
   host: string;
@@ -58,6 +60,7 @@ async function probeProxyTls(): Promise<boolean> {
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 async function nativeDownload(url: string, destPath: string): Promise<void> {
+  assertSafeUrl(url);
   const { execFile } = await import("node:child_process");
   const { existsSync: fsExists } = await import("node:fs");
   if (process.platform === "win32") {
@@ -117,6 +120,7 @@ async function nativeDownload(url: string, destPath: string): Promise<void> {
 }
 
 export async function fetchWithFallback(url: string, init?: RequestInit): Promise<Response> {
+  assertSafeUrl(url);
   const maxRetries = 3;
   const proxyTimeout = 15_000;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -190,7 +194,7 @@ function detectFromWindowsRegistry(): ProxySettings | null {
   if (process.platform !== "win32") return null;
   try {
     const regBase = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
-    const serverOut = execSync(`reg query "${regBase}" /v ProxyServer`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
+    const serverOut = execFileSync("reg", ["query", regBase, "/v", "ProxyServer"], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
     const serverMatch = serverOut.match(/REG_SZ\s+(.+)/);
     if (serverMatch) {
       const raw = serverMatch[1].trim();
@@ -215,7 +219,7 @@ function detectFromMacos(): ProxySettings | null {
     } catch {}
     for (const service of services) {
       for (const proto of ["getwebproxy", "getsecurewebproxy"]) {
-        const out = execSync(`networksetup -${proto} "${service}"`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
+        const out = execFileSync("networksetup", [`-${proto}`, service], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
         const lines = out.split(/\r?\n/).map(l => l.trim());
         const enabled = lines[0] === "Yes";
         const host = lines[1];

@@ -1,4 +1,5 @@
 import { AUTH } from "./defaults.js";
+import { assertSafeUrl } from "./urlGuard.js";
 
 export interface DeviceCodeInfo {
   user_code: string;
@@ -161,7 +162,7 @@ async function minecraftProfile(mcAccessToken: string): Promise<[string, string]
 }
 
 async function postJson(url: string, body: unknown): Promise<Record<string, unknown>> {
-  const resp = await fetch(url, {
+  const resp = await fetch(assertSafeUrl(url), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

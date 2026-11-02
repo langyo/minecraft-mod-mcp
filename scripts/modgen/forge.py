@@ -3,6 +3,7 @@
 import os
 
 from version_config import FG_ERAS, get_fg_era
+from netsec import safe_join
 
 from .gradle import maven_local_depth
 
@@ -55,7 +56,7 @@ dependencies {{
     compile 'net.java.dev.jna:jna-platform:5.15.0'
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w", encoding="utf-8") as f:
+    with open(safe_join(path, "build.gradle"), "w", encoding="utf-8") as f:
         f.write(content)
 
 
@@ -116,7 +117,7 @@ jar {{
     }}
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w") as f:
+    with open(safe_join(path, "build.gradle"), "w") as f:
         f.write(content)
 
 
@@ -180,9 +181,9 @@ dependencies {{
     compile "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w") as f:
+    with open(safe_join(path, "build.gradle"), "w") as f:
         f.write(content)
-    with open(os.path.join(path, "gradle.properties"), "w") as f:
+    with open(safe_join(path, "gradle.properties"), "w") as f:
         f.write("org.gradle.jvmargs=-Xmx3g\n")
 
 
@@ -240,9 +241,9 @@ dependencies {{
     implementation "org.java-websocket:Java-WebSocket:1.5.4"
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w") as f:
+    with open(safe_join(path, "build.gradle"), "w") as f:
         f.write(content)
-    with open(os.path.join(path, "gradle.properties"), "w") as f:
+    with open(safe_join(path, "gradle.properties"), "w") as f:
         f.write("org.gradle.jvmargs=-Xmx3g\n")
 
 
@@ -307,7 +308,7 @@ jar {{
     }}
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w") as f:
+    with open(safe_join(path, "build.gradle"), "w") as f:
         f.write(content)
 
 
@@ -371,7 +372,7 @@ jar {{
     }}
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w") as f:
+    with open(safe_join(path, "build.gradle"), "w") as f:
         f.write(content)
 
 
@@ -440,7 +441,7 @@ jar {{
     }}
 }}
 """
-    with open(os.path.join(path, "build.gradle"), "w") as f:
+    with open(safe_join(path, "build.gradle"), "w") as f:
         f.write(content)
 
 
@@ -452,7 +453,7 @@ jar {{
 def write_forge_settings_legacy(mc, info, path):
     content = f"""rootProject.name = 'minecraft-moddev-mcp-forge-{mc}'
 """
-    with open(os.path.join(path, "settings.gradle"), "w") as f:
+    with open(safe_join(path, "settings.gradle"), "w") as f:
         f.write(content)
 
 
@@ -475,5 +476,5 @@ plugins {{
 
 rootProject.name = 'minecraft-moddev-mcp-forge-{mc}'
 """
-    with open(os.path.join(path, "settings.gradle"), "w") as f:
+    with open(safe_join(path, "settings.gradle"), "w") as f:
         f.write(content)
