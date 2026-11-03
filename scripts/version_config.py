@@ -138,6 +138,8 @@ ALL_VERSIONS = {
     # AttachmentSyncHandler initial-sync check, #3671).
     # 2026-10-30 sweep: 26.1.2 moved to 26.1.2.125 (fixes the misaligned
     # fluid render overlay API patch, #3697).
+    # 2026-11-03 sweep: 26.1.2 moved to 26.1.2.126 (creates a fresh damage
+    # container when blocking a goat's attack, backport #3715).
     # --- FG 1.2 GTNH (MC 1.7.x) ---
     "1.7.2":  {"forge": "1.7.2-10.12.1.1109",           "fg_era": "fg12_gtnh", "java": 8,
                "version_id": "1.7.2-Forge10.12.1.1109"},
@@ -284,7 +286,7 @@ ALL_VERSIONS = {
     # FG7 7.0.40, MDG 2.0.148-but-2.0.147-still-suffices — is current.
     "26.1.2": {"forge": "26.1.2-64.1.5",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
                "version_id": "26.1.2-forge-64.1.5",
-               "neoforge": "26.1.2.125", "mdg": "2.0.141"},
+               "neoforge": "26.1.2.126", "mdg": "2.0.141"},
     # MC 26.x ships unobfuscated (intermediary is a fixed "0.0.0"), so Fabric
     # needs no yarn mappings there — only a loader pin. fabric_unobfuscated
     # switches the generator to the no-mappings loom 1.17 template.
