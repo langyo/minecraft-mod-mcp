@@ -360,6 +360,18 @@ public final class ScreenshotHelper {
 
     private static byte[] _takeGlScreenshot0Inner(Object mc, int width, int height) throws Exception {
         updateSkyColor(mc);
+        // The GL reads below target the real framebuffer, so prefer the live
+        // size from glfwGetFramebufferSize over caller-supplied dimensions,
+        // which may come from stale Window fields that stick to the
+        // window-creation size after a manual resize (issue #79). The helper
+        // returns 0 when GLFW is unavailable (LWJGL2, MC <= 1.12.2), so the
+        // existing field heuristics below stay in charge on those versions.
+        boolean glfwSizeUsed = false;
+        try {
+            int fbw = ReflectionHelper.getGlfwWindowSize(mc, true);
+            int fbh = ReflectionHelper.getGlfwWindowSize(mc, false);
+            if (fbw > 0 && fbh > 0) { width = fbw; height = fbh; glfwSizeUsed = true; }
+        } catch (Exception ignored) {}
         if (width <= 0 || height <= 0) throw new RuntimeException("bad dims " + width + "x" + height);
         Object fb = getMainRenderTarget(mc);
         int colorTexId = 0;
@@ -406,7 +418,7 @@ public final class ScreenshotHelper {
                 ReflectionHelper.dbgR("takeGl: fboId=" + fboId + " texId=" + colorTexId);
             } catch (Exception e) { ReflectionHelper.dbg("takeGl: failed to get fboId: " + e.getMessage()); }
         }
-        if (fb != null) {
+        if (fb != null && !glfwSizeUsed) {
             try {
                 int fbw = 0, fbh = 0;
                 for (Field f : ReflectionCache.getAllFields(fb.getClass())) {
