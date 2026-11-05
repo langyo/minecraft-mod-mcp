@@ -17,8 +17,8 @@ public final class McpProtocol {
         void scrollAt(int x, int y, int clicks);
         void mouseDrag(int x1, int y1, int x2, int y2, String button);
         void hotkey(String[] keys);
-        void setViewAngle(float yaw, float pitch);
-        void lookDelta(float deltaYaw, float deltaPitch);
+        String setViewAngle(float yaw, float pitch);
+        String lookDelta(float deltaYaw, float deltaPitch);
         void rightClick();
         byte[] screenshot();
         String executeCommand(String command);

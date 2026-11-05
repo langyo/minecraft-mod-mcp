@@ -19,7 +19,7 @@ import net.minecraft.util.MouseHelper;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
-@Mod(modid = "mcpmod", name = "ModDev MCP", version="0.4.25")
+@Mod(modid = "mcpmod", name = "ModDev MCP", version="0.4.26")
 public class ModDevMcpMod {
     public static ModDevMcpMod INSTANCE;
     private McpHttpServer httpServer;
@@ -89,8 +89,9 @@ public class ModDevMcpMod {
 
     @SubscribeEvent
     public void onGuiInitPre(GuiScreenEvent.InitGuiEvent.Pre event) {
-        if (ReflectionHelper.isMcpControlMode() && isPauseMenu(event.gui)) {
+        if (ReflectionHelper.isMcpControlMode() && McpConfig.isPauseMenuSuppressionEnabled() && isPauseMenu(event.gui)) {
             event.setCanceled(true);
+            ReflectionHelper.notePauseMenuSuppressed();
             try { Minecraft.getMinecraft().currentScreen = null; } catch (Exception ignored) {}
         }
     }
@@ -171,6 +172,8 @@ public class ModDevMcpMod {
                     }
                     prevMouseButton0 = mouse0;
                     McpOverlayLogic.renderResumeButton(wrapRenderer(mc), mc.fontRenderer, net.minecraft.client.resources.I18n.format("mcpmod.control.resume"), w, h, mx, my);
+                    // Restore GL state: leaving GL_SCISSOR_TEST enabled leaks into the rest of the frame (issue #76 B8)
+                    GL11.glDisable(GL11.GL_SCISSOR_TEST);
                 }
             }
         } catch (Exception ignored) {}
@@ -203,6 +206,7 @@ public class ModDevMcpMod {
                 GL11.glScissor(0, 0, mc.displayWidth, mc.displayHeight);
                 GL11.glEnable(GL11.GL_SCISSOR_TEST);
                 McpOverlayLogic.renderTransferButton(wrapRenderer(mc), mc.fontRenderer, "", w, h, mx, my);
+                GL11.glDisable(GL11.GL_SCISSOR_TEST);
             }
         } catch (Exception ignored) {}
     }

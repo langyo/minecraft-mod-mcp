@@ -115,6 +115,10 @@ public final class ReflectionHelper {
         return ScreenInteractionHelper.guiCharType(mc, ch, modifiers);
     }
 
+    public static String clearFocusedTextField(Object mc) {
+        return ScreenInteractionHelper.clearFocusedTextField(mc);
+    }
+
     public static String getWorldInfo(Object mc) {
         return PlayerWorldHelper.getWorldInfo(mc);
     }
@@ -252,6 +256,8 @@ public final class ReflectionHelper {
     }
 
     public static boolean isMcpControlMode() { return ControlModeHelper.isMcpControlMode(); }
+
+    public static void notePauseMenuSuppressed() { ControlModeHelper.notePauseMenuSuppressed(); }
 
     public static void setOverlayButtonBounds(int rx, int ry, int rw, int rh, int mx, int my, int mw, int mh) {
         ControlModeHelper.setOverlayButtonBounds(rx, ry, rw, rh, mx, my, mw, mh);

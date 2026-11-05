@@ -165,6 +165,9 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     public void typeText(String text) {
         executor.executeOnRenderThread(() -> {
             try {
+                // Replace the focused field's content instead of appending
+                // (issue #76 B4).
+                try { ReflectionHelper.clearFocusedTextField(mc()); } catch (Exception ignored) {}
                 for (char ch : text.toCharArray()) {
                     String r = ReflectionHelper.guiCharType(mc(), ch, 0);
                     ReflectionHelper.dbg("guiCharType '" + ch + "': " + r);
@@ -222,8 +225,10 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     public void hotkey(String[] keys) {
         executor.executeOnRenderThread(() -> {
             try {
+                // A zero handle (LWJGL2 eras have no GLFW window) must not
+                // silently drop the hotkey: sendKey falls through to the AWT
+                // Robot path with the same key codes (issue #76 B4).
                 long h = getWindowHandle();
-                if (h == 0) return;
                 int[] codes = new int[keys.length];
                 for (int i = 0; i < keys.length; i++) codes[i] = GlfwKeys.keyCode(keys[i]);
                 for (int c : codes) { ReflectionHelper.sendKey(h, c, 1); Thread.sleep(5); }
@@ -234,23 +239,39 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     }
 
     @Override
-    public void setViewAngle(float yaw, float pitch) {
+    public String setViewAngle(float yaw, float pitch) {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {"{\"error\":\"setViewAngle not scheduled\"}"};
         executor.executeOnRenderThread(() -> {
             try {
-                String result = ReflectionHelper.setPlayerRotation(mc(), yaw, pitch);
-                ReflectionHelper.dbg("setViewAngle: " + result);
-            } catch (Exception e) { System.err.println("[Input] setViewAngle: " + e.getMessage()); }
+                result[0] = ReflectionHelper.setPlayerRotation(mc(), yaw, pitch);
+                ReflectionHelper.dbg("setViewAngle: " + result[0]);
+            } catch (Exception e) {
+                result[0] = "{\"error\":\"" + e.getMessage() + "\"}";
+                System.err.println("[Input] setViewAngle: " + e.getMessage());
+            }
+            latch.countDown();
         });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
     }
 
     @Override
-    public void lookDelta(float deltaYaw, float deltaPitch) {
+    public String lookDelta(float deltaYaw, float deltaPitch) {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final String[] result = {"{\"error\":\"lookDelta not scheduled\"}"};
         executor.executeOnRenderThread(() -> {
             try {
-                String result = ReflectionHelper.deltaPlayerRotation(mc(), deltaYaw, deltaPitch);
-                ReflectionHelper.dbg("lookDelta: " + result);
-            } catch (Exception e) { System.err.println("[Input] lookDelta: " + e.getMessage()); }
+                result[0] = ReflectionHelper.deltaPlayerRotation(mc(), deltaYaw, deltaPitch);
+                ReflectionHelper.dbg("lookDelta: " + result[0]);
+            } catch (Exception e) {
+                result[0] = "{\"error\":\"" + e.getMessage() + "\"}";
+                System.err.println("[Input] lookDelta: " + e.getMessage());
+            }
+            latch.countDown();
         });
+        try { latch.await(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        return result[0];
     }
 
     @Override
