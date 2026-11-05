@@ -77,4 +77,26 @@ public final class McpConfig {
         backgroundInputCache = enabled;
         return enabled;
     }
+
+    private static Boolean pauseMenuSuppressionCache;
+
+    /**
+     * While MCP control mode is active, legacy-era modules cancel the pause
+     * menu (GuiIngameMenu) so opening ESC cannot pause the game out from
+     * under the agent; the menu is restored when control mode exits. Users
+     * who prefer the vanilla pause behavior can disable the cancellation
+     * with {@code -Dmcp.suppress_pause_menu=false} or the
+     * {@code MC_MCP_SUPPRESS_PAUSE_MENU} environment variable
+     * (issue #76 B8). Default: enabled.
+     */
+    public static boolean isPauseMenuSuppressionEnabled() {
+        Boolean cached = pauseMenuSuppressionCache;
+        if (cached != null) return cached;
+        String v = System.getProperty("mcp.suppress_pause_menu");
+        if (v == null || v.isEmpty()) v = System.getenv("MC_MCP_SUPPRESS_PAUSE_MENU");
+        boolean enabled = v == null || v.isEmpty()
+                || v.equalsIgnoreCase("true") || v.equals("1") || v.equalsIgnoreCase("yes");
+        pauseMenuSuppressionCache = enabled;
+        return enabled;
+    }
 }

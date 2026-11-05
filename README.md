@@ -127,6 +127,10 @@ If an agent or CI drives the client while you keep working, enable background in
 - never locks or confines the OS cursor when entering/leaving MCP control mode, and releases any confinement vanilla itself applies;
 - never falls back to `java.awt.Robot`, whose injected clicks/keystrokes would land on whatever window is actually in front.
 
+### MCP control mode and the pause menu (legacy 1.7–1.12 clients)
+
+While MCP control mode is active, pressing `Esc` would normally open the pause screen and pause the game out from under the agent. On the legacy clients (1.7.2–1.12.2) the mod therefore **cancels the pause menu** while control mode is active; when control mode exits, the pause menu is re-opened so your screen is never swallowed. If you prefer vanilla pause behavior, disable the cancellation with `-Dmcp.suppress_pause_menu=false` (JVM arg) or `MC_MCP_SUPPRESS_PAUSE_MENU=false` (env). On modern clients the pause behavior is handled by the game itself and this switch has no effect.
+
 ---
 
 ## How It Works

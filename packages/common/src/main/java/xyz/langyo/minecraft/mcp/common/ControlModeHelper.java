@@ -31,6 +31,11 @@ public final class ControlModeHelper {
     private static Field accumulatedDYField = null;
     private static boolean mouseFieldsInit = false;
     private static boolean hadScreenOnEnter = false;
+    // Set by the era modules when they cancel a pause-menu GUI while MCP
+    // control mode is active (anti-pause). Exiting control mode then
+    // reopens the pause menu so the user's screen is not swallowed
+    // (issue #76 B8).
+    private static volatile boolean pauseMenuSuppressed = false;
 
     private ControlModeHelper() {}
 
@@ -42,6 +47,10 @@ public final class ControlModeHelper {
     }
 
     public static boolean isMcpControlMode() { return mcpControlMode; }
+
+    /** Era modules call this when they cancel a pause menu while control
+     *  mode is active; exiting control mode then restores it (issue #76 B8). */
+    public static void notePauseMenuSuppressed() { pauseMenuSuppressed = true; }
 
     public static boolean isWaitingForRelease() { return waitingForRelease; }
 
@@ -63,6 +72,7 @@ public final class ControlModeHelper {
                 Object s = ReflectionCache.getCurrentScreen(mc);
                 hadScreenOnEnter = (s != null);
             } catch (Exception ignored) {}
+            pauseMenuSuppressed = false;
             mouseReleaseActive = false;
             forceCursorAndReleaseMouse(mc);
             logModEvent("enter_control_mode", "MCP took control");
@@ -138,6 +148,21 @@ public final class ControlModeHelper {
                 }
             }
             ReflectionHelper.dbg("exitMcpControlMode: OFF");
+            // If the era module canceled a pause menu while we were in
+            // control mode (anti-pause behavior), bring the user's menu back
+            // instead of leaving them with a swallowed screen (issue #76 B8).
+            if (pauseMenuSuppressed) {
+                pauseMenuSuppressed = false;
+                try {
+                    Object s = ReflectionCache.getCurrentScreen(mc);
+                    if (s == null) {
+                        ReflectionHelper.openPauseMenu(mc);
+                        ReflectionHelper.dbg("exitMcpControlMode: restored suppressed pause menu");
+                    }
+                } catch (Exception e) {
+                    ReflectionHelper.dbg("exitMcpControlMode: pause menu restore failed: " + e.getMessage());
+                }
+            }
             return JsonHelper.kv("control_mode", false);
         } catch (Exception e) { return JsonHelper.error(e.getMessage()); }
     }
@@ -235,14 +260,24 @@ public final class ControlModeHelper {
         ReflectionCache.initClassCache();
         try {
             long handle = WindowHelper.getWindowHandle(mc);
-            if (handle == 0 || !ReflectionCache.LWJGL3) return JsonHelper.error("no window handle");
-            Method glfwSetInputMode = ReflectionCache.getGlfwSetInputModeMethod();
-            if (glfwSetInputMode != null) {
-                glfwSetInputMode.invoke(null, handle, ReflectionCache.getGlfwCursor(), ReflectionCache.getGlfwCursorNormal());
+            if (handle != 0 && ReflectionCache.LWJGL3) {
+                Method glfwSetInputMode = ReflectionCache.getGlfwSetInputModeMethod();
+                if (glfwSetInputMode != null) {
+                    glfwSetInputMode.invoke(null, handle, ReflectionCache.getGlfwCursor(), ReflectionCache.getGlfwCursorNormal());
+                } else {
+                    Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
+                    glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class)
+                        .invoke(null, handle, glfw.getField("GLFW_CURSOR").getInt(null), glfw.getField("GLFW_CURSOR_NORMAL").getInt(null));
+                }
             } else {
-                Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-                glfw.getMethod("glfwSetInputMode", long.class, int.class, int.class)
-                    .invoke(null, handle, glfw.getField("GLFW_CURSOR").getInt(null), glfw.getField("GLFW_CURSOR_NORMAL").getInt(null));
+                // No verified GLFW window: LWJGL2 Mouse API instead of a
+                // fabricated handle (issue #76 B7).
+                try {
+                    Class<?> mouseClass = Class.forName("org.lwjgl.input.Mouse");
+                    mouseClass.getMethod("setGrabbed", boolean.class).invoke(null, false);
+                } catch (Exception e) {
+                    ReflectionHelper.dbg("releaseMouse LWJGL2: " + e.getMessage());
+                }
             }
             Object mouseHandler = ReflectionCache.getMouseHandler(mc);
             if (mouseHandler != null) {
@@ -262,15 +297,23 @@ public final class ControlModeHelper {
     }
 
     static void forceCursorAndReleaseMouse(Object mc) throws Exception {
+        long handle = 0;
         if (ReflectionCache.LWJGL3) {
-            long handle = WindowHelper.getWindowHandle(mc);
-            if (handle == 0) return;
-            initCursorCache();
-            Method glfwSetInputMode = ReflectionCache.getGlfwSetInputModeMethod();
-            if (glfwSetInputMode != null) {
-                glfwSetInputMode.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+            // Only touch GLFW with a handle that came from a verified window
+            // object; a fabricated handle crashes glfwSetInputMode natively
+            // (issue #76 B7, Cleanroom 1.12.2 LWJGL3 has no Window object).
+            handle = WindowHelper.getWindowHandle(mc);
+            if (handle != 0) {
+                initCursorCache();
+                Method glfwSetInputMode = ReflectionCache.getGlfwSetInputModeMethod();
+                if (glfwSetInputMode != null) {
+                    glfwSetInputMode.invoke(null, handle, GLFW_CURSOR_VAL, GLFW_CURSOR_NORMAL_VAL);
+                }
             }
-        } else {
+        }
+        if (handle == 0) {
+            // No real GLFW window object (LWJGL2 eras, or LWJGL3 runtimes
+            // without a Window holder): fall back to the LWJGL2 Mouse API.
             try {
                 Class<?> mouseClass = Class.forName("org.lwjgl.input.Mouse");
                 Method setGrabbed = mouseClass.getMethod("setGrabbed", boolean.class);

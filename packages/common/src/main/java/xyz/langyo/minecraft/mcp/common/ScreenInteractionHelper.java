@@ -199,6 +199,36 @@ public final class ScreenInteractionHelper {
                     }
                 } catch (Exception e) { ReflectionHelper.dbg("guiClick: world select error: " + e.getMessage()); }
             }
+            // Legacy (1.7-1.12 era) GuiScreen: mouseClicked is a protected
+            // void (int,int,int) - func_73864_a on SRG runtimes - so the
+            // public-boolean method scan below never sees it. Invoke it
+            // directly in GUI coordinates; GuiScreen forwards the click to
+            // its buttons and text fields, which also restores GuiTextField
+            // focus and caret for typing (issue #76 B4).
+            for (Method m : ReflectionCache.getAllMethods(screen.getClass())) {
+                Class<?>[] lpt = m.getParameterTypes();
+                if (m.getParameterCount() == 3 && lpt[0] == int.class && lpt[1] == int.class && lpt[2] == int.class
+                        && (m.getReturnType() == void.class || m.getReturnType() == boolean.class)
+                        && (m.getName().equals("func_73864_a") || m.getName().equals("mouseClicked"))) {
+                    try {
+                        m.setAccessible(true);
+                        m.invoke(screen, (int) gx, (int) gy, button);
+                        ReflectionHelper.dbg("guiClick: legacy " + m.getName() + "(" + (int) gx + "," + (int) gy + "," + button + ")");
+                        // Complete the press/release cycle for widgets that
+                        // act on mouse release (1.12.2 func_146286_b).
+                        for (Method rm : ReflectionCache.getAllMethods(screen.getClass())) {
+                            if ((rm.getName().equals("func_146286_b") || rm.getName().equals("mouseReleased"))
+                                    && rm.getParameterCount() == 3) {
+                                try { rm.setAccessible(true); rm.invoke(screen, (int) gx, (int) gy, button); } catch (Exception ignored) {}
+                                break;
+                            }
+                        }
+                        return "{\"clicked\":true,\"screen\":\"" + screenName + "\",\"gui\":[" + (int)gx + "," + (int)gy + "],\"method\":\"" + m.getName() + "\"}";
+                    } catch (Exception e) {
+                        ReflectionHelper.dbg("guiClick: legacy mouseClicked failed: " + e.getMessage());
+                    }
+                }
+            }
             StringBuilder results = new StringBuilder();
             java.util.List<Method> clickedMethods = new java.util.ArrayList<>();
             Method isMouseOverMethod = null;
@@ -1213,7 +1243,12 @@ public final class ScreenInteractionHelper {
             if (screen != null) {
                 for (Method m : ReflectionCache.getAllMethods(screen.getClass())) {
                     String n = m.getName();
-                    if ((n.equals("keyPressed") || n.equals("func_73864_a") || n.contains("keyPressed"))
+                    // NOTE: func_73864_a is legacy mouseClicked(int,int,int),
+                    // NOT keyPressed - it must not be invoked with key codes
+                    // (issue #76 B4). 1.12.2 has no keyPressed(int,int,int)
+                    // at all; its key events go through keyTyped below
+                    // (func_73869_a(char,int)).
+                    if ((n.equals("keyPressed") || n.contains("keyPressed"))
                             && m.getParameterCount() >= 3) {
                         try {
                             m.setAccessible(true);
@@ -1624,13 +1659,57 @@ public final class ScreenInteractionHelper {
 
     private static void hotkey(Object mc, String[] keys) {
         try {
+            // A zero handle (LWJGL2 eras without a GLFW window) must not bail
+            // out silently: sendKey falls through to the AWT Robot path with
+            // the same key codes (issue #76 B4).
             long h = WindowHelper.getWindowHandle(mc);
-            if (h == 0) return;
             int[] codes = new int[keys.length];
             for (int i = 0; i < keys.length; i++) codes[i] = GlfwKeys.keyCode(keys[i]);
             for (int c : codes) { InputInjectionHelper.sendKey(h, c, 1); Thread.sleep(5); }
             Thread.sleep(80);
             for (int i = codes.length - 1; i >= 0; i--) InputInjectionHelper.sendKey(h, codes[i], 0);
         } catch (Exception e) { System.err.println("[ScreenInteractionHelper] hotkey: " + e.getMessage()); }
+    }
+
+    /**
+     * Clears the focused text field on the current screen, if any, so typed
+     * text replaces the field content instead of appending. Works across
+     * mapping eras: Mojang EditBox.setValue/insertText, legacy MCP
+     * GuiTextField.setText, 1.12.2 SRG func_146180_a (issue #76 B4).
+     */
+    public static String clearFocusedTextField(Object mc) {
+        try {
+            Object screen = getCurrentScreen(mc);
+            if (screen == null) return "{\"cleared\":false,\"reason\":\"no screen\"}";
+            for (Field sf : ReflectionCache.getAllFields(screen.getClass())) {
+                if (java.lang.reflect.Modifier.isStatic(sf.getModifiers())) continue;
+                Object w;
+                try { sf.setAccessible(true); w = sf.get(screen); } catch (Exception e) { continue; }
+                if (w == null) continue;
+                String wn = w.getClass().getSimpleName();
+                if (!wn.contains("TextField") && !wn.contains("EditBox")) continue;
+                boolean focused = false;
+                for (Method fm : ReflectionCache.getAllMethods(w.getClass())) {
+                    String fmn = fm.getName();
+                    if ((fmn.equals("isFocused") || fmn.equals("func_146206_l")) && fm.getParameterCount() == 0
+                            && fm.getReturnType() == boolean.class) {
+                        try { fm.setAccessible(true); focused = (Boolean) fm.invoke(w); } catch (Exception ignored) {}
+                        break;
+                    }
+                }
+                if (!focused) continue;
+                for (Method sm : ReflectionCache.getAllMethods(w.getClass())) {
+                    String smn = sm.getName();
+                    if ((smn.equals("setText") || smn.equals("setValue") || smn.equals("func_146180_a"))
+                            && sm.getParameterCount() == 1 && sm.getParameterTypes()[0] == String.class) {
+                        try { sm.setAccessible(true); sm.invoke(w, ""); return "{\"cleared\":true,\"field\":\"" + wn + "\"}"; }
+                        catch (Exception ignored) {}
+                    }
+                }
+            }
+            return "{\"cleared\":false,\"reason\":\"no focused text field\"}";
+        } catch (Exception e) {
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
     }
 }

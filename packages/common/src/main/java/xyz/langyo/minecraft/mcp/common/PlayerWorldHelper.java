@@ -73,7 +73,12 @@ public final class PlayerWorldHelper {
             double[] pos = getPlayerPosition(player);
             float[] rot = getPlayerRotation(player);
             String dim = getDimensionId(player);
+            // Player-side enum scan first, then the Minecraft-instance
+            // controller path: on 1.12.2 SRG runtimes the game mode lives on
+            // PlayerControllerMP (Minecraft.field_71442_b), not on the player
+            // (issue #76 B1).
             String gamemode = detectGameMode(player);
+            if (gamemode == null) gamemode = getGameType(mc);
             int foodLevel = getPlayerFoodLevel(player);
             if (pos[0] == 0 && pos[1] == 0 && pos[2] == 0 && health == 0) {
                 ReflectionHelper.dbg("playerInfo: player=" + player.getClass().getName() + " name=" + name);
@@ -233,6 +238,11 @@ public final class PlayerWorldHelper {
         return new float[]{yaw, pitch};
     }
 
+    /**
+     * Returns the game mode read off the player entity itself, or null when
+     * the player exposes no Game enum accessor (1.12.2 keeps the game mode on
+     * PlayerControllerMP instead - the caller falls back to {@link #getGameType}).
+     */
     private static String detectGameMode(Object player) {
         try {
             for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
@@ -243,7 +253,24 @@ public final class PlayerWorldHelper {
                 }
             }
         } catch (Exception ignored) {}
-        return "survival";
+        return null;
+    }
+
+    /**
+     * Human-readable name of a GameType-like enum constant across mapping
+     * eras: Mojang {@code getName()}, 1.12.2 SRG {@code func_77149_b}, then
+     * the raw enum constant name (issue #76 B1).
+     */
+    private static String gameTypeName(Object gameType) {
+        if (gameType == null) return null;
+        for (String mn : new String[]{"getName", "func_77149_b"}) {
+            try {
+                Object r = gameType.getClass().getMethod(mn).invoke(gameType);
+                if (r != null && !r.toString().isEmpty()) return r.toString();
+            } catch (Exception ignored) {}
+        }
+        try { return ((Enum<?>) gameType).name().toLowerCase(); } catch (Exception ignored) {}
+        return null;
     }
 
     private static int getPlayerFoodLevel(Object player) {
@@ -316,17 +343,48 @@ public final class PlayerWorldHelper {
                     }
                 }
             }
+            // The WorldClient's own WorldInfo is a placeholder built as
+            // new WorldInfo(settings, "MpServer") on legacy versions, so the
+            // name read above is "MpServer" (or empty) there. Fall back to
+            // the integrated server's real WorldInfo (singleplayer) or the
+            // connected server's address (multiplayer). NOTE: world_name is
+            // a save name in singleplayer and a server address in
+            // multiplayer - this field cannot reliably distinguish the two
+            // modes (issue #76 B3).
+            if (worldName == null || worldName.isEmpty() || "unknown".equals(worldName) || "MpServer".equals(worldName)) {
+                String alt = resolveWorldNameFallback(mc);
+                if (alt != null && !alt.isEmpty()) worldName = alt;
+            }
             difficulty = getDifficultyKey(level);
             gameType = getGameType(mc);
 
             try {
-                for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
-                    if (m.getParameterCount() == 0 && (m.getReturnType() == long.class || m.getReturnType() == int.class)) {
-                        String mn = m.getName();
-                        if (mn.contains("5430") || mn.contains("24025") || mn.equals("getDayTime") || mn.equals("getGameTime")) {
-                            try { m.setAccessible(true); worldTime = ((Number) m.invoke(level)).longValue(); break; } catch (Exception ignored) {}
+                // Two passes: prefer the time of day (getDayTime /
+                // 1.12.2 SRG func_72820_D getWorldTime) over the total world
+                // time (getGameTime / func_82737_E) so "time" keeps the
+                // 0-24000 day-cycle semantics on every mapping era
+                // (issue #76 B2).
+                boolean timeFound = false;
+                for (String[] pass : new String[][]{
+                        new String[]{"getDayTime", "72820", "5430", "24025"},
+                        new String[]{"getGameTime", "82737"}}) {
+                    for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
+                        if (timeFound) break;
+                        if (m.getParameterCount() == 0 && (m.getReturnType() == long.class || m.getReturnType() == int.class)) {
+                            String mn = m.getName();
+                            for (String cand : pass) {
+                                if (mn.equals(cand) || mn.contains(cand)) {
+                                    try {
+                                        m.setAccessible(true);
+                                        worldTime = ((Number) m.invoke(level)).longValue();
+                                        timeFound = true;
+                                    } catch (Exception ignored) {}
+                                    if (timeFound) break;
+                                }
+                            }
                         }
                     }
+                    if (timeFound) break;
                 }
             } catch (Exception ignored) {}
 
@@ -334,8 +392,11 @@ public final class PlayerWorldHelper {
                 for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
                     if (m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
                         String mn = m.getName();
-                        if (mn.contains("raining") || mn.contains("thunder") || mn.contains("14090") || mn.contains("14091")) {
-                            try { m.setAccessible(true); if ((boolean) m.invoke(level)) { weather = mn.contains("thunder") ? "thunder" : "rain"; } } catch (Exception ignored) {}
+                        // 1.12.2 SRG: func_72896_J isRaining / func_72911_I
+                        // isThundering (issue #76 B2).
+                        if (mn.contains("raining") || mn.contains("thunder") || mn.contains("14090") || mn.contains("14091")
+                                || mn.contains("72896") || mn.contains("72911")) {
+                            try { m.setAccessible(true); if ((boolean) m.invoke(level)) { weather = (mn.contains("thunder") || mn.contains("72911")) ? "thunder" : "rain"; } } catch (Exception ignored) {}
                         }
                     }
                 }
@@ -370,6 +431,114 @@ public final class PlayerWorldHelper {
             try { return obj.getClass().getMethod(name).invoke(obj); } catch (Exception ignored) {}
         }
         return null;
+    }
+
+    /**
+     * Best-effort world name when the client-side WorldInfo is the vanilla
+     * "MpServer" placeholder (1.7-1.12 legacy clients). Singleplayer: read
+     * the integrated server's first WorldServer WorldInfo - same WorldInfo
+     * class as the placeholder, so the same first String accessor returns
+     * the real save name. Multiplayer: read the current ServerData's
+     * address. Returns null when neither is available (issue #76 B3).
+     */
+    private static String resolveWorldNameFallback(Object mc) {
+        try {
+            Object server = findIntegratedServer(mc);
+            if (server != null) {
+                Object world = null;
+                for (Field f : ReflectionCache.getAllFields(server.getClass())) {
+                    if (f.getType().isArray() && f.getType().getComponentType().getName().contains("World")) {
+                        try {
+                            f.setAccessible(true);
+                            Object arr = f.get(server);
+                            if (arr != null && java.lang.reflect.Array.getLength(arr) > 0) {
+                                world = java.lang.reflect.Array.get(arr, 0);
+                            }
+                        } catch (Exception ignored) {}
+                        if (world != null) break;
+                    }
+                }
+                if (world != null) {
+                    for (Method m : ReflectionCache.getAllMethods(world.getClass())) {
+                        if (m.getParameterCount() == 0 && !m.getReturnType().isPrimitive()
+                                && !m.getReturnType().isArray()
+                                && m.getReturnType().getName().contains("WorldInfo")) {
+                            try { m.setAccessible(true); Object wd = m.invoke(world); if (wd != null) return firstStringOf(wd); } catch (Exception ignored) {}
+                        }
+                    }
+                }
+                return null;
+            }
+            // Multiplayer: no integrated server. Report the server address.
+            Object sd = findMethodOrNull(mc, "getCurrentServerData", "func_71387_A", "currentServerEntry");
+            if (sd != null) {
+                String preferred = null;
+                String anyNonEmpty = null;
+                for (Field f : ReflectionCache.getAllFields(sd.getClass())) {
+                    if (f.getType() != String.class || java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+                    try {
+                        f.setAccessible(true);
+                        Object v = f.get(sd);
+                        if (v == null || v.toString().isEmpty()) continue;
+                        String fn = f.getName().toLowerCase();
+                        if (anyNonEmpty == null) anyNonEmpty = v.toString();
+                        if (fn.contains("ip") || fn.contains("address")) { preferred = v.toString(); break; }
+                    } catch (Exception ignored) {}
+                }
+                return preferred != null ? preferred : anyNonEmpty;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private static Object findIntegratedServer(Object mc) {
+        Object server = findMethodOrNull(mc, "getSingleplayerServer", "getServer", "getIntegratedServer", "func_71401_C");
+        if (server == null) {
+            for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
+                String n = f.getName();
+                if (n.equals("singleplayerServer") || n.contains("integratedServer") || n.equals("field_71437_Z")) {
+                    try { f.setAccessible(true); server = f.get(mc); } catch (Exception ignored) {}
+                    if (server != null) break;
+                }
+            }
+        }
+        return server;
+    }
+
+    private static String firstStringOf(Object obj) {
+        for (Method m : ReflectionCache.getAllMethods(obj.getClass())) {
+            if (m.getParameterCount() == 0 && m.getReturnType() == String.class) {
+                try { m.setAccessible(true); Object r = m.invoke(obj); if (r != null && !r.toString().isEmpty()) return r.toString(); } catch (Exception ignored) {}
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Runs the task on the server's thread via its scheduler (execute /
+     * addScheduledTask / 1.12.2 SRG func_152344_a). Returns true when the
+     * task was accepted by a scheduler (it may still be running); false only
+     * when no scheduler is reachable, so the caller can run the task inline
+     * (issue #76 B6).
+     */
+    private static boolean runOnServerThread(Object server, Runnable task) {
+        try {
+            for (String name : new String[]{"execute", "addScheduledTask", "func_152344_a"}) {
+                try {
+                    final java.lang.reflect.Method sched = server.getClass().getMethod(name, Runnable.class);
+                    final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+                    sched.invoke(server, (Runnable) () -> {
+                        try { task.run(); } finally { done.countDown(); }
+                    });
+                    try { done.await(5, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+                    return true;
+                } catch (NoSuchMethodException ignored) {
+                } catch (Exception e) {
+                    ReflectionHelper.dbg("runOnServerThread via " + name + ": " + e.getMessage());
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
     }
 
     public static String getDifficultyKey(Object level) throws Exception {
@@ -411,12 +580,23 @@ public final class PlayerWorldHelper {
             if (gm != null) {
                 for (Method m : ReflectionCache.getAllMethods(gm.getClass())) {
                     if (m.getReturnType().isEnum() && m.getParameterCount() == 0 && m.getReturnType().getSimpleName().contains("Game")) {
-                        try { Object pt = m.invoke(gm); return (String) pt.getClass().getMethod("getName").invoke(pt); } catch (Exception ignored) {}
+                        try {
+                            m.setAccessible(true);
+                            // 1.12.2 SRG: PlayerControllerMP.func_178889_l() returns
+                            // WorldSettings$GameType whose getName is func_77149_b
+                            // at runtime (issue #76 B1).
+                            String name = gameTypeName(m.invoke(gm));
+                            if (name != null) return name;
+                        } catch (Exception ignored) {}
                     }
                 }
                 for (Method m : ReflectionCache.getAllMethods(gm.getClass())) {
-                    if (m.getName().equals("getPlayerMode") && m.getParameterCount() == 0) {
-                        try { Object pt = m.invoke(gm); return (String) pt.getClass().getMethod("getName").invoke(pt); } catch (Exception ignored) {}
+                    if ((m.getName().equals("getPlayerMode") || m.getName().equals("func_178889_l")) && m.getParameterCount() == 0) {
+                        try {
+                            m.setAccessible(true);
+                            String name = gameTypeName(m.invoke(gm));
+                            if (name != null) return name;
+                        } catch (Exception ignored) {}
                     }
                 }
             }
@@ -453,7 +633,10 @@ public final class PlayerWorldHelper {
                 }
                 if (server != null) {
                     ReflectionHelper.dbg("sendCommand: got server " + server.getClass().getName());
+                    // 1.12.2 SRG: MinecraftServer.getCommandManager = func_71187_D
+                    // (issue #76 B6).
                     Object commands = invokeOrNull(server, "getCommands");
+                    if (commands == null) commands = invokeOrNull(server, "func_71187_D");
                     ReflectionHelper.dbg("sendCommand: commands=" + (commands != null ? commands.getClass().getName() : "null"));
                     if (commands != null) {
                         Object dispatcher = invokeOrNull(commands, "getDispatcher");
@@ -494,32 +677,59 @@ public final class PlayerWorldHelper {
                                     }
                                 }
                             }
-                            for (Method m : ReflectionCache.getAllMethods(commands.getClass())) {
-                                String mn = m.getName();
-                                if ((mn.equals("performCommand") || mn.equals("execute")) && m.getParameterCount() == 2) {
-                                    try {
-                                        if (source == null) source = invokeOrNull(server, "createCommandSourceStack");
-                                        if (source != null) {
-                                            Class<?>[] ptypes = m.getParameterTypes();
-                                            if (ptypes[0].isAssignableFrom(source.getClass()) && ptypes[1] == String.class) {
-                                                m.setAccessible(true);
-                                                m.invoke(commands, source, stripped);
+                        }
+                        // Legacy CommandManager (pre-brigadier, 1.12.2 era):
+                        // CommandHandler.executeCommand(sender, rawCommand) =
+                        // func_71556_a. This loop used to sit inside the
+                        // dispatcher!=null block, i.e. it was dead code exactly
+                        // where it was needed (issue #76 B6).
+                        for (Method m : ReflectionCache.getAllMethods(commands.getClass())) {
+                            String mn = m.getName();
+                            if ((mn.equals("performCommand") || mn.equals("execute") || mn.equals("func_71556_a")) && m.getParameterCount() == 2) {
+                                try {
+                                    Object source = invokeOrNull(server, "createCommandSourceStack");
+                                    if (source == null) {
+                                        // 1.12.2 has no command-source factory; the
+                                        // server (console, op level 4) and the player
+                                        // both implement ICommandSender.
+                                        Class<?> senderType = m.getParameterTypes()[0];
+                                        if (senderType.isAssignableFrom(server.getClass())) source = server;
+                                        else if (senderType.isAssignableFrom(player.getClass())) source = player;
+                                    }
+                                    if (source != null) {
+                                        Class<?>[] ptypes = m.getParameterTypes();
+                                        if (ptypes[0].isAssignableFrom(source.getClass()) && ptypes[1] == String.class) {
+                                            m.setAccessible(true);
+                                            // Commands mutate world state; run them on
+                                            // the server thread when the server exposes
+                                            // a scheduler (execute/addScheduledTask/
+                                            // func_152344_a), else invoke inline.
+                                            final Method fm = m;
+                                            final Object fsrc = source;
+                                            final Object fcommands = commands;
+                                            final String fname = mn;
+                                            if (runOnServerThread(server, () -> {
+                                                try { fm.invoke(fcommands, fsrc, stripped); }
+                                                catch (Exception e) { ReflectionHelper.dbg("sendCommand: scheduled " + fname + " failed: " + e.getMessage()); }
+                                            })) {
                                                 return "{\"sent\":true,\"method\":\"commands." + mn + "\"}";
                                             }
+                                            m.invoke(commands, source, stripped);
+                                            return "{\"sent\":true,\"method\":\"commands." + mn + "\"}";
                                         }
-                                    } catch (Exception e) { ReflectionHelper.dbg("sendCommand: " + mn + " failed: " + e.getMessage()); }
-                                }
+                                    }
+                                } catch (Exception e) { ReflectionHelper.dbg("sendCommand: " + mn + " failed: " + e.getMessage()); }
                             }
-                            for (Method m : ReflectionCache.getAllMethods(server.getClass())) {
-                                String mn = m.getName();
-                                if ((mn.contains("executeCommand") || mn.contains("runCommand") || mn.equals("execute"))
-                                        && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
-                                    try {
-                                        m.setAccessible(true);
-                                        m.invoke(server, stripped);
-                                        return "{\"sent\":true,\"method\":\"server." + mn + "\"}";
-                                    } catch (Exception e) { ReflectionHelper.dbg("sendCommand: server." + mn + " failed: " + e.getMessage()); }
-                                }
+                        }
+                        for (Method m : ReflectionCache.getAllMethods(server.getClass())) {
+                            String mn = m.getName();
+                            if ((mn.contains("executeCommand") || mn.contains("runCommand") || mn.equals("execute"))
+                                    && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
+                                try {
+                                    m.setAccessible(true);
+                                    m.invoke(server, stripped);
+                                    return "{\"sent\":true,\"method\":\"server." + mn + "\"}";
+                                } catch (Exception e) { ReflectionHelper.dbg("sendCommand: server." + mn + " failed: " + e.getMessage()); }
                             }
                         }
                     }
@@ -528,7 +738,7 @@ public final class PlayerWorldHelper {
 
             String msg = "/" + stripped;
             for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
-                if ((m.getName().equals("sendChatMessage") || m.getName().contains("sendChat") || m.getName().contains("func_146158_b"))
+                if ((m.getName().equals("sendChatMessage") || m.getName().contains("sendChat") || m.getName().contains("func_71166_a"))
                         && m.getParameterCount() == 1 && m.getParameterTypes()[0] == String.class) {
                     try { m.setAccessible(true); m.invoke(player, msg); return "{\"sent\":true,\"method\":\"" + m.getName() + "\"}"; }
                     catch (Exception ignored) {}
@@ -585,6 +795,15 @@ public final class PlayerWorldHelper {
                                 if (!isAllowedPacketClass(pktName)) continue;
                                 try {
                                     Class<?> pktClass = Class.forName(pktName);
+                                    if (msg.length() > 256) {
+                                        // Legacy chat packet constructors hard-truncate
+                                        // to 256 chars; report the protocol limit
+                                        // instead of silently cutting the command
+                                        // (issue #76 B6 - in singleplayer the command
+                                        // manager above already handled it).
+                                        return "{\"error\":\"command is " + msg.length()
+                                                + " chars; the chat packet fallback is limited to 256 characters and no command manager was reachable\"}";
+                                    }
                                     Object packet = pktClass.getConstructor(String.class).newInstance(msg);
                                     m.setAccessible(true);
                                     m.invoke(conn, packet);
@@ -652,6 +871,20 @@ public final class PlayerWorldHelper {
             setRotField(player, "rotationPitch", pitch);
             setRotField(player, "prevRotationYaw", yaw);
             setRotField(player, "prevRotationPitch", pitch);
+            // 1.12.2 SRG runtime field names (issue #76 B5): the fuzzy
+            // fragments above never match these, so the write used to fail
+            // silently while the tool still reported success.
+            setRotField(player, "field_70177_z", yaw);   // rotationYaw
+            setRotField(player, "field_70125_A", pitch); // rotationPitch
+            setRotField(player, "field_70126_B", yaw);   // prevRotationYaw
+            setRotField(player, "field_70127_C", pitch); // prevRotationPitch
+            // Read back and verify: never fabricate success when no rotation
+            // field accepted the write (issue #76 B5).
+            float[] now = getPlayerRotation(player);
+            if (Math.abs(now[0] - yaw) > 0.01f && Math.abs(now[1] - pitch) > 0.01f) {
+                return "{\"error\":\"rotation fields not writable on " + player.getClass().getName()
+                        + "\",\"read\":[" + now[0] + "," + now[1] + "]}";
+            }
             return "{\"rot_set\":true,\"yaw\":" + yaw + ",\"pitch\":" + pitch + "}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
@@ -662,11 +895,12 @@ public final class PlayerWorldHelper {
         try {
             Object player = getPlayer(mc);
             if (player == null) return "{\"error\":\"no player\"}";
-            float currentYaw = getRotField(player, "yRot", "rotationYaw");
-            float currentPitch = getRotField(player, "xRot", "rotationPitch");
+            float currentYaw = getRotField(player, "yRot", "rotationYaw", "field_70177_z");
+            float currentPitch = getRotField(player, "xRot", "rotationPitch", "field_70125_A");
             float newYaw = currentYaw + deltaYaw;
             float newPitch = Math.max(-90f, Math.min(90f, currentPitch + deltaPitch));
-            setPlayerRotation(mc, newYaw, newPitch);
+            String result = setPlayerRotation(mc, newYaw, newPitch);
+            if (result.contains("\"error\"")) return result;
             return "{\"rot_delta\":true,\"from\":[" + currentYaw + "," + currentPitch + "],\"to\":[" + newYaw + "," + newPitch + "]}";
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage() + "\"}";
@@ -1122,7 +1356,7 @@ public final class PlayerWorldHelper {
         try {
             for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
                 String mn = m.getName();
-                if (m.getParameterCount() == 0 && (mn.equals("pauseGame") || mn.equals("func_147108_a"))) {
+                if (m.getParameterCount() == 0 && (mn.equals("pauseGame") || mn.equals("func_147117_r") || mn.equals("func_147108_a"))) {
                     try {
                         m.setAccessible(true);
                         m.invoke(mc);
@@ -1263,10 +1497,12 @@ public final class PlayerWorldHelper {
             case "yawRot": return "36076";
             case "oYRot": return "36080";
             case "oXRot": return "36081";
-            case "rotationYaw": return "779";
-            case "rotationPitch": return "781";
-            case "prevRotationYaw": return "780";
-            case "prevRotationPitch": return "782";
+            // 1.12.2 SRG entity rotation fields (issue #76 B5). The old
+            // fragments ("779"/"780"/...) matched nothing on any runtime.
+            case "rotationYaw": return "70177";
+            case "rotationPitch": return "70125";
+            case "prevRotationYaw": return "70126";
+            case "prevRotationPitch": return "70127";
             default: return name;
         }
     }

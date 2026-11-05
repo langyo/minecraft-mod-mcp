@@ -27,14 +27,11 @@ public final class WindowHelper {
     }
 
     public static boolean hasWindow(Object mc) {
-        for (String name : new String[]{"getWindow", "getMainWindow"}) {
-            try { mc.getClass().getMethod(name); return true; } catch (NoSuchMethodException ignored) {}
-        }
-        for (Field f : mc.getClass().getDeclaredFields()) {
-            String tn = f.getType().getSimpleName();
-            if (tn.contains("Window") || tn.contains("MainWindow")) return true;
-        }
-        return false;
+        // Presence of a getWindow method/field is not enough: the GLFW paths
+        // must only run against a real, verified window object, so callers
+        // without one (LWJGL2 eras, Cleanroom 1.12.2) get a 0 handle and fall
+        // back to non-GLFW input (issue #76 B7).
+        try { return findWindowObject(mc) != null; } catch (Exception e) { return false; }
     }
 
     public static int getDisplayWidth(Object mc) {
@@ -76,12 +73,34 @@ public final class WindowHelper {
         } catch (Exception e) { return 0; }
     }
 
+    /**
+     * A class may only be treated as a GLFW window holder when it is not
+     * identifiable as something else that also exposes 0-arg long+int
+     * accessors: WorldClient keeps a long seed plus int dimensions and
+     * java.io.File a long length, and their values were previously used as
+     * GLFW handles, crashing glfwSetInputMode natively on Cleanroom's
+     * LWJGL3 1.12.2 where no Window object exists at all (issue #76 B7).
+     * The shape fallback stays for Fabric intermediary runtimes, whose real
+     * Window class is named class_1041.
+     */
+    static boolean isWindowHolderType(Class<?> clazz) {
+        String cn = clazz.getName();
+        if (cn.startsWith("com.mojang.blaze3d.") || cn.startsWith("org.lwjgl.")) return true;
+        if (cn.startsWith("java.") || cn.contains("World") || cn.contains("Level")) return false;
+        return clazz.getSimpleName().contains("Window") || isWindowType(clazz);
+    }
+
     static Object findWindowObject(Object mc) throws Exception {
         for (String name : new String[]{"getWindow", "getMainWindow"}) {
-            try { return mc.getClass().getMethod(name).invoke(mc); } catch (NoSuchMethodException ignored) {}
+            try {
+                Object w = mc.getClass().getMethod(name).invoke(mc);
+                if (w == null || isWindowHolderType(w.getClass())) return w;
+            } catch (NoSuchMethodException ignored) {}
         }
         java.lang.reflect.Field discovered = ReflectionCache.getDiscoveredField("window");
-        if (discovered != null) { try { discovered.setAccessible(true); return discovered.get(mc); } catch (Exception ignored) {} }
+        if (discovered != null && isWindowHolderType(discovered.getType())) {
+            try { discovered.setAccessible(true); return discovered.get(mc); } catch (Exception ignored) {}
+        }
         for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
             f.setAccessible(true);
             String tn = f.getType().getSimpleName();
@@ -92,7 +111,7 @@ public final class WindowHelper {
         for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
             f.setAccessible(true);
             Class<?> ft = f.getType();
-            if (!java.lang.reflect.Modifier.isStatic(f.getModifiers()) && isWindowType(ft)) {
+            if (!java.lang.reflect.Modifier.isStatic(f.getModifiers()) && isWindowHolderType(ft)) {
                 try { return f.get(mc); } catch (Exception ignored) {}
             }
         }

@@ -386,16 +386,18 @@ public class McpMessageHandler {
         float yaw = 0f, pitch = 0f;
         try { yaw = Float.parseFloat(p.get("yaw")); } catch (Exception ignored) {}
         try { pitch = Float.parseFloat(p.get("pitch")); } catch (Exception ignored) {}
-        if (minecraftInput != null) minecraftInput.setViewAngle(yaw, pitch);
-        return "yaw=" + yaw + ",pitch=" + pitch;
+        // Return the verified result instead of fabricating success
+        // (issue #76 B5).
+        if (minecraftInput != null) return minecraftInput.setViewAngle(yaw, pitch);
+        return "no input handler";
     }
 
     protected Object handleLookDelta(java.util.Map<String, String> p) {
         float deltaYaw = 0f, deltaPitch = 0f;
         try { deltaYaw = Float.parseFloat(p.get("delta_yaw")); } catch (Exception ignored) {}
         try { deltaPitch = Float.parseFloat(p.get("delta_pitch")); } catch (Exception ignored) {}
-        if (minecraftInput != null) minecraftInput.lookDelta(deltaYaw, deltaPitch);
-        return "deltaYaw=" + deltaYaw + ",deltaPitch=" + deltaPitch;
+        if (minecraftInput != null) return minecraftInput.lookDelta(deltaYaw, deltaPitch);
+        return "no input handler";
     }
 
     protected Object handleRightClick() {

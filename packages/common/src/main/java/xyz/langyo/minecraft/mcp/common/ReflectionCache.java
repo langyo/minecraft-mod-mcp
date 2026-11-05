@@ -258,6 +258,12 @@ public final class ReflectionCache {
     }
 
     private static boolean isWindowType(Class<?> clazz) {
+        // Same anti-misjudgment gate as WindowHelper.isWindowHolderType:
+        // WorldClient (long seed + int height) and java.io.File (long
+        // length) must never be discovered as the "window" field, whose
+        // long values would be used as GLFW handles (issue #76 B7).
+        String cn = clazz.getName();
+        if (cn.startsWith("java.") || cn.contains("World") || cn.contains("Level")) return false;
         boolean hasLongReturn = false;
         boolean hasIntReturn = false;
         for (Method m : getAllMethods(clazz)) {

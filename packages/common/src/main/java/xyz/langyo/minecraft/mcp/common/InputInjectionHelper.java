@@ -279,8 +279,16 @@ public final class InputInjectionHelper {
         } catch (Exception e) { System.err.println("[Input] setCursorPos: " + e.getMessage()); }
     }
 
+    /**
+     * Maps a key code from GlfwKeys.keyCode to an AWT VK code for the Robot
+     * fallback. The incoming code is a GLFW key code on LWJGL3 runtimes and
+     * an LWJGL2 DirectInput scancode otherwise (issue #76 B4: previously only
+     * X11 keysym values were mapped, so every special key resolved to -1 and
+     * the Robot press was dropped).
+     */
     private static int glfwToAwt(int glfwKey) {
         if (glfwKey >= 'A' && glfwKey <= 'Z') return KeyEvent.VK_A + (glfwKey - 'A');
+        if (glfwKey >= 'a' && glfwKey <= 'z') return KeyEvent.VK_A + (glfwKey - 'a');
         if (glfwKey >= '0' && glfwKey <= '9') return KeyEvent.VK_0 + (glfwKey - '0');
         switch (glfwKey) {
             case 0xFF0D: return KeyEvent.VK_ENTER;
@@ -316,7 +324,77 @@ public final class InputInjectionHelper {
             case 0x005D: return KeyEvent.VK_CLOSE_BRACKET;
             case 0x003B: return KeyEvent.VK_SEMICOLON;
             case 0x0060: return KeyEvent.VK_BACK_QUOTE;
-            default: return -1;
+            default: return ReflectionCache.LWJGL3 ? glfwSpecialToAwt(glfwKey) : lwjgl2ScancodeToAwt(glfwKey);
+        }
+    }
+
+    /** GLFW special keys (256+). Printable GLFW codes equal ASCII and are
+     *  already handled by the ranges above (GLFW 'A'-'Z' are 65-90). */
+    private static int glfwSpecialToAwt(int key) {
+        switch (key) {
+            case 256: return KeyEvent.VK_ESCAPE;
+            case 257: return KeyEvent.VK_ENTER;
+            case 258: return KeyEvent.VK_TAB;
+            case 259: return KeyEvent.VK_BACK_SPACE;
+            case 260: return KeyEvent.VK_INSERT;
+            case 261: return KeyEvent.VK_DELETE;
+            case 262: return KeyEvent.VK_RIGHT;
+            case 263: return KeyEvent.VK_LEFT;
+            case 264: return KeyEvent.VK_DOWN;
+            case 265: return KeyEvent.VK_UP;
+            case 266: return KeyEvent.VK_PAGE_UP;
+            case 267: return KeyEvent.VK_PAGE_DOWN;
+            case 268: return KeyEvent.VK_HOME;
+            case 269: return KeyEvent.VK_END;
+            case 280: return KeyEvent.VK_CAPS_LOCK;
+            case 340: return KeyEvent.VK_SHIFT;
+            case 341: return KeyEvent.VK_CONTROL;
+            case 342: return KeyEvent.VK_ALT;
+            default:
+                if (key >= 290 && key <= 301) return KeyEvent.VK_F1 + (key - 290);
+                return -1;
+        }
+    }
+
+    /** LWJGL2 DirectInput scancodes (org.lwjgl.input.Keyboard codes). */
+    private static int lwjgl2ScancodeToAwt(int key) {
+        switch (key) {
+            case 0x01: return KeyEvent.VK_ESCAPE;   // 1
+            case 0x0C: return KeyEvent.VK_MINUS;    // 12
+            case 0x0D: return KeyEvent.VK_EQUALS;   // 13
+            case 0x0E: return KeyEvent.VK_BACK_SPACE; // 14
+            case 0x0F: return KeyEvent.VK_TAB;      // 15
+            case 0x1A: return KeyEvent.VK_OPEN_BRACKET;  // 26
+            case 0x1B: return KeyEvent.VK_CLOSE_BRACKET; // 27
+            case 0x1C: return KeyEvent.VK_ENTER;    // 28
+            case 0x1D: return KeyEvent.VK_CONTROL;  // 29
+            case 0x27: return KeyEvent.VK_SEMICOLON;    // 39
+            case 0x28: return KeyEvent.VK_QUOTE;        // 40 apostrophe
+            case 0x29: return KeyEvent.VK_BACK_QUOTE;   // 41 grave
+            case 0x2A: return KeyEvent.VK_SHIFT;        // 42
+            case 0x2B: return KeyEvent.VK_BACK_SLASH;   // 43
+            case 0x33: return KeyEvent.VK_COMMA;        // 51
+            case 0x34: return KeyEvent.VK_PERIOD;       // 52
+            case 0x35: return KeyEvent.VK_SLASH;        // 53
+            case 0x37: return KeyEvent.VK_MULTIPLY;     // 55 keypad *
+            case 0x38: return KeyEvent.VK_ALT;          // 56
+            case 0x39: return KeyEvent.VK_SPACE;        // 57
+            case 0xC8: return KeyEvent.VK_UP;           // 200
+            case 0xCB: return KeyEvent.VK_LEFT;         // 203
+            case 0xCD: return KeyEvent.VK_RIGHT;        // 205
+            case 0xD0: return KeyEvent.VK_DOWN;         // 208
+            case 0xD3: return KeyEvent.VK_DELETE;       // 211
+            default:
+                if (key >= 0x02 && key <= 0x0A) return KeyEvent.VK_1 + (key - 0x02); // 1-9
+                if (key == 0x0B) return KeyEvent.VK_0;                              // 11
+                if (key >= 0x3B && key <= 0x44) return KeyEvent.VK_F1 + (key - 0x3B); // F1-F10 (59-68)
+                if (key == 0x57) return KeyEvent.VK_F11;  // 87
+                if (key == 0x58) return KeyEvent.VK_F12;  // 88
+                // QWERTY letter blocks (DirectInput layout, see GlfwKeys)
+                if (key >= 0x10 && key <= 0x19) return KeyEvent.VK_Q + ("qwertyuiop".charAt(key - 0x10) - 'q');
+                if (key >= 0x1E && key <= 0x26) return KeyEvent.VK_A + ("asdfghjkl".charAt(key - 0x1E) - 'a');
+                if (key >= 0x2C && key <= 0x32) return KeyEvent.VK_Z + ("zxcvbnm".charAt(key - 0x2C) - 'z');
+                return -1;
         }
     }
 }
