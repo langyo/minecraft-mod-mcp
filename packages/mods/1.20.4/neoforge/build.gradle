@@ -4,7 +4,7 @@ plugins {
     id 'net.neoforged.moddev' version '1.0.24'
 }
 
-version = '0.4.25'
+version = '0.4.26'
 group = 'xyz.langyo'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
@@ -25,7 +25,7 @@ dependencies {
 }
 
 neoForge {
-    version = "20.4.251"
+    version = "20.4.261"
     runs {
         configureEach {
             gameDirectory = project.file('run')
