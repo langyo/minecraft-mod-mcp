@@ -42,6 +42,12 @@ public final class ReflectionCache {
         try {
             try { mcClass = Class.forName("net.minecraft.client.Minecraft"); } catch (Exception ignored) {}
             if (mcClass == null) try { mcClass = Class.forName("net.minecraft.client.MinecraftClient"); } catch (Exception ignored) {}
+            // Production Fabric (MC 1.14-1.21.11) runs Minecraft under
+            // intermediary names: neither the Mojang nor the Yarn class name
+            // exists at runtime, only net.minecraft.class_310. Without this
+            // lookup every tool fails with "Failed to get Minecraft instance"
+            // even though the game is fully loaded (issue #75).
+            if (mcClass == null) try { mcClass = Class.forName("net.minecraft.class_310"); } catch (Exception ignored) {}
             if (mcClass != null) {
                 try { mcGetInstanceMethod = mcClass.getMethod("getInstance"); } catch (Exception ignored) {}
                 if (mcGetInstanceMethod == null) try { mcGetInstanceMethod = mcClass.getMethod("getMinecraft"); } catch (Exception ignored) {}
@@ -300,7 +306,14 @@ public final class ReflectionCache {
                     }
                 }
             }
-            throw new RuntimeException("No Minecraft static getter found");
+            // Diagnostic detail (issue #75): say WHICH lookups failed so a
+            // broken environment is self-explanatory in tool error payloads.
+            throw new RuntimeException("Minecraft instance not resolvable: class lookups for "
+                + "net.minecraft.client.Minecraft / net.minecraft.client.MinecraftClient / "
+                + "net.minecraft.class_310 all failed (mcClass=" + mcClass
+                + ", instanceRegistered=" + (cachedMcInstance != null)
+                + "). The game may still be early in startup, or this runtime uses "
+                + "class names none of the probes cover.");
         } catch (Exception e) {
             throw new RuntimeException("Failed to get Minecraft instance", e);
         }

@@ -17,7 +17,7 @@ public abstract class MinecraftClientMixin {
     private void onTick(CallbackInfo ci) {
         ModDevMcpMod mod = ModDevMcpMod.INSTANCE;
         if (mod != null) {
-            mod.onClientTick();
+            mod.onClientTick(this);
         }
     }
     @Inject(method = "openScreen", at = @At("HEAD"), cancellable = true)

@@ -107,6 +107,11 @@ public class McpHttpServer {
     private String buildStatusJson() {
         long pid = getPid();
         double uptime = (System.currentTimeMillis() - startTimeMs) / 1000.0;
+        // Instance-ready flag (issue #75): status used to look healthy while
+        // every game tool failed because the Minecraft instance was never
+        // captured. true/false here makes that state self-diagnosing.
+        boolean instanceReady = false;
+        try { instanceReady = ReflectionHelper.getMinecraftInstance() != null; } catch (Throwable t) { instanceReady = false; }
         StringBuilder sb = new StringBuilder("{");
         sb.append("\"ok\":true");
         sb.append(",\"type\":\"minecraft-mod\"");
@@ -116,6 +121,7 @@ public class McpHttpServer {
         if (forgeVer != null) sb.append(",\"forgeVersion\":\"").append(esc(forgeVer)).append("\"");
         sb.append(",\"pid\":").append(pid);
         sb.append(",\"port\":").append(port);
+        sb.append(",\"instanceReady\":").append(instanceReady);
         sb.append(",\"uptime\":").append(String.format(java.util.Locale.ROOT, "%.1f", uptime));
         sb.append("}");
         return sb.toString();
