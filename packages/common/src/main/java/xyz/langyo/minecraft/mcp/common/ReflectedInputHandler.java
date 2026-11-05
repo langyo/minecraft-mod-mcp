@@ -335,8 +335,19 @@ public class ReflectedInputHandler extends McpMessageHandler implements McpProto
     private byte[] doScreenshot() {
         try {
             Object mc = mc();
-            int w = getWidth();
-            int h = getHeight();
+            // Screenshot pixels are read from the OpenGL framebuffer, so the
+            // live framebuffer size reported by glfwGetFramebufferSize is the
+            // authoritative dimension source. The Window field chain in
+            // getWidth()/getHeight() can stick to the window-creation size
+            // after a manual resize (issue #79: 854x480 screenshots on a
+            // maximized 1920x1080 window). The helper returns 0 when GLFW is
+            // unavailable (LWJGL2, MC <= 1.12.2), keeping the old chain.
+            int w = ReflectionHelper.getGlfwWindowSize(mc, true);
+            int h = ReflectionHelper.getGlfwWindowSize(mc, false);
+            if (w <= 0 || h <= 0) {
+                w = getWidth();
+                h = getHeight();
+            }
             if (w <= 0 || h <= 0) {
                 java.lang.reflect.Field winField = ReflectionCache.getDiscoveredField("window");
                 if (winField != null) {
