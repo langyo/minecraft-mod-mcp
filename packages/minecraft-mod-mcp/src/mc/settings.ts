@@ -111,13 +111,22 @@ export function ensureMcpToken(): string {
   const token = randomBytes(32).toString("hex");
   try {
     writeFileSync(path, token, { mode: 0o600, flag: "wx" });
+    return token;
   } catch {
-    // Lost a first-launch race to another process, or found an empty file.
+    // The file exists (lost a first-launch race, or it is empty). Prefer
+    // whatever is in it; only overwrite while it is still empty.
     const winner = readMcpToken();
     if (winner) return winner;
-    writeFileSync(path, token, { mode: 0o600 });
+    const retry = randomBytes(32).toString("hex");
+    try {
+      writeFileSync(path, retry, { mode: 0o600, flag: "wx" });
+    } catch {
+      const after = readMcpToken();
+      if (after) return after;
+      writeFileSync(path, retry, { mode: 0o600 });
+    }
+    return retry;
   }
-  return token;
 }
 
 export function selectedAccount(config: LauncherConfig): Account | undefined {

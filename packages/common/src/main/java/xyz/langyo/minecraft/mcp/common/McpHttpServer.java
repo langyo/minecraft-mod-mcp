@@ -210,6 +210,7 @@ public class McpHttpServer {
 
     /** 401 with the challenge header; no CORS headers so browsers block reads. */
     private static void sendUnauthorized(HttpExchange exchange) throws IOException {
+        exchange.getResponseHeaders().set("Content-Type", "application/json");
         exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
         byte[] bytes = "{\"error\":\"unauthorized\",\"hint\":\"Authorization: Bearer <token> required (mcp.token)\"}".getBytes(StandardCharsets.UTF_8);
         exchange.sendResponseHeaders(401, bytes.length);
