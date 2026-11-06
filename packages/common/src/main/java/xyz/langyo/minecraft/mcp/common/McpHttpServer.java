@@ -26,6 +26,9 @@ public class McpHttpServer {
     private static final int MAX_HISTORY = 200;
     private static final Map<String, String> MIME_TYPES = new HashMap<>();
     private final long startTimeMs = System.currentTimeMillis();
+    /** Stable per-process id reported by /api/status so a bridge that launched
+     *  several games can tell them apart (issue #81). */
+    private final String instanceId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12);
     static {
         MIME_TYPES.put(".html", "text/html; charset=utf-8");
         MIME_TYPES.put(".css", "text/css; charset=utf-8");
@@ -235,6 +238,7 @@ public class McpHttpServer {
         if (forgeVer != null) sb.append(",\"forgeVersion\":\"").append(esc(forgeVer)).append("\"");
         sb.append(",\"pid\":").append(pid);
         sb.append(",\"port\":").append(port);
+        sb.append(",\"instanceId\":\"").append(esc(instanceId)).append("\"");
         sb.append(",\"instanceReady\":").append(instanceReady);
         sb.append(",\"uptime\":").append(String.format(java.util.Locale.ROOT, "%.1f", uptime));
         sb.append("}");

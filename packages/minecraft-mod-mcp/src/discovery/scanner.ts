@@ -18,12 +18,29 @@ export async function probePort(port: number): Promise<ModStatus | null> {
   }
 }
 
-export async function findMod(startPort = PORT_START, endPort = PORT_END): Promise<ModStatus | null> {
-  for (let port = startPort; port >= endPort; port--) {
-    const status = await probePort(port);
-    if (status) return status;
+/**
+ * Probe every port in the range and return all responding instances, so a
+ * bridge that shares the machine with other games can pick the right one
+ * instead of locking onto whichever answered first (issue #81). Probes run in
+ * small parallel batches: 800+ sequential round-trips are needlessly slow.
+ */
+export async function findAllMods(startPort = PORT_START, endPort = PORT_END): Promise<ModStatus[]> {
+  const found: ModStatus[] = [];
+  const BATCH = 32;
+  for (let port = startPort; port >= endPort; port -= BATCH) {
+    const batch: Promise<ModStatus | null>[] = [];
+    for (let p = port; p >= endPort && p > port - BATCH; p--) {
+      batch.push(probePort(p));
+    }
+    const statuses = await Promise.all(batch);
+    for (const s of statuses) if (s) found.push(s);
   }
-  return null;
+  return found;
+}
+
+export async function findMod(startPort = PORT_START, endPort = PORT_END): Promise<ModStatus | null> {
+  const all = await findAllMods(startPort, endPort);
+  return all.length > 0 ? all[0] : null;
 }
 
 export async function waitForMod(

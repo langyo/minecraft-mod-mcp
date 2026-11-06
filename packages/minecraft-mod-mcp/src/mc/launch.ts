@@ -298,6 +298,14 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     allArgs.push(`-Dmcp.port=${config.mcpPort}`);
   }
 
+  // Pin the screenshot workspace to <game dir>/screenshots so it does not
+  // depend on the process working directory (issue #81). Only when the
+  // operator has not set one; a user -Dmcp.screenshot.dir arrives later in
+  // the arg list and wins.
+  if (!process.env.MC_MCP_SCREENSHOT_DIR) {
+    allArgs.push(`-Dmcp.screenshot.dir=${join(mcDir, "screenshots")}`);
+  }
+
   // Report the deployed jar's version when its name carries one; otherwise
   // leave it to the mod (jar manifest), since a guess would misreport what
   // actually runs. Never a hardcoded constant (issue #81).

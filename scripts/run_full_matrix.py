@@ -89,6 +89,10 @@ def test_client(version, loader, timeout):
     env = {"DISPLAY": ":99", "LIBGL_ALWAYS_SOFTWARE": "1",
            "http_proxy": "http://127.0.0.1:7890", "https_proxy": "http://127.0.0.1:7890",
            "no_proxy": "127.0.0.1,localhost"}
+    # screenshot_to_file is jailed to one directory (issue #81); smoke.png
+    # lives in the game dir itself, so point the jail there. The launcher
+    # passes its environment through to the game.
+    env["MC_MCP_SCREENSHOT_DIR"] = game_dir
 
     try:
         rc, out = run_cli(["install", version, "--loader", loader], timeout=600, env=env)

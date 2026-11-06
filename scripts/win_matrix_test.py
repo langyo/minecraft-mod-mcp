@@ -322,6 +322,10 @@ def test_client(bridge: Bridge, version: str, loader: str,
         shutil.rmtree(game_dir, ignore_errors=True)
         os.makedirs(game_dir, exist_ok=True)
         port = PORT_START
+        # screenshot_to_file is jailed to one directory (issue #81); smoke.png
+        # lives in the game dir itself, so point the jail there. The launcher
+        # passes its environment through to the game.
+        env = {**os.environ, "MC_MCP_SCREENSHOT_DIR": game_dir}
         cmd = bridge._base() + ["launch", version, "--loader", loader,
                                 "--port", str(port), "--mc-dir", game_dir,
                                 "--width", "854", "--height", "480"]
@@ -330,7 +334,7 @@ def test_client(bridge: Bridge, version: str, loader: str,
         # Detached launch: the bridge spawns MC and returns. Capture as bytes
         # and decode leniently — the launcher prints zh-CN console text in GBK.
         try:
-            subprocess.run(cmd, capture_output=True, timeout=120)
+            subprocess.run(cmd, capture_output=True, timeout=120, env=env)
         except subprocess.TimeoutExpired:
             pass  # launch is detached; bridge may not exit on its own
 

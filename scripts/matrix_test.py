@@ -261,6 +261,10 @@ def test_client(bridge: Bridge, version: str, loader: str, xvfb: Xvfb,
         os.makedirs(game_dir, exist_ok=True)
         port = PORT_START
         env = xvfb.env()
+        # screenshot_to_file is jailed to one directory (issue #81); smoke.png
+        # lives in the game dir itself, so point the jail there. The launcher
+        # passes its environment through to the game.
+        env["MC_MCP_SCREENSHOT_DIR"] = game_dir
         cmd = bridge._base() + ["launch", version, "--loader", loader,
                                 "--port", str(port), "--mc-dir", game_dir,
                                 "--width", "854", "--height", "480"]

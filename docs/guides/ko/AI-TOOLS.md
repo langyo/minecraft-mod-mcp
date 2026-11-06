@@ -554,7 +554,7 @@ curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/events
 | 명령어 | 설명 |
 |---------|-------------|
 | `screenshot` | Minecraft 창의 스크린샷 촬영 |
-| `screenshot_to_file` | 스크린샷을 촬영하여 로컬 파일로 저장 (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
+| `screenshot_to_file` | 스크린샷을 촬영하여 로컬 파일로 저장 (`{"cmd":"screenshot_to_file","params":{"path":"vtty/mc.png"}}`) |
 | `click` | (x, y) 좌표 클릭 |
 | `press_key` | 키보드 키 입력 |
 | `type_text` | 텍스트 문자열 입력 |
@@ -578,7 +578,7 @@ Minecraft Mod MCP를 **비전 지원 MCP 서버**와 함께 사용하면 AI 에�
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ screenshots/vtty/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
     A --> D["Minecraft Mod MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
@@ -619,11 +619,13 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 }
 ```
 
+> **스크린샷 작업 공간**: `screenshot_to_file`은 게임의 `screenshots` 디렉터리 안에만 기록합니다. `vtty/mc.png` 같은 상대 경로는 그 안에서 해석되고, 범위 밖의 절대 경로는 거부됩니다. 작업 공간은 `-Dmcp.screenshot.dir`(JVM 인수) 또는 `MC_MCP_SCREENSHOT_DIR`(환경 변수)로 변경할 수 있습니다. 반환된 `file` 값을 비전 도구에 전달하세요.
+
 > **참고**: 비전 MCP는 디스크에서 파일을 읽으므로, 비전 도구를 호출하기 전에 항상 `screenshot_to_file`(`screenshot`이 아님)을 사용하세요. AI 에이전트는 `screenshot_to_file`을 호출할 때 특정 파일 경로를 지정할 수 있습니다.
 
 ### 예제 워크플로우
 
-1. AI 에이전트에게 질문하세요: *"Minecraft 스크린샷을 찍어 `/tmp/mc.png`에 저장한 다음, 화면에 무엇이 있는지 분석하고 새 게임을 시작하려면 어떤 버튼을 눌러야 하는지 알려주세요."*
+1. AI 에이전트에게 질문하세요: *"Minecraft 스크린샷을 찍어 `vtty/mc.png`에 저장한 다음, 화면에 무엇이 있는지 분석하고 새 게임을 시작하려면 어떤 버튼을 눌러야 하는지 알려주세요."*
 2. 에이전트가 `minecraft-mcp` → `screenshot_to_file` → 파일 저장
 3. 에이전트가 `zai-mcp-server` → `extract_text_from_screenshot` → UI 텍스트 읽기
 4. 에이전트가 본 내용과 다음 단계를 알려줍니다

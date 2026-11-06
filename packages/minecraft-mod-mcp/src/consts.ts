@@ -12,6 +12,8 @@ export interface ModStatus {
   forgeVersion?: string;
   pid: number;
   port: number;
+  /** Per-process id from the mod; lets multi-instance bridges tell games apart (issue #81). */
+  instanceId?: string;
   uptime: number;
 }
 

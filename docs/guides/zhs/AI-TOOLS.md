@@ -578,7 +578,7 @@ curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screensh
 | 命令 | 说明 |
 |---------|-------------|
 | `screenshot` | 截取屏幕截图，返回 base64 数据 URI |
-| `screenshot_to_file` | 截取屏幕截图并保存到本地文件（`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`） |
+| `screenshot_to_file` | 截取屏幕截图并保存到本地文件（`{"cmd":"screenshot_to_file","params":{"path":"vtty/mc.png"}}`） |
 | `click` | 在 (x, y) 坐标处点击 |
 | `press_key` | 按下键盘按键 |
 | `type_text` | 输入文本字符串 |
@@ -602,7 +602,7 @@ curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screensh
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["minecraft-mod-mcp 桥接器<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["minecraft-mod-mcp 桥接器<br/>screenshot_to_file<br/>→ screenshots/vtty/mc_screen.png"]
     A --> C["视觉 MCP<br/>分析截图<br/>→ 报告看到的内容"]
     A --> D["minecraft-mod-mcp 桥接器<br/>click x=400,y=300<br/>→ 进入游戏"]
 ```
@@ -642,11 +642,13 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 }
 ```
 
+> **截图工作区**：`screenshot_to_file` 只写入游戏的 `screenshots` 目录；`vtty/mc.png` 这类相对路径会在该目录内解析，目录之外的绝对路径会被拒绝。可用 `-Dmcp.screenshot.dir`（JVM 参数）或 `MC_MCP_SCREENSHOT_DIR`（环境变量）改指工作区。请把返回的 `file` 路径传给视觉工具。
+
 > **注意**：视觉 MCP 会从磁盘读取文件，因此调用视觉工具前请务必先用 `screenshot_to_file`（而非 `screenshot`）。你的 Agent 可以在调用 `screenshot_to_file` 时指定文件路径。
 
 ### 操作示例
 
-1. 向你的 AI Agent 提问：*"截取 Minecraft 的屏幕截图，保存到 `/tmp/mc.png`，然后分析屏幕上的内容，告诉我该按哪个按钮来开始新游戏。"*
+1. 向你的 AI Agent 提问：*"截取 Minecraft 的屏幕截图，保存到 `vtty/mc.png`，然后分析屏幕上的内容，告诉我该按哪个按钮来开始新游戏。"*
 2. Agent 调用 `minecraft-mod-mcp` → `screenshot_to_file` → 文件已保存。
 3. Agent 调用 `zai-mcp-server` → `extract_text_from_screenshot` → 读取 UI 文字。
 4. Agent 告诉你它看到了什么，以及下一步该做什么。

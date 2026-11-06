@@ -578,7 +578,7 @@ curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screensh
 | Command | Description |
 |---------|-------------|
 | `screenshot` | Capture a screenshot, returns a base64 data URI |
-| `screenshot_to_file` | Capture a screenshot and save to a local file (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
+| `screenshot_to_file` | Capture a screenshot and save to a local file (`{"cmd":"screenshot_to_file","params":{"path":"vtty/mc.png"}}`) |
 | `click` | Click at (x, y) |
 | `press_key` | Press a keyboard key |
 | `type_text` | Type a text string |
@@ -602,7 +602,7 @@ You can pair Minecraft Mod MCP with a **vision-capable MCP server** so the agent
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["minecraft-mod-mcp bridge<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["minecraft-mod-mcp bridge<br/>screenshot_to_file<br/>→ screenshots/vtty/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
     A --> D["minecraft-mod-mcp bridge<br/>click x=400,y=300<br/>→ enters game"]
 ```
@@ -642,11 +642,13 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 }
 ```
 
+> **Screenshot workspace**: `screenshot_to_file` only writes inside the game's `screenshots` directory; relative paths like `vtty/mc.png` resolve there and absolute paths outside it are rejected. The workspace can be moved with `-Dmcp.screenshot.dir` (JVM arg) or `MC_MCP_SCREENSHOT_DIR` (env). Always pass the returned `file` value to your vision tool.
+
 > **Note**: the vision MCP reads files from disk, so always call `screenshot_to_file` (not `screenshot`) before a vision tool. Your agent can pass a file path to `screenshot_to_file`.
 
 ### Example flow
 
-1. Ask your agent: *"Take a screenshot of Minecraft, save it to `/tmp/mc.png`, then analyze what's on screen and tell me which button to click to start a new game."*
+1. Ask your agent: *"Take a screenshot of Minecraft, save it to `vtty/mc.png`, then analyze what's on screen and tell me which button to click to start a new game."*
 2. Agent calls `minecraft-mod-mcp` → `screenshot_to_file` → file saved.
 3. Agent calls `zai-mcp-server` → `extract_text_from_screenshot` → reads UI text.
 4. Agent reports what it sees and the next step.

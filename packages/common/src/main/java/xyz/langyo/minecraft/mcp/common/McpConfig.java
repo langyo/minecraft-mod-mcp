@@ -90,6 +90,22 @@ public final class McpConfig {
     private static Boolean remoteControlCache;
 
     /**
+     * Writable workspace for screenshot_to_file (issue #81): every path the
+     * command accepts is resolved inside this directory. Defaults to
+     * {@code screenshots/} under the game directory (the process working
+     * directory); test harnesses that collect screenshots elsewhere point it
+     * at their own directory with {@code -Dmcp.screenshot.dir} or
+     * {@code MC_MCP_SCREENSHOT_DIR}.
+     */
+    public static String getScreenshotDir() {
+        String d = System.getProperty("mcp.screenshot.dir");
+        if (d != null && !d.trim().isEmpty()) return d;
+        d = System.getenv("MC_MCP_SCREENSHOT_DIR");
+        if (d != null && !d.trim().isEmpty()) return d;
+        return null;
+    }
+
+    /**
      * External confirmation gate for MCP control mode (issue #81). Control
      * mode used to be a soft gate: any local caller could invoke
      * {@code enter_control_mode} directly and self-authorize full input

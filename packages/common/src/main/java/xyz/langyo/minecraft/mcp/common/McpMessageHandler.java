@@ -203,21 +203,94 @@ public class McpMessageHandler {
 
     protected Object handleScreenshotToFile(java.util.Map<String, String> p) {
         String filePath = p.get("path");
-        if (filePath == null || filePath.isEmpty()) return "{\"error\":\"missing path\"}";
+        // Path jail (issue #81): writes stay inside the screenshot workspace
+        // (-Dmcp.screenshot.dir / MC_MCP_SCREENSHOT_DIR, else <game dir>/screenshots,
+        // where the game dir is the process working directory). Absolute paths
+        // must already live inside it; relative paths resolve against it.
+        java.nio.file.Path root;
+        java.nio.file.Path fp;
+        try {
+            root = screenshotRoot();
+            if (filePath == null || filePath.isEmpty()) {
+                fp = root.resolve("vtty").resolve("mcp-" + System.currentTimeMillis() + ".png");
+            } else {
+                java.nio.file.Path requested = java.nio.file.Paths.get(filePath);
+                fp = (requested.isAbsolute() ? requested : root.resolve(requested)).normalize();
+            }
+            if (!isInsideDirectory(fp, root)) {
+                return McpProtocol.GSON.toJson(java.util.Collections.singletonMap("error",
+                        "path escapes the screenshot directory: " + root));
+            }
+        } catch (Exception e) {
+            return McpProtocol.GSON.toJson(java.util.Collections.singletonMap("error", String.valueOf(e.getMessage())));
+        }
         try {
             byte[] bytes = minecraftInput != null ? minecraftInput.screenshot() : null;
             if (bytes == null) {
-                String msg = screenshotNullDetail(ScreenshotHelper.getLastFailureReason())
-                        .replace("\\", "\\\\").replace("\"", "\\\"");
-                return "{\"error\":\"" + msg + "\"}";
+                String msg = screenshotNullDetail(ScreenshotHelper.getLastFailureReason());
+                return McpProtocol.GSON.toJson(java.util.Collections.singletonMap("error", msg));
             }
-            java.nio.file.Path fp = java.nio.file.Paths.get(filePath);
+            if (!isPng(bytes)) {
+                return McpProtocol.GSON.toJson(java.util.Collections.singletonMap("error", "screenshot data is not a PNG"));
+            }
             java.nio.file.Files.createDirectories(fp.getParent());
+            // Resolve links before writing: a junction or symlink planted
+            // inside the workspace must not smuggle the write outside it.
+            if (!isInsideDirectory(fp, root)) {
+                return McpProtocol.GSON.toJson(java.util.Collections.singletonMap("error",
+                        "path resolves outside the screenshot directory"));
+            }
+            if (java.nio.file.Files.isSymbolicLink(fp) || java.nio.file.Files.isSymbolicLink(fp.getParent())) {
+                return McpProtocol.GSON.toJson(java.util.Collections.singletonMap("error", "symbolic link target refused"));
+            }
             java.nio.file.Files.write(fp, bytes);
-            return "{\"file\":\"" + fp.toAbsolutePath().toString().replace("\\", "\\\\") + "\",\"size\":" + bytes.length + "}";
+            java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+            out.put("file", fp.toAbsolutePath().toString());
+            out.put("size", bytes.length);
+            return McpProtocol.GSON.toJson(out);
         } catch (Exception e) {
-            return "{\"error\":\"" + e.getMessage().replace("\\", "\\\\").replace("\"", "\\\"") + "\"}";
+            return McpProtocol.GSON.toJson(java.util.Collections.singletonMap("error", String.valueOf(e.getMessage())));
         }
+    }
+
+    /**
+     * Containment check on real paths. Textual containment alone both
+     * accepts junctions/symlinks planted inside the workspace and rejects
+     * different spellings of the root itself (8.3 short names, case). So:
+     * textual match, or the deepest existing ancestor of fp resolving inside
+     * the real root; plus a real-path re-check of fp's parent to catch links
+     * on the final segments.
+     */
+    private static boolean isInsideDirectory(java.nio.file.Path fp, java.nio.file.Path root) throws java.io.IOException {
+        java.nio.file.Path normalizedFp = fp.normalize();
+        java.nio.file.Path normalizedRoot = root.normalize();
+        java.nio.file.Files.createDirectories(normalizedRoot);
+        java.nio.file.Path realRoot = normalizedRoot.toRealPath();
+        if (normalizedFp.startsWith(normalizedRoot)) {
+            java.nio.file.Path probe = normalizedFp.getParent() != null ? normalizedFp.getParent() : normalizedFp;
+            java.nio.file.Files.createDirectories(probe);
+            return probe.toRealPath().startsWith(realRoot);
+        }
+        // Different spelling of an inside path (8.3 short name, case)?
+        java.nio.file.Path existing = normalizedFp;
+        while (existing != null && !java.nio.file.Files.exists(existing)) {
+            existing = existing.getParent();
+        }
+        return existing != null && existing.toRealPath().startsWith(realRoot);
+    }
+
+    private static java.nio.file.Path screenshotRoot() {
+        String configured = McpConfig.getScreenshotDir();
+        java.nio.file.Path root = configured != null
+                ? java.nio.file.Paths.get(configured.trim())
+                : java.nio.file.Paths.get("screenshots");
+        return root.toAbsolutePath().normalize();
+    }
+
+    private static boolean isPng(byte[] bytes) {
+        return bytes != null && bytes.length >= 8
+                && (bytes[0] & 0xFF) == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47
+                && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A;
     }
 
     protected Object handleClick(java.util.Map<String, String> p) {
