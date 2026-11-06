@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { modVersionFromJar, modJarPath, deployModJar } from "../src/mc/platform.js";
@@ -99,5 +99,34 @@ describe("deployModJar", () => {
     deployModJar(mods, src);
 
     expect(readdirSync(mods).sort()).toEqual(["jei-1.21.7.jar", "minecraft-mcp-1.21.7-forge-v0.4.27.jar"]);
+  });
+
+  it("only treats this project's own jar names as stale copies", () => {
+    const mods = join(root, "mods");
+    mkdirSync(mods);
+    writeFileSync(join(mods, "minecraft-mcp-server-plugin.jar"), "third party");
+    const src = join(root, "minecraft-mcp-1.21.7-forge-v0.4.27.jar");
+    writeFileSync(src, "new");
+
+    deployModJar(mods, src);
+
+    expect(readdirSync(mods).sort()).toEqual(["minecraft-mcp-1.21.7-forge-v0.4.27.jar", "minecraft-mcp-server-plugin.jar"]);
+  });
+
+  it("refreshes a same-named jar only when the source is newer", () => {
+    const mods = join(root, "mods");
+    const src = join(root, "minecraft-moddev-mcp-mod-0.4.27.jar");
+    writeFileSync(src, "first");
+    const dest = deployModJar(mods, src);
+
+    writeFileSync(src, "rebuilt");
+    utimesSync(src, new Date(0), new Date(0));
+    deployModJar(mods, src);
+    expect(readFileSync(dest, "utf-8")).toBe("first");
+
+    const future = new Date(Date.now() + 60_000);
+    utimesSync(src, future, future);
+    deployModJar(mods, src);
+    expect(readFileSync(dest, "utf-8")).toBe("rebuilt");
   });
 });

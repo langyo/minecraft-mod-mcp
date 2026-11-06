@@ -538,15 +538,18 @@ curl http://localhost:9876/api/status
 
 # Выполнение команды
 curl -X POST http://localhost:9876/api/cmd \
+  -H "Authorization: Bearer $MC_MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"cmd":"screenshot","params":{}}'
 
 # Сделать скриншот
-curl http://localhost:9876/api/screenshot
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screenshot
 
 # Подписка на события (поток SSE)
-curl http://localhost:9876/api/events
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/events
 ```
+
+> **Аутентификация**: в играх, запущенных через лаунчер, все вызовы выше, кроме `/api/status`, требуют Bearer-токен. Токен — это переменная окружения `MC_MCP_TOKEN`, если она задана, иначе содержимое файла `.minecraft/mcp_launcher/mcp-token`. Игре, запущенной вами без настроенного токена, заголовок не нужен.
 
 ### Основные команды
 

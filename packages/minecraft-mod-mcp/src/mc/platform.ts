@@ -1,5 +1,5 @@
 import { join, resolve, dirname, basename } from "node:path";
-import { existsSync, readdirSync, mkdirSync, writeFileSync, copyFileSync, unlinkSync } from "node:fs";
+import { existsSync, readdirSync, mkdirSync, writeFileSync, copyFileSync, unlinkSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { crossHomedir, isWindows, isMacos, classpathSeparator as cpSep } from "../runtime/detector.js";
 import { detectJavas } from "./javaDetect.js";
@@ -111,6 +111,10 @@ export function modJarPath(mcVersion: string, loader: string): string | null {
   return null;
 }
 
+// Names this project gives its own mod jars: release/cache names and the
+// local Gradle output. Anything else in mods/ belongs to the user.
+const MCP_JAR_RE = /^(minecraft-mcp-\d[\w.]*-(forge|fabric|neoforge)(-v[\d.]+)?|minecraft-moddev-mcp-.+)\.jar$/;
+
 /**
  * Copy a mod jar into a mods/ directory, first removing stale copies of the
  * MCP mod. Version-keyed jar names would otherwise leave two copies side by
@@ -120,13 +124,20 @@ export function deployModJar(modsDir: string, modJar: string): string {
   if (!existsSync(modsDir)) mkdirSync(modsDir, { recursive: true });
   const name = basename(modJar);
   for (const f of readdirSync(modsDir)) {
-    if (f === name || !f.endsWith(".jar")) continue;
-    if (f.startsWith("minecraft-mcp-") || f.startsWith("minecraft-moddev-mcp-")) {
+    if (f !== name && MCP_JAR_RE.test(f)) {
       try { unlinkSync(join(modsDir, f)); } catch {}
     }
   }
   const dest = join(modsDir, name);
-  if (!existsSync(dest)) copyFileSync(modJar, dest);
+  // A rebuilt jar keeps its name, so existence alone is not enough.
+  if (!existsSync(dest) || statSync(modJar).mtimeMs > statSync(dest).mtimeMs) {
+    try {
+      copyFileSync(modJar, dest);
+    } catch (err) {
+      // Windows locks the jar of a running game; keep that copy.
+      if (!existsSync(dest)) throw err;
+    }
+  }
   return dest;
 }
 
@@ -143,23 +154,25 @@ interface Release {
   assets?: ReleaseAsset[];
 }
 
-async function fetchRelease(url: string): Promise<Release | null> {
+/** The release, "missing" for a 404, or null for any other failure. */
+async function fetchRelease(url: string): Promise<Release | "missing" | null> {
   const resp = await fetch(url, {
     headers: { "user-agent": "minecraft-mod-mcp", accept: "application/json" },
   });
-  if (!resp.ok) return null;
-  return (await resp.json()) as Release;
+  if (resp.status === 404) return "missing";
+  return resp.ok ? ((await resp.json()) as Release) : null;
 }
 
-/** Newest previously verified (or legacy) cached jar, used only when offline. */
+/**
+ * Newest version-keyed cached jar. Unversioned cache entries are skipped on
+ * purpose: older bridges wrote them without pinning or verification, so they
+ * may hold a mod that predates the loopback binding and token auth.
+ */
 function newestCachedJar(cacheDir: string, mcVersion: string, loader: string): string | null {
   if (!existsSync(cacheDir)) return null;
-  const prefix = `minecraft-mcp-${mcVersion}-${loader}`;
+  const prefix = `minecraft-mcp-${mcVersion}-${loader}-v`;
   try {
-    const jars = readdirSync(cacheDir).filter(
-      (f) => f === `${prefix}.jar` || (f.startsWith(`${prefix}-v`) && f.endsWith(".jar")),
-    );
-    const pick = pickModJar(jars);
+    const pick = pickModJar(readdirSync(cacheDir).filter((f) => f.startsWith(prefix) && f.endsWith(".jar")));
     return pick ? join(cacheDir, pick) : null;
   } catch {
     return null;
@@ -172,11 +185,12 @@ function newestCachedJar(cacheDir: string, mcVersion: string, loader: string): s
  * checkout, so without this the game launches vanilla (no MCP HTTP server).
  *
  * Hardened in issue #81: the download is pinned to the release matching this
- * bridge's version (falling back to the latest stable release only when that
- * tag was never published), verified against the sha256 digest GitHub
- * publishes for each release asset, and cached under a version-keyed name so
- * upgrades actually reach the game. Returns null if no JAR can be obtained
- * (launch then proceeds without the mod).
+ * bridge's version and verified against the sha256 digest GitHub publishes for
+ * each release asset. When that tag was never published the newest cached jar
+ * is used, else the latest stable release. Any other failure (offline, rate
+ * limit, missing asset) can only reuse a cached jar. Every fallback warns on
+ * stderr. Returns null if no JAR can be obtained (launch then proceeds
+ * without the mod).
  */
 export async function ensureModJar(mcVersion: string, loader: string): Promise<string | null> {
   const local = modJarPath(mcVersion, loader);
@@ -186,45 +200,54 @@ export async function ensureModJar(mcVersion: string, loader: string): Promise<s
   const pinnedCache = join(cacheDir, `minecraft-mcp-${mcVersion}-${loader}-v${PACKAGE_VERSION}.jar`);
   if (existsSync(pinnedCache)) return pinnedCache;
 
-  let rel: Release | null;
+  const cachedFallback = (): string | null => {
+    const jar = newestCachedJar(cacheDir, mcVersion, loader);
+    if (jar) console.error(`[minecraft-mod-mcp] Using cached ${basename(jar)}: the v${PACKAGE_VERSION} mod is not available.`);
+    return jar;
+  };
+
+  let rel: Release | "missing" | null;
   try {
-    rel = (await fetchRelease(`${RELEASES_API}/tags/v${PACKAGE_VERSION}`))
-      ?? (await fetchRelease(`${RELEASES_API}/latest`));
+    rel = await fetchRelease(`${RELEASES_API}/tags/v${PACKAGE_VERSION}`);
+    if (rel === "missing") {
+      const jar = cachedFallback();
+      if (jar) return jar;
+      rel = await fetchRelease(`${RELEASES_API}/latest`);
+    }
   } catch {
     rel = null;
   }
-  if (!rel) return newestCachedJar(cacheDir, mcVersion, loader);
+  if (!rel || rel === "missing") return cachedFallback();
 
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(`^minecraft-mcp-${esc(mcVersion)}-${esc(loader)}(-v[\\d.]+)?\\.jar$`);
   const asset = rel.assets?.find((a) => pattern.test(a.name));
-  if (!asset) return newestCachedJar(cacheDir, mcVersion, loader);
+  if (!asset) return cachedFallback();
 
   const relVersion = (rel.tag_name ?? "").replace(/^v/, "");
+  if (relVersion !== PACKAGE_VERSION) {
+    console.error(`[minecraft-mod-mcp] No v${PACKAGE_VERSION} release yet; using the mod from ${rel.tag_name}.`);
+  }
   const cachePath = join(cacheDir, `minecraft-mcp-${mcVersion}-${loader}-v${relVersion || "0.0.0"}.jar`);
   if (existsSync(cachePath)) return cachePath;
 
   let bytes: Buffer;
   try {
     const dlResp = await fetch(assertSafeUrl(asset.browser_download_url));
-    if (!dlResp.ok) return newestCachedJar(cacheDir, mcVersion, loader);
+    if (!dlResp.ok) return cachedFallback();
     bytes = Buffer.from(await dlResp.arrayBuffer());
   } catch {
-    return newestCachedJar(cacheDir, mcVersion, loader);
+    return cachedFallback();
   }
 
-  // Integrity: refuse a jar whose bytes do not match the published digest.
-  const expected = asset.digest?.toLowerCase().startsWith("sha256:")
-    ? asset.digest.slice("sha256:".length).toLowerCase()
-    : null;
-  if (expected) {
-    const actual = createHash("sha256").update(bytes).digest("hex");
-    if (actual !== expected) {
-      console.error(`[minecraft-mod-mcp] ${asset.name} failed sha256 verification (expected ${expected}, got ${actual}); refusing to use it.`);
-      return null;
-    }
-  } else {
-    console.error(`[minecraft-mod-mcp] ${asset.name} has no published sha256 digest; integrity not verified.`);
+  // Integrity: refuse a jar unless its bytes match the published digest. Every
+  // release this bridge can reach publishes one, so a missing digest is as
+  // suspect as a wrong one.
+  const expected = asset.digest?.toLowerCase().match(/^sha256:([0-9a-f]{64})$/)?.[1];
+  const actual = createHash("sha256").update(bytes).digest("hex");
+  if (actual !== expected) {
+    console.error(`[minecraft-mod-mcp] ${asset.name} failed sha256 verification (published ${asset.digest ?? "no digest"}, got ${actual}); refusing to use it.`);
+    return null;
   }
 
   try {

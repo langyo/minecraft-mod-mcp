@@ -58,7 +58,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: "enter_control_mode",
-    description: "Enter MCP control mode — releases mouse cursor, enables click/type/keyboard input. User must have activated via PauseScreen button or overlay click first.",
+    description: "Enter MCP control mode — releases mouse cursor, enables click/type/keyboard input. Works for games launched through this bridge (or with -Dmcp.remote_control=true); in any other game the user must take over in game first (ESC > MCP Take Over).",
     inputSchema: z.object({}),
   },
   {

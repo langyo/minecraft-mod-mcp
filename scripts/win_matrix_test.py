@@ -43,7 +43,7 @@ DIST_CLI = os.path.join(ROOT, "packages", "minecraft-mod-mcp", "dist", "cli.js")
 
 # One shared mod-API token for every game this harness launches (issue #81):
 # the launcher hands MC_MCP_TOKEN to the game, whose /api/cmd then requires it.
-MOD_TOKEN = os.environ.setdefault("MC_MCP_TOKEN", secrets.token_hex(32))
+MOD_TOKEN = os.environ["MC_MCP_TOKEN"] = os.environ.get("MC_MCP_TOKEN") or secrets.token_hex(32)
 
 PORT_START = 9876
 PORT_END = 9000

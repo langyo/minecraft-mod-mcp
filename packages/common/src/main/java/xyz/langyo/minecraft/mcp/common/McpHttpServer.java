@@ -20,6 +20,7 @@ public class McpHttpServer {
     private HttpServer server;
     private final McpMessageHandler handler;
     private int port;
+    private boolean loopbackOnly = true;
     private final List<CallEvent> callHistory = new CopyOnWriteArrayList<>();
     private final List<SseClient> sseClients = new CopyOnWriteArrayList<>();
     private static final int MAX_HISTORY = 200;
@@ -74,8 +75,15 @@ public class McpHttpServer {
     public void start() throws IOException {
         // Loopback by default (issue #81): the control surface must not be
         // reachable from the network. -Dmcp.bind / MC_MCP_BIND override for
-        // operators who deliberately want LAN exposure.
+        // operators who deliberately want LAN exposure, which also requires
+        // a token: an unauthenticated API must never reach the network.
         String bindAddress = McpConfig.getBindAddress();
+        if (!isLoopbackAddress(bindAddress) && !isAuthConfigured()) {
+            System.err.println("[MCP] Refusing to bind " + bindAddress
+                + " without a token (-Dmcp.token / MC_MCP_TOKEN); using 127.0.0.1");
+            bindAddress = "127.0.0.1";
+        }
+        loopbackOnly = isLoopbackAddress(bindAddress);
         int configuredPort = this.port;
         if (configuredPort > 0) {
             server = HttpServer.create(new InetSocketAddress(bindAddress, configuredPort), 0);
@@ -100,6 +108,7 @@ public class McpHttpServer {
         server.createContext("/api/events", new EventHandler());
         server.createContext("/api/calls", new CallsHandler());
         server.createContext("/api/status", exchange -> {
+            if (!checkHost(exchange)) return;
             sendJson(exchange, 200, buildStatusJson());
         });
         server.createContext("/debug", new StaticHandler());
@@ -122,11 +131,51 @@ public class McpHttpServer {
         return t != null && !t.isEmpty();
     }
 
+    private static boolean isLoopbackAddress(String address) {
+        try {
+            return java.net.InetAddress.getByName(address).isLoopbackAddress();
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
+     * DNS rebinding guard: a page whose domain rebinds to 127.0.0.1 counts as
+     * same-origin in the browser, so with no token configured nothing else
+     * would stop it, but its Host header still names that domain. Only the
+     * host part is compared so tunnels on another local port keep working.
+     */
+    private boolean isAllowedHost(HttpExchange exchange) {
+        if (!loopbackOnly) return true;
+        String host = exchange.getRequestHeaders().getFirst("Host");
+        if (host == null) return true;
+        host = host.trim().toLowerCase(java.util.Locale.ROOT);
+        if (host.startsWith("[")) return host.equals("[::1]") || host.startsWith("[::1]:");
+        int colon = host.indexOf(':');
+        if (colon >= 0) host = host.substring(0, colon);
+        return host.equals("127.0.0.1") || host.equals("localhost");
+    }
+
+    /** Sends the rejection and returns false for a disallowed Host header. */
+    private boolean checkHost(HttpExchange exchange) throws IOException {
+        if (isAllowedHost(exchange)) return true;
+        sendJson(exchange, 403, "{\"error\":\"forbidden host\"}");
+        return false;
+    }
+
+    /** Host and token gate for the protected endpoints. */
+    private boolean checkAccess(HttpExchange exchange) throws IOException {
+        if (!checkHost(exchange)) return false;
+        if (isAuthorized(exchange)) return true;
+        sendUnauthorized(exchange);
+        return false;
+    }
+
     private boolean isAuthorized(HttpExchange exchange) {
         String expected = McpConfig.getAuthToken();
         if (expected == null || expected.isEmpty()) return true;
         String header = exchange.getRequestHeaders().getFirst("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
+        if (header != null && header.regionMatches(true, 0, "Bearer ", 0, 7)) {
             return constantTimeEquals(expected, header.substring(7).trim());
         }
         // EventSource cannot set headers; accept ?token= as a fallback for
@@ -246,6 +295,7 @@ public class McpHttpServer {
     class StaticHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            if (!checkHost(exchange)) return;
             serveResource(exchange, "index.html");
         }
     }
@@ -253,6 +303,7 @@ public class McpHttpServer {
     class RootHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            if (!checkHost(exchange)) return;
             String path = exchange.getRequestURI().getPath();
             if (path.equals("/") || path.equals("/index.html") || path.equals("/debug")) {
                 serveResource(exchange, "index.html");
@@ -294,10 +345,7 @@ public class McpHttpServer {
     class ScreenshotHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            if (!isAuthorized(exchange)) {
-                sendUnauthorized(exchange);
-                return;
-            }
+            if (!checkAccess(exchange)) return;
             CallEvent ev = new CallEvent();
             ev.timestamp = System.currentTimeMillis();
             ev.direction = "request";
@@ -370,16 +418,15 @@ public class McpHttpServer {
                 sendJson(exchange, 405, "{\"error\":\"method not allowed\"}");
                 return;
             }
-            if (!isAuthorized(exchange)) {
-                sendUnauthorized(exchange);
-                return;
-            }
+            if (!checkAccess(exchange)) return;
             // Requiring a JSON content type blocks cross-origin "simple
             // requests" (text/plain form posts) from web pages: without a
             // CORS preflight approval from us the browser never sends them
-            // (issue #81).
+            // (issue #81). Compare the exact media type: browsers treat
+            // "text/plain; x=application/json" as plain text.
             String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
-            if (contentType == null || !contentType.toLowerCase(java.util.Locale.ROOT).contains("application/json")) {
+            String mediaType = contentType == null ? "" : contentType.split(";", 2)[0].trim();
+            if (!mediaType.equalsIgnoreCase("application/json")) {
                 exchange.getResponseHeaders().set("Accept", "application/json");
                 sendJson(exchange, 415, "{\"error\":\"content type must be application/json\"}");
                 return;
@@ -436,10 +483,7 @@ public class McpHttpServer {
     class EventHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            if (!isAuthorized(exchange)) {
-                sendUnauthorized(exchange);
-                return;
-            }
+            if (!checkAccess(exchange)) return;
             if (sseClients.size() >= 4) {
                 sendJson(exchange, 503, "{\"error\":\"too many SSE clients\"}");
                 return;
@@ -475,10 +519,7 @@ public class McpHttpServer {
     class CallsHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            if (!isAuthorized(exchange)) {
-                sendUnauthorized(exchange);
-                return;
-            }
+            if (!checkAccess(exchange)) return;
             StringBuilder sb = new StringBuilder("[");
             int sz = callHistory.size();
             int start = Math.max(0, sz - 50);

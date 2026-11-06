@@ -49,7 +49,9 @@ def ensure_mod_token():
     Setting it before any launch keeps the launcher, the game and these
     helpers on the same token.
     """
-    return os.environ.setdefault("MC_MCP_TOKEN", secrets.token_hex(32))
+    token = os.environ.get("MC_MCP_TOKEN") or secrets.token_hex(32)
+    os.environ["MC_MCP_TOKEN"] = token
+    return token
 
 
 def _mod_auth_headers():

@@ -538,15 +538,18 @@ curl http://localhost:9876/api/status
 
 # Ejecutar un comando
 curl -X POST http://localhost:9876/api/cmd \
+  -H "Authorization: Bearer $MC_MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"cmd":"screenshot","params":{}}'
 
 # Tomar una captura de pantalla
-curl http://localhost:9876/api/screenshot
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screenshot
 
 # Suscribirse a eventos (flujo SSE)
-curl http://localhost:9876/api/events
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/events
 ```
+
+> **Autenticación**: los juegos iniciados por el lanzador exigen el token Bearer en todas las llamadas anteriores excepto `/api/status`. El token es la variable de entorno `MC_MCP_TOKEN` si la defines; si no, el contenido de `.minecraft/mcp_launcher/mcp-token`. Un juego iniciado por ti sin token configurado no necesita la cabecera.
 
 ### Comandos Comunes
 

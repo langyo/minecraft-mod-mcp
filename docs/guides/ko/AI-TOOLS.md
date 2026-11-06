@@ -536,15 +536,18 @@ curl http://localhost:9876/api/status
 
 # 명령어 실행
 curl -X POST http://localhost:9876/api/cmd \
+  -H "Authorization: Bearer $MC_MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"cmd":"screenshot","params":{}}'
 
 # 스크린샷 촬영
-curl http://localhost:9876/api/screenshot
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screenshot
 
 # 이벤트 구독 (SSE 스트림)
-curl http://localhost:9876/api/events
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/events
 ```
+
+> **인증**: 런처로 실행한 게임에서는 `/api/status`를 제외한 위의 모든 호출에 Bearer 토큰이 필요합니다. 토큰은 `MC_MCP_TOKEN` 환경 변수(설정한 경우)이며, 그렇지 않으면 `.minecraft/mcp_launcher/mcp-token` 파일의 내용입니다. 토큰을 설정하지 않고 직접 실행한 게임에서는 이 헤더가 필요 없습니다.
 
 ### 주요 명령어
 

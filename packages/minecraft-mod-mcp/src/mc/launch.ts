@@ -236,7 +236,7 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
   // All three loaders discover mods from mods/ — the jar must NOT also enter
   // the classpath: on module-aware Forge (1.17+) the duplicate Automatic-Module
   // triggers "ResolutionException: module mcpmod contains package ..." at boot.
-  if (config.modJar && existsSync(config.modJar)) {
+  if (config.modJar && existsSync(config.modJar) && !config.dryRun) {
     deployModToModsDir(mcDir, config.modJar);
   }
 
@@ -298,11 +298,11 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     allArgs.push(`-Dmcp.port=${config.mcpPort}`);
   }
 
-  // Report the version of the mod jar actually deployed (its file name
-  // carries it), falling back to this bridge's version; never a stale
-  // hardcoded constant (issue #81).
-  const modVersion = (config.modJar && modVersionFromJar(config.modJar)) || LAUNCHER.version;
-  allArgs.push(`-Dmcp.mod.version=${modVersion}`);
+  // Report the deployed jar's version when its name carries one; otherwise
+  // leave it to the mod (jar manifest), since a guess would misreport what
+  // actually runs. Never a hardcoded constant (issue #81).
+  const modVersion = config.modJar ? modVersionFromJar(config.modJar) : null;
+  if (modVersion) allArgs.push(`-Dmcp.mod.version=${modVersion}`);
   allArgs.push(`-Dmcp.mod.loader=${config.loader ?? "forge"}`);
   // Launching through this launcher is the operator's consent to agent
   // control, so MCP control mode may be entered remotely (issue #81 gate).

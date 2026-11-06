@@ -50,7 +50,7 @@ public final class McpConfig {
     }
 
     public static String getForgeVersion() {
-        String f = System.getProperty("mcp.forge.version");
+        String f = System.getProperty("mcp.mod.forge.version");
         if (f != null && !f.isEmpty()) return f;
         return null;
     }
@@ -76,7 +76,8 @@ public final class McpConfig {
      * Bind address for the HTTP server (issue #81). Defaults to loopback so
      * the game control surface is not reachable from the network; users who
      * deliberately want LAN exposure can opt in with {@code -Dmcp.bind=0.0.0.0}
-     * or {@code MC_MCP_BIND}.
+     * or {@code MC_MCP_BIND}. The server ignores a non-loopback address unless
+     * a token is configured too.
      */
     public static String getBindAddress() {
         String a = System.getProperty("mcp.bind");

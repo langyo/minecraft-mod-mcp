@@ -538,15 +538,18 @@ curl http://localhost:9876/api/status
 
 # 執行指令
 curl -X POST http://localhost:9876/api/cmd \
+  -H "Authorization: Bearer $MC_MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"cmd":"screenshot","params":{}}'
 
 # 截取螢幕截圖
-curl http://localhost:9876/api/screenshot
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screenshot
 
 # 訂閱事件（SSE 串流）
-curl http://localhost:9876/api/events
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/events
 ```
+
+> **驗證**：由啟動器啟動的遊戲，除 `/api/status` 外的上述呼叫都需要攜帶 Bearer token。token 取自你設定的 `MC_MCP_TOKEN` 環境變數，否則是 `.minecraft/mcp_launcher/mcp-token` 檔案的內容。你自行啟動且未設定 token 的遊戲不需要此請求標頭。
 
 ### 常用指令
 

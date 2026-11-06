@@ -212,7 +212,7 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   const config = loadConfig();
   const account = selectedAccount(config);
   const mcpPort = config.mcp_port ?? await findFreePort();
-  const mcpToken = ensureMcpToken(config);
+  const mcpToken = ensureMcpToken();
 
   const extraJvmParts: string[] = [];
   if (config.java_args) extraJvmParts.push(config.java_args);
@@ -265,7 +265,6 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   });
 
   mod.setMcProcess(child);
-  mod.setAuthToken(mcpToken);
   return { launched: true, version: versionId, loader, pid: child.pid, mcpPort, javaVersion: cmd.javaVersion, logs };
 }
 
@@ -425,7 +424,7 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   const config = loadConfig();
   const account = selectedAccount(config);
   const mcpPort = config.mcp_port ?? await findFreePort();
-  const mcpToken = ensureMcpToken(config);
+  const mcpToken = ensureMcpToken();
 
   const cmd = buildLaunchCommand({
     versionId,
@@ -460,7 +459,6 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   child.unref();
 
   mod.setMcProcess(child);
-  mod.setAuthToken(mcpToken);
   return {
     server: { pid: srv.process.pid, port: srv.port, dir: srv.dir, serverType: setup.serverType },
     client: { pid: child.pid, version: versionId, mcpPort, connectingTo: `${SERVER.connectHost}:${srv.port}` },

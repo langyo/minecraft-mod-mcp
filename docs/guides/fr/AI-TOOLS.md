@@ -533,15 +533,18 @@ curl http://localhost:9876/api/status
 
 # Exécuter une commande
 curl -X POST http://localhost:9876/api/cmd \
+  -H "Authorization: Bearer $MC_MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"cmd":"screenshot","params":{}}'
 
 # Prendre une capture d'écran
-curl http://localhost:9876/api/screenshot
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screenshot
 
 # S'abonner aux événements (flux SSE)
-curl http://localhost:9876/api/events
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/events
 ```
+
+> **Authentification** : les jeux démarrés par le lanceur exigent le jeton Bearer sur tous les appels ci-dessus, sauf `/api/status`. Le jeton est la variable d'environnement `MC_MCP_TOKEN` si vous la définissez, sinon le contenu de `.minecraft/mcp_launcher/mcp-token`. Un jeu lancé par vos soins sans jeton configuré n'a pas besoin de l'en-tête.
 
 ### Commandes courantes
 

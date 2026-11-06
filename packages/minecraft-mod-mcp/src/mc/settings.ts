@@ -39,12 +39,6 @@ export interface LauncherConfig {
   selected_account?: string;
   download_source: DownloadSource;
   mcp_port?: number;
-  /**
-   * Shared bearer token for the mod's HTTP API (issue #81). Generated on
-   * first launch, handed to the game via the MC_MCP_TOKEN environment
-   * variable and sent by the bridge as Authorization: Bearer.
-   */
-  mcp_token?: string;
   language: string;
 }
 
@@ -87,19 +81,43 @@ export function saveConfig(config: LauncherConfig): void {
   writeFileSync(path, JSON.stringify(config, null, 2), "utf-8");
 }
 
+export function mcpTokenPath(): string {
+  return join(launcherDir(), "mcp-token");
+}
+
+/** The shared mod-API token if one exists: MC_MCP_TOKEN, then the token file. */
+export function readMcpToken(): string | null {
+  if (process.env.MC_MCP_TOKEN) return process.env.MC_MCP_TOKEN;
+  try {
+    return readFileSync(mcpTokenPath(), "utf-8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Resolve the shared token for the mod's HTTP API (issue #81). Precedence:
- * the MC_MCP_TOKEN environment variable (lets external tooling and test
- * harnesses pin a known token for the whole process tree), then the token
- * persisted in config.json, else a freshly generated one that is persisted.
+ * Resolve the shared token for the mod's HTTP API (issue #81), generating one
+ * on first launch. MC_MCP_TOKEN lets external tooling and test harnesses pin a
+ * known token for a whole process tree. The generated token lives in its own
+ * owner-only file rather than config.json, so launching never rewrites the
+ * launcher config.
  */
-export function ensureMcpToken(config: LauncherConfig): string {
-  const fromEnv = process.env.MC_MCP_TOKEN;
-  if (fromEnv) return fromEnv;
-  if (config.mcp_token) return config.mcp_token;
-  config.mcp_token = randomBytes(32).toString("hex");
-  saveConfig(config);
-  return config.mcp_token;
+export function ensureMcpToken(): string {
+  const existing = readMcpToken();
+  if (existing) return existing;
+  const path = mcpTokenPath();
+  const dir = dirname(path);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const token = randomBytes(32).toString("hex");
+  try {
+    writeFileSync(path, token, { mode: 0o600, flag: "wx" });
+  } catch {
+    // Lost a first-launch race to another process, or found an empty file.
+    const winner = readMcpToken();
+    if (winner) return winner;
+    writeFileSync(path, token, { mode: 0o600 });
+  }
+  return token;
 }
 
 export function selectedAccount(config: LauncherConfig): Account | undefined {

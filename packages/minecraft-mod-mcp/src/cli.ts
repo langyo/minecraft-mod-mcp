@@ -10,10 +10,10 @@ import { detectJavas } from "./mc/javaDetect.js";
 import { ensureJavaInstalled } from "./mc/javaDownload.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "./mc/download.js";
-import { versionsDir, classpathSeparator, ensureModJar } from "./mc/platform.js";
+import { versionsDir, classpathSeparator, ensureModJar, deployModJar } from "./mc/platform.js";
 import { findFreePort } from "./discovery/scanner.js";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync, openSync, closeSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, openSync, closeSync } from "node:fs";
 import { gradleProxyEnv, setupGlobalProxy } from "./mc/proxy.js";
 import { assertAllowedProgram, JAVA_ALLOWLIST, GRADLEW_ALLOWLIST } from "./mc/spawnGuard.js";
 import { join, resolve } from "node:path";
@@ -228,7 +228,7 @@ Options:
       ? resolve(values["mod-jar"])
       : (await ensureModJar(versionArg, loader)) ?? undefined,
     mcpPort: typeof values.port === "string" ? parseInt(values.port, 10) : config.mcp_port ?? await findFreePort(),
-    mcpToken: ensureMcpToken(config),
+    mcpToken: values["dry-run"] === true ? undefined : ensureMcpToken(),
     dryRun: values["dry-run"] === true,
     maxMemoryMb: parseInt(typeof values.memory === "string" ? values.memory : String(config.max_memory_mb), 10),
     minMemoryMb: typeof values["min-memory"] === "string"
@@ -795,13 +795,10 @@ Resources:
   console.log(`  Server JAR: ${setup.jarPath}`);
   console.log(`  Server type: ${setup.serverType}`);
 
-  if (typeof values["mod-jar"] === "string") {
+  if (typeof values["mod-jar"] === "string" && !values["dry-run"]) {
     const modJarSrc = values["mod-jar"] as string;
     if (existsSync(modJarSrc)) {
-      const modsDir = join(setup.serverDir, "mods");
-      if (!existsSync(modsDir)) mkdirSync(modsDir, { recursive: true });
-      const dest = join(modsDir, modJarSrc.split(/[/\\]/).pop()!);
-      copyFileSync(modJarSrc, dest);
+      const dest = deployModJar(join(setup.serverDir, "mods"), modJarSrc);
       console.log(`  Mod JAR copied to: ${dest}`);
     }
   }
@@ -1124,10 +1121,7 @@ Client Options:
 
   const autoModJar = typeof values["mod-jar"] === "string" ? (values["mod-jar"] as string) : await ensureModJar(versionArg, loader);
   if (autoModJar && existsSync(autoModJar)) {
-    const serverModsDir = join(setup.serverDir, SERVER.modsDirName);
-    if (!existsSync(serverModsDir)) mkdirSync(serverModsDir, { recursive: true });
-    const dest = join(serverModsDir, autoModJar.split(/[/\\]/).pop()!);
-    copyFileSync(autoModJar, dest);
+    const dest = deployModJar(join(setup.serverDir, SERVER.modsDirName), autoModJar);
     console.log(`  Deployed mod JAR to server: ${dest}`);
   }
 
