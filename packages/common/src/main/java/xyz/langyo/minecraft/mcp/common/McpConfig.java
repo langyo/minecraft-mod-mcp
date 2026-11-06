@@ -55,6 +55,61 @@ public final class McpConfig {
         return null;
     }
 
+    /**
+     * Shared bearer token for the HTTP API (issue #81). When configured via
+     * {@code -Dmcp.token} or {@code MC_MCP_TOKEN}, every mutating endpoint
+     * ({@code /api/cmd}, {@code /api/screenshot}, {@code /api/events},
+     * {@code /api/calls}) requires {@code Authorization: Bearer <token>}.
+     * {@code /api/status} stays open so port discovery keeps working.
+     * When no token is configured the API stays open (legacy behavior for
+     * manually launched games) but the server still binds loopback-only.
+     */
+    public static String getAuthToken() {
+        String t = System.getProperty("mcp.token");
+        if (t != null && !t.isEmpty()) return t;
+        t = System.getenv("MC_MCP_TOKEN");
+        if (t != null && !t.isEmpty()) return t;
+        return null;
+    }
+
+    /**
+     * Bind address for the HTTP server (issue #81). Defaults to loopback so
+     * the game control surface is not reachable from the network; users who
+     * deliberately want LAN exposure can opt in with {@code -Dmcp.bind=0.0.0.0}
+     * or {@code MC_MCP_BIND}. The server ignores a non-loopback address unless
+     * a token is configured too.
+     */
+    public static String getBindAddress() {
+        String a = System.getProperty("mcp.bind");
+        if (a != null && !a.isEmpty()) return a;
+        a = System.getenv("MC_MCP_BIND");
+        if (a != null && !a.isEmpty()) return a;
+        return "127.0.0.1";
+    }
+
+    private static Boolean remoteControlCache;
+
+    /**
+     * External confirmation gate for MCP control mode (issue #81). Control
+     * mode used to be a soft gate: any local caller could invoke
+     * {@code enter_control_mode} directly and self-authorize full input
+     * control. Now remote entry additionally requires the operator's
+     * launch-time consent ({@code -Dmcp.remote_control=true} or
+     * {@code MC_MCP_REMOTE_CONTROL}): launching through the bundled
+     * launcher sets it automatically, while a mod jar dropped into a
+     * manually launched game defaults to the in-game consent path
+     * (ESC &gt; MCP Take Over).
+     */
+    public static boolean isRemoteControlAllowed() {
+        Boolean cached = remoteControlCache;
+        if (cached != null) return cached;
+        String v = System.getProperty("mcp.remote_control");
+        if (v == null || v.isEmpty()) v = System.getenv("MC_MCP_REMOTE_CONTROL");
+        boolean enabled = v != null && (v.equalsIgnoreCase("true") || v.equals("1") || v.equalsIgnoreCase("yes"));
+        remoteControlCache = enabled;
+        return enabled;
+    }
+
     private static Boolean backgroundInputCache;
 
     /**

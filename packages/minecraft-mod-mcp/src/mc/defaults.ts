@@ -1,7 +1,30 @@
+import { createRequire } from "node:module";
+
+/**
+ * The bridge's own package version, read from package.json at load time so
+ * the launcher can never drift from the published version again (issue #81:
+ * it used to pass a hardcoded -Dmcp.mod.version=0.2.1). Bundles live in
+ * dist/ (../package.json); unbundled sources live in src/mc/ (../../).
+ */
+function readPackageVersion(): string {
+  try {
+    const req = createRequire(import.meta.url);
+    for (const rel of ["../package.json", "../../package.json"]) {
+      try {
+        const pkg = req(rel) as { name?: string; version?: string };
+        if (pkg?.name === "minecraft-mod-mcp" && typeof pkg.version === "string") return pkg.version;
+      } catch {}
+    }
+  } catch {}
+  return "0.0.0";
+}
+
+export const PACKAGE_VERSION = readPackageVersion();
+
 export const LAUNCHER = {
   name: "MMML",
   nameGame: "MCP-Launcher",
-  version: "0.2.1",
+  version: PACKAGE_VERSION,
   versionType: "release",
   mcpServerName: "minecraft-mod-mcp",
 } as const;

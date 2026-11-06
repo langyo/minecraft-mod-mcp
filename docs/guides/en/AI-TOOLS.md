@@ -561,12 +561,15 @@ curl http://localhost:9876/api/status
 
 # Run a command
 curl -X POST http://localhost:9876/api/cmd \
+  -H "Authorization: Bearer $MC_MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"cmd":"screenshot","params":{}}'
 
 # Take a screenshot
-curl http://localhost:9876/api/screenshot
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screenshot
 ```
+
+> **Auth**: games started by the launcher require the bearer token on every call above except `/api/status`. The token is the `MC_MCP_TOKEN` environment variable if you set one, otherwise the contents of `.minecraft/mcp_launcher/mcp-token`. A game you launched yourself with no token configured does not need the header.
 
 > **Note**: the `/api/events` endpoint is a plain **debug SSE stream** of call history (for the in-game `/debug` dashboard). It is **not** an MCP transport — do not configure it as an MCP `"type":"sse"` server. Use the stdio bridge above for MCP.
 

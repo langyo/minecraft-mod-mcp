@@ -117,6 +117,18 @@ To confirm which port the mod chose:
 
 The version and loader (Forge/Fabric/NeoForge) are confirmed at handshake via `/api/status` so both the bridge and the debug page know exactly which mod environment they're talking to.
 
+### Security of the HTTP API
+
+The mod's HTTP API drives the game's input, so it is locked down by default:
+
+- **Loopback only.** The server binds `127.0.0.1` and, while bound there, rejects any `Host` header other than `127.0.0.1`, `localhost` or `[::1]` (DNS rebinding). To deliberately expose it on your LAN, set `-Dmcp.bind=0.0.0.0` (JVM arg) or `MC_MCP_BIND` (env) **together with a token**; without one the mod stays on loopback.
+- **Shared bearer token.** When a token is configured with `-Dmcp.token=...` or `MC_MCP_TOKEN`, `/api/cmd`, `/api/screenshot`, `/api/events` and `/api/calls` require `Authorization: Bearer <token>`; `/api/status` stays open for port discovery. The bundled launcher always sets one for the game it launches: it uses `MC_MCP_TOKEN` from its own environment if present, otherwise a random token kept in the owner-only file `mcp_launcher/mcp-token`, and hands it to the game via the environment (never the command line). The bridge sends the same token automatically. A mod jar the launcher installs into a dedicated server's `mods/` runs with the tokenless loopback default unless you export `MC_MCP_TOKEN` for that server yourself. For the debug dashboard, open `http://localhost:{port}/debug?token=<token>`.
+- **JSON only.** `POST /api/cmd` requires the media type `application/json`, so web pages cannot fire commands at the local API with cross-origin form posts.
+- **Command whitelist.** Only the documented commands are dispatched; anything else is rejected before reaching a handler.
+- **Control-mode consent.** `enter_control_mode` can only be called remotely when the game was launched with `-Dmcp.remote_control=true` (or `MC_MCP_REMOTE_CONTROL=1`); the bundled launcher sets this, since launching through it is your consent to agent control. In a game you launched yourself, take over in game instead (`Esc` → **MCP Take Over**).
+
+Mod jars downloaded by the launcher are pinned to the release matching the bridge version and verified against the sha256 digest GitHub publishes for each release asset. If that release was never published, or GitHub cannot be reached, the launcher warns on stderr and falls back to a previously downloaded jar of another version, or to the latest stable release (verified the same way) when the tag does not exist and nothing is cached.
+
 ### Background input mode (driving a client in the background)
 
 On Windows, a Minecraft window launched by a background process still counts as "focused" to GLFW, so while an agent drives the client the mod's cursor moves (`glfwSetCursorPos`) and cursor locking (`GLFW_CURSOR_DISABLED`) would move and confine **your real desktop cursor**, even though the game window stays behind your other windows.

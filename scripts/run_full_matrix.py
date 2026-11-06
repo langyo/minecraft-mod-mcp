@@ -5,7 +5,7 @@ Runs headlessly via Xvfb, all downloads through proxy (http_proxy:7890).
 Writes per-result JSON incrementally; kill/restart gracefully resumes.
 Usage: python3 scripts/run_full_matrix.py [--resume results.json] [--client-only|--server-only]
 """
-import json, os, shutil, signal, subprocess, sys, time, urllib.request, urllib.error
+import json, os, secrets, shutil, signal, subprocess, sys, time, urllib.request, urllib.error
 from dataclasses import dataclass, asdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -14,6 +14,9 @@ from netsec import safe_join
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CLI = os.path.join(ROOT, "packages", "minecraft-mod-mcp", "dist", "cli.js")
+# One shared mod-API token for every game this harness launches (issue #81):
+# the launcher hands MC_MCP_TOKEN to the game, whose /api/cmd then requires it.
+MOD_TOKEN = os.environ["MC_MCP_TOKEN"] = os.environ.get("MC_MCP_TOKEN") or secrets.token_hex(32)
 PORT_START, PORT_END = 9876, 9000
 DEFAULT_TIMEOUT = 180
 GAME_ROOT = os.path.expanduser("~/.minecraft/mcp_launcher/smoke")
@@ -39,7 +42,8 @@ def screenshot(port, path):
     try:
         body = json.dumps({"cmd": "screenshot_to_file", "params": {"path": path}}).encode()
         req = urllib.request.Request(f"http://127.0.0.1:{port}/api/cmd", data=body,
-                                     headers={"Content-Type": "application/json"})
+                                     headers={"Content-Type": "application/json",
+                                              "Authorization": f"Bearer {MOD_TOKEN}"})
         with NO_PROXY.open(req, timeout=30) as r:
             r.read()
         return os.path.isfile(path) and os.path.getsize(path) > 1024

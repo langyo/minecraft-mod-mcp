@@ -9,13 +9,13 @@ import { loadVersionsData } from "../mc/versionsData.js";
 import { getVersion, getVersionForLoader, getVersions, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "../mc/versions.js";
 import { loadVersionMerged } from "../mc/versionJson.js";
 import { buildLaunchCommand } from "../mc/launch.js";
-import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, type Account } from "../mc/settings.js";
+import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, ensureMcpToken, type Account } from "../mc/settings.js";
 import { findFreePort } from "../discovery/scanner.js";
 import { fetchVersionManifest, fetchVersionJson, downloadVersion, listInstalledVersions, downloadLoaderVersion, ensureVersionInstalled } from "../mc/download.js";
 import { detectJavas } from "../mc/javaDetect.js";
 import { createOfflineUuid } from "../mc/auth.js";
-import { versionsDir, ensureModJar } from "../mc/platform.js";
-import { existsSync, copyFileSync, mkdirSync } from "node:fs";
+import { versionsDir, ensureModJar, deployModJar } from "../mc/platform.js";
+import { existsSync, mkdirSync } from "node:fs";
 
 function mcVersionGte(version: string, target: string): boolean {
   const parse = (v: string) => v.split(".").map(Number);
@@ -212,6 +212,7 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   const config = loadConfig();
   const account = selectedAccount(config);
   const mcpPort = config.mcp_port ?? await findFreePort();
+  const mcpToken = ensureMcpToken();
 
   const extraJvmParts: string[] = [];
   if (config.java_args) extraJvmParts.push(config.java_args);
@@ -231,6 +232,7 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
     versionId,
     loader,
     mcpPort,
+    mcpToken,
     modJar: modJar ?? undefined,
     maxMemoryMb: Number(params.memory) || config.max_memory_mb,
     minMemoryMb: Number(params.min_memory) || config.min_memory_mb,
@@ -254,6 +256,7 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
     cwd: mcDir_,
     stdio: "ignore",
     detached: true,
+    env: { ...process.env, ...cmd.env },
   });
   child.unref();
 
@@ -407,10 +410,7 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
 
   const modJar = await ensureModJar(version, loader);
   if (modJar && existsSync(modJar)) {
-    const serverModsDir = join(setup.serverDir, SERVER.modsDirName);
-    if (!existsSync(serverModsDir)) mkdirSync(serverModsDir, { recursive: true });
-    const dest = join(serverModsDir, modJar.split(/[/\\]/).pop()!);
-    copyFileSync(modJar, dest);
+    deployModJar(join(setup.serverDir, SERVER.modsDirName), modJar);
   }
 
   const serverPort = Number(params.port) || GAME.defaultServerPort;
@@ -424,12 +424,14 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   const config = loadConfig();
   const account = selectedAccount(config);
   const mcpPort = config.mcp_port ?? await findFreePort();
+  const mcpToken = ensureMcpToken();
 
   const cmd = buildLaunchCommand({
     versionId,
     loader,
     mcpPort,
-    modJar: (await ensureModJar(version, loader)) ?? undefined,
+    mcpToken,
+    modJar: modJar ?? undefined,
     maxMemoryMb: clientMem,
     minMemoryMb: config.min_memory_mb,
     extraJvmArgs: config.java_args,
@@ -452,6 +454,7 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
     cwd: mcDir_,
     stdio: "ignore",
     detached: true,
+    env: { ...process.env, ...cmd.env },
   });
   child.unref();
 

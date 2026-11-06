@@ -24,6 +24,7 @@ import fnmatch
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -39,6 +40,10 @@ from version_config import ALL_VERSIONS, get_loaders, MODS_DIR, is_legacy  # noq
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST_CLI = os.path.join(ROOT, "packages", "minecraft-mod-mcp", "dist", "cli.js")
+
+# One shared mod-API token for every game this harness launches (issue #81):
+# the launcher hands MC_MCP_TOKEN to the game, whose /api/cmd then requires it.
+MOD_TOKEN = os.environ["MC_MCP_TOKEN"] = os.environ.get("MC_MCP_TOKEN") or secrets.token_hex(32)
 
 PORT_START = 9876
 PORT_END = 9000
@@ -270,7 +275,7 @@ def api_cmd(port: int, cmd: str, params: dict | None = None, timeout: int = 60) 
         body = json.dumps({"cmd": cmd, "params": params or {}}).encode()
         req = urllib.request.Request(
             f"http://127.0.0.1:{port}/api/cmd", data=body,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {MOD_TOKEN}"},
         )
         with _NO_PROXY_OPENER.open(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", "ignore"))

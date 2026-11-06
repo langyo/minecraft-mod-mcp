@@ -51,8 +51,12 @@ public final class WindowHelper {
             if (handle == 0) return 0;
             Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
             Class<?> intBufClass = Class.forName("java.nio.IntBuffer");
-            Object wBuf = java.nio.IntBuffer.allocate(1);
-            Object hBuf = java.nio.IntBuffer.allocate(1);
+            // GLFW writes through the buffer's native address, so these must
+            // be direct: a heap IntBuffer reports the array base offset (0x10
+            // on JDK 9+) and glfwGetFramebufferSize crashes the JVM writing
+            // to it.
+            java.nio.IntBuffer wBuf = directIntBuffer();
+            java.nio.IntBuffer hBuf = directIntBuffer();
             try {
                 glfwClass.getMethod("glfwGetFramebufferSize", long.class, intBufClass, intBufClass)
                     .invoke(null, handle, wBuf, hBuf);
@@ -60,8 +64,12 @@ public final class WindowHelper {
                 glfwClass.getMethod("glfwGetWindowSize", long.class, intBufClass, intBufClass)
                     .invoke(null, handle, wBuf, hBuf);
             }
-            return isWidth ? ((java.nio.IntBuffer)wBuf).get(0) : ((java.nio.IntBuffer)hBuf).get(0);
+            return isWidth ? wBuf.get(0) : hBuf.get(0);
         } catch (Exception e) { return 0; }
+    }
+
+    private static java.nio.IntBuffer directIntBuffer() {
+        return java.nio.ByteBuffer.allocateDirect(4).order(java.nio.ByteOrder.nativeOrder()).asIntBuffer();
     }
 
     public static int getLwjgl2DisplaySize(boolean isWidth) {

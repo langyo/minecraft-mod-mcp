@@ -561,12 +561,15 @@ curl http://localhost:9876/api/status
 
 # 执行命令
 curl -X POST http://localhost:9876/api/cmd \
+  -H "Authorization: Bearer $MC_MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"cmd":"screenshot","params":{}}'
 
 # 截取屏幕截图
-curl http://localhost:9876/api/screenshot
+curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/screenshot
 ```
+
+> **鉴权**：由启动器启动的游戏，除 `/api/status` 外的上述调用都需要携带 Bearer token。token 取自你设置的 `MC_MCP_TOKEN` 环境变量，否则是 `.minecraft/mcp_launcher/mcp-token` 文件的内容。你自行启动且未配置 token 的游戏不需要此请求头。
 
 > **注意**：`/api/events` 端点是一个**纯调试用 SSE 流**，推送的是调用历史（供游戏内 `/debug` 面板使用），它**不是** MCP 传输层——**不要**把它配置成 MCP 的 `"type":"sse"` 服务器。要用 MCP 请用上面的 stdio 桥接器。
 

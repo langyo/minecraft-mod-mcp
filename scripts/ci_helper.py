@@ -18,6 +18,7 @@ import base64
 import hashlib
 import json
 import os
+import secrets
 import shutil
 import subprocess
 import sys
@@ -38,6 +39,24 @@ def _assert_local_mod_url(url):
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise ValueError(f"mod API URL must be loopback, got {url!r}")
     return url
+
+
+def ensure_mod_token():
+    """Pin one shared mod-API token for this process tree (issue #81).
+
+    The launcher hands MC_MCP_TOKEN to the game and the mod then requires
+    ``Authorization: Bearer <token>`` on /api/cmd and /api/screenshot.
+    Setting it before any launch keeps the launcher, the game and these
+    helpers on the same token.
+    """
+    token = os.environ.get("MC_MCP_TOKEN") or secrets.token_hex(32)
+    os.environ["MC_MCP_TOKEN"] = token
+    return token
+
+
+def _mod_auth_headers():
+    token = os.environ.get("MC_MCP_TOKEN")
+    return {"Authorization": f"Bearer {token}"} if token else {}
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
@@ -521,7 +540,7 @@ def api_call(mod_url, cmd, params=None, timeout=30, retries=4):
         req = urllib.request.Request(
             f"{mod_url}/api/cmd",
             data=payload,
-            headers={"Content-Type": "application/json", "User-Agent": "minecraft-mcp-ci"},
+            headers={"Content-Type": "application/json", "User-Agent": "minecraft-mcp-ci", **_mod_auth_headers()},
             method="POST",
         )
         try:
@@ -538,7 +557,7 @@ def get_screenshot(mod_url, timeout=60):
     _assert_local_mod_url(mod_url)
     req = urllib.request.Request(
         f"{mod_url}/api/screenshot",
-        headers={"User-Agent": "minecraft-mcp-ci"},
+        headers={"User-Agent": "minecraft-mcp-ci", **_mod_auth_headers()},
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
@@ -776,6 +795,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
 
     _log(f"Launching MC {version_name} (JDK {jdk_ver})")
 
+    ensure_mod_token()
     env = os.environ.copy()
     env["JAVA_HOME"] = os.environ.get(f"JAVA_HOME_{jdk_ver}_X64",
                                        os.environ.get(f"JAVA_HOME_{jdk_ver}",
@@ -950,6 +970,7 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
     if not version_name:
         return {"setup": {"passed": False, "detail": "Version setup failed"}}
 
+    ensure_mod_token()
     env = os.environ.copy()
     launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
 
@@ -1116,6 +1137,7 @@ def main():
             sys.exit(1)
 
         launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
+        ensure_mod_token()
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name,
              "--memory", "2048", "--mod-jar", str(args.mod_jar)],
