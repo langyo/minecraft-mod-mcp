@@ -1,13 +1,17 @@
 import { execFileSync } from "node:child_process";
 import { PORT_START, PORT_END, type ModStatus } from "../consts.js";
-import { findMod, waitForMod, probePort } from "../discovery/scanner.js";
+import { findAllMods, probePort } from "../discovery/scanner.js";
 import { MCP, MOD } from "../mc/defaults.js";
 import { readMcpToken } from "../mc/settings.js";
 
 export class ModClient {
   private modPort: number | null = null;
   private baseUrl = "";
+  private instanceId: string | null = null;
   private mcProcess: ReturnType<typeof import("node:child_process").spawn> | null = null;
+  private spawnedAtMs = 0;
+  /** How long a fresh launch owns discovery before falling back to any game. */
+  private static readonly SPAWN_GRACE_MS = 20_000;
 
   // Resolved per request: a CLI launch can create the token after this
   // long-running client started (issue #81).
@@ -29,21 +33,48 @@ export class ModClient {
   }
 
   async discover(startPort = PORT_START, endPort = PORT_END): Promise<ModStatus | null> {
-    const status = await findMod(startPort, endPort);
-    if (status) {
-      this.modPort = status.port;
-      this.baseUrl = `http://${MCP.bindAddress}:${status.port}`;
+    // Scan the whole range: with several games running, prefer the one this
+    // client spawned (pid match), then the one it talked to before
+    // (instanceId), else the first that answered (issue #81).
+    const all = await findAllMods(startPort, endPort);
+    const expectedPid = this.mcProcess?.pid;
+    const spawned = this.spawnedAtMs > 0;
+    const withinGrace = spawned && Date.now() - this.spawnedAtMs < ModClient.SPAWN_GRACE_MS;
+    if (expectedPid) {
+      const mine = all.find((s) => s.pid === expectedPid);
+      if (mine) {
+        this.connect(mine);
+        return mine;
+      }
+      // Right after our own launch the new game is still loading; do not
+      // lock onto a different instance during the grace window (issue #81).
+      // After it, fall through: launcher stubs (javapath) report a different
+      // pid than the JVM, so a pid match is not always possible.
+      if (withinGrace) return null;
     }
+    const status =
+      (this.instanceId ? all.find((s) => s.instanceId === this.instanceId) : undefined) ??
+      all[0] ??
+      null;
+    if (status) this.connect(status);
     return status;
   }
 
+  private connect(status: ModStatus): void {
+    this.modPort = status.port;
+    this.instanceId = status.instanceId ?? null;
+    this.baseUrl = `http://${MCP.bindAddress}:${status.port}`;
+  }
+
   async waitForConnection(timeoutMs: number = MCP.waitTimeoutMs): Promise<ModStatus | null> {
-    const status = await waitForMod(PORT_START, PORT_END, timeoutMs);
-    if (status) {
-      this.modPort = status.port;
-      this.baseUrl = `http://${MCP.bindAddress}:${status.port}`;
+    const deadline = Date.now() + timeoutMs;
+    let status: ModStatus | null = null;
+    while (Date.now() < deadline) {
+      status = await this.discover();
+      if (status) return status;
+      await new Promise((r) => setTimeout(r, Math.min(MCP.pollIntervalMs, Math.max(0, deadline - Date.now()))));
     }
-    return status;
+    return null;
   }
 
   async checkAlive(): Promise<boolean> {
@@ -100,6 +131,11 @@ export class ModClient {
 
   setMcProcess(proc: ReturnType<typeof import("node:child_process").spawn>) {
     this.mcProcess = proc;
+    this.spawnedAtMs = Date.now();
+    // A newly launched game owns this client: drop any connection to an
+    // earlier instance so discovery binds to the new one (issue #81).
+    this.disconnect();
+    this.instanceId = null;
   }
 
   getMcProcess() {

@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { GAME, PLAYER, SERVER } from "../mc/defaults.js";
 import { assertAllowedProgram, JAVA_ALLOWLIST } from "../mc/spawnGuard.js";
 import { spawn } from "node:child_process";
+import { openSync, closeSync } from "node:fs";
 import { join } from "node:path";
 import { loadVersionsData } from "../mc/versionsData.js";
 import { getVersion, getVersionForLoader, getVersions, loaders, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "../mc/versions.js";
@@ -252,16 +253,30 @@ async function launchMinecraft(params: Record<string, unknown>, mod: ModClient):
   if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
 
   assertAllowedProgram(cmd.java, JAVA_ALLOWLIST);
-  const child = spawn(cmd.java, cmd.args, {
-    cwd: mcDir_,
-    stdio: "ignore",
-    detached: true,
-    env: { ...process.env, ...cmd.env },
-  });
+  // Keep the game's output on disk (issue #81): a JVM that dies before
+  // logging otherwise vanishes without a trace. Truncated per launch.
+  const logsDir = join(mcDir_, "logs");
+  if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true });
+  const stderrFd = openSync(join(logsDir, "mc-stderr.log"), "w");
+  const stdoutFd = openSync(join(logsDir, "mc-stdout.log"), "w");
+  let child: ReturnType<typeof spawn>;
+  try {
+    child = spawn(cmd.java, cmd.args, {
+      cwd: mcDir_,
+      stdio: ["ignore", stdoutFd, stderrFd],
+      detached: true,
+      env: { ...process.env, ...cmd.env },
+    });
+  } finally {
+    try { closeSync(stderrFd); closeSync(stdoutFd); } catch {}
+  }
   child.unref();
 
   child.on("error", (err) => {
     console.error(`[minecraft-mod-mcp] Launch failed: ${err.message}`);
+  });
+  child.on("exit", (code, signal) => {
+    console.error(`[minecraft-mod-mcp] Game exited (pid ${child.pid}): code=${code} signal=${signal}`);
   });
 
   mod.setMcProcess(child);
@@ -450,13 +465,29 @@ async function serveTool(params: Record<string, unknown>, mod: ModClient): Promi
   if (!existsSync(mcDir_)) mkdirSync(mcDir_, { recursive: true });
 
   assertAllowedProgram(cmd.java, JAVA_ALLOWLIST);
-  const child = spawn(cmd.java, cmd.args, {
-    cwd: mcDir_,
-    stdio: "ignore",
-    detached: true,
-    env: { ...process.env, ...cmd.env },
-  });
+  // Same on-disk output capture as launch_minecraft (issue #81).
+  const clientLogsDir = join(mcDir_, "logs");
+  if (!existsSync(clientLogsDir)) mkdirSync(clientLogsDir, { recursive: true });
+  const cErrFd = openSync(join(clientLogsDir, "mc-stderr.log"), "w");
+  const cOutFd = openSync(join(clientLogsDir, "mc-stdout.log"), "w");
+  let child: ReturnType<typeof spawn>;
+  try {
+    child = spawn(cmd.java, cmd.args, {
+      cwd: mcDir_,
+      stdio: ["ignore", cOutFd, cErrFd],
+      detached: true,
+      env: { ...process.env, ...cmd.env },
+    });
+  } finally {
+    try { closeSync(cErrFd); closeSync(cOutFd); } catch {}
+  }
   child.unref();
+  child.on("error", (err) => {
+    console.error(`[minecraft-mod-mcp] Client launch failed: ${err.message}`);
+  });
+  child.on("exit", (code, signal) => {
+    console.error(`[minecraft-mod-mcp] Client exited (pid ${child.pid}): code=${code} signal=${signal}`);
+  });
 
   mod.setMcProcess(child);
   return {

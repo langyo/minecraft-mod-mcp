@@ -556,7 +556,7 @@ curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/events
 | Comando | Descripción |
 |---------|-------------|
 | `screenshot` | Toma una captura de pantalla de la ventana de Minecraft |
-| `screenshot_to_file` | Toma una captura de pantalla y la guarda en un archivo local (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
+| `screenshot_to_file` | Toma una captura de pantalla y la guarda en un archivo local (`{"cmd":"screenshot_to_file","params":{"path":"vtty/mc.png"}}`) |
 | `click` | Hace clic en las coordenadas (x, y) |
 | `press_key` | Presiona una tecla del teclado |
 | `type_text` | Escribe una cadena de texto |
@@ -580,7 +580,7 @@ Puedes combinar Minecraft Mod MCP con **servidores MCP con capacidad de visión*
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ screenshots/vtty/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
     A --> D["Minecraft Mod MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
@@ -621,11 +621,13 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 }
 ```
 
+> **Espacio de capturas**: `screenshot_to_file` solo escribe dentro del directorio `screenshots` del juego; las rutas relativas como `vtty/mc.png` se resuelven ahí y las rutas absolutas fuera de él se rechazan. El directorio se puede cambiar con `-Dmcp.screenshot.dir` (argumento JVM) o `MC_MCP_SCREENSHOT_DIR` (variable de entorno). Pasa siempre el valor `file` devuelto a tu herramienta de visión.
+
 > **Nota**: El MCP de visión lee archivos desde el disco, así que usa siempre `screenshot_to_file` (no `screenshot`) antes de llamar a las herramientas de visión. Tu agente de IA puede especificar una ruta de archivo al llamar a `screenshot_to_file`.
 
 ### Ejemplo de flujo de trabajo
 
-1. Pide a tu agente de IA: *"Toma una captura de pantalla de Minecraft, guárdala en `/tmp/mc.png`, luego analiza lo que aparece en pantalla y dime qué botón hacer clic para empezar un juego nuevo."*
+1. Pide a tu agente de IA: *"Toma una captura de pantalla de Minecraft, guárdala en `vtty/mc.png`, luego analiza lo que aparece en pantalla y dime qué botón hacer clic para empezar un juego nuevo."*
 2. El agente llama a `minecraft-mcp` → `screenshot_to_file` → archivo guardado
 3. El agente llama a `zai-mcp-server` → `extract_text_from_screenshot` → lee el texto de la IU
 4. El agente te dice lo que ve y qué hacer a continuación

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, chmodSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { randomBytes } from "node:crypto";
 import { isWindows } from "../runtime/detector.js";
@@ -59,6 +59,60 @@ export function configPath(): string {
   return join(launcherDir(), "config.json");
 }
 
+/**
+ * Microsoft account tokens live here (0600) instead of config.json, so the
+ * OAuth credentials are not world-readable and sharing a config file cannot
+ * leak them (issue #81). Shape: { secrets: { [account uuid]: tokens } }.
+ */
+export function accountSecretsPath(): string {
+  return join(launcherDir(), "account-secrets.json");
+}
+
+interface AccountTokens {
+  access_token?: string;
+  refresh_token?: string;
+}
+
+type SecretStore = { secrets: Record<string, AccountTokens> };
+
+function readSecretStore(): Record<string, AccountTokens> {
+  try {
+    const store = JSON.parse(readFileSync(accountSecretsPath(), "utf-8")) as SecretStore;
+    return store?.secrets && typeof store.secrets === "object" ? store.secrets : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSecretStore(secrets: Record<string, AccountTokens>): void {
+  const path = accountSecretsPath();
+  const dir = dirname(path);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  // Write-then-rename so a crash mid-write cannot lose every token.
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ secrets } satisfies SecretStore, null, 2), { mode: 0o600, encoding: "utf-8" });
+  try {
+    // Rename does not carry the mode on every platform; re-apply owner-only.
+    chmodSync(tmp, 0o600);
+    renameSync(tmp, path);
+  } catch (err) {
+    try { unlinkSync(tmp); } catch {}
+    throw err;
+  }
+}
+
+/** A config with the token fields removed — the only shape persisted to config.json. */
+type PersistedConfig = LauncherConfig;
+
+function stripTokens(config: LauncherConfig): PersistedConfig {
+  return {
+    ...config,
+    accounts: config.accounts.map((a) =>
+      a.type === "microsoft" ? { ...a, access_token: "", refresh_token: "" } : a,
+    ),
+  };
+}
+
 export function loadConfig(): LauncherConfig {
   const path = configPath();
   if (!existsSync(path)) {
@@ -66,19 +120,73 @@ export function loadConfig(): LauncherConfig {
     saveConfig(cfg);
     return cfg;
   }
+  let config: LauncherConfig;
   try {
     const content = readFileSync(path, "utf-8");
-    return { ...defaultConfig(), ...JSON.parse(content) } as LauncherConfig;
+    config = { ...defaultConfig(), ...JSON.parse(content) } as LauncherConfig;
   } catch {
     return defaultConfig();
   }
+  const secrets = readSecretStore();
+  let migrated = false;
+  config.accounts = config.accounts.map((a) => {
+    if (a.type !== "microsoft") return a;
+    // Tokens found in config.json are authoritative: they can only come from
+    // the write-failure fallback of this version or an older build, both of
+    // which wrote them later than the secrets file. Copy them over, then
+    // strip config.json — even when they match, so plaintext never lingers.
+    if (a.access_token || a.refresh_token) migrated = true;
+    if (a.access_token && secrets[a.uuid]?.access_token !== a.access_token) {
+      secrets[a.uuid] = { ...secrets[a.uuid], access_token: a.access_token };
+    }
+    if (a.refresh_token && secrets[a.uuid]?.refresh_token !== a.refresh_token) {
+      secrets[a.uuid] = { ...secrets[a.uuid], refresh_token: a.refresh_token };
+    }
+    const stored = secrets[a.uuid];
+    return { ...a, access_token: stored?.access_token || "", refresh_token: stored?.refresh_token || "" };
+  });
+  if (migrated) {
+    try {
+      writeSecretStore(secrets);
+      writeFileSync(path, JSON.stringify(stripTokens(config), null, 2), "utf-8");
+    } catch {
+      // Read-only media: keep the merged in-memory view.
+    }
+  }
+  return config;
 }
 
 export function saveConfig(config: LauncherConfig): void {
   const path = configPath();
   const dir = dirname(path);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(path, JSON.stringify(config, null, 2), "utf-8");
+
+  const secrets = readSecretStore();
+  const live = new Set<string>();
+  for (const a of config.accounts) {
+    if (a.type !== "microsoft") continue;
+    live.add(a.uuid);
+    // Saved values always overwrite the stored ones; an explicit clear is an
+    // empty string, and reload then serves the same empty token.
+    const stored: AccountTokens = {
+      access_token: a.access_token || "",
+      refresh_token: a.refresh_token || "",
+    };
+    if (stored.access_token || stored.refresh_token) secrets[a.uuid] = stored;
+    else delete secrets[a.uuid];
+  }
+  for (const uuid of Object.keys(secrets)) {
+    if (!live.has(uuid)) delete secrets[uuid];
+  }
+  try {
+    writeSecretStore(secrets);
+  } catch {
+    // Without the secrets file the accounts would lose their tokens on
+    // reload; refuse to strip them from config.json in that case.
+    writeFileSync(path, JSON.stringify(config, null, 2), "utf-8");
+    return;
+  }
+  writeFileSync(path, JSON.stringify(stripTokens(config), null, 2), "utf-8");
 }
 
 export function mcpTokenPath(): string {

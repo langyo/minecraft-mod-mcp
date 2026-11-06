@@ -898,6 +898,10 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         ("get_world_info", {}, lambda r: isinstance(r, dict)),
         ("execute_command", {"command": "/time set day"},
          lambda r: isinstance(r, dict)),
+        # The screenshot workspace jail (issue #81): an escaping path must be
+        # refused, not written.
+        ("screenshot_to_file", {"path": "../escape.png"},
+         lambda r: "escapes" in str(r.get("error", ""))),
     ]
 
     for cmd, params, validator in tests:

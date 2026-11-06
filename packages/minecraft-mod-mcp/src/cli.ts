@@ -261,12 +261,17 @@ Options:
   const cmd = buildLaunchCommand(launchConfig, vj, data);
 
   if (launchConfig.dryRun) {
+    // Never print a real account token (issue #81: log hygiene); skip the
+    // placeholder ("0") that means "no account", or every 0 gets masked.
+    const account = selectedAccount(loadConfig());
+    const secret = account?.type === "microsoft" && account.access_token.length > 4 ? account.access_token : "";
+    const show = (arg: string) => secret && arg.includes(secret) ? arg.split(secret).join("***") : arg;
     console.log(`Java: ${cmd.java}`);
     console.log(`MainClass: ${cmd.mainClass}`);
     console.log(`Classpath (${cmd.classpath.split(classpathSeparator()).length} entries):`);
-    for (const cp of cmd.classpath.split(classpathSeparator())) console.log(`  ${cp}`);
+    for (const cp of cmd.classpath.split(classpathSeparator())) console.log(`  ${show(cp)}`);
     console.log(`Args:`);
-    for (const arg of cmd.args) console.log(`  ${arg}`);
+    for (const arg of cmd.args) console.log(`  ${show(arg)}`);
     return;
   }
 

@@ -26,9 +26,9 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: "screenshot_to_file",
-    description: "Capture a screenshot and save to disk. Returns file path and size.",
+    description: "Capture a screenshot and save it as PNG inside the game's screenshot workspace. Returns the written path and size; paths outside the workspace are rejected.",
     inputSchema: z.object({
-      path: z.string().optional().describe("File path to save to. Defaults to screenshots/vtty/ directory."),
+      path: z.string().optional().describe("Path inside the game's screenshots/ workspace (set via -Dmcp.screenshot.dir / MC_MCP_SCREENSHOT_DIR). Relative paths resolve there; paths outside are rejected. Defaults to screenshots/vtty/mcp-<timestamp>.png."),
     }),
   },
   {

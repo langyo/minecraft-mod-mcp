@@ -556,7 +556,7 @@ curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/events
 | Команда | Описание |
 |---------|-------------|
 | `screenshot` | Сделать скриншот окна Minecraft |
-| `screenshot_to_file` | Сделать скриншот и сохранить в локальный файл (`{"cmd":"screenshot_to_file","params":{"path":"/tmp/mc.png"}}`) |
+| `screenshot_to_file` | Сделать скриншот и сохранить в локальный файл (`{"cmd":"screenshot_to_file","params":{"path":"vtty/mc.png"}}`) |
 | `click` | Кликнуть по координатам (x, y) |
 | `press_key` | Нажать клавишу клавиатуры |
 | `type_text` | Ввести текстовую строку |
@@ -580,7 +580,7 @@ curl -H "Authorization: Bearer $MC_MCP_TOKEN" http://localhost:9876/api/events
 ```mermaid
 flowchart TD
     A["AI Agent"]
-    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ /tmp/mc_screen.png"]
+    A --> B["Minecraft Mod MCP<br/>screenshot_to_file<br/>→ screenshots/vtty/mc_screen.png"]
     A --> C["Vision MCP<br/>analyze screenshot<br/>→ report what it sees"]
     A --> D["Minecraft Mod MCP<br/>click x=400,y=300<br/>→ enters game"]
 ```
@@ -621,11 +621,13 @@ claude mcp add -s user zai-mcp-server --env Z_AI_API_KEY=<your_zhipu_api_key> --
 }
 ```
 
+> **Рабочая папка скриншотов**: `screenshot_to_file` пишет только в каталог `screenshots` игры; относительные пути вида `vtty/mc.png` разрешаются в нём, а абсолютные пути вне него отклоняются. Каталог можно сменить через `-Dmcp.screenshot.dir` (аргумент JVM) или `MC_MCP_SCREENSHOT_DIR` (переменную окружения). Всегда передавайте возвращённое значение `file` своему инструменту зрения.
+
 > **Примечание**: Vision MCP читает файлы с диска, поэтому всегда используйте `screenshot_to_file` (не `screenshot`) перед вызовом инструментов зрения. Ваш ИИ-агент может указать путь к файлу при вызове `screenshot_to_file`.
 
 ### Пример рабочего процесса
 
-1. Попросите вашего ИИ-агента: *"Сделай скриншот Minecraft, сохрани его в `/tmp/mc.png`, затем проанализируй, что на экране, и скажи, какую кнопку нажать, чтобы начать новую игру."*
+1. Попросите вашего ИИ-агента: *"Сделай скриншот Minecraft, сохрани его в `vtty/mc.png`, затем проанализируй, что на экране, и скажи, какую кнопку нажать, чтобы начать новую игру."*
 2. Агент вызывает `minecraft-mcp` → `screenshot_to_file` → файл сохранён
 3. Агент вызывает `zai-mcp-server` → `extract_text_from_screenshot` → читает текст интерфейса
 4. Агент сообщает, что он видит, и что делать дальше
