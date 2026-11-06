@@ -1,8 +1,9 @@
-import { join, resolve, dirname } from "node:path";
-import { existsSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve, dirname, basename } from "node:path";
+import { existsSync, readdirSync, mkdirSync, writeFileSync, copyFileSync, unlinkSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { crossHomedir, isWindows, isMacos, classpathSeparator as cpSep } from "../runtime/detector.js";
 import { detectJavas } from "./javaDetect.js";
-import { PATHS, JAVA } from "./defaults.js";
+import { PATHS, JAVA, PACKAGE_VERSION } from "./defaults.js";
 import { assertSafeUrl } from "./urlGuard.js";
 
 function homedir(): string {
@@ -52,51 +53,183 @@ export function launcherDir(): string {
   return join(mcDir(), PATHS.launcherDirName);
 }
 
+// Version suffix of an MCP mod jar name: "-1.2.3.jar" (local builds),
+// "-v1.2.3.jar" (release / cache) or "-1.2.3-SNAPSHOT.jar". Unversioned
+// release names ("minecraft-mcp-1.12.2-forge.jar") end in the loader and do
+// not match, so an MC version is never mistaken for the mod version.
+const JAR_VERSION_RE = /-v?(\d+\.\d+\.\d+(?:-SNAPSHOT)?)\.jar$/i;
+
+/** Mod version embedded in a jar file name, or null when the name carries none. */
+export function modVersionFromJar(jarPath: string): string | null {
+  const m = basename(jarPath).match(JAR_VERSION_RE);
+  return m ? m[1] : null;
+}
+
+function compareVersions(a: string, b: string): number {
+  const parse = (v: string) => {
+    const dash = v.indexOf("-");
+    const core = dash >= 0 ? v.slice(0, dash) : v;
+    return { nums: core.split(".").map((n) => parseInt(n, 10) || 0), pre: dash >= 0 ? v.slice(dash + 1) : "" };
+  };
+  const pa = parse(a), pb = parse(b);
+  for (let i = 0; i < 3; i++) {
+    const d = (pa.nums[i] ?? 0) - (pb.nums[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  if (pa.pre === pb.pre) return 0;
+  if (pa.pre === "") return 1;
+  if (pb.pre === "") return -1;
+  return pa.pre.localeCompare(pb.pre);
+}
+
+/** Pick the jar matching this bridge's version, else the highest-versioned one. */
+function pickModJar(jars: string[]): string | null {
+  if (jars.length === 0) return null;
+  const exact = jars.find((f) => modVersionFromJar(f) === PACKAGE_VERSION);
+  if (exact) return exact;
+  const versioned = jars.filter((f) => modVersionFromJar(f) !== null);
+  if (versioned.length > 0) {
+    versioned.sort((a, b) => compareVersions(modVersionFromJar(b)!, modVersionFromJar(a)!));
+    return versioned[0];
+  }
+  return [...jars].sort((a, b) => b.length - a.length)[0];
+}
+
 export function modJarPath(mcVersion: string, loader: string): string | null {
   const projectDir = resolve("packages", "mods", mcVersion, loader);
   const libsDir = join(projectDir, "build", "libs");
   if (!existsSync(libsDir)) return null;
 
   try {
+    // build/libs keeps one jar per version ever built; the old "longest
+    // name wins" pick could launch 0.4.17 over 0.4.21 (issue #81).
     const jars = readdirSync(libsDir).filter(f => f.endsWith(".jar") && !f.endsWith("-sources.jar") && !f.endsWith("-javadoc.jar"));
-    if (jars.length > 0) {
-      jars.sort((a, b) => b.length - a.length);
-      return join(libsDir, jars[0]);
-    }
+    const pick = pickModJar(jars);
+    if (pick) return join(libsDir, pick);
   } catch {}
 
   return null;
 }
 
 /**
+ * Copy a mod jar into a mods/ directory, first removing stale copies of the
+ * MCP mod. Version-keyed jar names would otherwise leave two copies side by
+ * side and the loader refuses to start with a duplicate mod (issue #81).
+ */
+export function deployModJar(modsDir: string, modJar: string): string {
+  if (!existsSync(modsDir)) mkdirSync(modsDir, { recursive: true });
+  const name = basename(modJar);
+  for (const f of readdirSync(modsDir)) {
+    if (f === name || !f.endsWith(".jar")) continue;
+    if (f.startsWith("minecraft-mcp-") || f.startsWith("minecraft-moddev-mcp-")) {
+      try { unlinkSync(join(modsDir, f)); } catch {}
+    }
+  }
+  const dest = join(modsDir, name);
+  if (!existsSync(dest)) copyFileSync(modJar, dest);
+  return dest;
+}
+
+const RELEASES_API = "https://api.github.com/repos/langyo/minecraft-mod-mcp/releases";
+
+interface ReleaseAsset {
+  name: string;
+  browser_download_url: string;
+  digest?: string | null;
+}
+
+interface Release {
+  tag_name?: string;
+  assets?: ReleaseAsset[];
+}
+
+async function fetchRelease(url: string): Promise<Release | null> {
+  const resp = await fetch(url, {
+    headers: { "user-agent": "minecraft-mod-mcp", accept: "application/json" },
+  });
+  if (!resp.ok) return null;
+  return (await resp.json()) as Release;
+}
+
+/** Newest previously verified (or legacy) cached jar, used only when offline. */
+function newestCachedJar(cacheDir: string, mcVersion: string, loader: string): string | null {
+  if (!existsSync(cacheDir)) return null;
+  const prefix = `minecraft-mcp-${mcVersion}-${loader}`;
+  try {
+    const jars = readdirSync(cacheDir).filter(
+      (f) => f === `${prefix}.jar` || (f.startsWith(`${prefix}-v`) && f.endsWith(".jar")),
+    );
+    const pick = pickModJar(jars);
+    return pick ? join(cacheDir, pick) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Resolve a mod JAR for a version/loader, downloading it from GitHub Releases
  * when no locally-built one exists. End users running via `npx` have no source
  * checkout, so without this the game launches vanilla (no MCP HTTP server).
- * Returns null if no JAR can be obtained (launch then proceeds without the mod).
+ *
+ * Hardened in issue #81: the download is pinned to the release matching this
+ * bridge's version (falling back to the latest stable release only when that
+ * tag was never published), verified against the sha256 digest GitHub
+ * publishes for each release asset, and cached under a version-keyed name so
+ * upgrades actually reach the game. Returns null if no JAR can be obtained
+ * (launch then proceeds without the mod).
  */
 export async function ensureModJar(mcVersion: string, loader: string): Promise<string | null> {
   const local = modJarPath(mcVersion, loader);
   if (local) return local;
 
   const cacheDir = join(launcherDir(), "modjars");
-  const cachePath = join(cacheDir, `minecraft-mcp-${mcVersion}-${loader}.jar`);
+  const pinnedCache = join(cacheDir, `minecraft-mcp-${mcVersion}-${loader}-v${PACKAGE_VERSION}.jar`);
+  if (existsSync(pinnedCache)) return pinnedCache;
+
+  let rel: Release | null;
+  try {
+    rel = (await fetchRelease(`${RELEASES_API}/tags/v${PACKAGE_VERSION}`))
+      ?? (await fetchRelease(`${RELEASES_API}/latest`));
+  } catch {
+    rel = null;
+  }
+  if (!rel) return newestCachedJar(cacheDir, mcVersion, loader);
+
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^minecraft-mcp-${esc(mcVersion)}-${esc(loader)}(-v[\\d.]+)?\\.jar$`);
+  const asset = rel.assets?.find((a) => pattern.test(a.name));
+  if (!asset) return newestCachedJar(cacheDir, mcVersion, loader);
+
+  const relVersion = (rel.tag_name ?? "").replace(/^v/, "");
+  const cachePath = join(cacheDir, `minecraft-mcp-${mcVersion}-${loader}-v${relVersion || "0.0.0"}.jar`);
   if (existsSync(cachePath)) return cachePath;
 
+  let bytes: Buffer;
   try {
-    const apiResp = await fetch("https://api.github.com/repos/langyo/minecraft-mod-mcp/releases/latest", {
-      headers: { "user-agent": "minecraft-mod-mcp", accept: "application/json" },
-    });
-    if (!apiResp.ok) return null;
-    const rel = (await apiResp.json()) as { assets?: Array<{ name: string; browser_download_url: string }> };
-    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`^minecraft-mcp-${esc(mcVersion)}-${esc(loader)}(-v[\\d.]+)?\\.jar$`);
-    const asset = rel.assets?.find((a) => pattern.test(a.name));
-    if (!asset) return null;
-
     const dlResp = await fetch(assertSafeUrl(asset.browser_download_url));
-    if (!dlResp.ok) return null;
+    if (!dlResp.ok) return newestCachedJar(cacheDir, mcVersion, loader);
+    bytes = Buffer.from(await dlResp.arrayBuffer());
+  } catch {
+    return newestCachedJar(cacheDir, mcVersion, loader);
+  }
+
+  // Integrity: refuse a jar whose bytes do not match the published digest.
+  const expected = asset.digest?.toLowerCase().startsWith("sha256:")
+    ? asset.digest.slice("sha256:".length).toLowerCase()
+    : null;
+  if (expected) {
+    const actual = createHash("sha256").update(bytes).digest("hex");
+    if (actual !== expected) {
+      console.error(`[minecraft-mod-mcp] ${asset.name} failed sha256 verification (expected ${expected}, got ${actual}); refusing to use it.`);
+      return null;
+    }
+  } else {
+    console.error(`[minecraft-mod-mcp] ${asset.name} has no published sha256 digest; integrity not verified.`);
+  }
+
+  try {
     if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true });
-    writeFileSync(cachePath, Buffer.from(await dlResp.arrayBuffer()));
+    writeFileSync(cachePath, bytes);
     return cachePath;
   } catch {
     return null;

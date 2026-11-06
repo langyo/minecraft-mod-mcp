@@ -1476,6 +1476,9 @@ def main():
     cmd.extend([
         f"-Dmcp.mod.version={mc_ver}",
         f"-Dmcp.mod.loader={loader}",
+        # Dev/CI launches are agent-driven by design: consent to remote MCP
+        # control mode entry (issue #81 gate; otherwise in-game only).
+        "-Dmcp.remote_control=true",
     ])
     if loader in ("forge", "neoforge"):
         # Accept dashed ("1.8-forge-11.14.4.1563"), glued

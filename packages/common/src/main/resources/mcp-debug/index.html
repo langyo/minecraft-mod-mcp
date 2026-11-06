@@ -98,6 +98,11 @@ var showGrid=false;
 var BASE=location.origin;
 var currentES=null;
 var pendingReq=null;
+// Shared bearer token (issue #81): when the mod runs with -Dmcp.token, the
+// authenticated endpoints need Authorization: Bearer. Open this page with
+// ?token=... appended; EventSource gets the token as a query parameter.
+var TOKEN=(function(){var m=location.search.match(/[?&]token=([^&]+)/);return m?decodeURIComponent(m[1]):''})();
+function authHeaders(x){if(TOKEN)x.setRequestHeader('Authorization','Bearer '+TOKEN)}
 
 function $(id){return document.getElementById(id)}
 
@@ -122,6 +127,7 @@ function fetchSS(){
   var x=new XMLHttpRequest();
   pendingReq=x;
   x.open('GET',BASE+'/api/screenshot',true);
+  authHeaders(x);
   x.responseType='json';
   x.onload=function(){
     pendingReq=null;
@@ -169,6 +175,7 @@ function clearC(){$('cl').innerHTML='';tot=0;$('cc').textContent='0'}
 function fetchCalls(){
   var x=new XMLHttpRequest();
   x.open('GET',BASE+'/api/calls',true);
+  authHeaders(x);
   x.responseType='json';
   x.onload=function(){
     if(x.status!==200)return;
@@ -197,6 +204,7 @@ function sendC(){
   var x=new XMLHttpRequest();
   x.open('POST',BASE+'/api/cmd',true);
   x.setRequestHeader('Content-Type','application/json');
+  authHeaders(x);
   x.onload=function(){
     var ms=Math.round(performance.now()-t0);
     addC({timestamp:Date.now(),direction:'response',method:cmd,result:x.responseText,error:x.status>=400?x.responseText:null,duration_ms:ms});
@@ -214,7 +222,7 @@ function connectSSE(){
   link.textContent=url;
   link.href=BASE;
   link.target='_blank';
-  var es=new EventSource(BASE+'/api/events');
+  var es=new EventSource(BASE+'/api/events'+(TOKEN?'?token='+encodeURIComponent(TOKEN):''));
   currentES=es;
   es.onopen=function(){$('dot').className='dot';$('st').textContent='Connected';};
   es.onmessage=function(ev){try{addC(JSON.parse(ev.data))}catch(e){}};

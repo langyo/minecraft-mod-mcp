@@ -1,10 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join, extname, basename } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { crossHomedir, isWindows, isMacos } from "../runtime/detector.js";
 import type { Library, VersionJson } from "./versionJson.js";
 import { collectAllArgs, resolveClasspath, shouldApply, libraryPath } from "./versionJson.js";
-import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion, jdkHome, launcherDir } from "./platform.js";
+import { nativesDir, assetsDir, versionsDir, librariesDir, classpathSeparator, findJavaForVersion, jdkHome, launcherDir, deployModJar, modVersionFromJar } from "./platform.js";
 import { loadVersionsData, type VersionsData } from "./versionsData.js";
 import { getVersionById, type Loader } from "./versions.js";
 import { installedJavaHome, ensureJavaInstalled } from "./javaDownload.js";
@@ -23,12 +23,7 @@ function ensureOptionsTxt(gameDir: string) {
 }
 
 function deployModToModsDir(gameDir: string, modJar: string) {
-  const modsDir = join(gameDir, SERVER.modsDirName);
-  if (!existsSync(modsDir)) mkdirSync(modsDir, { recursive: true });
-  const dest = join(modsDir, modJar.split(/[/\\]/).pop()!);
-  if (!existsSync(dest)) {
-    copyFileSync(modJar, dest);
-  }
+  deployModJar(join(gameDir, SERVER.modsDirName), modJar);
 }
 
 function getNativeOsKey(): string {
@@ -134,6 +129,8 @@ export interface LaunchConfig {
   loader: Loader;
   modJar?: string;
   mcpPort?: number;
+  /** Shared bearer token for the mod HTTP API; passed via MC_MCP_TOKEN (issue #81). */
+  mcpToken?: string;
   dryRun?: boolean;
   maxMemoryMb?: number;
   minMemoryMb?: number;
@@ -155,6 +152,12 @@ export interface LaunchCommand {
   classpath: string;
   mainClass: string;
   javaVersion: number;
+  /**
+   * Extra environment for the game process. Secrets travel here rather than
+   * in args: command lines are visible to other users in process listings,
+   * a process's environment is not (issue #81).
+   */
+  env: Record<string, string>;
 }
 
 const LEGACY_JVM_ARGS = [
@@ -295,8 +298,15 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     allArgs.push(`-Dmcp.port=${config.mcpPort}`);
   }
 
-  allArgs.push("-Dmcp.mod.version=0.2.1");
+  // Report the version of the mod jar actually deployed (its file name
+  // carries it), falling back to this bridge's version; never a stale
+  // hardcoded constant (issue #81).
+  const modVersion = (config.modJar && modVersionFromJar(config.modJar)) || LAUNCHER.version;
+  allArgs.push(`-Dmcp.mod.version=${modVersion}`);
   allArgs.push(`-Dmcp.mod.loader=${config.loader ?? "forge"}`);
+  // Launching through this launcher is the operator's consent to agent
+  // control, so MCP control mode may be entered remotely (issue #81 gate).
+  allArgs.push("-Dmcp.remote_control=true");
 
   if (targetJavaVersion >= 9) {
     allArgs.push(...LEGACY_JVM_ARGS);
@@ -381,7 +391,10 @@ export function buildLaunchCommand(config: LaunchConfig, vj: VersionJson, data?:
     }
   }
 
-  return { java, args: allArgs, classpath, mainClass: vj.mainClass, javaVersion: targetJavaVersion };
+  const env: Record<string, string> = {};
+  if (config.mcpToken) env.MC_MCP_TOKEN = config.mcpToken;
+
+  return { java, args: allArgs, classpath, mainClass: vj.mainClass, javaVersion: targetJavaVersion, env };
 }
 
 const SORT_FIX_PREFIXES = ["1.7.2", "1.7.10", "1.6", "1.5"];

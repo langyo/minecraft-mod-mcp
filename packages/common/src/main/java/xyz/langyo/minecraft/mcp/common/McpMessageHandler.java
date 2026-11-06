@@ -50,16 +50,52 @@ public class McpMessageHandler {
         ALWAYS_ALLOWED = java.util.Collections.unmodifiableSet(s);
     }
 
+    /**
+     * Command whitelist (issue #81): dispatch only ever routes explicitly
+     * known commands. Anything else, including methods that used to fall
+     * through to reflective handlers, is rejected before any handler runs.
+     */
+    private static final java.util.Set<String> KNOWN_COMMANDS;
+    static {
+        java.util.Set<String> s = new java.util.HashSet<>(ALWAYS_ALLOWED);
+        s.add("screenshot_to_file");
+        s.add("click"); s.add("press_key"); s.add("press_enter"); s.add("type_text");
+        s.add("scroll"); s.add("scroll_at"); s.add("direct_scroll"); s.add("select_list_item");
+        s.add("mouse_drag"); s.add("drag"); s.add("hotkey"); s.add("execute_command");
+        s.add("click_button_id"); s.add("click_button_index");
+        s.add("call_screen_method"); s.add("paste_text");
+        s.add("set_view_angle"); s.add("look_delta");
+        s.add("right_click"); s.add("use_item"); s.add("place_block");
+        s.add("switch_tab");
+        KNOWN_COMMANDS = java.util.Collections.unmodifiableSet(s);
+    }
+
     protected Object dispatch(String method, java.util.Map<String, String> params, Object wsClient) {
         McpProtocol.MinecraftInput inp = minecraftInput;
         if (inp == null) {
             return "error: no input handler bound";
         }
+        if (!KNOWN_COMMANDS.contains(method)) {
+            return "unknown command: " + method;
+        }
         if (method.equals("ping")) return "pong";
         if (method.equals("screenshot")) return handleScreenshot();
         if (method.equals("screenshot_to_file")) return handleScreenshotToFile(params);
         if (method.equals("overlay_click")) return handleOverlayClick(params);
-        if (method.equals("enter_control_mode") || method.equals("exit_control_mode")) return handleControlMode(params, method);
+        if (method.equals("enter_control_mode")) {
+            // External confirmation gate (issue #81): control mode must not be
+            // self-authorized by a remote caller. The bundled launcher passes
+            // -Dmcp.remote_control=true (launching programmatically IS the
+            // operator's consent); without it, entry requires the in-game
+            // human path (ESC > MCP Take Over). Already-in-control calls stay
+            // answerable so clients can poll the state.
+            if (!ReflectionHelper.isMcpControlMode() && !McpConfig.isRemoteControlAllowed()) {
+                return "{\"error\":\"control mode entry not consented\","
+                    + "\"hint\":\"Enter control mode in game (ESC > MCP Take Over) or launch with -Dmcp.remote_control=true\"}";
+            }
+            return handleControlMode(params, method);
+        }
+        if (method.equals("exit_control_mode")) return handleControlMode(params, method);
 
         boolean inControl = ReflectionHelper.isMcpControlMode();
         if (!inControl && !ALWAYS_ALLOWED.contains(method)) {

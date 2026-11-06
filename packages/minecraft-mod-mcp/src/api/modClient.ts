@@ -2,11 +2,31 @@ import { execFileSync } from "node:child_process";
 import { PORT_START, PORT_END, type ModStatus } from "../consts.js";
 import { findMod, waitForMod, probePort } from "../discovery/scanner.js";
 import { MCP, MOD } from "../mc/defaults.js";
+import { loadConfig } from "../mc/settings.js";
 
 export class ModClient {
   private modPort: number | null = null;
   private baseUrl = "";
   private mcProcess: ReturnType<typeof import("node:child_process").spawn> | null = null;
+  // undefined = not yet resolved from the launcher config.
+  private authToken: string | null | undefined = undefined;
+
+  /** Use this bearer token for the mod's authenticated endpoints (issue #81). */
+  setAuthToken(token: string | null): void {
+    this.authToken = token;
+  }
+
+  private authHeaders(): Record<string, string> {
+    if (this.authToken === undefined) {
+      // Same precedence as the launcher (ensureMcpToken): env, then config.
+      try {
+        this.authToken = process.env.MC_MCP_TOKEN || loadConfig().mcp_token || null;
+      } catch {
+        this.authToken = process.env.MC_MCP_TOKEN || null;
+      }
+    }
+    return this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {};
+  }
 
   get connected(): boolean {
     return this.modPort !== null;
@@ -58,7 +78,7 @@ export class ModClient {
     try {
       const resp = await fetch(`${this.baseUrl}${MOD.cmdEndpoint}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.authHeaders() },
         body: JSON.stringify(body),
       });
       if (!resp.ok) {
@@ -79,7 +99,9 @@ export class ModClient {
       if (!this.baseUrl) throw new Error("Mod not connected");
     }
     try {
-      const resp = await fetch(`${this.baseUrl}${MOD.screenshotEndpoint}`);
+      const resp = await fetch(`${this.baseUrl}${MOD.screenshotEndpoint}`, {
+        headers: this.authHeaders(),
+      });
       if (!resp.ok) throw new Error(`Screenshot failed: ${resp.status}`);
       return resp.json();
     } catch (err: any) {

@@ -26,6 +26,7 @@ import argparse
 import fnmatch
 import json
 import os
+import secrets
 import shutil
 import signal
 import subprocess
@@ -42,6 +43,10 @@ from version_config import ALL_VERSIONS, get_loaders, MODS_DIR  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST_CLI = os.path.join(ROOT, "packages", "minecraft-mod-mcp", "dist", "cli.js")
+
+# One shared mod-API token for every game this harness launches (issue #81):
+# the launcher hands MC_MCP_TOKEN to the game, whose /api/cmd then requires it.
+MOD_TOKEN = os.environ.setdefault("MC_MCP_TOKEN", secrets.token_hex(32))
 
 PORT_START = 9876
 PORT_END = 9000
@@ -225,7 +230,8 @@ def screenshot_via_http(port: int, path: str) -> bool:
     try:
         body = json.dumps({"cmd": "screenshot_to_file", "params": {"path": path}}).encode()
         req = urllib.request.Request(f"http://127.0.0.1:{port}/api/cmd", data=body,
-                                     headers={"Content-Type": "application/json"})
+                                     headers={"Content-Type": "application/json",
+                                              "Authorization": f"Bearer {MOD_TOKEN}"})
         with _NO_PROXY_OPENER.open(req, timeout=30) as r:
             r.read()
         return os.path.isfile(path) and os.path.getsize(path) > 1024

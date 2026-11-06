@@ -5,7 +5,7 @@ import { loadVersionsData } from "./mc/versionsData.js";
 import { getVersions, getVersion, getVersionForLoader, loaders, getFgEra, type Loader, DEFAULT_FABRIC_LOADER_VERSION } from "./mc/versions.js";
 import { loadVersionMerged } from "./mc/versionJson.js";
 import { buildLaunchCommand, ensureJavaForLaunch, type LaunchConfig } from "./mc/launch.js";
-import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, type Account } from "./mc/settings.js";
+import { loadConfig, saveConfig, addAccount, selectedAccount, gameDirPath, javaExecPath, accountUuid, accountUsername, accountAccessToken, accountUserType, ensureMcpToken, type Account } from "./mc/settings.js";
 import { detectJavas } from "./mc/javaDetect.js";
 import { ensureJavaInstalled } from "./mc/javaDownload.js";
 import { startDeviceAuth, pollDeviceAuth, createOfflineUuid } from "./mc/auth.js";
@@ -228,6 +228,7 @@ Options:
       ? resolve(values["mod-jar"])
       : (await ensureModJar(versionArg, loader)) ?? undefined,
     mcpPort: typeof values.port === "string" ? parseInt(values.port, 10) : config.mcp_port ?? await findFreePort(),
+    mcpToken: ensureMcpToken(config),
     dryRun: values["dry-run"] === true,
     maxMemoryMb: parseInt(typeof values.memory === "string" ? values.memory : String(config.max_memory_mb), 10),
     minMemoryMb: typeof values["min-memory"] === "string"
@@ -291,6 +292,7 @@ Options:
     cwd: mcDir_,
     stdio: ["ignore", stdoutFd, stderrFd],
     detached: true,
+    env: { ...process.env, ...cmd.env },
   });
   child.unref();
   // Close the parent's copies; the detached child keeps its own.
