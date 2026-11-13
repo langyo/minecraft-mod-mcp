@@ -140,6 +140,8 @@ ALL_VERSIONS = {
     # fluid render overlay API patch, #3697).
     # 2026-11-03 sweep: 26.1.2 moved to 26.1.2.126 (creates a fresh damage
     # container when blocking a goat's attack, backport #3715).
+    # 2026-11-14 sweep: 26.3 Forge moved to the recommended 66.1.8, the
+    # 26.3 NeoForge line to 26.3.0.103 and 1.21.1 NeoForge to 21.1.266.
     # --- FG 1.2 GTNH (MC 1.7.x) ---
     "1.7.2":  {"forge": "1.7.2-10.12.1.1109",           "fg_era": "fg12_gtnh", "java": 8,
                "version_id": "1.7.2-Forge10.12.1.1109"},
@@ -247,7 +249,7 @@ ALL_VERSIONS = {
                "version_id": "1.21-Forge51.0.33", "fabric_yarn": "1.21+build.9"},
     "1.21.1": {"forge": "1.21.1-52.1.20",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.1",
                "version_id": "1.21.1-Forge52.1.20", "fabric_yarn": "1.21.1+build.3",
-               "neoforge": "21.1.265", "mdg": "2.0.141"},
+               "neoforge": "21.1.266", "mdg": "2.0.141"},
     # Forge skipped MC 1.21.2 entirely (52.x = 1.21.1, 53.x = 1.21.3), so this
     # version ships NeoForge + Fabric only. NeoForge 21.2.x never left beta,
     # but 1.21.2 users exist and get full mod support like every other version.
@@ -310,10 +312,22 @@ ALL_VERSIONS = {
     # namespaces and conditions #3643, .100 adds Game Session Attachments #3679 and .101 fixes registryFriendlyLengthPrefixed dropping the connection type #3712). Fabric loader 0.20.1 (2026-10-19)
     # reverts the ASM 9.11 update that 0.20.0 shipped, so the 26.2/26.3
     # fabric pins take the hotfix. The Forge pin moved to 66.1.0 on
-    # 2026-10-22, the day it became the recommended 26.3 build.
-    "26.3":   {"forge": "26.3-66.1.0",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
-               "version_id": "26.3-forge-66.1.0",
-               "neoforge": "26.3.0.101", "mdg": "2.0.147",
+    # 2026-10-22, the day it became the recommended 26.3 build, and to
+    # 66.1.8 on 2026-11-14, the day 66.1.8 took over as recommended.
+    # 2026-11-14 sweep: the 26.3 NeoForge pin moved to 26.3.0.103
+    # (newest stable at re-check; .102 utilizes a field redirector coremod
+    # for Entity.type and BlockEntity.type so mods can override them more
+    # easily #3721, .103 adds an extension method for client-side
+    # inventory item ticks #3733) and 1.21.1 to 21.1.266 (network version
+    # negotiation mismatch error backport #3734). Everything else in the
+    # tracked wave — MC latest release still 26.3 (26.4 snapshot-only),
+    # every other Forge recommended pin, NeoForge 26.1.2.126 /
+    # 26.2.0.93 / 21.11.48 (20.4 stays on the hand-tuned 20.4.251
+    # exception), fabric loader 0.20.1, every yarn pin, FG7 7.0.40,
+    # MDG 2.0.148-but-2.0.147-still-suffices — is current.
+    "26.3":   {"forge": "26.3-66.1.8",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
+               "version_id": "26.3-forge-66.1.8",
+               "neoforge": "26.3.0.103", "mdg": "2.0.147",
                "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
 }
 
