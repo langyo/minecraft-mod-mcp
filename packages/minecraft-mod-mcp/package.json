@@ -58,7 +58,7 @@
   },
   "devDependencies": {
     "@types/node": "^*",
-    "tsup": "^*",
+    "tsup": "^9.0.0",
     "typescript": "^*",
     "vitest": "^*"
   }
