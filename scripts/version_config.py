@@ -142,6 +142,8 @@ ALL_VERSIONS = {
     # container when blocking a goat's attack, backport #3715).
     # 2026-11-14 sweep: 26.3 Forge moved to the recommended 66.1.8, the
     # 26.3 NeoForge line to 26.3.0.103 and 1.21.1 NeoForge to 21.1.266.
+    # 2026-11-18 sweep: the 26.3 NeoForge line moved to 26.3.0.110, 26.2
+    # to 26.2.0.95, 26.1.2 to 26.1.2.127 and 1.21.1 to 21.1.267.
     # --- FG 1.2 GTNH (MC 1.7.x) ---
     "1.7.2":  {"forge": "1.7.2-10.12.1.1109",           "fg_era": "fg12_gtnh", "java": 8,
                "version_id": "1.7.2-Forge10.12.1.1109"},
@@ -249,7 +251,7 @@ ALL_VERSIONS = {
                "version_id": "1.21-Forge51.0.33", "fabric_yarn": "1.21+build.9"},
     "1.21.1": {"forge": "1.21.1-52.1.20",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.1",
                "version_id": "1.21.1-Forge52.1.20", "fabric_yarn": "1.21.1+build.3",
-               "neoforge": "21.1.266", "mdg": "2.0.141"},
+               "neoforge": "21.1.267", "mdg": "2.0.141"},
     # Forge skipped MC 1.21.2 entirely (52.x = 1.21.1, 53.x = 1.21.3), so this
     # version ships NeoForge + Fabric only. NeoForge 21.2.x never left beta,
     # but 1.21.2 users exist and get full mod support like every other version.
@@ -288,7 +290,7 @@ ALL_VERSIONS = {
     # FG7 7.0.40, MDG 2.0.148-but-2.0.147-still-suffices — is current.
     "26.1.2": {"forge": "26.1.2-64.1.5",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
                "version_id": "26.1.2-forge-64.1.5",
-               "neoforge": "26.1.2.126", "mdg": "2.0.141"},
+               "neoforge": "26.1.2.127", "mdg": "2.0.141"},
     # MC 26.x ships unobfuscated (intermediary is a fixed "0.0.0"), so Fabric
     # needs no yarn mappings there — only a loader pin. fabric_unobfuscated
     # switches the generator to the no-mappings loom 1.17 template.
@@ -296,7 +298,7 @@ ALL_VERSIONS = {
                "version_id": "26.2-forge-65.1.5",
                # 26.2.0.90 carries the same HolderSet.contents visibility
                # change as 26.3, so it needs MDG >= 2.0.147 like 26.3.
-               "neoforge": "26.2.0.93", "mdg": "2.0.147",
+               "neoforge": "26.2.0.95", "mdg": "2.0.147",
                "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
     # The NeoForge 26.3 stable line landed upstream (26.3.0.77, re-checked
     # 2026-10-15); the pin tracks it and still needs MDG >= 2.0.147 for the
@@ -325,9 +327,28 @@ ALL_VERSIONS = {
     # 26.2.0.93 / 21.11.48 (20.4 stays on the hand-tuned 20.4.251
     # exception), fabric loader 0.20.1, every yarn pin, FG7 7.0.40,
     # MDG 2.0.148-but-2.0.147-still-suffices — is current.
+    # 2026-11-18 sweep: the 26.3 NeoForge pin moved to 26.3.0.110
+    # (newest stable at re-check; .104 is a 26.3 patch cleanup #3612,
+    # .105 fixes VanillaContainerWrapper#isValid for some furnaces and
+    # brewing stands #3729, .106 prevents negative damage being passed
+    # into DamageContainer creation #3728, .107 updates the
+    # AddTableLootModifier Javadoc #3743, .108 fixes the mod list
+    # appearing empty when searching while scrolled #3745, .109 is a
+    # Crowdin refresh #3632 and .110 lets PieceBeardifierModifier
+    # pieces keep their jigsaw junctions #3713), 26.2 to 26.2.0.95
+    # (.94 removes the zombie spawning village siege patch #3727, .95
+    # is a Crowdin refresh #3650), 26.1.2 to 26.1.2.127 (Crowdin
+    # refresh #3649) and 1.21.1 to 21.1.267 (Crowdin refresh #3648).
+    # Everything else in the tracked wave — MC latest release still
+    # 26.3 (26.4 snapshot-only), every Forge recommended pin (26.2
+    # 65.1.6 / 26.1.2 64.1.6 / 1.21.11 61.2.5 / 1.21.1 52.1.21 are
+    # latest-only, not yet recommended), NeoForge 21.11.48 (20.4 stays
+    # on the hand-tuned 20.4.251 exception), fabric loader 0.20.1,
+    # every yarn pin, FG7 7.0.40, MDG 2.0.148-but-2.0.147-still-suffices
+    # — is current.
     "26.3":   {"forge": "26.3-66.1.8",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
                "version_id": "26.3-forge-66.1.8",
-               "neoforge": "26.3.0.103", "mdg": "2.0.147",
+               "neoforge": "26.3.0.110", "mdg": "2.0.147",
                "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
 }
 
