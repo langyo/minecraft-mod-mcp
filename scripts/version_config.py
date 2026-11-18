@@ -144,6 +144,7 @@ ALL_VERSIONS = {
     # 26.3 NeoForge line to 26.3.0.103 and 1.21.1 NeoForge to 21.1.266.
     # 2026-11-18 sweep: the 26.3 NeoForge line moved to 26.3.0.110, 26.2
     # to 26.2.0.95, 26.1.2 to 26.1.2.127 and 1.21.1 to 21.1.267.
+    # 2026-11-19 sweep: the 26.3 NeoForge line moved to 26.3.0.113.
     # --- FG 1.2 GTNH (MC 1.7.x) ---
     "1.7.2":  {"forge": "1.7.2-10.12.1.1109",           "fg_era": "fg12_gtnh", "java": 8,
                "version_id": "1.7.2-Forge10.12.1.1109"},
@@ -346,9 +347,19 @@ ALL_VERSIONS = {
     # on the hand-tuned 20.4.251 exception), fabric loader 0.20.1,
     # every yarn pin, FG7 7.0.40, MDG 2.0.148-but-2.0.147-still-suffices
     # — is current.
+    # 2026-11-19 sweep: the 26.3 NeoForge pin moved to 26.3.0.113 (newest
+    # stable at re-check; .111 makes temperature modifiers extensible
+    # #3717, .112 safely handles fluid interactions within an interaction
+    # loop #3720 and .113 fixes the page arrow direction in RTL languages
+    # #3735). Everything else in the tracked wave — MC latest release
+    # still 26.3 (26.4 snapshot-only), every Forge recommended pin (26.2
+    # 65.1.6 / 26.1.2 64.1.6 / 1.21.11 61.2.5 / 1.21.1 52.1.21 are
+    # latest-only, not yet recommended; 1.20.1 47.4.29 likewise), every
+    # other NeoForge line, fabric loader 0.20.1, every yarn pin, FG7
+    # 7.0.40 and MDG 2.0.148-but-2.0.147-still-suffices — is current.
     "26.3":   {"forge": "26.3-66.1.8",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
                "version_id": "26.3-forge-66.1.8",
-               "neoforge": "26.3.0.110", "mdg": "2.0.147",
+               "neoforge": "26.3.0.113", "mdg": "2.0.147",
                "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
 }
 
