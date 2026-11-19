@@ -315,8 +315,9 @@ ALL_VERSIONS = {
     # namespaces and conditions #3643, .100 adds Game Session Attachments #3679 and .101 fixes registryFriendlyLengthPrefixed dropping the connection type #3712). Fabric loader 0.20.1 (2026-10-19)
     # reverts the ASM 9.11 update that 0.20.0 shipped, so the 26.2/26.3
     # fabric pins take the hotfix. The Forge pin moved to 66.1.0 on
-    # 2026-10-22, the day it became the recommended 26.3 build, and to
-    # 66.1.8 on 2026-11-14, the day 66.1.8 took over as recommended.
+    # 2026-10-22, the day it became the recommended 26.3 build, to 66.1.8
+    # on 2026-11-14, the day 66.1.8 took over as recommended, and to
+    # 66.1.9 on 2026-11-20, the day 66.1.9 took over as recommended.
     # 2026-11-14 sweep: the 26.3 NeoForge pin moved to 26.3.0.103
     # (newest stable at re-check; .102 utilizes a field redirector coremod
     # for Entity.type and BlockEntity.type so mods can override them more
@@ -357,8 +358,17 @@ ALL_VERSIONS = {
     # latest-only, not yet recommended; 1.20.1 47.4.29 likewise), every
     # other NeoForge line, fabric loader 0.20.1, every yarn pin, FG7
     # 7.0.40 and MDG 2.0.148-but-2.0.147-still-suffices — is current.
-    "26.3":   {"forge": "26.3-66.1.8",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
-               "version_id": "26.3-forge-66.1.8",
+    # 2026-11-20 sweep: the 26.3 Forge pin moved to the recommended
+    # 66.1.9 (.9 fixes RemoveSpawnsBiomeModifier not properly functioning
+    # because it worked on a copy of the biome info #10925). Everything
+    # else in the tracked wave — MC latest release still 26.3 (26.4
+    # snapshot-only), every other Forge recommended pin (26.2 65.1.6 /
+    # 26.1.2 64.1.6 / 1.21.11 61.2.5 / 1.21.1 52.1.21 are latest-only,
+    # not yet recommended; 1.20.1 47.4.29 and 1.20.6 50.2.15 likewise),
+    # every NeoForge line, fabric loader 0.20.1, every yarn pin, FG7
+    # 7.0.40 and MDG 2.0.148-but-2.0.147-still-suffices — is current.
+    "26.3":   {"forge": "26.3-66.1.9",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
+               "version_id": "26.3-forge-66.1.9",
                "neoforge": "26.3.0.113", "mdg": "2.0.147",
                "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
 }
