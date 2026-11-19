@@ -2,7 +2,7 @@ plugins {
     id "fabric-loom" version "1.5-SNAPSHOT"
 }
 
-version = "0.4.31"
+version = "0.4.32"
 group = "xyz.langyo"
 
 sourceCompatibility = "21"
