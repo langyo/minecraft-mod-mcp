@@ -1,5 +1,6 @@
-set windows-shell := ["pwsh", "-NoLogo", "-Command"]
-set windows-powershell := true
+# "powershell" (5.1, always present) instead of "pwsh": pwsh is optional and
+# may not be on PATH (just cannot probe for it at parse time).
+set windows-shell := ["powershell", "-NoLogo", "-Command"]
 
 base := absolute_path("")
 
@@ -40,7 +41,8 @@ prepare-cache:
     python scripts/prepare_cache.py
 
 # Download 1.7.x Gradle cache from GitHub Release (skips setupDecompWorkspace)
-prepare-cache-1.7x:
+# (dots are not valid in just recipe names, hence "17x")
+prepare-cache-17x:
     node scripts/ensure-1.7x-cache.mjs
 
 # Ensure JDK 8 is available (needed for 1.7.x - 1.12.2 builds)

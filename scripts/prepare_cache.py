@@ -370,7 +370,7 @@ def main():
                 fail += 1
         else:
             print(f"  GTNH FG {gtnh_version}: {ext} (cached)")
-    print("  1.7.x decompiled cache: use 'node scripts/ensure-1.7x-cache.mjs' or 'just prepare-cache-1.7x'")
+    print("  1.7.x decompiled cache: use 'node scripts/ensure-1.7x-cache.mjs' or 'just prepare-cache-17x'")
 
     # ================================================================
     # Phase 4: MCP snapshot mappings (FG 3/4.1) -> FG's own mcp_repo
