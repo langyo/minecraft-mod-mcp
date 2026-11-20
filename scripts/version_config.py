@@ -145,6 +145,8 @@ ALL_VERSIONS = {
     # 2026-11-18 sweep: the 26.3 NeoForge line moved to 26.3.0.110, 26.2
     # to 26.2.0.95, 26.1.2 to 26.1.2.127 and 1.21.1 to 21.1.267.
     # 2026-11-19 sweep: the 26.3 NeoForge line moved to 26.3.0.113.
+    # 2026-11-21 sweep: the 26.3 NeoForge line moved to 26.3.0.115 and
+    # 26.1.2 to 26.1.2.128.
     # --- FG 1.2 GTNH (MC 1.7.x) ---
     "1.7.2":  {"forge": "1.7.2-10.12.1.1109",           "fg_era": "fg12_gtnh", "java": 8,
                "version_id": "1.7.2-Forge10.12.1.1109"},
@@ -291,7 +293,7 @@ ALL_VERSIONS = {
     # FG7 7.0.40, MDG 2.0.148-but-2.0.147-still-suffices — is current.
     "26.1.2": {"forge": "26.1.2-64.1.5",                   "fg_era": "fg7",  "java": 25, "mappings": "official_26.1.2",
                "version_id": "26.1.2-forge-64.1.5",
-               "neoforge": "26.1.2.127", "mdg": "2.0.141"},
+               "neoforge": "26.1.2.128", "mdg": "2.0.141"},
     # MC 26.x ships unobfuscated (intermediary is a fixed "0.0.0"), so Fabric
     # needs no yarn mappings there — only a loader pin. fabric_unobfuscated
     # switches the generator to the no-mappings loom 1.17 template.
@@ -367,9 +369,20 @@ ALL_VERSIONS = {
     # not yet recommended; 1.20.1 47.4.29 and 1.20.6 50.2.15 likewise),
     # every NeoForge line, fabric loader 0.20.1, every yarn pin, FG7
     # 7.0.40 and MDG 2.0.148-but-2.0.147-still-suffices — is current.
+    # 2026-11-21 sweep: the 26.3 NeoForge pin moved to 26.3.0.115 (newest
+    # stable at re-check; .114 checks interactions on liquid block place
+    # #3751 and .115 updates FancyModLoader to v12.0.16 and Mixin to
+    # 0.17.5+mixin.0.8.7 #3749) and 26.1.2 to 26.1.2.128 (fixes the mod
+    # list appearing empty when searching while scrolled #3686). Everything
+    # else in the tracked wave — MC latest release still 26.3 (26.4
+    # snapshot-only), every Forge recommended pin (26.2 65.1.6 / 26.1.2
+    # 64.1.6 / 1.21.11 61.2.5 / 1.21.1 52.1.21 are latest-only, not yet
+    # recommended; 1.20.1 47.4.29 and 1.20.6 50.2.15 likewise), every
+    # other NeoForge line, fabric loader 0.20.1, every yarn pin, FG7
+    # 7.0.40 and MDG 2.0.148-but-2.0.147-still-suffices — is current.
     "26.3":   {"forge": "26.3-66.1.9",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
                "version_id": "26.3-forge-66.1.9",
-               "neoforge": "26.3.0.113", "mdg": "2.0.147",
+               "neoforge": "26.3.0.115", "mdg": "2.0.147",
                "fabric_loader": "0.20.1", "fabric_unobfuscated": True},
 }
 

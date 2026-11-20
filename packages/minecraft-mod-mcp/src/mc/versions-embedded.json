@@ -497,7 +497,7 @@
       "java": 25,
       "version_id": "26.1.2-forge-64.1.5",
       "mappings": "official_26.1.2",
-      "neoforge": "26.1.2.127",
+      "neoforge": "26.1.2.128",
       "mdg": "2.0.141"
     },
     "26_2": {
@@ -517,7 +517,7 @@
       "version_id": "26.3-forge-66.1.9",
       "mappings": "official_26.3",
       "fabric_loader": "0.20.1",
-      "neoforge": "26.3.0.113",
+      "neoforge": "26.3.0.115",
       "mdg": "2.0.147"
     }
   },
