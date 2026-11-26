@@ -175,7 +175,10 @@ Options:
       memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
       "min-memory": { type: "string" },
       "jvm-args": { type: "string" },
-      "game-args": { type: "string" },
+      // multiple: "--game-args --quickPlaySingleplayer W" must keep every
+      // token; a plain string option truncated the value to its first token
+      // and the world name was silently dropped.
+      "game-args": { type: "string", multiple: true },
       fullscreen: { type: "boolean", default: false },
       width: { type: "string" },
       height: { type: "string" },
@@ -237,7 +240,7 @@ Options:
     extraJvmArgs: extraJvmParts.length > 0 ? extraJvmParts.join(" ") : undefined,
     extraGameArgs: buildExtraGameArgs(
       config.game_args,
-      typeof values["game-args"] === "string" ? (values["game-args"] as string) : undefined,
+      gameArgsString(values["game-args"]),
       values.server,
       values["server-port"],
       versionArg,
@@ -760,7 +763,7 @@ Resources:
       memory: { type: "string", default: String(GAME.defaultServerMemoryMb) },
       "min-memory": { type: "string" },
       "jvm-args": { type: "string" },
-      "game-args": { type: "string" },
+      "game-args": { type: "string", multiple: true },
       port: { type: "string", default: String(GAME.defaultServerPort) },
       motd: { type: "string" },
       "max-players": { type: "string" },
@@ -817,7 +820,7 @@ Resources:
     parts.push(`-Dmcp.port=0`);
     if (typeof values["jvm-args"] === "string") parts.push(...(values["jvm-args"] as string).split(/\s+/).filter(Boolean));
     parts.push(`-jar`, setup.jarPath, `--nogui`);
-    if (typeof values["game-args"] === "string") parts.push(...(values["game-args"] as string).split(/\s+/).filter(Boolean));
+    { const ga = gameArgsString(values["game-args"]); if (ga) parts.push(...ga.split(/\s+/).filter(Boolean)); }
     console.log(`\n[dry-run] Command:`);
     console.log(`  ${parts.join(" ")}`);
     console.log(`\n[dry-run] Server properties:`);
@@ -837,7 +840,7 @@ Resources:
     maxMemoryMb: maxMem,
     minMemoryMb: minMem,
     extraJvmArgs: typeof values["jvm-args"] === "string" ? (values["jvm-args"] as string) : undefined,
-    extraGameArgs: typeof values["game-args"] === "string" ? (values["game-args"] as string) : undefined,
+    extraGameArgs: gameArgsString(values["game-args"]),
     port: serverPort,
   });
 
@@ -1071,7 +1074,7 @@ Client Options:
       "server-memory": { type: "string", default: String(GAME.defaultServerMemoryMb) },
       "server-min-memory": { type: "string" },
       "jvm-args": { type: "string" },
-      "game-args": { type: "string" },
+      "game-args": { type: "string", multiple: true },
       "server-game-args": { type: "string" },
       fullscreen: { type: "boolean", default: false },
       width: { type: "string" },
@@ -1160,9 +1163,18 @@ Client Options:
   if (typeof values.height === "string") launchArgs.push("--height", values.height);
   if (typeof values["min-memory"] === "string") launchArgs.push("--min-memory", values["min-memory"]);
   if (typeof values["jvm-args"] === "string") launchArgs.push("--jvm-args", values["jvm-args"]);
-  if (typeof values["game-args"] === "string") launchArgs.push("--game-args", values["game-args"]);
+  { const ga = gameArgsString(values["game-args"]); if (ga) launchArgs.push("--game-args", ga); }
 
   await runLaunch(launchArgs);
+}
+
+
+function gameArgsString(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    const parts = (value as unknown[]).filter((v): v is string => typeof v === "string");
+    return parts.length ? parts.join(" ") : undefined;
+  }
+  return typeof value === "string" ? value : undefined;
 }
 
 main().catch((err) => {
