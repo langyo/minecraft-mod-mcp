@@ -326,115 +326,197 @@ def install_mod_jar(jar_path, mc_dir=None):
     return str(dest)
 
 
-def install_test_world(world_name="CI_TestWorld", mc_dir=None):
+def install_test_world(world_name="CI_TestWorld", mc_dir=None, data_version=None):
     """Copy or generate the test superflat world save."""
     mc = mc_dir or str(MC_DIR)
     saves_dir = Path(mc) / "saves" / world_name
     if saves_dir.exists():
         shutil.rmtree(str(saves_dir), ignore_errors=True)
     saves_dir.mkdir(parents=True, exist_ok=True)
-    _generate_level_dat(str(saves_dir), world_name)
+    _generate_level_dat(str(saves_dir), world_name, data_version)
     _log(f"Test world created: {saves_dir}")
     return str(saves_dir)
 
 
-def _generate_level_dat(save_dir, world_name):
-    """Generate a minimal superflat Redstone Ready level.dat using gzip+NBT."""
-    import gzip
+# DataVersion of each version the smoke matrix runs on, so the game starts its
+# own upgrade from a plausible point instead of from one number on every lane.
+_DATA_VERSIONS = {
+    "1.14.4": 1976, "1.15.2": 2230, "1.16.5": 2586, "1.17.1": 2730,
+    "1.18.2": 2975, "1.19.4": 3337, "1.20.1": 3465, "1.20.4": 3700,
+    "1.20.6": 3839, "1.21.1": 3955, "1.21.4": 4189, "1.21.7": 4438,
+    "1.21.11": 4671, "26.1.2": 4790, "26.2": 4790, "26.3": 4790,
+}
+
+
+def data_version_for(mc_ver):
+    """Best-known DataVersion for a MC version string, else the 1.20.2 value."""
+    return _DATA_VERSIONS.get(str(mc_ver), 3953)
+
+
+# NBT tag ids used by the encoder below.
+_NBT_END, _NBT_BYTE, _NBT_INT, _NBT_LONG, _NBT_STRING, _NBT_LIST, _NBT_COMPOUND = 0, 1, 3, 4, 8, 9, 10
+
+
+class _Byte(int):
+    """NBT TAG_Byte."""
+
+
+class _Int(int):
+    """NBT TAG_Int."""
+
+
+class _Long(int):
+    """NBT TAG_Long."""
+
+
+def _nbt_type(value):
+    if isinstance(value, _Byte):
+        return _NBT_BYTE
+    if isinstance(value, _Int):
+        return _NBT_INT
+    if isinstance(value, _Long):
+        return _NBT_LONG
+    if isinstance(value, str):
+        return _NBT_STRING
+    if isinstance(value, list):
+        return _NBT_LIST
+    if isinstance(value, dict):
+        return _NBT_COMPOUND
+    raise TypeError(f"unsupported NBT value {value!r}; wrap ints as _Byte/_Int/_Long")
+
+
+def _nbt_write(value, out):
+    """Write one tag payload (no type byte and no name)."""
     import struct
+
+    kind = _nbt_type(value)
+    if kind == _NBT_BYTE:
+        out.write(struct.pack(">b", value))
+    elif kind == _NBT_INT:
+        out.write(struct.pack(">i", value))
+    elif kind == _NBT_LONG:
+        out.write(struct.pack(">q", value))
+    elif kind == _NBT_STRING:
+        data = value.encode("utf-8")
+        out.write(struct.pack(">H", len(data)))
+        out.write(data)
+    elif kind == _NBT_LIST:
+        # An empty list declares TAG_String; every non-empty list here is
+        # homogeneous so its first element names the type.
+        out.write(struct.pack(">bi", _nbt_type(value[0]) if value else _NBT_STRING, len(value)))
+        for item in value:
+            _nbt_write(item, out)
+    else:
+        for name, item in value.items():
+            name_bytes = name.encode("utf-8")
+            out.write(struct.pack(">b", _nbt_type(item)))
+            out.write(struct.pack(">H", len(name_bytes)))
+            out.write(name_bytes)
+            _nbt_write(item, out)
+        out.write(b"\x00")  # TAG_End
+
+
+def _nbt_encode_root(tree):
+    """Root TAG_Compound header (type byte + empty name) plus the payload."""
     import io
 
-    buf = io.BytesIO()
+    out = io.BytesIO()
+    out.write(b"\x0a\x00\x00")
+    _nbt_write(tree, out)
+    return out.getvalue()
 
-    def write_tag(tag_type, name, write_value):
-        buf.write(struct.pack(">b", tag_type))
-        if name is not None:
-            name_bytes = name.encode("utf-8")
-            buf.write(struct.pack(">H", len(name_bytes)))
-            buf.write(name_bytes)
-        if write_value:
-            write_value()
 
-    def write_byte(val):
-        buf.write(struct.pack(">b", val))
+def _generate_level_dat(save_dir, world_name, data_version=None):
+    """Generate a superflat level.dat (gzip + NBT).
 
-    def write_int(val):
-        buf.write(struct.pack(">i", val))
+    The tree mirrors what the game writes for a flat 1.17-1.20 world. Hand
+    writing the byte stream tag by tag dropped the root header, tagged ints as
+    longs and emitted "layers" as an empty compound, so the game refused every
+    world with "Loading NBT data: EOFException" / "Overworld settings
+    missing" / "Failed to load data pack config".
+    """
+    import gzip
 
-    def write_long(val):
-        buf.write(struct.pack(">q", val))
-
-    def write_string(val):
-        data = val.encode("utf-8")
-        buf.write(struct.pack(">H", len(data)))
-        buf.write(data)
-
-    def write_compound(entries):
-        for tag_type, name, write_fn in entries:
-            write_tag(tag_type, name, write_fn)
-        buf.write(b"\x00")  # TAG_End
-
-    def _gen():
-        write_compound([
-            # Data compound
-            (10, "Data", lambda: write_compound([
-                (4, "DataVersion", lambda: write_int(3953)),
-                (4, "version", lambda: write_int(19133)),
-                (8, "LevelName", lambda: write_string(world_name)),
-                (4, "GameType", lambda: write_int(1)),
-                (1, "MapFeatures", lambda: write_byte(1)),
-                (1, "allowCommands", lambda: write_byte(1)),
-                (1, "hardcore", lambda: write_byte(0)),
-                (1, "Difficulty", lambda: write_byte(2)),
-                (1, "DifficultyLocked", lambda: write_byte(0)),
-                (3, "SpawnX", lambda: write_int(0)),
-                (3, "SpawnY", lambda: write_int(5)),
-                (3, "SpawnZ", lambda: write_int(0)),
-                (4, "RandomSeed", lambda: write_long(42)),
-                (8, "generatorName", lambda: write_string("flat")),
-                (8, "generatorOptions", lambda: write_string(
-                    "3;minecraft:bedrock,2*minecraft:dirt,minecraft:grass;1;village")),
-                (1, "initialized", lambda: write_byte(1)),
-                (4, "LastPlayed", lambda: write_long(int(time.time() * 1000))),
-                (4, "Time", lambda: write_long(0)),
-                (4, "DayTime", lambda: write_long(1000)),
-                (4, "ClearWeatherTime", lambda: write_int(0)),
-                (4, "rainTime", lambda: write_int(0)),
-                (4, "thunderTime", lambda: write_int(0)),
-                (1, "raining", lambda: write_byte(0)),
-                (1, "thundering", lambda: write_byte(0)),
-                (10, "GameRules", lambda: write_compound([
-                    (8, "doDaylightCycle", lambda: write_string("true")),
-                    (8, "doWeatherCycle", lambda: write_string("true")),
-                    (8, "doFireTick", lambda: write_string("false")),
-                    (8, "doMobSpawning", lambda: write_string("false")),
-                    (8, "keepInventory", lambda: write_string("true")),
-                ])),
-                (10, "WorldGenSettings", lambda: write_compound([
-                    (1, "bonus_chest", lambda: write_byte(0)),
-                    (1, "generate_features", lambda: write_byte(1)),
-                    (10, "dimensions", lambda: write_compound([
-                        (10, "minecraft:overworld", lambda: write_compound([
-                            (8, "type", lambda: write_string("minecraft:overworld")),
-                            (10, "generator", lambda: write_compound([
-                                (8, "type", lambda: write_string("minecraft:flat")),
-                                (10, "settings", lambda: write_compound([
-                                    (10, "layers", lambda: write_compound([])),
-                                    (8, "biome", lambda: write_string("minecraft:plains")),
-                                ])),
-                            ])),
-                        ])),
-                    ])),
-                ])),
-            ])),
-        ])
-
-    _gen()
+    dv = int(data_version if data_version is not None else 3953)
+    tree = {"Data": {
+        "DataVersion": _Int(dv),
+        "version": _Int(19133),
+        "LevelName": world_name,
+        "GameType": _Int(1),
+        "MapFeatures": _Byte(1),
+        "allowCommands": _Byte(1),
+        "hardcore": _Byte(0),
+        "Difficulty": _Byte(2),
+        "DifficultyLocked": _Byte(0),
+        "SpawnX": _Int(0),
+        "SpawnY": _Int(10),
+        "SpawnZ": _Int(0),
+        "RandomSeed": _Long(42),
+        "generatorName": "flat",
+        "initialized": _Byte(1),
+        "LastPlayed": _Long(int(time.time() * 1000)),
+        "Time": _Long(0),
+        "DayTime": _Long(1000),
+        "clearWeatherTime": _Int(0),
+        "rainTime": _Int(0),
+        "thunderTime": _Int(0),
+        "raining": _Byte(0),
+        "thundering": _Byte(0),
+        "DataPacks": {"Enabled": ["vanilla"], "Disabled": []},
+        "GameRules": {
+            "doDaylightCycle": "true",
+            "doWeatherCycle": "true",
+            "doFireTick": "false",
+            "doMobSpawning": "false",
+            "keepInventory": "true",
+        },
+        "WorldGenSettings": {
+            "bonus_chest": _Byte(0),
+            "seed": _Long(42),
+            "generate_features": _Byte(1),
+            "dimensions": {
+                "minecraft:overworld": {
+                    "type": "minecraft:overworld",
+                    "generator": {
+                        "type": "minecraft:flat",
+                        "settings": {
+                            "features": _Int(1),
+                            "biome": "minecraft:plains",
+                            "lakes": _Byte(0),
+                            "layers": [
+                                {"block": "minecraft:bedrock", "height": _Int(1)},
+                                {"block": "minecraft:dirt", "height": _Int(2)},
+                                {"block": "minecraft:grass_block", "height": _Int(1)},
+                            ],
+                            "structure_overrides": [],
+                        },
+                    },
+                },
+                "minecraft:the_nether": {
+                    "type": "minecraft:the_nether",
+                    "generator": {
+                        "type": "minecraft:noise",
+                        "settings": "minecraft:nether",
+                        "biome_source": {"type": "minecraft:multi_noise", "preset": "minecraft:nether"},
+                    },
+                },
+                "minecraft:the_end": {
+                    "type": "minecraft:the_end",
+                    "generator": {
+                        "type": "minecraft:noise",
+                        "settings": "minecraft:end",
+                        "biome_source": {"type": "minecraft:the_end"},
+                    },
+                },
+            },
+        },
+    }}
+    payload = _nbt_encode_root(tree)
 
     level_dat = safe_join(save_dir, "level.dat")
     os.makedirs(save_dir, exist_ok=True)
     with gzip.open(level_dat, "wb") as f:
-        f.write(buf.getvalue())
+        f.write(payload)
 
     session_lock = safe_join(save_dir, "session.lock")
     with open(session_lock, "wb") as f:
@@ -563,8 +645,84 @@ def get_screenshot(mod_url, timeout=60):
         return resp.read()
 
 
-def verify_screenshot(png_data, min_size_kb=1):
-    """Verify that PNG data appears valid (has PNG header and reasonable size)."""
+def _png_pixel_stats(png_data):
+    """Decode a PNG well enough to tell a real frame from a blank one.
+
+    Returns (width, height, distinct_colours_sampled) or raises. Only the
+    standard library is available in CI, so this inflates IDAT by hand.
+    """
+    import struct
+    import zlib
+
+    if png_data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("not a PNG")
+    pos = 8
+    width = height = bit_depth = color_type = None
+    idat = bytearray()
+    while pos + 8 <= len(png_data):
+        length = struct.unpack_from(">I", png_data, pos)[0]
+        ctype = png_data[pos + 4:pos + 8]
+        data = png_data[pos + 8:pos + 8 + length]
+        pos += 12 + length
+        if ctype == b"IHDR":
+            width, height = struct.unpack_from(">II", data, 0)
+            bit_depth = data[8]
+            color_type = data[9]
+        elif ctype == b"IDAT":
+            idat += data
+        elif ctype == b"IEND":
+            break
+    if width is None or bit_depth != 8 or color_type not in (2, 6):
+        raise ValueError(f"unsupported PNG colour type {color_type} / depth {bit_depth}")
+    channels = 3 if color_type == 2 else 4
+    stride = width * channels
+    raw = zlib.decompress(bytes(idat))
+
+    def paeth(a, b, c):
+        p = a + b - c
+        pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+        return a if pa <= pb and pa <= pc else (b if pb <= pc else c)
+
+    prev = bytearray(stride)
+    colors = set()
+    rpos = 0
+    # Sample a grid rather than every pixel: enough to catch a flat frame.
+    step_y = max(1, height // 64)
+    step_x = max(1, width // 64)
+    for y in range(height):
+        ftype = raw[rpos]
+        rpos += 1
+        line = bytearray(raw[rpos:rpos + stride])
+        rpos += stride
+        if ftype == 1:
+            for i in range(channels, stride):
+                line[i] = (line[i] + line[i - channels]) & 0xFF
+        elif ftype == 2:
+            for i in range(stride):
+                line[i] = (line[i] + prev[i]) & 0xFF
+        elif ftype == 3:
+            for i in range(stride):
+                left = line[i - channels] if i >= channels else 0
+                line[i] = (line[i] + ((left + prev[i]) >> 1)) & 0xFF
+        elif ftype == 4:
+            for i in range(stride):
+                left = line[i - channels] if i >= channels else 0
+                upleft = prev[i - channels] if i >= channels else 0
+                line[i] = (line[i] + paeth(left, prev[i], upleft)) & 0xFF
+        prev = line
+        if y % step_y == 0:
+            for x in range(0, stride, channels * step_x):
+                colors.add(bytes(line[x:x + 3]))
+    return width, height, len(colors)
+
+
+def verify_screenshot(png_data, min_size_kb=1, min_colors=16):
+    """Verify that PNG data is a real frame, not a blank capture.
+
+    Size alone proved useless: a single-colour 1280x720 PNG is 5 KB, which
+    passed the old 1 KB floor while every screenshot on 1.17-1.21.4 was blank.
+    Sampling distinct colours catches a flat frame at any resolution.
+    """
     if not png_data or len(png_data) < 8:
         return False, "Empty or too small"
     if png_data[:8] != b"\x89PNG\r\n\x1a\n":
@@ -572,7 +730,53 @@ def verify_screenshot(png_data, min_size_kb=1):
     size_kb = len(png_data) // 1024
     if size_kb < min_size_kb:
         return False, f"PNG too small ({size_kb}KB < {min_size_kb}KB)"
-    return True, f"Valid PNG, {size_kb}KB"
+    try:
+        width, height, colors = _png_pixel_stats(png_data)
+    except Exception as e:
+        return False, f"PNG unreadable ({e})"
+    if colors < min_colors:
+        return False, f"blank frame: {colors} distinct colour(s) sampled in {width}x{height}"
+    return True, f"Valid PNG {width}x{height}, {size_kb}KB, {colors} sampled colours"
+
+
+def valid_player_info(resp):
+    """A player read that actually found the player, not a stub.
+
+    The old check only asserted isinstance(dict), so {"name": null} passed and
+    every Forge lane shipped with get_player_info returning a stub (issue #100).
+    """
+    if not isinstance(resp, dict) or "error" in resp:
+        return False
+    name = resp.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return False
+    try:
+        health = float(resp.get("health"))
+        pos = str(resp.get("pos", ""))
+        coords = [float(v) for v in pos.split()]
+    except (TypeError, ValueError):
+        return False
+    if health <= 0 or len(coords) != 3:
+        return False
+    # A real read reports where the player actually is; the stub reported the
+    # origin with zero health.
+    if health == 0 and all(c == 0 for c in coords):
+        return False
+    return True
+
+
+def valid_world_info(resp):
+    """A world read that found the level, not a null/unknown stub."""
+    if not isinstance(resp, dict) or "error" in resp:
+        return False
+    name = resp.get("world_name")
+    if not isinstance(name, str) or not name.strip():
+        return False
+    if name in ("unknown", "MpServer", "null"):
+        return False
+    if str(resp.get("difficulty", "")).lower() not in ("peaceful", "easy", "normal", "hard"):
+        return False
+    return True
 
 
 def compare_screenshots(new_data, ref_path, threshold=0.02):
@@ -786,7 +990,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     install_mod_jar(mod_jar)
 
     if world_name:
-        install_test_world(world_name)
+        install_test_world(world_name, data_version=data_version_for(mc_ver))
 
     version_name = setup_mc_version(mc_ver, loader)
     if not version_name:
@@ -894,8 +1098,8 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
 
     tests = [
         ("ping", {}, lambda r: r.get("result") == "pong"),
-        ("get_player_info", {}, lambda r: isinstance(r, dict)),
-        ("get_world_info", {}, lambda r: isinstance(r, dict)),
+        ("get_player_info", {}, valid_player_info),
+        ("get_world_info", {}, valid_world_info),
         ("execute_command", {"command": "/time set day"},
          lambda r: isinstance(r, dict)),
         # The screenshot workspace jail (issue #81): an escaping path must be
@@ -933,11 +1137,11 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
                 results["screenshot_compare"] = {"passed": ok2, "detail": detail2}
                 _log(f"  TEST [screenshot_compare]: {'PASS' if ok2 else 'FAIL'} ({detail2})")
         else:
-            _log(f"  TEST [screenshot]: SKIP ({detail})")
-            results["screenshot"] = {"passed": True, "detail": f"skipped: {detail}"}
+            _log(f"  TEST [screenshot]: FAIL ({detail})")
+            results["screenshot"] = {"passed": False, "detail": detail}
     except Exception as e:
-        _log(f"  TEST [screenshot]: SKIP ({e})")
-        results["screenshot"] = {"passed": True, "detail": f"skipped: {e}"}
+        _log(f"  TEST [screenshot]: FAIL ({e})")
+        results["screenshot"] = {"passed": False, "detail": str(e)[:200]}
 
     if any(not v.get("passed") for v in results.values()):
         _dump_game_diagnostics("at least one API test failed")
@@ -968,7 +1172,7 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
     kill_minecraft()
     setup_xvfb(screen="1280x720x24")
     install_mod_jar(mod_jar)
-    install_test_world(world_name)
+    install_test_world(world_name, data_version=data_version_for(mc_ver))
 
     version_name = setup_mc_version(mc_ver, loader)
     if not version_name:
@@ -1133,7 +1337,7 @@ def main():
         kill_minecraft()
         setup_xvfb(screen="1280x720x24")
         install_mod_jar(mod_jar)
-        install_test_world(args.world)
+        install_test_world(args.world, data_version=data_version_for(args.mc_ver))
 
         version_name = setup_mc_version(args.mc_ver, args.loader)
         if not version_name:
