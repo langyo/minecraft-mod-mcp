@@ -94,7 +94,7 @@ public final class PlayerWorldHelper {
                 }
             }
             return String.format("{\"name\":\"%s\",\"health\":%.1f,\"pos\":\"%.1f %.1f %.1f\",\"rotation\":\"%.1f %.1f\",\"dimension\":\"%s\",\"gamemode\":\"%s\",\"food\":%d}",
-                    name, health, pos[0], pos[1], pos[2], rot[0], rot[1], dim, gamemode, foodLevel);
+                    JsonHelper.escape(name), health, pos[0], pos[1], pos[2], rot[0], rot[1], JsonHelper.escape(dim), gamemode, foodLevel);
         } catch (Exception e) {
             return "{\"name\":null,\"error\":\"" + e.getMessage() + "\"}";
         }
@@ -102,6 +102,10 @@ public final class PlayerWorldHelper {
 
     private static String getPlayerName(Object player) {
         try {
+            // 1.17+ SRG: Entity.getScoreboardName (issue #100); the loose
+            // passes below know no SRG names.
+            String srg = invokeExactString(player, "m_6302_");
+            if (srg != null && !srg.isEmpty()) return srg;
             for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
                 if (m.getParameterCount() == 0 && m.getReturnType() == String.class) {
                     String mn = m.getName();
@@ -132,12 +136,32 @@ public final class PlayerWorldHelper {
                     }
                 }
             }
+            // 1.13+: getName() returns a Component, so every pass above comes
+            // up empty on Mojang-named runtimes (NeoForge, Forge from 1.20.6).
+            // authlib is never remapped, so the game profile answers with the
+            // plain name on every runtime (issue #100).
+            Object profile = invokeExact(player, "getGameProfile", "m_36316_");
+            if (profile == null) {
+                for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
+                    if (m.getParameterCount() == 0 && m.getReturnType().getName().equals("com.mojang.authlib.GameProfile")) {
+                        try { m.setAccessible(true); profile = m.invoke(player); } catch (Exception ignored) {}
+                        break;
+                    }
+                }
+            }
+            if (profile != null) {
+                String profileName = invokeString(profile, "getName");
+                if (!profileName.isEmpty()) return profileName;
+            }
         } catch (Exception ignored) {}
         return "";
     }
 
     private static double getPlayerHealth(Object player) {
         try {
+            // 1.17+ SRG: LivingEntity.getHealth (issue #100).
+            Object srg = invokeExact(player, "m_21223_");
+            if (srg instanceof Number) return ((Number) srg).doubleValue();
             for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
                 if (m.getParameterCount() == 0 && (m.getReturnType() == float.class || m.getReturnType() == double.class)) {
                     String mn = m.getName();
@@ -166,6 +190,10 @@ public final class PlayerWorldHelper {
     private static double[] getPlayerPosition(Object player) {
         double x = 0, y = 0, z = 0;
         try {
+            // 1.17+ SRG: Entity.getX/getY/getZ (issue #100). Before the
+            // 1.12.2 field pass: those field ids no longer exist there.
+            Object sx = invokeExact(player, "m_20185_"), sy = invokeExact(player, "m_20186_"), sz = invokeExact(player, "m_20189_");
+            if (sx instanceof Number && sy instanceof Number && sz instanceof Number) return new double[]{((Number) sx).doubleValue(), ((Number) sy).doubleValue(), ((Number) sz).doubleValue()};
             // 1.12.2 SRG keeps position as fields (field_70165_t/u/v), no getX()
             // methods exist on the entity hierarchy in that era.
             for (Field f : ReflectionCache.getAllFields(player.getClass())) {
@@ -210,6 +238,10 @@ public final class PlayerWorldHelper {
     private static float[] getPlayerRotation(Object player) {
         float yaw = 0, pitch = 0;
         try {
+            // 1.17+ SRG: Entity.yRot / xRot (issue #100). Before the exact
+            // 1.12.2 names, which are different ids there.
+            Object sy = readFieldExact(player, "f_19857_"), sp = readFieldExact(player, "f_19858_");
+            if (sy instanceof Float && sp instanceof Float) return new float[]{(Float) sy, (Float) sp};
             // Exact SRG/MCP names first: the fuzzy fragments below
             // ("126"/"125") also collide with field_70126_B
             // (prevRotationYaw) on 1.12.2 SRG runtimes.
@@ -258,12 +290,12 @@ public final class PlayerWorldHelper {
 
     /**
      * Human-readable name of a GameType-like enum constant across mapping
-     * eras: Mojang {@code getName()}, 1.12.2 SRG {@code func_77149_b}, then
-     * the raw enum constant name (issue #76 B1).
+     * eras: Mojang {@code getName()}, 1.12.2 SRG {@code func_77149_b}, 1.17+
+     * SRG {@code m_46405_}, then the raw enum constant name (issue #76 B1).
      */
     private static String gameTypeName(Object gameType) {
         if (gameType == null) return null;
-        for (String mn : new String[]{"getName", "func_77149_b"}) {
+        for (String mn : new String[]{"getName", "func_77149_b", "m_46405_"}) {
             try {
                 Object r = gameType.getClass().getMethod(mn).invoke(gameType);
                 if (r != null && !r.toString().isEmpty()) return r.toString();
@@ -296,7 +328,7 @@ public final class PlayerWorldHelper {
                 for (Field f : ReflectionCache.getAllFields(hungerManager.getClass())) {
                     if (f.getType() == int.class) {
                         String fn = f.getName();
-                        if (fn.contains("foodLevel") || fn.contains("7110") || fn.contains("food") || fn.equals("field_23418")) {
+                        if (fn.contains("foodLevel") || fn.contains("7110") || fn.contains("food") || fn.equals("field_23418") || fn.equals("f_38696_")) {
                             try { f.setAccessible(true); return f.getInt(hungerManager); } catch (Exception ignored) {}
                         }
                     }
@@ -315,7 +347,11 @@ public final class PlayerWorldHelper {
         try {
             Object level = getLevel(mc);
             if (level == null) return "{\"world_name\":null}";
-            String worldName = "unknown";
+            // 1.13+: ClientLevel.getServer() is null and the client's own
+            // LevelData only knows the "MpServer" placeholder, so the save
+            // name lives on the integrated server's WorldData (issue #100).
+            String worldName = integratedSaveName(mc);
+            if (worldName == null) worldName = "unknown";
             String difficulty = "normal";
             String gameType = "survival";
             long worldTime = 0;
@@ -365,6 +401,11 @@ public final class PlayerWorldHelper {
                 // 0-24000 day-cycle semantics on every mapping era
                 // (issue #76 B2).
                 boolean timeFound = false;
+                // 1.17+ SRG: Level.getDayTime / getGameTime (issue #100); the
+                // fragment passes below know no SRG names.
+                Object srgTime = invokeExact(level, "m_46468_");
+                if (srgTime == null) srgTime = invokeExact(level, "m_46467_");
+                if (srgTime instanceof Number) { worldTime = ((Number) srgTime).longValue(); timeFound = true; }
                 for (String[] pass : new String[][]{
                         new String[]{"getDayTime", "72820", "5430", "24025"},
                         new String[]{"getGameTime", "82737"}}) {
@@ -389,7 +430,14 @@ public final class PlayerWorldHelper {
             } catch (Exception ignored) {}
 
             try {
+                // 1.17+ SRG: Level.isRaining / isThundering (issue #100); the
+                // fragment pass below knows no SRG names.
+                Object srgWeather = invokeExact(level, "m_46471_");
+                Object srgThunder = invokeExact(level, "m_46470_");
+                if (srgThunder instanceof Boolean && (Boolean) srgThunder) weather = "thunder";
+                else if (srgWeather instanceof Boolean && (Boolean) srgWeather) weather = "rain";
                 for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
+                    if (srgWeather instanceof Boolean) break;
                     if (m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
                         String mn = m.getName();
                         // 1.12.2 SRG: func_72896_J isRaining / func_72911_I
@@ -402,8 +450,9 @@ public final class PlayerWorldHelper {
                 }
             } catch (Exception ignored) {}
 
+            // The save name is user text and can carry quotes or backslashes.
             return String.format("{\"world_name\":\"%s\",\"difficulty\":\"%s\",\"gametype\":\"%s\",\"time\":%d,\"weather\":\"%s\"}",
-                    worldName, difficulty, gameType, worldTime, weather);
+                    JsonHelper.escape(worldName), difficulty, gameType, worldTime, weather);
         } catch (Exception e) {
             return "{\"world_name\":null,\"error\":\"" + e.getMessage() + "\"}";
         }
@@ -418,11 +467,12 @@ public final class PlayerWorldHelper {
             if (dimId != null) return String.valueOf(dimId);
         }
         try {
-            Object dim = level.getClass().getMethod("dimension").invoke(level);
-            try { return dim.getClass().getMethod("identifier").invoke(dim).toString(); } catch (NoSuchMethodException ignored) {}
-            try { return dim.getClass().getMethod("location").invoke(dim).toString(); } catch (NoSuchMethodException ignored) {}
-            try { return dim.getClass().getMethod("getRegistryName").invoke(dim).toString(); } catch (NoSuchMethodException ignored) {}
-        } catch (NoSuchMethodException ignored) {}
+            Object dim = invokeExact(level, "dimension", "m_46472_");
+            if (dim != null) {
+                Object id = invokeExact(dim, "identifier", "location", "getRegistryName", "m_135782_");
+                if (id != null) return id.toString();
+            }
+        } catch (Exception ignored) {}
         return "overworld";
     }
 
@@ -470,7 +520,7 @@ public final class PlayerWorldHelper {
                 return null;
             }
             // Multiplayer: no integrated server. Report the server address.
-            Object sd = findMethodOrNull(mc, "getCurrentServerData", "func_71387_A", "currentServerEntry");
+            Object sd = findMethodOrNull(mc, "getCurrentServer", "getCurrentServerData", "m_91089_", "func_71387_A", "currentServerEntry");
             if (sd != null) {
                 String preferred = null;
                 String anyNonEmpty = null;
@@ -482,7 +532,7 @@ public final class PlayerWorldHelper {
                         if (v == null || v.toString().isEmpty()) continue;
                         String fn = f.getName().toLowerCase();
                         if (anyNonEmpty == null) anyNonEmpty = v.toString();
-                        if (fn.contains("ip") || fn.contains("address")) { preferred = v.toString(); break; }
+                        if (fn.contains("ip") || fn.contains("address") || f.getName().equals("f_105363_")) { preferred = v.toString(); break; }
                     } catch (Exception ignored) {}
                 }
                 return preferred != null ? preferred : anyNonEmpty;
@@ -492,11 +542,11 @@ public final class PlayerWorldHelper {
     }
 
     private static Object findIntegratedServer(Object mc) {
-        Object server = findMethodOrNull(mc, "getSingleplayerServer", "getServer", "getIntegratedServer", "func_71401_C");
+        Object server = findMethodOrNull(mc, "getSingleplayerServer", "getServer", "getIntegratedServer", "m_91092_", "func_71401_C");
         if (server == null) {
             for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
                 String n = f.getName();
-                if (n.equals("singleplayerServer") || n.contains("integratedServer") || n.equals("field_71437_Z")) {
+                if (n.equals("singleplayerServer") || n.contains("integratedServer") || n.equals("field_71437_Z") || n.equals("f_91007_")) {
                     try { f.setAccessible(true); server = f.get(mc); } catch (Exception ignored) {}
                     if (server != null) break;
                 }
@@ -543,7 +593,11 @@ public final class PlayerWorldHelper {
 
     public static String getDifficultyKey(Object level) throws Exception {
         Object diff = null;
+        // 1.17+ SRG: LevelAccessor.getDifficulty (issue #100); the fragment
+        // pass below knows no SRG names.
+        diff = invokeExact(level, "m_46791_");
         for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
+            if (diff != null) break;
             if (m.getParameterCount() == 0 && m.getReturnType().isEnum()) {
                 String mn = m.getName();
                 if (mn.contains("Difficulty") || mn.contains("1675") || mn.contains("1676")) {
@@ -572,7 +626,7 @@ public final class PlayerWorldHelper {
             if (gm == null) {
                 for (java.lang.reflect.Field f : ReflectionCache.getAllFields(mc.getClass())) {
                     String fn = f.getName().toLowerCase();
-                    if (fn.contains("gamemode") || fn.contains("interaction") || fn.contains("multiplayer") || fn.contains("playercontroller") || fn.contains("field_71442_b")) {
+                    if (fn.contains("gamemode") || fn.contains("interaction") || fn.contains("multiplayer") || fn.contains("playercontroller") || fn.contains("field_71442_b") || fn.contains("f_91072_")) {
                         try { f.setAccessible(true); gm = f.get(mc); break; } catch (Exception ignored) {}
                     }
                 }
@@ -591,7 +645,7 @@ public final class PlayerWorldHelper {
                     }
                 }
                 for (Method m : ReflectionCache.getAllMethods(gm.getClass())) {
-                    if ((m.getName().equals("getPlayerMode") || m.getName().equals("func_178889_l")) && m.getParameterCount() == 0) {
+                    if ((m.getName().equals("getPlayerMode") || m.getName().equals("func_178889_l") || m.getName().equals("m_105295_")) && m.getParameterCount() == 0) {
                         try {
                             m.setAccessible(true);
                             String name = gameTypeName(m.invoke(gm));
@@ -1017,7 +1071,7 @@ public final class PlayerWorldHelper {
             if (gameMode == null) {
                 for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
                     String fn = f.getName().toLowerCase();
-                    if (fn.contains("gamemode") || fn.contains("interaction") || fn.contains("multiplayer") || fn.contains("playercontroller") || fn.contains("field_71442_b")) {
+                    if (fn.contains("gamemode") || fn.contains("interaction") || fn.contains("multiplayer") || fn.contains("playercontroller") || fn.contains("field_71442_b") || fn.contains("f_91072_")) {
                         try { f.setAccessible(true); gameMode = f.get(mc); ReflectionHelper.dbg("doPlaceBlock: found gameMode via field " + f.getName()); break; } catch (Exception ignored) {}
                     }
                 }
@@ -1435,6 +1489,95 @@ public final class PlayerWorldHelper {
     private static Object invokeOrNull(Object obj, String methodName) {
         try { return obj.getClass().getMethod(methodName).invoke(obj); }
         catch (Exception e) { return null; }
+    }
+
+    /**
+     * Save name from the integrated server's WorldData (1.13+), or null when
+     * there is no integrated server or the accessors are not known for this
+     * runtime.
+     */
+    private static String integratedSaveName(Object mc) {
+        Object server = findIntegratedServer(mc);
+        Object wd = server != null ? invokeExact(server, "getWorldData", "m_129910_") : null;
+        return wd != null ? invokeExactString(wd, "getLevelName", "m_5462_") : null;
+    }
+
+    // ============================================================
+    // EXACT-NAME LOOKUPS (Forge SRG runtimes)
+    // ============================================================
+    // Forge plays 1.13-1.20.x in production on SRG names (func_*/field_* up
+    // to 1.16.5, then the renumbered m_*/f_* ids from 1.17), where none of
+    // the Mojang names the loose candidate passes key on exist. The 1.17+
+    // ids used by the callers were read off MCPConfig + the official
+    // mappings for 1.17.1, 1.18.2, 1.19.4 and 1.20.1 and are identical on
+    // all four (issue #100). They return null everywhere else, so the loose
+    // passes stay in charge on the other runtimes.
+
+    /** Returned by the exact-name helpers when no method carries one of the names. */
+    private static final Object NOT_FOUND = new Object();
+
+    /** Value of the first 0-arg method carrying one of the exact names, or null. */
+    private static Object invokeExact(Object obj, String... names) {
+        if (obj == null) return null;
+        for (Class<?> c = obj.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Method m : c.getDeclaredMethods()) {
+                Object r = invokeIfNamed(m, obj, names);
+                if (r != NOT_FOUND) return r;
+            }
+            // Interface accessors dispatch to the implementation, e.g. the
+            // default LevelAccessor#getDifficulty.
+            for (Class<?> i : c.getInterfaces()) {
+                Object r = invokeExactInterface(i, obj, names);
+                if (r != NOT_FOUND) return r;
+            }
+        }
+        return null;
+    }
+
+    private static Object invokeExactInterface(Class<?> iface, Object obj, String... names) {
+        for (Method m : iface.getDeclaredMethods()) {
+            Object r = invokeIfNamed(m, obj, names);
+            if (r != NOT_FOUND) return r;
+        }
+        for (Class<?> parent : iface.getInterfaces()) {
+            Object r = invokeExactInterface(parent, obj, names);
+            if (r != NOT_FOUND) return r;
+        }
+        return NOT_FOUND;
+    }
+
+    /**
+     * NOT_FOUND for a static or non-0-arg method or one carrying none of the
+     * names, null when the named method throws, else its value.
+     */
+    private static Object invokeIfNamed(Method m, Object obj, String... names) {
+        if (m.getParameterCount() != 0 || java.lang.reflect.Modifier.isStatic(m.getModifiers())) return NOT_FOUND;
+        for (String name : names) {
+            if (!m.getName().equals(name)) continue;
+            try { m.setAccessible(true); return m.invoke(obj); } catch (Exception e) { return null; }
+        }
+        return NOT_FOUND;
+    }
+
+    private static String invokeExactString(Object obj, String... names) {
+        Object r = invokeExact(obj, names);
+        return r != null ? r.toString() : null;
+    }
+
+    /** Value of the first instance field carrying one of the exact names, or null. */
+    private static Object readFieldExact(Object obj, String... names) {
+        if (obj == null) return null;
+        for (Class<?> c = obj.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Field f : c.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+                for (String name : names) {
+                    if (f.getName().equals(name)) {
+                        try { f.setAccessible(true); return f.get(obj); } catch (Exception e) { return null; }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static double getDouble(Object obj, String... names) throws Exception {

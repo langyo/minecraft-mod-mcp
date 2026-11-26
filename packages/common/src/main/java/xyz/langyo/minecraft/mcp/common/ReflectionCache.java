@@ -416,7 +416,9 @@ public final class ReflectionCache {
         try { return mc.getClass().getMethod("player").invoke(mc); } catch (NoSuchMethodException ignored) {}
         for (Field f : getAllFields(mc.getClass())) {
             String n = f.getName();
-            if (n.equals("player") || n.equals("thePlayer") || n.equals("field_71439_g")) {
+            // f_91074_ is the 1.17+ Forge SRG id (issue #100); the ids were
+            // renumbered at 1.17, so the 1.12.2 name misses there.
+            if (n.equals("player") || n.equals("thePlayer") || n.equals("field_71439_g") || n.equals("f_91074_")) {
                 try { f.setAccessible(true); Object p = f.get(mc); if (p != null) return p; } catch (Exception ignored) {}
             }
         }
@@ -430,8 +432,9 @@ public final class ReflectionCache {
         try { return mc.getClass().getMethod("world").invoke(mc); } catch (NoSuchMethodException ignored) {}
         for (Field f : getAllFields(mc.getClass())) {
             String n = f.getName();
-            // field_71441_e = theWorld in 1.12.2 and world in 1.13-1.16 SRG
-            if (n.equals("theWorld") || n.equals("field_71441_f") || n.equals("field_71441_e") || n.equals("level") || n.equals("world")) {
+            // field_71441_e = theWorld in 1.12.2 and world in 1.13-1.16 SRG,
+            // f_91073_ = level in the renumbered 1.17+ SRG ids (issue #100)
+            if (n.equals("theWorld") || n.equals("field_71441_f") || n.equals("field_71441_e") || n.equals("level") || n.equals("world") || n.equals("f_91073_")) {
                 try { f.setAccessible(true); Object v = f.get(mc); if (v != null) return v; } catch (Exception ignored) {}
             }
         }
@@ -441,8 +444,10 @@ public final class ReflectionCache {
     }
 
     static Object getPlayerLevel(Object player) throws Exception {
-        try { return player.getClass().getMethod("level").invoke(player); } catch (NoSuchMethodException ignored) {}
-        try { return player.getClass().getMethod("world").invoke(player); } catch (NoSuchMethodException ignored) {}
+        // m_20193_ is the 1.17+ Forge SRG id (issue #100).
+        for (String name : new String[]{"level", "world", "m_20193_"}) {
+            try { return player.getClass().getMethod(name).invoke(player); } catch (NoSuchMethodException ignored) {}
+        }
         for (Field f : getAllFields(player.getClass())) {
             String n = f.getName();
             if (n.equals("theWorld") || n.equals("field_70170_p") || n.equals("level") || n.equals("world")) {
