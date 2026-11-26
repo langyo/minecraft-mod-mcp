@@ -94,7 +94,7 @@ public final class PlayerWorldHelper {
                 }
             }
             return String.format("{\"name\":\"%s\",\"health\":%.1f,\"pos\":\"%.1f %.1f %.1f\",\"rotation\":\"%.1f %.1f\",\"dimension\":\"%s\",\"gamemode\":\"%s\",\"food\":%d}",
-                    name, health, pos[0], pos[1], pos[2], rot[0], rot[1], dim, gamemode, foodLevel);
+                    JsonHelper.escape(name), health, pos[0], pos[1], pos[2], rot[0], rot[1], JsonHelper.escape(dim), gamemode, foodLevel);
         } catch (Exception e) {
             return "{\"name\":null,\"error\":\"" + e.getMessage() + "\"}";
         }
@@ -102,9 +102,8 @@ public final class PlayerWorldHelper {
 
     private static String getPlayerName(Object player) {
         try {
-            // 1.17+ SRG: Entity.getScoreboardName (issue #100). The exact id
-            // comes first because the fragments below also match unrelated
-            // SRG ids.
+            // 1.17+ SRG: Entity.getScoreboardName (issue #100); the loose
+            // passes below know no SRG names.
             String srg = invokeExactString(player, "m_6302_");
             if (srg != null && !srg.isEmpty()) return srg;
             for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
@@ -192,7 +191,7 @@ public final class PlayerWorldHelper {
         double x = 0, y = 0, z = 0;
         try {
             // 1.17+ SRG: Entity.getX/getY/getZ (issue #100). Before the
-            // 1.12.2 field pass: the same field ids no longer exist there.
+            // 1.12.2 field pass: those field ids no longer exist there.
             Object sx = invokeExact(player, "m_20185_"), sy = invokeExact(player, "m_20186_"), sz = invokeExact(player, "m_20189_");
             if (sx instanceof Number && sy instanceof Number && sz instanceof Number) return new double[]{((Number) sx).doubleValue(), ((Number) sy).doubleValue(), ((Number) sz).doubleValue()};
             // 1.12.2 SRG keeps position as fields (field_70165_t/u/v), no getX()
@@ -402,9 +401,8 @@ public final class PlayerWorldHelper {
                 // 0-24000 day-cycle semantics on every mapping era
                 // (issue #76 B2).
                 boolean timeFound = false;
-                // 1.17+ SRG: Level.getDayTime / getGameTime (issue #100). The
-                // exact ids come first; the fragments below match unrelated
-                // SRG ids (m_5430_, m_24025_, ...).
+                // 1.17+ SRG: Level.getDayTime / getGameTime (issue #100); the
+                // fragment passes below know no SRG names.
                 Object srgTime = invokeExact(level, "m_46468_");
                 if (srgTime == null) srgTime = invokeExact(level, "m_46467_");
                 if (srgTime instanceof Number) { worldTime = ((Number) srgTime).longValue(); timeFound = true; }
@@ -432,9 +430,8 @@ public final class PlayerWorldHelper {
             } catch (Exception ignored) {}
 
             try {
-                // 1.17+ SRG: Level.isRaining / isThundering (issue #100). The
-                // exact ids decide when they exist; the fragments below match
-                // unrelated SRG ids (m_14090_, m_14091_).
+                // 1.17+ SRG: Level.isRaining / isThundering (issue #100); the
+                // fragment pass below knows no SRG names.
                 Object srgWeather = invokeExact(level, "m_46471_");
                 Object srgThunder = invokeExact(level, "m_46470_");
                 if (srgThunder instanceof Boolean && (Boolean) srgThunder) weather = "thunder";
@@ -453,8 +450,9 @@ public final class PlayerWorldHelper {
                 }
             } catch (Exception ignored) {}
 
+            // The save name is user text and can carry quotes or backslashes.
             return String.format("{\"world_name\":\"%s\",\"difficulty\":\"%s\",\"gametype\":\"%s\",\"time\":%d,\"weather\":\"%s\"}",
-                    worldName, difficulty, gameType, worldTime, weather);
+                    JsonHelper.escape(worldName), difficulty, gameType, worldTime, weather);
         } catch (Exception e) {
             return "{\"world_name\":null,\"error\":\"" + e.getMessage() + "\"}";
         }
@@ -595,8 +593,8 @@ public final class PlayerWorldHelper {
 
     public static String getDifficultyKey(Object level) throws Exception {
         Object diff = null;
-        // 1.17+ SRG: LevelAccessor.getDifficulty (issue #100). The exact id
-        // comes first; the fragments below match unrelated SRG ids.
+        // 1.17+ SRG: LevelAccessor.getDifficulty (issue #100); the fragment
+        // pass below knows no SRG names.
         diff = invokeExact(level, "m_46791_");
         for (Method m : ReflectionCache.getAllMethods(level.getClass())) {
             if (diff != null) break;
@@ -1515,6 +1513,9 @@ public final class PlayerWorldHelper {
     // all four (issue #100). They return null everywhere else, so the loose
     // passes stay in charge on the other runtimes.
 
+    /** Returned by the exact-name helpers when no method carries one of the names. */
+    private static final Object NOT_FOUND = new Object();
+
     /** Value of the first 0-arg method carrying one of the exact names, or null. */
     private static Object invokeExact(Object obj, String... names) {
         if (obj == null) return null;
@@ -1523,9 +1524,8 @@ public final class PlayerWorldHelper {
                 Object r = invokeIfNamed(m, obj, names);
                 if (r != NOT_FOUND) return r;
             }
-            // Interface accessors dispatch to the implementation even when
-            // they are declared on a superclass's interface (LevelAccessor
-            // #getDifficulty is reached through Level).
+            // Interface accessors dispatch to the implementation, e.g. the
+            // default LevelAccessor#getDifficulty.
             for (Class<?> i : c.getInterfaces()) {
                 Object r = invokeExactInterface(i, obj, names);
                 if (r != NOT_FOUND) return r;
@@ -1546,9 +1546,10 @@ public final class PlayerWorldHelper {
         return NOT_FOUND;
     }
 
-    private static final Object NOT_FOUND = new Object();
-
-    /** The named method's value, or NOT_FOUND when the method carries none of the names. */
+    /**
+     * NOT_FOUND for a static or non-0-arg method or one carrying none of the
+     * names, null when the named method throws, else its value.
+     */
     private static Object invokeIfNamed(Method m, Object obj, String... names) {
         if (m.getParameterCount() != 0 || java.lang.reflect.Modifier.isStatic(m.getModifiers())) return NOT_FOUND;
         for (String name : names) {
@@ -1563,11 +1564,12 @@ public final class PlayerWorldHelper {
         return r != null ? r.toString() : null;
     }
 
-    /** Value of the first field carrying one of the exact names, or null. */
+    /** Value of the first instance field carrying one of the exact names, or null. */
     private static Object readFieldExact(Object obj, String... names) {
         if (obj == null) return null;
         for (Class<?> c = obj.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
             for (Field f : c.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
                 for (String name : names) {
                     if (f.getName().equals(name)) {
                         try { f.setAccessible(true); return f.get(obj); } catch (Exception e) { return null; }

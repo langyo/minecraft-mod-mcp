@@ -197,11 +197,13 @@ public final class WindowHelper {
 
     /**
      * A long dug up by the shape scan can be anything; treat it as a window
-     * pointer only when it can be one. Native heap pointers are positive
-     * and in practice sit far above the first 4 GiB on a 64-bit JVM, while
-     * the values picked up by mistake are small counters (0x7b1156 in
-     * issue #101). A rejected handle only disables the GLFW paths for the
-     * session; a wrong one crashes the game.
+     * pointer only when it can at least look like one. Native heap pointers
+     * are positive and in practice sit far above the first 4 GiB on a 64-bit
+     * JVM, which rules out the small counters picked up by mistake before
+     * (0x7b1156 in issue #101). It does not rule out a hash or a timestamp:
+     * the real protection is that the trusted names above are tried first
+     * and stop the scan. A rejected handle only disables the GLFW paths for
+     * the session; a wrong one crashes the game.
      */
     static boolean looksLikeWindowHandle(long value) {
         if (value <= 0) return false;
@@ -213,6 +215,6 @@ public final class WindowHelper {
         try {
             Object handle = Class.forName("org.lwjgl.glfw.GLFW").getMethod("glfwGetCurrentContext").invoke(null);
             return handle instanceof Number ? ((Number) handle).longValue() : 0;
-        } catch (Exception e) { return 0; }
+        } catch (Exception | LinkageError e) { return 0; }
     }
 }
