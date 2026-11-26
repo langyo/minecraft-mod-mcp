@@ -151,6 +151,7 @@ ALL_VERSIONS = {
     # 2026-11-25 sweep: the 26.1.2 NeoForge line moved to 26.1.2.130 and
     # the 26.3 NeoForge line to 26.3.0.117.
     # 2026-11-26 sweep: the 26.3 NeoForge line moved to 26.3.0.118.
+    # 2026-11-27 sweep: the 1.21.1 NeoForge line moved to 21.1.268.
     # --- FG 1.2 GTNH (MC 1.7.x) ---
     "1.7.2":  {"forge": "1.7.2-10.12.1.1109",           "fg_era": "fg12_gtnh", "java": 8,
                "version_id": "1.7.2-Forge10.12.1.1109"},
@@ -258,7 +259,7 @@ ALL_VERSIONS = {
                "version_id": "1.21-Forge51.0.33", "fabric_yarn": "1.21+build.9"},
     "1.21.1": {"forge": "1.21.1-52.1.20",                   "fg_era": "fg6",  "java": 21, "mappings": "official_1.21.1",
                "version_id": "1.21.1-Forge52.1.20", "fabric_yarn": "1.21.1+build.3",
-               "neoforge": "21.1.267", "mdg": "2.0.141"},
+               "neoforge": "21.1.268", "mdg": "2.0.141"},
     # Forge skipped MC 1.21.2 entirely (52.x = 1.21.1, 53.x = 1.21.3), so this
     # version ships NeoForge + Fabric only. NeoForge 21.2.x never left beta,
     # but 1.21.2 users exist and get full mod support like every other version.
@@ -421,6 +422,15 @@ ALL_VERSIONS = {
     # 50.2.15 likewise), every other NeoForge line, fabric loader
     # 0.20.1, every yarn pin, FG7 7.0.40 and
     # MDG 2.0.148-but-2.0.147-still-suffices — is current.
+    # 2026-11-27 sweep: the 1.21.1 NeoForge pin moved to 21.1.268 (newest
+    # stable at re-check; fixes the mod list appearing empty when scrolled
+    # while searching #3770). Everything else in the tracked wave — MC
+    # latest release still 26.3 (26.4 snapshot/pre-release only), every
+    # Forge recommended pin (26.2 65.1.6 / 26.1.2 64.1.6 / 1.21.11 61.2.5 /
+    # 1.21.1 52.1.21 are latest-only, not yet recommended; 1.20.1 47.4.29
+    # and 1.20.6 50.2.15 likewise), every other NeoForge line, fabric
+    # loader 0.20.1, every yarn pin, FG7 7.0.41-but-7.0.40-still-suffices
+    # and MDG 2.0.148-but-2.0.147-still-suffices — is current.
     "26.3":   {"forge": "26.3-66.1.9",                     "fg_era": "fg7",  "java": 25, "mappings": "official_26.3",
                "version_id": "26.3-forge-66.1.9",
                "neoforge": "26.3.0.118", "mdg": "2.0.147",
