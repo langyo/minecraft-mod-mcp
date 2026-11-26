@@ -1038,7 +1038,11 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     install_mod_jar(mod_jar)
 
     if world_name:
-        install_test_world(world_name, data_version=data_version_for(mc_ver))
+        # The launcher's game directory is <mc>/mcp_launcher/game when no
+        # --mc-dir is passed (settings.ts:gameDirPath), and quick play
+        # resolves the save relative to it - MC_DIR/saves is never read.
+        install_test_world(world_name, mc_dir=str(GAME_DIR),
+                           data_version=data_version_for(mc_ver))
 
     version_name = setup_mc_version(mc_ver, loader)
     if not version_name:
@@ -1232,7 +1236,8 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
     kill_minecraft()
     setup_xvfb(screen="1280x720x24")
     install_mod_jar(mod_jar)
-    install_test_world(world_name, data_version=data_version_for(mc_ver))
+    install_test_world(world_name, mc_dir=str(GAME_DIR),
+                       data_version=data_version_for(mc_ver))
 
     version_name = setup_mc_version(mc_ver, loader)
     if not version_name:
@@ -1397,7 +1402,8 @@ def main():
         kill_minecraft()
         setup_xvfb(screen="1280x720x24")
         install_mod_jar(mod_jar)
-        install_test_world(args.world, data_version=data_version_for(args.mc_ver))
+        install_test_world(args.world, mc_dir=str(GAME_DIR),
+                           data_version=data_version_for(args.mc_ver))
 
         version_name = setup_mc_version(args.mc_ver, args.loader)
         if not version_name:
