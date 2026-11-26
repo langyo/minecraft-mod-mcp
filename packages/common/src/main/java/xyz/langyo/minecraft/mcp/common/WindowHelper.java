@@ -2,6 +2,7 @@ package xyz.langyo.minecraft.mcp.common;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 public final class WindowHelper {
 
@@ -47,7 +48,15 @@ public final class WindowHelper {
     public static int getGlfwWindowSize(Object mc, boolean isWidth) {
         if (!ReflectionCache.LWJGL3) return 0;
         try {
-            long handle = getWindowHandle(mc);
+            // The GL reads that consume this size (glReadPixels) target the
+            // context that is current on the calling thread, and
+            // glfwGetCurrentContext answers exactly that by reading GLFW's
+            // per-thread slot - it dereferences nothing. Take it first: a bad
+            // reflected handle must never reach glfwGetFramebufferSize, which
+            // reads through the pointer and takes the whole JVM down
+            // natively (issue #101).
+            long handle = getCurrentContextHandle();
+            if (handle == 0) handle = getWindowHandle(mc);
             if (handle == 0) return 0;
             Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
             Class<?> intBufClass = Class.forName("java.nio.IntBuffer");
@@ -139,27 +148,71 @@ public final class WindowHelper {
     }
 
     private static long extractHandleFromWindow(Object window) throws Exception {
-        for (Method m : ReflectionCache.getAllMethods(window.getClass())) {
-            if (m.getParameterCount() == 0 && m.getReturnType() == long.class) {
-                try { m.setAccessible(true); Object r = m.invoke(window); if (r instanceof Number && ((Number)r).longValue() != 0) return ((Number)r).longValue(); } catch (Exception ignored) {}
-            }
-        }
-        for (String methodName : new String[]{"handle", "getHandle", "getWindow"}) {
+        // Trusted names first (issue #101). Every mapping era names the
+        // handle accessors: getWindow / window (Mojang names at runtime on
+        // NeoForge, on Forge from 1.20.6 and on the unobfuscated 26.x Fabric
+        // builds), m_85439_ / f_85349_ (Forge 1.17-1.20.4 SRG),
+        // func_198092_i / field_198119_f (Forge 1.13-1.16 SRG) and
+        // method_4490 / field_5187 (production Fabric).
+        boolean trusted = false;
+        for (String methodName : new String[]{"getWindow", "handle", "getHandle", "method_4490", "m_85439_", "func_198092_i"}) {
             try {
                 Object result = window.getClass().getMethod(methodName).invoke(window);
                 if (result instanceof Number) {
-                    long val = ((Number) result).longValue();
-                    if (val != 0) return val;
+                    trusted = true;
+                    if (((Number) result).longValue() != 0) return ((Number) result).longValue();
                 }
-            } catch (NoSuchMethodException ignored) {}
+            } catch (Exception ignored) {}
         }
         for (Field f : ReflectionCache.getAllFields(window.getClass())) {
-            if (f.getType() == long.class) {
+            String fn = f.getName();
+            if (f.getType() == long.class && (fn.equals("window") || fn.equals("field_5187") || fn.equals("f_85349_") || fn.equals("field_198119_f"))) {
+                try { f.setAccessible(true); long val = f.getLong(window); trusted = true; if (val != 0) return val; } catch (Exception ignored) {}
+            }
+        }
+        // A trusted accessor that exists but still reads 0 means the window
+        // is not created yet: report no handle rather than fall through.
+        if (trusted) return 0;
+        // The shape scan is the last resort, never the first pick: it runs
+        // over every 0-arg long member in unspecified order, so a mod-added
+        // one (an uptime counter, a frame stamp) wins the race and is handed
+        // to GLFW as a GLFWwindow*, which reads through it and takes the JVM
+        // down natively (issue #101). Only instance members can carry a
+        // per-window handle, and only trust what the scan digs up when the
+        // value can be a pointer at all.
+        for (Method m : ReflectionCache.getAllMethods(window.getClass())) {
+            if (m.getParameterCount() == 0 && m.getReturnType() == long.class && !Modifier.isStatic(m.getModifiers())) {
+                try { m.setAccessible(true); Object r = m.invoke(window); if (r instanceof Number && looksLikeWindowHandle(((Number)r).longValue())) return ((Number)r).longValue(); } catch (Exception ignored) {}
+            }
+        }
+        for (Field f : ReflectionCache.getAllFields(window.getClass())) {
+            if (f.getType() == long.class && !Modifier.isStatic(f.getModifiers())) {
                 f.setAccessible(true);
                 long val = f.getLong(window);
-                if (val != 0) return val;
+                if (looksLikeWindowHandle(val)) return val;
             }
         }
         return 0;
+    }
+
+    /**
+     * A long dug up by the shape scan can be anything; treat it as a window
+     * pointer only when it can be one. Native heap pointers are positive
+     * and in practice sit far above the first 4 GiB on a 64-bit JVM, while
+     * the values picked up by mistake are small counters (0x7b1156 in
+     * issue #101). A rejected handle only disables the GLFW paths for the
+     * session; a wrong one crashes the game.
+     */
+    static boolean looksLikeWindowHandle(long value) {
+        if (value <= 0) return false;
+        return !"64".equals(System.getProperty("sun.arch.data.model")) || value >= (1L << 32);
+    }
+
+    /** The GLFWwindow* whose GL context is current on this thread, or 0. */
+    private static long getCurrentContextHandle() {
+        try {
+            Object handle = Class.forName("org.lwjgl.glfw.GLFW").getMethod("glfwGetCurrentContext").invoke(null);
+            return handle instanceof Number ? ((Number) handle).longValue() : 0;
+        } catch (Exception e) { return 0; }
     }
 }
