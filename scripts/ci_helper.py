@@ -60,7 +60,25 @@ def _mod_auth_headers():
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
-MC_DIR = Path(os.environ.get("HOME", os.path.expanduser("~"))) / ".minecraft"
+def _resolve_mc_dir():
+    """The game directory the Node launcher will pick.
+
+    The launcher prefers APPDATA on Windows and ~ elsewhere (see
+    packages/minecraft-mod-mcp/src/mc/platform.ts:mcDir), so the world this
+    helper writes has to land in the same place it launches from. On the Linux
+    runners both candidates collapse to ~/.minecraft.
+    """
+    candidates = []
+    if os.name == "nt" and os.environ.get("APPDATA"):
+        candidates.append(Path(os.environ["APPDATA"]) / ".minecraft")
+    candidates.append(Path(os.environ.get("HOME") or os.path.expanduser("~")) / ".minecraft")
+    for candidate in candidates:
+        if (candidate / "versions").is_dir():
+            return candidate
+    return candidates[0]
+
+
+MC_DIR = _resolve_mc_dir()
 GAME_DIR = MC_DIR / "mcp_launcher" / "game"
 
 TEST_WORLD_DIR = ROOT / "tests" / "reference-screenshots"
@@ -340,6 +358,10 @@ def install_test_world(world_name="CI_TestWorld", mc_dir=None, data_version=None
 
 # DataVersion of each version the smoke matrix runs on, so the game starts its
 # own upgrade from a plausible point instead of from one number on every lane.
+#
+# These are best effort. A value OLDER than the running game is safe: the game
+# upgrades the save. Values newer than the game are not, so 26.2/26.3 reuse
+# 26.1.2's number and get its upgrade chain rather than a downgrade.
 _DATA_VERSIONS = {
     "1.14.4": 1976, "1.15.2": 2230, "1.16.5": 2586, "1.17.1": 2730,
     "1.18.2": 2975, "1.19.4": 3337, "1.20.1": 3465, "1.20.4": 3700,
@@ -360,9 +382,19 @@ _NBT_END, _NBT_BYTE, _NBT_INT, _NBT_LONG, _NBT_STRING, _NBT_LIST, _NBT_COMPOUND 
 class _Byte(int):
     """NBT TAG_Byte."""
 
+    def __new__(cls, value):
+        if not -128 <= value <= 127:
+            raise ValueError(f"TAG_Byte out of range: {value}")
+        return super().__new__(cls, value)
+
 
 class _Int(int):
     """NBT TAG_Int."""
+
+    def __new__(cls, value):
+        if not -(2 ** 31) <= value < 2 ** 31:
+            raise ValueError(f"TAG_Int out of range: {value}")
+        return super().__new__(cls, value)
 
 
 class _Long(int):
@@ -635,14 +667,34 @@ def api_call(mod_url, cmd, params=None, timeout=30, retries=4):
 
 
 def get_screenshot(mod_url, timeout=60):
-    """Get a screenshot from the mod and return raw PNG bytes."""
+    """Get a screenshot from the mod and return raw PNG bytes.
+
+    /api/screenshot answers with a JSON envelope
+    ({"original": "data:image/png;base64,...", "grid": ..., "width", "height"}),
+    not a bare PNG. Everything downstream - verify_screenshot, the saved
+    screenshots/, compare_screenshots_* - expects bytes, so unwrap here; this
+    is the single place that knows about the envelope.
+    """
     _assert_local_mod_url(mod_url)
     req = urllib.request.Request(
         f"{mod_url}/api/screenshot",
         headers={"User-Agent": "minecraft-mcp-ci", **_mod_auth_headers()},
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read()
+        body = resp.read()
+    if body[:1] == b"{":
+        try:
+            envelope = json.loads(body.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return body
+        for key in ("original", "grid"):
+            uri = envelope.get(key) if isinstance(envelope, dict) else None
+            if isinstance(uri, str) and uri.startswith("data:image/png;base64,"):
+                try:
+                    return base64.b64decode(uri.split(",", 1)[1])
+                except (ValueError, TypeError):
+                    break
+    return body
 
 
 def _png_pixel_stats(png_data):
@@ -740,10 +792,12 @@ def verify_screenshot(png_data, min_size_kb=1, min_colors=16):
 
 
 def valid_player_info(resp):
-    """A player read that actually found the player, not a stub.
+    """A player read that found the player, not a stub.
 
     The old check only asserted isinstance(dict), so {"name": null} passed and
     every Forge lane shipped with get_player_info returning a stub (issue #100).
+    Keep it loose on game state: a dead player really does report health 0, and
+    a player can legitimately stand at the origin.
     """
     if not isinstance(resp, dict) or "error" in resp:
         return False
@@ -751,32 +805,26 @@ def valid_player_info(resp):
     if not isinstance(name, str) or not name.strip():
         return False
     try:
-        health = float(resp.get("health"))
-        pos = str(resp.get("pos", ""))
-        coords = [float(v) for v in pos.split()]
+        float(resp.get("health"))
+        coords = [float(v) for v in str(resp.get("pos", "")).split()]
     except (TypeError, ValueError):
         return False
-    if health <= 0 or len(coords) != 3:
-        return False
-    # A real read reports where the player actually is; the stub reported the
-    # origin with zero health.
-    if health == 0 and all(c == 0 for c in coords):
-        return False
-    return True
+    return len(coords) == 3
 
 
 def valid_world_info(resp):
-    """A world read that found the level, not a null/unknown stub."""
+    """A world read that found a level, not a null/placeholder stub.
+
+    A save may legitimately be called "unknown", so only the shapes the mod
+    emits when it found nothing are rejected: a null name, or the literal
+    "MpServer" placeholder a client-side WorldInfo carries in multiplayer.
+    """
     if not isinstance(resp, dict) or "error" in resp:
         return False
     name = resp.get("world_name")
     if not isinstance(name, str) or not name.strip():
         return False
-    if name in ("unknown", "MpServer", "null"):
-        return False
-    if str(resp.get("difficulty", "")).lower() not in ("peaceful", "easy", "normal", "hard"):
-        return False
-    return True
+    return name != "MpServer"
 
 
 def compare_screenshots(new_data, ref_path, threshold=0.02):
@@ -1036,9 +1084,13 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     if loader in ("forge", "neoforge") and not renderpearl:
         parts.append("-Dforge.disableEarlyDisplay=true")
         parts.append("-Dneoforge.disableEarlyDisplay=true")
-    if world_name:
-        parts.append(f"-Dmcp.test.world={world_name}")
     extra_jvm = " ".join(parts)
+    # -Dmcp.test.world had no reader anywhere, so every lane sat on the main
+    # menu and get_player_info legitimately returned a stub - which the smoke
+    # check used to accept. Quick play is the only non-GUI way in; versions
+    # before 1.20 have none, so those lanes stay on the main menu and are
+    # asserted on the screenshot instead (see run_smoke_test).
+    extra_game = f"--quickPlaySingleplayer {world_name}" if world_name and vtuple >= (1, 20) else ""
 
     launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
     try:
@@ -1048,7 +1100,8 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
             ["node", launcher, "launch", version_name, "--headless",
              "--memory", "2048",
              "--extra-jvm", extra_jvm,
-             "--mod-jar", str(mod_jar), "--dry-run"],
+             "--mod-jar", str(mod_jar),
+             *(["--game-args", extra_game] if extra_game else []), "--dry-run"],
             env=env, capture_output=True, text=True, timeout=120,
         )
         _log("Dry-run launch plan:")
@@ -1058,7 +1111,8 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
             ["node", launcher, "launch", version_name, "--headless",
              "--memory", "2048",
              "--extra-jvm", extra_jvm,
-             "--mod-jar", str(mod_jar)],
+             "--mod-jar", str(mod_jar),
+             *(["--game-args", extra_game] if extra_game else [])],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
         )
@@ -1346,9 +1400,14 @@ def main():
 
         launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
         ensure_mod_token()
+        try:
+            _vtuple = tuple(int(x) for x in args.mc_ver.split("."))
+        except ValueError:
+            _vtuple = (1, 0)
+        game_args = ["--game-args", f"--quickPlaySingleplayer {args.world}"] if _vtuple >= (1, 20) else []
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name,
-             "--memory", "2048", "--mod-jar", str(args.mod_jar)],
+             "--memory", "2048", "--mod-jar", str(args.mod_jar), *game_args],
             env=os.environ.copy(),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,

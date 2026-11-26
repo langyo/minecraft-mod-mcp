@@ -565,7 +565,14 @@ public final class ScreenshotHelper {
         // must name an attachment, and leaving the default BACK selection in
         // place returned the untouched back buffer (blank screenshots).
         int prevReadFbo = 0;
+        int prevReadBuffer = GL_BACK;
         try {
+            for (Method m : gl11.getMethods()) {
+                if (m.getName().equals("glGetInteger") && m.getParameterCount() == 1) {
+                    try { m.setAccessible(true); Integer buf = (Integer) m.invoke(null, GL_READ_BUFFER); if (buf != null) prevReadBuffer = buf; } catch (Exception ignored) {}
+                    break;
+                }
+            }
             for (Method m : gl11.getMethods()) {
                 if (m.getName().equals("glGetInteger") && m.getParameterCount() == 1) {
                     try { m.setAccessible(true); Integer bound = (Integer) m.invoke(null, GL_READ_FRAMEBUFFER_BINDING); if (bound != null) prevReadFbo = bound; } catch (Exception ignored) {}
@@ -603,12 +610,14 @@ public final class ScreenshotHelper {
                 Method bindFramebuffer = glBindFramebufferMethod();
                 if (bindFramebuffer != null) bindFramebuffer.invoke(null, GL_READ_FRAMEBUFFER, prevReadFbo);
                 for (Method m : gl11.getMethods()) {
-                    if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) { try { m.setAccessible(true); m.invoke(null, 0x0404); } catch (Exception ignored) {}; break; }
+                    if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) { try { m.setAccessible(true); m.invoke(null, prevReadBuffer); } catch (Exception ignored) {}; break; }
                 }
             } catch (Exception ignored) {}
         }
     }
 
+    private static final int GL_BACK = 0x0405;
+    private static final int GL_READ_BUFFER = 0x0C02;
     private static final int GL_READ_FRAMEBUFFER = 0x8CA8;
     private static final int GL_READ_FRAMEBUFFER_BINDING = 0x8CAA;
     private static final int GL_COLOR_ATTACHMENT0 = 0x8CE0;
@@ -1174,30 +1183,56 @@ public final class ScreenshotHelper {
         for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
             if (m.getParameterCount() == 0 && m.getReturnType() != void.class && !m.getReturnType().isPrimitive()) {
                 String rtName = m.getReturnType().getName();
-                if (rtName.contains("RenderTarget") || rtName.contains("Framebuffer") || rtName.contains("FrameBuffer")
-                        || isRenderTargetType(m.getReturnType())) {
+                if (rtName.contains("RenderTarget") || rtName.contains("Framebuffer") || rtName.contains("FrameBuffer")) {
                     try { m.setAccessible(true); return m.invoke(mc); } catch (Exception ignored) {}
                 }
+                // Opaque class name (intermediary): recognise the instance.
+                try {
+                    m.setAccessible(true);
+                    Object candidate = m.invoke(mc);
+                    if (isRenderTargetInstance(candidate)) return candidate;
+                } catch (Exception ignored) {}
             }
         }
         return null;
     }
 
     /**
-     * True for a render-target-like type by shape rather than by name, so
-     * intermediary runtimes (where the type is class_276) are recognised:
-     * a colour-texture int plus a framebuffer id, as the 1.17-1.21.4
-     * RenderTarget carries them.
+     * True for a render-target-like type without relying on class or field
+     * names, which are opaque on intermediary runtimes: the type carries a
+     * GpuTexture (1.21.5+) or an int field whose value glIsFramebuffer
+     * accepts (1.17-1.21.4). Requires a live GL context, so this is only
+     * reached from the render thread.
      */
     private static boolean isRenderTargetType(Class<?> clazz) {
-        boolean hasFbo = false, hasColor = false, hasSize = false;
         for (Field f : ReflectionCache.getAllFields(clazz)) {
-            if (f.getType() != int.class || java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
-            String n = f.getName();
-            if (n.equals("frameBufferId") || n.equals("framebufferId") || n.contains("rameBuffer")) hasFbo = true;
-            else if (n.equals("colorTextureId") || n.contains("olorTexture")) hasColor = true;
-            else if (n.equals("width") || n.equals("height")) hasSize = true;
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+            Class<?> t = f.getType();
+            if (t.getName().contains("GpuTexture") || t.getName().contains("GlTexture")) return true;
+            if (t == int.class) {
+                String n = f.getName();
+                // Cheap name wins first (Mojang/SRG runtimes); otherwise the
+                // field is only probeable once we have an instance, which the
+                // caller supplies through isRenderTargetInstance.
+                if (n.equals("frameBufferId") || n.equals("framebufferId") || n.equals("colorTextureId")
+                        || n.equals("f_83920_") || n.equals("f_83923_")) return true;
+            }
         }
-        return hasFbo && hasColor && hasSize;
+        return false;
+    }
+
+    /**
+     * Instance-level companion to {@link #isRenderTargetType}: accepts the
+     * type when one of its int fields is a live GL framebuffer name, which is
+     * what an intermediary RenderTarget holds.
+     */
+    private static boolean isRenderTargetInstance(Object candidate) {
+        if (candidate == null) return false;
+        if (isRenderTargetType(candidate.getClass())) return true;
+        for (Field f : ReflectionCache.getAllFields(candidate.getClass())) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) || f.getType() != int.class) continue;
+            try { f.setAccessible(true); if (isFramebufferName(f.getInt(candidate))) return true; } catch (Exception ignored) {}
+        }
+        return false;
     }
 }
