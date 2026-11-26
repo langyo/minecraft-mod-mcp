@@ -1150,10 +1150,16 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         pass
     time.sleep(1)
 
+    # Quick play exists from 1.20; before it there is no non-GUI way into a
+    # world, so on those lanes the game stays on the main menu and the player
+    # and world reads legitimately answer with stubs - assert shape only there.
+    can_quick_play = vtuple >= (1, 20)
+    info_validator = valid_player_info if can_quick_play else (lambda r: isinstance(r, dict))
+    world_validator = valid_world_info if can_quick_play else (lambda r: isinstance(r, dict))
     tests = [
         ("ping", {}, lambda r: r.get("result") == "pong"),
-        ("get_player_info", {}, valid_player_info),
-        ("get_world_info", {}, valid_world_info),
+        ("get_player_info", {}, info_validator),
+        ("get_world_info", {}, world_validator),
         ("execute_command", {"command": "/time set day"},
          lambda r: isinstance(r, dict)),
         # The screenshot workspace jail (issue #81): an escaping path must be
