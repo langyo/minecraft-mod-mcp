@@ -1162,6 +1162,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         # they never travel through our own argument assembly (where the
         # "-D..." strings were being shredded into single characters on the
         # runners). Game args stay on the env path the plan showed working.
+        _log(f"  [flags] extra_jvm={extra_jvm!r} extra_game={extra_game!r}")
         if extra_jvm:
             env["JAVA_TOOL_OPTIONS"] = extra_jvm
         else:
@@ -1179,6 +1180,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         _log("Dry-run launch plan (first 14 lines):")
         for line in plan_lines[:14]:
             _log(f"  [plan] {line[:220]}")
+        _log(f"  [flags] env JAVA_TOOL_OPTIONS={env.get('JAVA_TOOL_OPTIONS')!r}")
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name, "--headless",
              "--memory", "2048",
