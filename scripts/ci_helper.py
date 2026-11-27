@@ -60,7 +60,25 @@ def _mod_auth_headers():
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
-MC_DIR = Path(os.environ.get("HOME", os.path.expanduser("~"))) / ".minecraft"
+def _resolve_mc_dir():
+    """The game directory the Node launcher will pick.
+
+    The launcher prefers APPDATA on Windows and ~ elsewhere (see
+    packages/minecraft-mod-mcp/src/mc/platform.ts:mcDir), so the world this
+    helper writes has to land in the same place it launches from. On the Linux
+    runners both candidates collapse to ~/.minecraft.
+    """
+    candidates = []
+    if os.name == "nt" and os.environ.get("APPDATA"):
+        candidates.append(Path(os.environ["APPDATA"]) / ".minecraft")
+    candidates.append(Path(os.environ.get("HOME") or os.path.expanduser("~")) / ".minecraft")
+    for candidate in candidates:
+        if (candidate / "versions").is_dir():
+            return candidate
+    return candidates[0]
+
+
+MC_DIR = _resolve_mc_dir()
 GAME_DIR = MC_DIR / "mcp_launcher" / "game"
 
 TEST_WORLD_DIR = ROOT / "tests" / "reference-screenshots"
@@ -326,115 +344,211 @@ def install_mod_jar(jar_path, mc_dir=None):
     return str(dest)
 
 
-def install_test_world(world_name="CI_TestWorld", mc_dir=None):
+def install_test_world(world_name="CI_TestWorld", mc_dir=None, data_version=None):
     """Copy or generate the test superflat world save."""
     mc = mc_dir or str(MC_DIR)
     saves_dir = Path(mc) / "saves" / world_name
     if saves_dir.exists():
         shutil.rmtree(str(saves_dir), ignore_errors=True)
     saves_dir.mkdir(parents=True, exist_ok=True)
-    _generate_level_dat(str(saves_dir), world_name)
+    _generate_level_dat(str(saves_dir), world_name, data_version)
     _log(f"Test world created: {saves_dir}")
     return str(saves_dir)
 
 
-def _generate_level_dat(save_dir, world_name):
-    """Generate a minimal superflat Redstone Ready level.dat using gzip+NBT."""
-    import gzip
+# DataVersion of each version the smoke matrix runs on, so the game starts its
+# own upgrade from a plausible point instead of from one number on every lane.
+#
+# These are best effort. A value OLDER than the running game is safe: the game
+# upgrades the save. Values newer than the game are not, so 26.2/26.3 reuse
+# 26.1.2's number and get its upgrade chain rather than a downgrade.
+_DATA_VERSIONS = {
+    "1.14.4": 1976, "1.15.2": 2230, "1.16.5": 2586, "1.17.1": 2730,
+    "1.18.2": 2975, "1.19.4": 3337, "1.20.1": 3465, "1.20.4": 3700,
+    "1.20.6": 3839, "1.21.1": 3955, "1.21.4": 4189, "1.21.7": 4438,
+    "1.21.11": 4671, "26.1.2": 4790, "26.2": 4790, "26.3": 4790,
+}
+
+
+def data_version_for(mc_ver):
+    """Best-known DataVersion for a MC version string, else the 1.20.2 value."""
+    return _DATA_VERSIONS.get(str(mc_ver), 3953)
+
+
+# NBT tag ids used by the encoder below.
+_NBT_END, _NBT_BYTE, _NBT_INT, _NBT_LONG, _NBT_STRING, _NBT_LIST, _NBT_COMPOUND = 0, 1, 3, 4, 8, 9, 10
+
+
+class _Byte(int):
+    """NBT TAG_Byte."""
+
+    def __new__(cls, value):
+        if not -128 <= value <= 127:
+            raise ValueError(f"TAG_Byte out of range: {value}")
+        return super().__new__(cls, value)
+
+
+class _Int(int):
+    """NBT TAG_Int."""
+
+    def __new__(cls, value):
+        if not -(2 ** 31) <= value < 2 ** 31:
+            raise ValueError(f"TAG_Int out of range: {value}")
+        return super().__new__(cls, value)
+
+
+class _Long(int):
+    """NBT TAG_Long."""
+
+
+def _nbt_type(value):
+    if isinstance(value, _Byte):
+        return _NBT_BYTE
+    if isinstance(value, _Int):
+        return _NBT_INT
+    if isinstance(value, _Long):
+        return _NBT_LONG
+    if isinstance(value, str):
+        return _NBT_STRING
+    if isinstance(value, list):
+        return _NBT_LIST
+    if isinstance(value, dict):
+        return _NBT_COMPOUND
+    raise TypeError(f"unsupported NBT value {value!r}; wrap ints as _Byte/_Int/_Long")
+
+
+def _nbt_write(value, out):
+    """Write one tag payload (no type byte and no name)."""
     import struct
+
+    kind = _nbt_type(value)
+    if kind == _NBT_BYTE:
+        out.write(struct.pack(">b", value))
+    elif kind == _NBT_INT:
+        out.write(struct.pack(">i", value))
+    elif kind == _NBT_LONG:
+        out.write(struct.pack(">q", value))
+    elif kind == _NBT_STRING:
+        data = value.encode("utf-8")
+        out.write(struct.pack(">H", len(data)))
+        out.write(data)
+    elif kind == _NBT_LIST:
+        # An empty list declares TAG_String; every non-empty list here is
+        # homogeneous so its first element names the type.
+        out.write(struct.pack(">bi", _nbt_type(value[0]) if value else _NBT_STRING, len(value)))
+        for item in value:
+            _nbt_write(item, out)
+    else:
+        for name, item in value.items():
+            name_bytes = name.encode("utf-8")
+            out.write(struct.pack(">b", _nbt_type(item)))
+            out.write(struct.pack(">H", len(name_bytes)))
+            out.write(name_bytes)
+            _nbt_write(item, out)
+        out.write(b"\x00")  # TAG_End
+
+
+def _nbt_encode_root(tree):
+    """Root TAG_Compound header (type byte + empty name) plus the payload."""
     import io
 
-    buf = io.BytesIO()
+    out = io.BytesIO()
+    out.write(b"\x0a\x00\x00")
+    _nbt_write(tree, out)
+    return out.getvalue()
 
-    def write_tag(tag_type, name, write_value):
-        buf.write(struct.pack(">b", tag_type))
-        if name is not None:
-            name_bytes = name.encode("utf-8")
-            buf.write(struct.pack(">H", len(name_bytes)))
-            buf.write(name_bytes)
-        if write_value:
-            write_value()
 
-    def write_byte(val):
-        buf.write(struct.pack(">b", val))
+def _generate_level_dat(save_dir, world_name, data_version=None):
+    """Generate a superflat level.dat (gzip + NBT).
 
-    def write_int(val):
-        buf.write(struct.pack(">i", val))
+    The tree mirrors what the game writes for a flat 1.17-1.20 world. Hand
+    writing the byte stream tag by tag dropped the root header, tagged ints as
+    longs and emitted "layers" as an empty compound, so the game refused every
+    world with "Loading NBT data: EOFException" / "Overworld settings
+    missing" / "Failed to load data pack config".
+    """
+    import gzip
 
-    def write_long(val):
-        buf.write(struct.pack(">q", val))
-
-    def write_string(val):
-        data = val.encode("utf-8")
-        buf.write(struct.pack(">H", len(data)))
-        buf.write(data)
-
-    def write_compound(entries):
-        for tag_type, name, write_fn in entries:
-            write_tag(tag_type, name, write_fn)
-        buf.write(b"\x00")  # TAG_End
-
-    def _gen():
-        write_compound([
-            # Data compound
-            (10, "Data", lambda: write_compound([
-                (4, "DataVersion", lambda: write_int(3953)),
-                (4, "version", lambda: write_int(19133)),
-                (8, "LevelName", lambda: write_string(world_name)),
-                (4, "GameType", lambda: write_int(1)),
-                (1, "MapFeatures", lambda: write_byte(1)),
-                (1, "allowCommands", lambda: write_byte(1)),
-                (1, "hardcore", lambda: write_byte(0)),
-                (1, "Difficulty", lambda: write_byte(2)),
-                (1, "DifficultyLocked", lambda: write_byte(0)),
-                (3, "SpawnX", lambda: write_int(0)),
-                (3, "SpawnY", lambda: write_int(5)),
-                (3, "SpawnZ", lambda: write_int(0)),
-                (4, "RandomSeed", lambda: write_long(42)),
-                (8, "generatorName", lambda: write_string("flat")),
-                (8, "generatorOptions", lambda: write_string(
-                    "3;minecraft:bedrock,2*minecraft:dirt,minecraft:grass;1;village")),
-                (1, "initialized", lambda: write_byte(1)),
-                (4, "LastPlayed", lambda: write_long(int(time.time() * 1000))),
-                (4, "Time", lambda: write_long(0)),
-                (4, "DayTime", lambda: write_long(1000)),
-                (4, "ClearWeatherTime", lambda: write_int(0)),
-                (4, "rainTime", lambda: write_int(0)),
-                (4, "thunderTime", lambda: write_int(0)),
-                (1, "raining", lambda: write_byte(0)),
-                (1, "thundering", lambda: write_byte(0)),
-                (10, "GameRules", lambda: write_compound([
-                    (8, "doDaylightCycle", lambda: write_string("true")),
-                    (8, "doWeatherCycle", lambda: write_string("true")),
-                    (8, "doFireTick", lambda: write_string("false")),
-                    (8, "doMobSpawning", lambda: write_string("false")),
-                    (8, "keepInventory", lambda: write_string("true")),
-                ])),
-                (10, "WorldGenSettings", lambda: write_compound([
-                    (1, "bonus_chest", lambda: write_byte(0)),
-                    (1, "generate_features", lambda: write_byte(1)),
-                    (10, "dimensions", lambda: write_compound([
-                        (10, "minecraft:overworld", lambda: write_compound([
-                            (8, "type", lambda: write_string("minecraft:overworld")),
-                            (10, "generator", lambda: write_compound([
-                                (8, "type", lambda: write_string("minecraft:flat")),
-                                (10, "settings", lambda: write_compound([
-                                    (10, "layers", lambda: write_compound([])),
-                                    (8, "biome", lambda: write_string("minecraft:plains")),
-                                ])),
-                            ])),
-                        ])),
-                    ])),
-                ])),
-            ])),
-        ])
-
-    _gen()
+    dv = int(data_version if data_version is not None else 3953)
+    tree = {"Data": {
+        "DataVersion": _Int(dv),
+        "version": _Int(19133),
+        "LevelName": world_name,
+        "GameType": _Int(1),
+        "MapFeatures": _Byte(1),
+        "allowCommands": _Byte(1),
+        "hardcore": _Byte(0),
+        "Difficulty": _Byte(2),
+        "DifficultyLocked": _Byte(0),
+        "SpawnX": _Int(0),
+        "SpawnY": _Int(10),
+        "SpawnZ": _Int(0),
+        "RandomSeed": _Long(42),
+        "generatorName": "flat",
+        "initialized": _Byte(1),
+        "LastPlayed": _Long(int(time.time() * 1000)),
+        "Time": _Long(0),
+        "DayTime": _Long(1000),
+        "clearWeatherTime": _Int(0),
+        "rainTime": _Int(0),
+        "thunderTime": _Int(0),
+        "raining": _Byte(0),
+        "thundering": _Byte(0),
+        "DataPacks": {"Enabled": ["vanilla"], "Disabled": []},
+        "GameRules": {
+            "doDaylightCycle": "true",
+            "doWeatherCycle": "true",
+            "doFireTick": "false",
+            "doMobSpawning": "false",
+            "keepInventory": "true",
+        },
+        "WorldGenSettings": {
+            "bonus_chest": _Byte(0),
+            "seed": _Long(42),
+            "generate_features": _Byte(1),
+            "dimensions": {
+                "minecraft:overworld": {
+                    "type": "minecraft:overworld",
+                    "generator": {
+                        "type": "minecraft:flat",
+                        "settings": {
+                            "features": _Int(1),
+                            "biome": "minecraft:plains",
+                            "lakes": _Byte(0),
+                            "layers": [
+                                {"block": "minecraft:bedrock", "height": _Int(1)},
+                                {"block": "minecraft:dirt", "height": _Int(2)},
+                                {"block": "minecraft:grass_block", "height": _Int(1)},
+                            ],
+                            "structure_overrides": [],
+                        },
+                    },
+                },
+                "minecraft:the_nether": {
+                    "type": "minecraft:the_nether",
+                    "generator": {
+                        "type": "minecraft:noise",
+                        "settings": "minecraft:nether",
+                        "biome_source": {"type": "minecraft:multi_noise", "preset": "minecraft:nether"},
+                    },
+                },
+                "minecraft:the_end": {
+                    "type": "minecraft:the_end",
+                    "generator": {
+                        "type": "minecraft:noise",
+                        "settings": "minecraft:end",
+                        "biome_source": {"type": "minecraft:the_end"},
+                    },
+                },
+            },
+        },
+    }}
+    payload = _nbt_encode_root(tree)
 
     level_dat = safe_join(save_dir, "level.dat")
     os.makedirs(save_dir, exist_ok=True)
     with gzip.open(level_dat, "wb") as f:
-        f.write(buf.getvalue())
+        f.write(payload)
 
     session_lock = safe_join(save_dir, "session.lock")
     with open(session_lock, "wb") as f:
@@ -553,18 +667,114 @@ def api_call(mod_url, cmd, params=None, timeout=30, retries=4):
 
 
 def get_screenshot(mod_url, timeout=60):
-    """Get a screenshot from the mod and return raw PNG bytes."""
+    """Get a screenshot from the mod and return raw PNG bytes.
+
+    /api/screenshot answers with a JSON envelope
+    ({"original": "data:image/png;base64,...", "grid": ..., "width", "height"}),
+    not a bare PNG. Everything downstream - verify_screenshot, the saved
+    screenshots/, compare_screenshots_* - expects bytes, so unwrap here; this
+    is the single place that knows about the envelope.
+    """
     _assert_local_mod_url(mod_url)
     req = urllib.request.Request(
         f"{mod_url}/api/screenshot",
         headers={"User-Agent": "minecraft-mcp-ci", **_mod_auth_headers()},
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read()
+        body = resp.read()
+    if body[:1] == b"{":
+        try:
+            envelope = json.loads(body.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return body
+        for key in ("original", "grid"):
+            uri = envelope.get(key) if isinstance(envelope, dict) else None
+            if isinstance(uri, str) and uri.startswith("data:image/png;base64,"):
+                try:
+                    return base64.b64decode(uri.split(",", 1)[1])
+                except (ValueError, TypeError):
+                    break
+    return body
 
 
-def verify_screenshot(png_data, min_size_kb=1):
-    """Verify that PNG data appears valid (has PNG header and reasonable size)."""
+def _png_pixel_stats(png_data):
+    """Decode a PNG well enough to tell a real frame from a blank one.
+
+    Returns (width, height, distinct_colours_sampled) or raises. Only the
+    standard library is available in CI, so this inflates IDAT by hand.
+    """
+    import struct
+    import zlib
+
+    if png_data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("not a PNG")
+    pos = 8
+    width = height = bit_depth = color_type = None
+    idat = bytearray()
+    while pos + 8 <= len(png_data):
+        length = struct.unpack_from(">I", png_data, pos)[0]
+        ctype = png_data[pos + 4:pos + 8]
+        data = png_data[pos + 8:pos + 8 + length]
+        pos += 12 + length
+        if ctype == b"IHDR":
+            width, height = struct.unpack_from(">II", data, 0)
+            bit_depth = data[8]
+            color_type = data[9]
+        elif ctype == b"IDAT":
+            idat += data
+        elif ctype == b"IEND":
+            break
+    if width is None or bit_depth != 8 or color_type not in (2, 6):
+        raise ValueError(f"unsupported PNG colour type {color_type} / depth {bit_depth}")
+    channels = 3 if color_type == 2 else 4
+    stride = width * channels
+    raw = zlib.decompress(bytes(idat))
+
+    def paeth(a, b, c):
+        p = a + b - c
+        pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+        return a if pa <= pb and pa <= pc else (b if pb <= pc else c)
+
+    prev = bytearray(stride)
+    colors = set()
+    rpos = 0
+    # Sample a grid rather than every pixel: enough to catch a flat frame.
+    step_y = max(1, height // 64)
+    step_x = max(1, width // 64)
+    for y in range(height):
+        ftype = raw[rpos]
+        rpos += 1
+        line = bytearray(raw[rpos:rpos + stride])
+        rpos += stride
+        if ftype == 1:
+            for i in range(channels, stride):
+                line[i] = (line[i] + line[i - channels]) & 0xFF
+        elif ftype == 2:
+            for i in range(stride):
+                line[i] = (line[i] + prev[i]) & 0xFF
+        elif ftype == 3:
+            for i in range(stride):
+                left = line[i - channels] if i >= channels else 0
+                line[i] = (line[i] + ((left + prev[i]) >> 1)) & 0xFF
+        elif ftype == 4:
+            for i in range(stride):
+                left = line[i - channels] if i >= channels else 0
+                upleft = prev[i - channels] if i >= channels else 0
+                line[i] = (line[i] + paeth(left, prev[i], upleft)) & 0xFF
+        prev = line
+        if y % step_y == 0:
+            for x in range(0, stride, channels * step_x):
+                colors.add(bytes(line[x:x + 3]))
+    return width, height, len(colors)
+
+
+def verify_screenshot(png_data, min_size_kb=1, min_colors=16):
+    """Verify that PNG data is a real frame, not a blank capture.
+
+    Size alone proved useless: a single-colour 1280x720 PNG is 5 KB, which
+    passed the old 1 KB floor while every screenshot on 1.17-1.21.4 was blank.
+    Sampling distinct colours catches a flat frame at any resolution.
+    """
     if not png_data or len(png_data) < 8:
         return False, "Empty or too small"
     if png_data[:8] != b"\x89PNG\r\n\x1a\n":
@@ -572,7 +782,49 @@ def verify_screenshot(png_data, min_size_kb=1):
     size_kb = len(png_data) // 1024
     if size_kb < min_size_kb:
         return False, f"PNG too small ({size_kb}KB < {min_size_kb}KB)"
-    return True, f"Valid PNG, {size_kb}KB"
+    try:
+        width, height, colors = _png_pixel_stats(png_data)
+    except Exception as e:
+        return False, f"PNG unreadable ({e})"
+    if colors < min_colors:
+        return False, f"blank frame: {colors} distinct colour(s) sampled in {width}x{height}"
+    return True, f"Valid PNG {width}x{height}, {size_kb}KB, {colors} sampled colours"
+
+
+def valid_player_info(resp):
+    """A player read that found the player, not a stub.
+
+    The old check only asserted isinstance(dict), so {"name": null} passed and
+    every Forge lane shipped with get_player_info returning a stub (issue #100).
+    Keep it loose on game state: a dead player really does report health 0, and
+    a player can legitimately stand at the origin.
+    """
+    if not isinstance(resp, dict) or "error" in resp:
+        return False
+    name = resp.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return False
+    try:
+        float(resp.get("health"))
+        coords = [float(v) for v in str(resp.get("pos", "")).split()]
+    except (TypeError, ValueError):
+        return False
+    return len(coords) == 3
+
+
+def valid_world_info(resp):
+    """A world read that found a level, not a null/placeholder stub.
+
+    A save may legitimately be called "unknown", so only the shapes the mod
+    emits when it found nothing are rejected: a null name, or the literal
+    "MpServer" placeholder a client-side WorldInfo carries in multiplayer.
+    """
+    if not isinstance(resp, dict) or "error" in resp:
+        return False
+    name = resp.get("world_name")
+    if not isinstance(name, str) or not name.strip():
+        return False
+    return name != "MpServer"
 
 
 def compare_screenshots(new_data, ref_path, threshold=0.02):
@@ -774,6 +1026,95 @@ def _dump_game_diagnostics(reason, tail_lines=80):
                 pass
 
 
+
+def mc_version_tuple(mc_ver):
+    """(major, minor, patch) of a MC version string, (1, 0) on garbage."""
+    try:
+        return tuple(int(x) for x in str(mc_ver).split("."))
+    except ValueError:
+        return (1, 0)
+
+
+def era_launch_flags(mc_ver, loader, world_name=None):
+    """Era-appropriate launch flags shared by the smoke and screenshot jobs.
+
+    Returns (extra_jvm, extra_game, can_quick_play):
+      extra_jvm      - JVM system properties the era needs under Xvfb/llvmpipe;
+      extra_game     - quick play for the test save when the version has it;
+      can_quick_play - whether the version can enter a world without the GUI.
+
+    Keeping the smoke and screenshot launches on the same flags matters: the
+    screenshot job used to launch without the early-display suppression and
+    captured a single-colour frame on 1.20.4-forge while the smoke lane, with
+    the flags, captured a real frame of the same version.
+    """
+    try:
+        vtuple = tuple(int(x) for x in str(mc_ver).split("."))
+    except ValueError:
+        vtuple = (1, 0)
+    major = vtuple[0]
+    parts = []
+    # MC 26.3+ (Render Pearl) on Forge/NeoForge: BOTH the AWT-headless trick
+    # and the disableEarlyDisplay flags suppress FML's early GLFW window,
+    # which forces Render Pearl to create its own GLX/Vulkan window - and
+    # that dies on the runner's llvmpipe stack ("Couldn't find matching GLX
+    # visual" + "no VK_KHR_surface"), fatally on NeoForge-patched init.
+    # Letting FML open its (working, GLFW-based) early window lets Render
+    # Pearl adopt that context instead. Older lanes keep the original flags.
+    renderpearl = loader in ("forge", "neoforge") and vtuple >= (26, 3)
+    if major >= 13 and not renderpearl:
+        parts.append("-Djava.awt.headless=true")
+    # Forge >= 1.20.5 and NeoForge >= 20.6 open an early GL window that
+    # times out under Xvfb/llvmpipe ("Timed out trying to setup the Game
+    # Window"); older loaders ignore the properties. NeoForge 20.6.x still
+    # reads the forge-prefixed switch, 21+ the neoforged one.
+    if loader in ("forge", "neoforge") and not renderpearl:
+        parts.append("-Dforge.disableEarlyDisplay=true")
+        parts.append("-Dneoforge.disableEarlyDisplay=true")
+    # Quick play is the only non-GUI way into a world; versions before 1.20
+    # have none and stay on the main menu.
+    can_quick_play = vtuple >= (1, 20)
+    extra_game = f"--quickPlaySingleplayer {world_name}" if world_name and can_quick_play else ""
+    return " ".join(parts), extra_game, can_quick_play
+
+
+def wait_for_player(mod_url, timeout_s=90):
+    """Poll until the player entity is readable, for lanes that entered a world.
+
+    The world keeps loading after the HTTP server answers (spawn prep on
+    llvmpipe is slow, and the 26.x renderer adds more), so a fixed sleep
+    asserted mid-load and read stubs even though the world was about to come
+    up. Returns True when a player appeared, False on timeout.
+    """
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        try:
+            if valid_player_info(api_call(mod_url, "get_player_info", {}, retries=1)):
+                time.sleep(3)  # let the first ticks settle before asserting
+                return True
+        except Exception:
+            pass
+        time.sleep(3)
+    return False
+
+
+def capture_screenshot(mod_url, attempts=2, timeout=90):
+    """get_screenshot with one retry for transient transport drops.
+
+    The JDK 8 fabric lanes on llvmpipe occasionally close the screenshot
+    connection mid-response; a second attempt reads fine.
+    """
+    last = None
+    for attempt in range(attempts):
+        try:
+            return get_screenshot(mod_url, timeout=timeout)
+        except Exception as e:
+            last = e
+            time.sleep(5)
+    raise last
+
+
+
 def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=None, timeout=300):
     """Run a full smoke test: launch MC, test APIs, verify screenshot.
 
@@ -786,7 +1127,11 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     install_mod_jar(mod_jar)
 
     if world_name:
-        install_test_world(world_name)
+        # The launcher's game directory is <mc>/mcp_launcher/game when no
+        # --mc-dir is passed (settings.ts:gameDirPath), and quick play
+        # resolves the save relative to it - MC_DIR/saves is never read.
+        install_test_world(world_name, mc_dir=str(GAME_DIR),
+                           data_version=data_version_for(mc_ver))
 
     version_name = setup_mc_version(mc_ver, loader)
     if not version_name:
@@ -806,54 +1151,38 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     # connection"), while LWJGL3-era loads benefit (Forge >= 1.20.5 skips
     # its EarlyDisplay window when AWT is headless). Apply it only to
     # MC >= 1.13.
-    parts = []
-    try:
-        major = int(mc_ver.split(".")[0])
-    except ValueError:
-        major = 1
-    try:
-        vtuple = tuple(int(x) for x in mc_ver.split("."))
-    except ValueError:
-        vtuple = (1, 0)
-    # MC 26.3+ (Render Pearl) on Forge/NeoForge: BOTH the AWT-headless trick
-    # and the disableEarlyDisplay flags suppress FML's early GLFW window,
-    # which forces Render Pearl to create its own GLX/Vulkan window - and
-    # that dies on the runner's llvmpipe stack ("Couldn't find matching GLX
-    # visual" + "no VK_KHR_surface"), fatally on NeoForge-patched init.
-    # Letting FML open its (working, GLFW-based) early window lets Render
-    # Pearl adopt that context instead. Older lanes keep the original flags.
-    renderpearl = loader in ("forge", "neoforge") and vtuple >= (26, 3)
-    if major >= 13 and not renderpearl:
-        parts.append("-Djava.awt.headless=true")
-    # Forge >= 1.20.5 and NeoForge >= 20.6 open an early GL window that
-    # times out under Xvfb/llvmpipe ("Timed out trying to setup the Game
-    # Window"); older loaders ignore the properties. NeoForge 20.6.x still
-    # reads the forge-prefixed switch, 21+ the neoforged one.
-    if loader in ("forge", "neoforge") and not renderpearl:
-        parts.append("-Dforge.disableEarlyDisplay=true")
-        parts.append("-Dneoforge.disableEarlyDisplay=true")
-    if world_name:
-        parts.append(f"-Dmcp.test.world={world_name}")
-    extra_jvm = " ".join(parts)
+    extra_jvm, extra_game, can_quick_play = era_launch_flags(mc_ver, loader, world_name)
 
     launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
     try:
         # Show exactly what will be executed: zero-output deaths leave no
         # other trace on the runner.
+        # JVM flags go through JAVA_TOOL_OPTIONS: the JVM reads it itself, so
+        # they never travel through our own argument assembly (where the
+        # "-D..." strings were being shredded into single characters on the
+        # runners). Game args stay on the env path the plan showed working.
+        _log(f"  [flags] extra_jvm={extra_jvm!r} extra_game={extra_game!r}")
+        if extra_jvm:
+            env["JAVA_TOOL_OPTIONS"] = extra_jvm
+        else:
+            env.pop("JAVA_TOOL_OPTIONS", None)
+        env["MC_MCP_EXTRA_GAME"] = extra_game
         dry = subprocess.run(
             ["node", launcher, "launch", version_name, "--headless",
              "--memory", "2048",
-             "--extra-jvm", extra_jvm,
              "--mod-jar", str(mod_jar), "--dry-run"],
             env=env, capture_output=True, text=True, timeout=120,
         )
-        _log("Dry-run launch plan:")
-        for line in ((dry.stdout or "") + (dry.stderr or "")).splitlines()[:14]:
+        plan_lines = ((dry.stdout or "") + (dry.stderr or "")).splitlines()
+        node_version = subprocess.run(["node", "--version"], capture_output=True, text=True).stdout.strip()
+        _log(f"Node: {node_version}")
+        _log("Dry-run launch plan (first 14 lines):")
+        for line in plan_lines[:14]:
             _log(f"  [plan] {line[:220]}")
+        _log(f"  [flags] env JAVA_TOOL_OPTIONS={env.get('JAVA_TOOL_OPTIONS')!r}")
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name, "--headless",
              "--memory", "2048",
-             "--extra-jvm", extra_jvm,
              "--mod-jar", str(mod_jar)],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
@@ -880,6 +1209,11 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     except TimeoutError:
         results["mod_ready"] = {"passed": False, "detail": "HTTP server not found"}
         _dump_game_diagnostics("mod never became ready")
+        # The dry-run plan is the exact command the JVM rejected; dump it in
+        # full (the 14-line preview above hides the Args section).
+        _log("  [plan] full launch command the JVM rejected:")
+        for line in plan_lines:
+            _log(f"  [plan] {line[:300]}")
         kill_minecraft()
         return results
 
@@ -892,10 +1226,16 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         pass
     time.sleep(1)
 
+    # Quick play exists from 1.20; before it there is no non-GUI way into a
+    # world, so on those lanes the game stays on the main menu and the player
+    # and world reads legitimately answer with stubs - assert shape only there.
+    can_quick_play = mc_version_tuple(mc_ver) >= (1, 20)
+    info_validator = valid_player_info if can_quick_play else (lambda r: isinstance(r, dict))
+    world_validator = valid_world_info if can_quick_play else (lambda r: isinstance(r, dict))
     tests = [
         ("ping", {}, lambda r: r.get("result") == "pong"),
-        ("get_player_info", {}, lambda r: isinstance(r, dict)),
-        ("get_world_info", {}, lambda r: isinstance(r, dict)),
+        ("get_player_info", {}, info_validator),
+        ("get_world_info", {}, world_validator),
         ("execute_command", {"command": "/time set day"},
          lambda r: isinstance(r, dict)),
         # The screenshot workspace jail (issue #81): an escaping path must be
@@ -917,27 +1257,36 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
             results[cmd] = {"passed": False, "detail": str(e)}
             _log(f"  TEST [{cmd}]: ERROR - {e}")
 
-    try:
-        png_data = get_screenshot(mod_url)
-        ok, detail = verify_screenshot(png_data, min_size_kb=1)
-        results["screenshot"] = {"passed": ok, "detail": detail}
-        if ok:
-            ss_path = SCREENSHOT_DIR / f"{mc_ver}_{loader}_{int(time.time())}.png"
-            ss_path.parent.mkdir(parents=True, exist_ok=True)
-            ss_path.write_bytes(png_data)
-            _log(f"  TEST [screenshot]: PASS ({detail}), saved to {ss_path}")
+    capture_supported = mc_version_tuple(mc_ver) < (26, 1, 2)
+    if not capture_supported:
+        # 26.x renderers answer /api/screenshot with HTTP 500: the capture
+        # path does not know them yet. Record a documented skip so the lane
+        # still asserts the API contract without pretending the pixels were
+        # checked.
+        _log("  TEST [screenshot]: SKIP (capture not implemented for this renderer era)")
+        results["screenshot"] = {"passed": True, "skipped": True,
+                                 "detail": "capture not implemented for this renderer era"}
+    else:
+        try:
+            png_data = capture_screenshot(mod_url)
+            ok, detail = verify_screenshot(png_data, min_size_kb=1)
+            results["screenshot"] = {"passed": ok, "detail": detail}
+            if ok:
+                ss_path = SCREENSHOT_DIR / f"{mc_ver}_{loader}_{int(time.time())}.png"
+                ss_path.parent.mkdir(parents=True, exist_ok=True)
+                ss_path.write_bytes(png_data)
+                _log(f"  TEST [screenshot]: PASS ({detail}), saved to {ss_path}")
 
-            ref_path = REF_SCREENSHOT_DIR / f"ref_{mc_ver}_{loader}.png"
-            if ref_path.exists():
-                ok2, detail2 = compare_screenshots_structural(str(ss_path), str(ref_path))
-                results["screenshot_compare"] = {"passed": ok2, "detail": detail2}
-                _log(f"  TEST [screenshot_compare]: {'PASS' if ok2 else 'FAIL'} ({detail2})")
-        else:
-            _log(f"  TEST [screenshot]: SKIP ({detail})")
-            results["screenshot"] = {"passed": True, "detail": f"skipped: {detail}"}
-    except Exception as e:
-        _log(f"  TEST [screenshot]: SKIP ({e})")
-        results["screenshot"] = {"passed": True, "detail": f"skipped: {e}"}
+                ref_path = REF_SCREENSHOT_DIR / f"ref_{mc_ver}_{loader}.png"
+                if ref_path.exists():
+                    ok2, detail2 = compare_screenshots_structural(str(ss_path), str(ref_path))
+                    results["screenshot_compare"] = {"passed": ok2, "detail": detail2}
+                    _log(f"  TEST [screenshot_compare]: {'PASS' if ok2 else 'FAIL'} ({detail2})")
+            else:
+                _log(f"  TEST [screenshot]: FAIL ({detail})")
+        except Exception as e:
+            _log(f"  TEST [screenshot]: FAIL ({e})")
+            results["screenshot"] = {"passed": False, "detail": str(e)[:200]}
 
     if any(not v.get("passed") for v in results.values()):
         _dump_game_diagnostics("at least one API test failed")
@@ -968,7 +1317,8 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
     kill_minecraft()
     setup_xvfb(screen="1280x720x24")
     install_mod_jar(mod_jar)
-    install_test_world(world_name)
+    install_test_world(world_name, mc_dir=str(GAME_DIR),
+                       data_version=data_version_for(mc_ver))
 
     version_name = setup_mc_version(mc_ver, loader)
     if not version_name:
@@ -1133,7 +1483,8 @@ def main():
         kill_minecraft()
         setup_xvfb(screen="1280x720x24")
         install_mod_jar(mod_jar)
-        install_test_world(args.world)
+        install_test_world(args.world, mc_dir=str(GAME_DIR),
+                           data_version=data_version_for(args.mc_ver))
 
         version_name = setup_mc_version(args.mc_ver, args.loader)
         if not version_name:
@@ -1142,9 +1493,16 @@ def main():
 
         launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
         ensure_mod_token()
+        extra_jvm, extra_game, can_quick_play = era_launch_flags(args.mc_ver, args.loader, args.world)
+        if extra_jvm:
+            os.environ["JAVA_TOOL_OPTIONS"] = extra_jvm
+        else:
+            os.environ.pop("JAVA_TOOL_OPTIONS", None)
+        os.environ["MC_MCP_EXTRA_GAME"] = extra_game
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name,
-             "--memory", "2048", "--mod-jar", str(args.mod_jar)],
+             "--memory", "2048",
+             "--mod-jar", str(args.mod_jar)],
             env=os.environ.copy(),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
@@ -1152,8 +1510,11 @@ def main():
 
         try:
             mod_url = wait_for_mod(timeout=240)
-            time.sleep(15)
-            png = get_screenshot(mod_url)
+            if can_quick_play:
+                wait_for_player(mod_url, timeout_s=120)
+            else:
+                time.sleep(15)
+            png = capture_screenshot(mod_url)
             ok, detail = verify_screenshot(png)
             print(f"SCREENSHOT: {'PASS' if ok else 'FAIL'} - {detail}")
             ss_path = SCREENSHOT_DIR / f"ref_ci_{args.mc_ver}_{args.loader}.png"

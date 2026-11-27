@@ -166,6 +166,12 @@ Options:
     return;
   }
 
+  // The two free-form flags are extracted BEFORE parseArgs, by literal
+  // next-entry pairing: their values start with "-" ("-Dprop=...",
+  // "--quickPlay..."), and parseArgs has shuffled such values between option
+  // and positional across Node releases, which silently dropped them.
+  const extraJvmFlags = takeAllFlags(args, "--extra-jvm").join(" ");
+  const extraGameArgsRaw = takeAllFlags(args, "--game-args").join(" ");
   const { values, positionals } = parseArgs({
     args,
     options: {
@@ -175,7 +181,6 @@ Options:
       memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
       "min-memory": { type: "string" },
       "jvm-args": { type: "string" },
-      "game-args": { type: "string" },
       fullscreen: { type: "boolean", default: false },
       width: { type: "string" },
       height: { type: "string" },
@@ -185,19 +190,9 @@ Options:
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
       headless: { type: "boolean", default: false },
-      // multiple: "--extra-jvm -Da=x -Db=y" would otherwise be shredded by
-      // parseArgs when the value starts with "-" (strict:false treats the
-      // flag as boolean and explodes the value into one-char tokens).
-      "extra-jvm": { type: "string", multiple: true },
     },
     strict: false,
   });
-
-  // --extra-jvm may be passed multiple times (or hold several properties);
-  // normalize to one space-joined string.
-  const extraJvmFlags = Array.isArray(values["extra-jvm"])
-    ? (values["extra-jvm"] as string[]).join(" ")
-    : (values["extra-jvm"] as string | undefined);
 
   const versionArg = positionals[0];
   const loader = (values.loader ?? GAME.defaultLoader) as Loader;
@@ -215,7 +210,7 @@ Options:
   const extraJvmParts: string[] = [];
   if (config.java_args) extraJvmParts.push(config.java_args);
   if (typeof values["jvm-args"] === "string") extraJvmParts.push(values["jvm-args"]);
-  if (typeof extraJvmFlags === "string") extraJvmParts.push(extraJvmFlags);
+  if (typeof extraJvmFlags === "string" && extraJvmFlags.length > 0) extraJvmParts.push(extraJvmFlags);
 
   const launchConfig: LaunchConfig = {
     versionId,
@@ -234,10 +229,14 @@ Options:
     minMemoryMb: typeof values["min-memory"] === "string"
       ? parseInt(values["min-memory"] as string, 10)
       : config.min_memory_mb,
-    extraJvmArgs: extraJvmParts.length > 0 ? extraJvmParts.join(" ") : undefined,
+    // CI passes free-form jvm/game args through env: the values start with
+    // "-" and argv tokenization has shredded them on some runner setups.
+    extraJvmArgs: extraJvmParts.length > 0
+      ? extraJvmParts.join(" ")
+      : (process.env.MC_MCP_EXTRA_JVM || undefined),
     extraGameArgs: buildExtraGameArgs(
       config.game_args,
-      typeof values["game-args"] === "string" ? (values["game-args"] as string) : undefined,
+      extraGameArgsRaw || process.env.MC_MCP_EXTRA_GAME || undefined,
       values.server,
       values["server-port"],
       versionArg,
@@ -760,7 +759,7 @@ Resources:
       memory: { type: "string", default: String(GAME.defaultServerMemoryMb) },
       "min-memory": { type: "string" },
       "jvm-args": { type: "string" },
-      "game-args": { type: "string" },
+      "game-args": { type: "string", multiple: true },
       port: { type: "string", default: String(GAME.defaultServerPort) },
       motd: { type: "string" },
       "max-players": { type: "string" },
@@ -817,7 +816,7 @@ Resources:
     parts.push(`-Dmcp.port=0`);
     if (typeof values["jvm-args"] === "string") parts.push(...(values["jvm-args"] as string).split(/\s+/).filter(Boolean));
     parts.push(`-jar`, setup.jarPath, `--nogui`);
-    if (typeof values["game-args"] === "string") parts.push(...(values["game-args"] as string).split(/\s+/).filter(Boolean));
+    { const ga = gameArgsString(values["game-args"]); if (ga) parts.push(...ga.split(/\s+/).filter(Boolean)); }
     console.log(`\n[dry-run] Command:`);
     console.log(`  ${parts.join(" ")}`);
     console.log(`\n[dry-run] Server properties:`);
@@ -837,7 +836,7 @@ Resources:
     maxMemoryMb: maxMem,
     minMemoryMb: minMem,
     extraJvmArgs: typeof values["jvm-args"] === "string" ? (values["jvm-args"] as string) : undefined,
-    extraGameArgs: typeof values["game-args"] === "string" ? (values["game-args"] as string) : undefined,
+    extraGameArgs: gameArgsString(values["game-args"]),
     port: serverPort,
   });
 
@@ -1071,7 +1070,7 @@ Client Options:
       "server-memory": { type: "string", default: String(GAME.defaultServerMemoryMb) },
       "server-min-memory": { type: "string" },
       "jvm-args": { type: "string" },
-      "game-args": { type: "string" },
+      "game-args": { type: "string", multiple: true },
       "server-game-args": { type: "string" },
       fullscreen: { type: "boolean", default: false },
       width: { type: "string" },
@@ -1160,9 +1159,37 @@ Client Options:
   if (typeof values.height === "string") launchArgs.push("--height", values.height);
   if (typeof values["min-memory"] === "string") launchArgs.push("--min-memory", values["min-memory"]);
   if (typeof values["jvm-args"] === "string") launchArgs.push("--jvm-args", values["jvm-args"]);
-  if (typeof values["game-args"] === "string") launchArgs.push("--game-args", values["game-args"]);
+  { const ga = gameArgsString(values["game-args"]); if (ga) launchArgs.push("--game-args", ga); }
 
   await runLaunch(launchArgs);
+}
+
+
+/**
+ * Literal flag extraction, immune to parseArgs tokenization: pair each
+ * occurrence of `name` with the raw next argv entry (even when it starts
+ * with "-") and remove both. Node releases have shuffled dash-prefixed
+ * values between option and positional, which silently dropped "-D..." and
+ * "--quickPlay..." style payloads.
+ */
+function takeAllFlags(argv: string[], name: string): string[] {
+  const taken: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== name) continue;
+    const value = argv[i + 1];
+    argv.splice(i, 2);
+    i--;
+    if (value !== undefined) taken.push(value);
+  }
+  return taken;
+}
+
+function gameArgsString(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    const parts = (value as unknown[]).filter((v): v is string => typeof v === "string");
+    return parts.length ? parts.join(" ") : undefined;
+  }
+  return typeof value === "string" ? value : undefined;
 }
 
 main().catch((err) => {

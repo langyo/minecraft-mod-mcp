@@ -378,10 +378,33 @@ public final class ScreenshotHelper {
         int fboId = 0;
         if (fb != null) {
             try {
-                for (Field f : ReflectionCache.getAllFields(fb.getClass())) {
-                    f.setAccessible(true);
-                    if (f.getType() == int.class) {
-                        try { int fv = f.getInt(fb); if (fv > 0 && fboId == 0) fboId = fv; } catch (Exception ignored) {}
+                // 1.17-1.21.4 RenderTarget keeps the FBO and the colour
+                // texture as plain int fields: take them by name. Picking
+                // "the first positive int" grabbed `width` (1280), and the
+                // reader below then bound a framebuffer that does not exist
+                // and returned the untouched back buffer - blank screenshots
+                // on those versions.
+                int namedFbo = getIntFieldByName(fb, "frameBufferId", "framebufferId", "f_83920_");
+                int namedTex = getIntFieldByName(fb, "colorTextureId", "f_83923_");
+                if (namedFbo > 0 && isFramebufferName(namedFbo)) fboId = namedFbo;
+                if (namedTex > 0) colorTexId = namedTex;
+                // Structural inference is for the 1.17-1.21.4 field layout
+                // only. From 1.21.5 the target holds GpuTexture objects and
+                // the getFbo path below is authoritative, so an int that
+                // merely happens to name a live framebuffer must not win.
+                if ((fboId == 0 || colorTexId == 0) && !hasGpuTextureField(fb)) {
+                    // Intermediary runtimes name these fields field_*, so ask
+                    // GL which positive int is a framebuffer and which a
+                    // texture: those answers cannot be guessed wrong.
+                    for (Field f : ReflectionCache.getAllFields(fb.getClass())) {
+                        if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) || f.getType() != int.class) continue;
+                        try {
+                            f.setAccessible(true);
+                            int v = f.getInt(fb);
+                            if (v <= 0) continue;
+                            if (fboId == 0 && isFramebufferName(v)) { fboId = v; continue; }
+                            if (colorTexId == 0 && isTextureName(v)) colorTexId = v;
+                        } catch (Exception ignored) {}
                     }
                 }
                 if (fboId == 0) {
@@ -535,28 +558,140 @@ public final class ScreenshotHelper {
         Class<?> gl11 = Class.forName("org.lwjgl.opengl.GL11");
         int GL_RGBA = gl11.getDeclaredField("GL_RGBA").getInt(null);
         int GL_UB = gl11.getDeclaredField("GL_UNSIGNED_BYTE").getInt(null);
-        int GL_FRONT = 0x0404;
         for (Method m : gl11.getMethods()) { if (m.getName().equals("glFinish") && m.getParameterCount() == 0) { try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}; break; } }
-        for (Method m : gl11.getMethods()) {
-            if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) { try { m.setAccessible(true); m.invoke(null, GL_FRONT); } catch (Exception ignored) {}; break; }
-        }
-        for (Method m : gl11.getMethods()) { if (m.getName().equals("glFinish") && m.getParameterCount() == 0) { try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}; break; } }
-        ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
+        // Read from the render target's own FBO: bind it as the read
+        // framebuffer and select its colour attachment. glReadBuffer only
+        // takes GL_FRONT/GL_BACK for the default framebuffer; on an FBO it
+        // must name an attachment, and leaving the default BACK selection in
+        // place returned the untouched back buffer (blank screenshots).
+        int prevReadFbo = 0;
+        int prevReadBuffer = GL_BACK;
+        try {
+            for (Method m : gl11.getMethods()) {
+                if (m.getName().equals("glGetInteger") && m.getParameterCount() == 1) {
+                    try { m.setAccessible(true); Integer buf = (Integer) m.invoke(null, GL_READ_BUFFER); if (buf != null) prevReadBuffer = buf; } catch (Exception ignored) {}
+                    break;
+                }
+            }
+            for (Method m : gl11.getMethods()) {
+                if (m.getName().equals("glGetInteger") && m.getParameterCount() == 1) {
+                    try { m.setAccessible(true); Integer bound = (Integer) m.invoke(null, GL_READ_FRAMEBUFFER_BINDING); if (bound != null) prevReadFbo = bound; } catch (Exception ignored) {}
+                    break;
+                }
+            }
+            Method bindFramebuffer = glBindFramebufferMethod();
+            if (bindFramebuffer != null) bindFramebuffer.invoke(null, GL_READ_FRAMEBUFFER, fboId);
+            for (Method m : gl11.getMethods()) {
+                if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) { try { m.setAccessible(true); m.invoke(null, GL_COLOR_ATTACHMENT0); } catch (Exception ignored) {}; break; }
+            }
+        } catch (Exception ignored) {}
         boolean ok = false;
-        for (Method m : gl11.getMethods()) {
-            if (m.getName().equals("glReadPixels") && m.getParameterCount() == 7) {
-                Class<?>[] pts = m.getParameterTypes();
-                if (pts[6] == java.nio.ByteBuffer.class) { m.setAccessible(true); m.invoke(null, 0, 0, w, h, GL_RGBA, GL_UB, bb); ok = true; break; }
+        try {
+            for (Method m : gl11.getMethods()) { if (m.getName().equals("glFinish") && m.getParameterCount() == 0) { try { m.setAccessible(true); m.invoke(null); } catch (Exception ignored) {}; break; } }
+            ByteBuffer bb = ByteBuffer.allocateDirect(w * h * 4);
+            for (Method m : gl11.getMethods()) {
+                if (m.getName().equals("glReadPixels") && m.getParameterCount() == 7) {
+                    Class<?>[] pts = m.getParameterTypes();
+                    if (pts[6] == java.nio.ByteBuffer.class) { m.setAccessible(true); m.invoke(null, 0, 0, w, h, GL_RGBA, GL_UB, bb); ok = true; break; }
+                }
+            }
+            if (!ok) throw new RuntimeException("glReadPixels not found");
+            bb.rewind(); int[] raw = new int[w * h];
+            for (int i = 0; i < raw.length; i++) { int r = bb.get() & 0xFF, g = bb.get() & 0xFF, b = bb.get() & 0xFF, a = bb.get() & 0xFF; raw[i] = (a << 24) | (r << 16) | (g << 8) | b; }
+            int[] flipped = new int[w * h];
+            for (int y2 = 0; y2 < h; y2++) for (int x2 = 0; x2 < w; x2++) flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
+            BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB); img.setRGB(0, 0, w, h, flipped, 0, w);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream(); ImageIO.write(img, "png", baos); byte[] result = baos.toByteArray();
+            if (result.length == 0) throw new RuntimeException("empty PNG from FBO read"); return result;
+        } finally {
+            // Restore the previous read framebuffer so the game keeps
+            // rendering into whatever it had bound.
+            try {
+                Method bindFramebuffer = glBindFramebufferMethod();
+                if (bindFramebuffer != null) bindFramebuffer.invoke(null, GL_READ_FRAMEBUFFER, prevReadFbo);
+                for (Method m : gl11.getMethods()) {
+                    if (m.getName().equals("glReadBuffer") && m.getParameterCount() == 1) { try { m.setAccessible(true); m.invoke(null, prevReadBuffer); } catch (Exception ignored) {}; break; }
+                }
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private static final int GL_BACK = 0x0405;
+    private static final int GL_READ_BUFFER = 0x0C02;
+    private static final int GL_READ_FRAMEBUFFER = 0x8CA8;
+    private static final int GL_READ_FRAMEBUFFER_BINDING = 0x8CAA;
+    private static final int GL_COLOR_ATTACHMENT0 = 0x8CE0;
+    private static Method glBindFramebufferCached = null;
+    private static boolean glBindFramebufferResolved = false;
+
+    /** glBindFramebuffer(target, framebuffer) from GL30/GL21/GL11, or null. */
+    private static Method glBindFramebufferMethod() {
+        if (glBindFramebufferResolved) return glBindFramebufferCached;
+        glBindFramebufferResolved = true;
+        for (String cls : new String[]{"org.lwjgl.opengl.GL30", "org.lwjgl.opengl.GL21"}) {
+            try {
+                for (Method m : Class.forName(cls).getMethods()) {
+                    if (m.getName().equals("glBindFramebuffer") && m.getParameterCount() == 2) {
+                        m.setAccessible(true);
+                        glBindFramebufferCached = m;
+                        return m;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    /** True when the target carries GpuTexture objects (MC 1.21.5+ layout). */
+    private static boolean hasGpuTextureField(Object target) {
+        for (Field f : ReflectionCache.getAllFields(target.getClass())) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+            String tn = f.getType().getName();
+            if (tn.contains("GpuTexture") || tn.contains("GlTexture")) return true;
+        }
+        return false;
+    }
+
+    /** True when the name is a live GL framebuffer (not a guessed field value). */
+    private static boolean isFramebufferName(int id) {
+        Object r = glQuery("glIsFramebuffer", id);
+        return r instanceof Boolean && (Boolean) r;
+    }
+
+    /** True when the name is a live GL texture. */
+    private static boolean isTextureName(int id) {
+        Object r = glQuery("glIsTexture", id);
+        return r instanceof Boolean && (Boolean) r;
+    }
+
+    /** glIsX(id) from GL30/GL21/GL11, or null when the entry point is absent. */
+    private static Object glQuery(String name, int id) {
+        try {
+            for (String cls : new String[]{"org.lwjgl.opengl.GL30", "org.lwjgl.opengl.GL21",
+                    "org.lwjgl.opengl.GL12", "org.lwjgl.opengl.GL11"}) {
+                try {
+                    for (Method m : Class.forName(cls).getMethods()) {
+                        if (m.getName().equals(name) && m.getParameterCount() == 1) {
+                            m.setAccessible(true);
+                            return m.invoke(null, id);
+                        }
+                    }
+                } catch (ClassNotFoundException ignored) {}
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    /** The named int field on the object or its superclasses, or 0. */
+    private static int getIntFieldByName(Object obj, String... names) {
+        for (Field f : ReflectionCache.getAllFields(obj.getClass())) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) || f.getType() != int.class) continue;
+            for (String name : names) {
+                if (!f.getName().equals(name)) continue;
+                try { f.setAccessible(true); return f.getInt(obj); } catch (Exception ignored) {}
             }
         }
-        if (!ok) throw new RuntimeException("glReadPixels not found");
-        bb.rewind(); int[] raw = new int[w * h];
-        for (int i = 0; i < raw.length; i++) { int r = bb.get() & 0xFF, g = bb.get() & 0xFF, b = bb.get() & 0xFF, a = bb.get() & 0xFF; raw[i] = (a << 24) | (r << 16) | (g << 8) | b; }
-        int[] flipped = new int[w * h];
-        for (int y2 = 0; y2 < h; y2++) for (int x2 = 0; x2 < w; x2++) flipped[y2 * w + x2] = raw[(h - 1 - y2) * w + x2];
-        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB); img.setRGB(0, 0, w, h, flipped, 0, w);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream(); ImageIO.write(img, "png", baos); byte[] result = baos.toByteArray();
-        if (result.length == 0) throw new RuntimeException("empty PNG from FBO read"); return result;
+        return 0;
     }
 
     private static long getAddressOfBuffer(ByteBuffer bb) throws Exception {
@@ -1034,17 +1169,70 @@ public final class ScreenshotHelper {
     }
 
     private static Object getMainRenderTarget(Object mc) {
-        try { return mc.getClass().getMethod("getMainRenderTarget").invoke(mc); } catch (Exception ignored) {}
+        // Production Fabric 1.21.x names this method_1522 and the field
+        // field_1689; the whole render target hierarchy is intermediary, so
+        // the return-type fallback below cannot recognise it by name either.
+        for (String name : new String[]{"getMainRenderTarget", "method_1522"}) {
+            try { return mc.getClass().getMethod(name).invoke(mc); } catch (Exception ignored) {}
+        }
         Method discovered = ReflectionCache.getDiscoveredMethod("getMainRenderTarget");
         if (discovered != null) { try { discovered.setAccessible(true); return discovered.invoke(mc); } catch (Exception ignored) {} }
+        // Intermediary runtimes: the target's own class name is opaque, so
+        // accept the one non-primitive 0-arg accessor whose type carries the
+        // RenderTarget shape (framebuffer/colour-texture int fields).
         for (Method m : ReflectionCache.getAllMethods(mc.getClass())) {
             if (m.getParameterCount() == 0 && m.getReturnType() != void.class && !m.getReturnType().isPrimitive()) {
                 String rtName = m.getReturnType().getName();
                 if (rtName.contains("RenderTarget") || rtName.contains("Framebuffer") || rtName.contains("FrameBuffer")) {
                     try { m.setAccessible(true); return m.invoke(mc); } catch (Exception ignored) {}
                 }
+                // Opaque class name (intermediary): recognise the instance.
+                try {
+                    m.setAccessible(true);
+                    Object candidate = m.invoke(mc);
+                    if (isRenderTargetInstance(candidate)) return candidate;
+                } catch (Exception ignored) {}
             }
         }
         return null;
+    }
+
+    /**
+     * True for a render-target-like type without relying on class or field
+     * names, which are opaque on intermediary runtimes: the type carries a
+     * GpuTexture (1.21.5+) or an int field whose value glIsFramebuffer
+     * accepts (1.17-1.21.4). Requires a live GL context, so this is only
+     * reached from the render thread.
+     */
+    private static boolean isRenderTargetType(Class<?> clazz) {
+        for (Field f : ReflectionCache.getAllFields(clazz)) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+            Class<?> t = f.getType();
+            if (t.getName().contains("GpuTexture") || t.getName().contains("GlTexture")) return true;
+            if (t == int.class) {
+                String n = f.getName();
+                // Cheap name wins first (Mojang/SRG runtimes); otherwise the
+                // field is only probeable once we have an instance, which the
+                // caller supplies through isRenderTargetInstance.
+                if (n.equals("frameBufferId") || n.equals("framebufferId") || n.equals("colorTextureId")
+                        || n.equals("f_83920_") || n.equals("f_83923_")) return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Instance-level companion to {@link #isRenderTargetType}: accepts the
+     * type when one of its int fields is a live GL framebuffer name, which is
+     * what an intermediary RenderTarget holds.
+     */
+    private static boolean isRenderTargetInstance(Object candidate) {
+        if (candidate == null) return false;
+        if (isRenderTargetType(candidate.getClass())) return true;
+        for (Field f : ReflectionCache.getAllFields(candidate.getClass())) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) || f.getType() != int.class) continue;
+            try { f.setAccessible(true); if (isFramebufferName(f.getInt(candidate))) return true; } catch (Exception ignored) {}
+        }
+        return false;
     }
 }
