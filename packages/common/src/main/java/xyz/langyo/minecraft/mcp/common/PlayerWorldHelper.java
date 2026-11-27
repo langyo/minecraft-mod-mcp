@@ -542,11 +542,15 @@ public final class PlayerWorldHelper {
     }
 
     private static Object findIntegratedServer(Object mc) {
-        Object server = findMethodOrNull(mc, "getSingleplayerServer", "getServer", "getIntegratedServer", "m_91092_", "func_71401_C");
+        // method_1576 / field_1766 are the intermediary names of
+        // Minecraft#getSingleplayerServer and the singleplayerServer field
+        // (stable 1.18.2-1.21.11, verified the same way as the ids in
+        // integratedSaveName); production Fabric has no other candidate.
+        Object server = findMethodOrNull(mc, "getSingleplayerServer", "getServer", "getIntegratedServer", "m_91092_", "func_71401_C", "method_1576");
         if (server == null) {
             for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
                 String n = f.getName();
-                if (n.equals("singleplayerServer") || n.contains("integratedServer") || n.equals("field_71437_Z") || n.equals("f_91007_")) {
+                if (n.equals("singleplayerServer") || n.contains("integratedServer") || n.equals("field_71437_Z") || n.equals("f_91007_") || n.equals("field_1766")) {
                     try { f.setAccessible(true); server = f.get(mc); } catch (Exception ignored) {}
                     if (server != null) break;
                 }
@@ -1497,9 +1501,15 @@ public final class PlayerWorldHelper {
      * runtime.
      */
     private static String integratedSaveName(Object mc) {
+        // Production Fabric plays on intermediary names, so the Mojang /
+        // SRG candidates miss: method_27728 is MinecraftServer#getWorldData
+        // and method_150 is WorldData#getLevelName - both stable across
+        // 1.18.2, 1.20.6, 1.21.1 and 1.21.11 (checked descriptor-anchored
+        // against each version's published intermediary file: the descriptor
+        // returns the WorldData / String shape on all four).
         Object server = findIntegratedServer(mc);
-        Object wd = server != null ? invokeExact(server, "getWorldData", "m_129910_") : null;
-        return wd != null ? invokeExactString(wd, "getLevelName", "m_5462_") : null;
+        Object wd = server != null ? invokeExact(server, "getWorldData", "m_129910_", "method_27728") : null;
+        return wd != null ? invokeExactString(wd, "getLevelName", "m_5462_", "method_150") : null;
     }
 
     // ============================================================
