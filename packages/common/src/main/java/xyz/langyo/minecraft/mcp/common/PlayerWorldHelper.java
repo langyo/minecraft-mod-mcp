@@ -110,7 +110,12 @@ public final class PlayerWorldHelper {
                 if (m.getParameterCount() == 0 && m.getReturnType() == String.class) {
                     String mn = m.getName();
                     ReflectionHelper.dbg("name: checking " + mn + " ret=String");
-                    if (mn.contains("74861") || mn.contains("5820") || mn.contains("5477") || mn.contains("56017") || mn.contains("5776") || mn.contains("70005") || mn.equals("getName") || mn.equals("getNameForScoreboard") || mn.equals("getStringifiedName") || mn.equals("asString")) {
+                    // getScoreboardName is the Mojang name behind m_6302_ and
+                    // getPlainTextName arrived in 1.21.6; neither was known to
+                    // this pass, so every Mojang-named 1.20.6+ runtime fell
+                    // through every pass below to an empty name (verified on
+                    // Forge 1.21.11 with a dump of the readable members).
+                    if (mn.contains("74861") || mn.contains("5820") || mn.contains("5477") || mn.contains("56017") || mn.contains("5776") || mn.contains("70005") || mn.equals("getName") || mn.equals("getScoreboardName") || mn.equals("getNameForScoreboard") || mn.equals("getPlainTextName") || mn.equals("getStringifiedName") || mn.equals("asString")) {
                         try { m.setAccessible(true); Object r = m.invoke(player); if (r != null && !r.toString().isEmpty()) { ReflectionHelper.dbg("name: matched " + mn + "=" + r); return r.toString(); } } catch (Exception ignored) {}
                     }
                 }
@@ -136,10 +141,10 @@ public final class PlayerWorldHelper {
                     }
                 }
             }
-            // 1.13+: getName() returns a Component, so every pass above comes
-            // up empty on Mojang-named runtimes (NeoForge, Forge from 1.20.6).
-            // authlib is never remapped, so the game profile answers with the
-            // plain name on every runtime (issue #100).
+            // 1.13+: getName() returns a Component, so the Text passes above
+            // only fire on Yarn-shaped names ("Text"), never on Mojang's
+            // "Component". authlib is never remapped, so the game profile
+            // answers with the plain name on every runtime (issue #100).
             Object profile = invokeExact(player, "getGameProfile", "m_36316_");
             if (profile == null) {
                 for (Method m : ReflectionCache.getAllMethods(player.getClass())) {
@@ -149,8 +154,21 @@ public final class PlayerWorldHelper {
                     }
                 }
             }
+            if (profile == null) {
+                // 1.21.x dropped the getGameProfile accessor entirely: the
+                // profile now lives in a plain field (named "profile" on
+                // Mojang names). Match it by type, not by name.
+                for (Field f : ReflectionCache.getAllFields(player.getClass())) {
+                    if (f.getType().getName().equals("com.mojang.authlib.GameProfile")) {
+                        try { f.setAccessible(true); profile = f.get(player); } catch (Exception ignored) {}
+                        if (profile != null) break;
+                    }
+                }
+            }
             if (profile != null) {
-                String profileName = invokeString(profile, "getName");
+                // authlib 6 turned GameProfile into a record: the accessor is
+                // name(), not getName().
+                String profileName = invokeString(profile, "getName", "name");
                 if (!profileName.isEmpty()) return profileName;
             }
         } catch (Exception ignored) {}
@@ -542,11 +560,15 @@ public final class PlayerWorldHelper {
     }
 
     private static Object findIntegratedServer(Object mc) {
-        Object server = findMethodOrNull(mc, "getSingleplayerServer", "getServer", "getIntegratedServer", "m_91092_", "func_71401_C");
+        // method_1576 / field_1766 are the intermediary names of
+        // Minecraft#getSingleplayerServer and the singleplayerServer field
+        // (stable 1.18.2-1.21.11, verified the same way as the ids in
+        // integratedSaveName); production Fabric has no other candidate.
+        Object server = findMethodOrNull(mc, "getSingleplayerServer", "getServer", "getIntegratedServer", "m_91092_", "func_71401_C", "method_1576");
         if (server == null) {
             for (Field f : ReflectionCache.getAllFields(mc.getClass())) {
                 String n = f.getName();
-                if (n.equals("singleplayerServer") || n.contains("integratedServer") || n.equals("field_71437_Z") || n.equals("f_91007_")) {
+                if (n.equals("singleplayerServer") || n.contains("integratedServer") || n.equals("field_71437_Z") || n.equals("f_91007_") || n.equals("field_1766")) {
                     try { f.setAccessible(true); server = f.get(mc); } catch (Exception ignored) {}
                     if (server != null) break;
                 }
@@ -1479,11 +1501,14 @@ public final class PlayerWorldHelper {
         } catch (Exception e) { return null; }
     }
 
-    private static String invokeString(Object obj, String methodName) {
-        try {
-            Object r = obj.getClass().getMethod(methodName).invoke(obj);
-            return r != null ? r.toString() : "";
-        } catch (Exception e) { return ""; }
+    private static String invokeString(Object obj, String... methodNames) {
+        for (String methodName : methodNames) {
+            try {
+                Object r = obj.getClass().getMethod(methodName).invoke(obj);
+                if (r != null && !r.toString().isEmpty()) return r.toString();
+            } catch (Exception ignored) {}
+        }
+        return "";
     }
 
     private static Object invokeOrNull(Object obj, String methodName) {
@@ -1497,9 +1522,15 @@ public final class PlayerWorldHelper {
      * runtime.
      */
     private static String integratedSaveName(Object mc) {
+        // Production Fabric plays on intermediary names, so the Mojang /
+        // SRG candidates miss: method_27728 is MinecraftServer#getWorldData
+        // and method_150 is WorldData#getLevelName - both stable across
+        // 1.18.2, 1.20.6, 1.21.1 and 1.21.11 (checked descriptor-anchored
+        // against each version's published intermediary file: the descriptor
+        // returns the WorldData / String shape on all four).
         Object server = findIntegratedServer(mc);
-        Object wd = server != null ? invokeExact(server, "getWorldData", "m_129910_") : null;
-        return wd != null ? invokeExactString(wd, "getLevelName", "m_5462_") : null;
+        Object wd = server != null ? invokeExact(server, "getWorldData", "m_129910_", "method_27728") : null;
+        return wd != null ? invokeExactString(wd, "getLevelName", "m_5462_", "method_150") : null;
     }
 
     // ============================================================

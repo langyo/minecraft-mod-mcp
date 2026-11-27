@@ -344,14 +344,14 @@ def install_mod_jar(jar_path, mc_dir=None):
     return str(dest)
 
 
-def install_test_world(world_name="CI_TestWorld", mc_dir=None, data_version=None):
+def install_test_world(world_name="CI_TestWorld", mc_dir=None, data_version=None, mc_ver=None):
     """Copy or generate the test superflat world save."""
     mc = mc_dir or str(MC_DIR)
     saves_dir = Path(mc) / "saves" / world_name
     if saves_dir.exists():
         shutil.rmtree(str(saves_dir), ignore_errors=True)
     saves_dir.mkdir(parents=True, exist_ok=True)
-    _generate_level_dat(str(saves_dir), world_name, data_version)
+    _generate_level_dat(str(saves_dir), world_name, data_version, mc_ver=mc_ver)
     _log(f"Test world created: {saves_dir}")
     return str(saves_dir)
 
@@ -359,14 +359,21 @@ def install_test_world(world_name="CI_TestWorld", mc_dir=None, data_version=None
 # DataVersion of each version the smoke matrix runs on, so the game starts its
 # own upgrade from a plausible point instead of from one number on every lane.
 #
-# These are best effort. A value OLDER than the running game is safe: the game
-# upgrades the save. Values newer than the game are not, so 26.2/26.3 reuse
-# 26.1.2's number and get its upgrade chain rather than a downgrade.
+# These are exact, read off each release's own embedded version.json
+# ("world_version"). The old practice of reusing 26.1.2's number for the whole
+# 26.x series made 26.2/26.3 flag the save as ancient and stall quick play on
+# the upgrade prompt.
 _DATA_VERSIONS = {
     "1.14.4": 1976, "1.15.2": 2230, "1.16.5": 2586, "1.17.1": 2730,
     "1.18.2": 2975, "1.19.4": 3337, "1.20.1": 3465, "1.20.4": 3700,
     "1.20.6": 3839, "1.21.1": 3955, "1.21.4": 4189, "1.21.7": 4438,
-    "1.21.11": 4671, "26.1.2": 4790, "26.2": 4790, "26.3": 4790,
+    "1.21.11": 4671,
+    # 26.x: per-version values read off each client jar's embedded
+    # version.json ("world_version"). Reusing 4790 across the series made
+    # 26.2/26.3 see our save as an ancient world: the upgrade ran but the
+    # opened result failed to parse, stalling the join before the player
+    # ever spawned (invisible on 26.1.2, whose guess happened to be right).
+    "26.1.2": 4790, "26.2": 4903, "26.3": 5023,
 }
 
 
@@ -376,7 +383,7 @@ def data_version_for(mc_ver):
 
 
 # NBT tag ids used by the encoder below.
-_NBT_END, _NBT_BYTE, _NBT_INT, _NBT_LONG, _NBT_STRING, _NBT_LIST, _NBT_COMPOUND = 0, 1, 3, 4, 8, 9, 10
+_NBT_END, _NBT_BYTE, _NBT_INT, _NBT_LONG, _NBT_FLOAT, _NBT_STRING, _NBT_LIST, _NBT_COMPOUND, _NBT_INT_ARRAY = 0, 1, 3, 4, 5, 8, 9, 10, 11
 
 
 class _Byte(int):
@@ -401,6 +408,17 @@ class _Long(int):
     """NBT TAG_Long."""
 
 
+class _IntArray(list):
+    """NBT TAG_Int_Array (the 26.x spawn position is one of these)."""
+
+    def __init__(self, values):
+        super().__init__(_Int(v) for v in values)
+
+
+class _Float(float):
+    """NBT TAG_Float."""
+
+
 def _nbt_type(value):
     if isinstance(value, _Byte):
         return _NBT_BYTE
@@ -408,6 +426,10 @@ def _nbt_type(value):
         return _NBT_INT
     if isinstance(value, _Long):
         return _NBT_LONG
+    if isinstance(value, _IntArray):
+        return _NBT_INT_ARRAY
+    if isinstance(value, _Float):
+        return _NBT_FLOAT
     if isinstance(value, str):
         return _NBT_STRING
     if isinstance(value, list):
@@ -428,6 +450,12 @@ def _nbt_write(value, out):
         out.write(struct.pack(">i", value))
     elif kind == _NBT_LONG:
         out.write(struct.pack(">q", value))
+    elif kind == _NBT_INT_ARRAY:
+        out.write(struct.pack(">i", len(value)))
+        for v in value:
+            out.write(struct.pack(">i", v))
+    elif kind == _NBT_FLOAT:
+        out.write(struct.pack(">f", value))
     elif kind == _NBT_STRING:
         data = value.encode("utf-8")
         out.write(struct.pack(">H", len(data)))
@@ -458,7 +486,7 @@ def _nbt_encode_root(tree):
     return out.getvalue()
 
 
-def _generate_level_dat(save_dir, world_name, data_version=None):
+def _generate_level_dat(save_dir, world_name, data_version=None, mc_ver=None):
     """Generate a superflat level.dat (gzip + NBT).
 
     The tree mirrors what the game writes for a flat 1.17-1.20 world. Hand
@@ -470,6 +498,101 @@ def _generate_level_dat(save_dir, world_name, data_version=None):
     import gzip
 
     dv = int(data_version if data_version is not None else 3953)
+
+    # 26.x moved to a new save schema the hard way: world generation settings
+    # live in data/minecraft/world_gen_settings.dat (not in level.dat), the
+    # difficulty/spawn moved into compounds, and the version is Version{Id}
+    # plus a version_history list. A pre-26 tree still parses, but the game
+    # then flags the world as an old save and blocks quick play on the
+    # "Create a backup before upgrading this world?" prompt - so the smoke
+    # lane never enters the world. Mirror the shape the game itself writes
+    # (taken from a native 26.3 server-generated world), typed field for
+    # field. Peaceful keeps slimes from killing the player before the reads.
+    if mc_version_tuple(mc_ver) >= (26, 1):
+        name = str(mc_ver or "26.x")
+        tree = {"Data": {
+            "difficulty_settings": {"difficulty": "peaceful", "hardcore": _Byte(0), "locked": _Byte(0)},
+            "Time": _Long(1000),
+            "version_history": [_Int(dv)],
+            "GameType": _Int(0),
+            "ServerBrands": ["vanilla"],
+            "version": _Int(19133),
+            "LastPlayed": _Long(int(time.time() * 1000)),
+            "spawn": {
+                "pos": _IntArray([0, -60, 0]),
+                "pitch": _Float(0.0),
+                "dimension": "minecraft:overworld",
+                "yaw": _Float(0.0),
+            },
+            "Version": {"Snapshot": _Byte(0), "Series": "main", "Id": _Int(dv), "Name": name},
+            "LevelName": world_name,
+            "initialized": _Byte(1),
+            "WasModded": _Byte(0),
+            "DataVersion": _Int(dv),
+            "allowCommands": _Byte(0),
+            "DataPacks": {"Enabled": ["vanilla"], "Disabled": []},
+        }}
+        payload = _nbt_encode_root(tree)
+        level_dat = safe_join(save_dir, "level.dat")
+        os.makedirs(save_dir, exist_ok=True)
+        with gzip.open(level_dat, "wb") as f:
+            f.write(payload)
+        # The generator settings moved to their own file; same tree the game
+        # writes, with the world's own DataVersion so no sibling upgrade runs.
+        gen_tree = {"data": {
+            "bonus_chest": _Byte(0),
+            "seed": _Long(42),
+            "generate_structures": _Byte(1),
+            "dimensions": {
+                "minecraft:overworld": {
+                    "type": "minecraft:overworld",
+                    "generator": {
+                        "type": "minecraft:flat",
+                        "settings": {
+                            "features": _Byte(0),
+                            "biome": "minecraft:plains",
+                            "layers": [
+                                {"block": "minecraft:bedrock", "height": _Int(1)},
+                                {"block": "minecraft:dirt", "height": _Int(2)},
+                                {"block": "minecraft:grass_block", "height": _Int(1)},
+                            ],
+                            "structure_overrides": [],
+                            "lakes": _Byte(0),
+                        },
+                    },
+                },
+                "minecraft:the_nether": {
+                    "type": "minecraft:the_nether",
+                    "generator": {
+                        "type": "minecraft:noise",
+                        "settings": "minecraft:nether",
+                        "biome_source": {"type": "minecraft:multi_noise", "preset": "minecraft:nether"},
+                    },
+                },
+                "minecraft:the_end": {
+                    "type": "minecraft:the_end",
+                    "generator": {
+                        "type": "minecraft:noise",
+                        "settings": "minecraft:end",
+                        "biome_source": {"type": "minecraft:the_end"},
+                    },
+                },
+            },
+        }, "DataVersion": _Int(dv)}
+        gen_dir = safe_join(save_dir, "data", "minecraft")
+        os.makedirs(gen_dir, exist_ok=True)
+        with gzip.open(safe_join(gen_dir, "world_gen_settings.dat"), "wb") as f:
+            f.write(_nbt_encode_root(gen_tree))
+        # Dimension folders: the game creates their metadata on load, but the
+        # layout must exist (verified against a native server world, which
+        # opens through quick play with exactly this shape).
+        for dim in ("overworld", "the_nether", "the_end"):
+            os.makedirs(safe_join(save_dir, "dimensions", "minecraft", dim, "data", "minecraft"), exist_ok=True)
+        session_lock = safe_join(save_dir, "session.lock")
+        with open(session_lock, "wb") as f:
+            f.write(b"\x00" * 8)
+        return
+
     tree = {"Data": {
         "DataVersion": _Int(dv),
         "version": _Int(19133),
@@ -1052,7 +1175,6 @@ def era_launch_flags(mc_ver, loader, world_name=None):
         vtuple = tuple(int(x) for x in str(mc_ver).split("."))
     except ValueError:
         vtuple = (1, 0)
-    major = vtuple[0]
     parts = []
     # MC 26.3+ (Render Pearl) on Forge/NeoForge: BOTH the AWT-headless trick
     # and the disableEarlyDisplay flags suppress FML's early GLFW window,
@@ -1062,7 +1184,7 @@ def era_launch_flags(mc_ver, loader, world_name=None):
     # Letting FML open its (working, GLFW-based) early window lets Render
     # Pearl adopt that context instead. Older lanes keep the original flags.
     renderpearl = loader in ("forge", "neoforge") and vtuple >= (26, 3)
-    if major >= 13 and not renderpearl:
+    if vtuple >= (1, 13) and not renderpearl:
         parts.append("-Djava.awt.headless=true")
     # Forge >= 1.20.5 and NeoForge >= 20.6 open an early GL window that
     # times out under Xvfb/llvmpipe ("Timed out trying to setup the Game
@@ -1131,7 +1253,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         # --mc-dir is passed (settings.ts:gameDirPath), and quick play
         # resolves the save relative to it - MC_DIR/saves is never read.
         install_test_world(world_name, mc_dir=str(GAME_DIR),
-                           data_version=data_version_for(mc_ver))
+                           data_version=data_version_for(mc_ver), mc_ver=mc_ver)
 
     version_name = setup_mc_version(mc_ver, loader)
     if not version_name:
@@ -1232,6 +1354,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     else:
         time.sleep(5)  # main menu only; nothing to wait for
 
+
     try:
         api_call(mod_url, "enter_control_mode", {})
         _log(f"  Entered control mode")
@@ -1240,7 +1363,18 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     time.sleep(1)
 
     info_validator = valid_player_info if can_quick_play else (lambda r: isinstance(r, dict))
-    world_validator = valid_world_info if can_quick_play else (lambda r: isinstance(r, dict))
+    # On quick-play lanes the game enters OUR generated save, so the save
+    # name is known exactly; asserting it - not merely "not a stub" - is
+    # what catches a mapping-era regression reporting "unknown". That exact
+    # bug shipped on production Fabric 1.18-1.21 (the helper knew no
+    # intermediary ids) and sailed through the loose check.
+    if can_quick_play and world_name:
+        world_validator = (lambda r, wn=world_name:
+                           valid_world_info(r) and r.get("world_name") == wn)
+    elif can_quick_play:
+        world_validator = valid_world_info
+    else:
+        world_validator = (lambda r: isinstance(r, dict))
     tests = [
         ("ping", {}, lambda r: r.get("result") == "pong"),
         ("get_player_info", {}, info_validator),
@@ -1327,7 +1461,7 @@ def run_e2e_test(mc_ver, loader, jdk_ver, mod_jar, world_name, timeout=600):
     setup_xvfb(screen="1280x720x24")
     install_mod_jar(mod_jar)
     install_test_world(world_name, mc_dir=str(GAME_DIR),
-                       data_version=data_version_for(mc_ver))
+                       data_version=data_version_for(mc_ver), mc_ver=mc_ver)
 
     version_name = setup_mc_version(mc_ver, loader)
     if not version_name:
@@ -1493,7 +1627,7 @@ def main():
         setup_xvfb(screen="1280x720x24")
         install_mod_jar(mod_jar)
         install_test_world(args.world, mc_dir=str(GAME_DIR),
-                           data_version=data_version_for(args.mc_ver))
+                           data_version=data_version_for(args.mc_ver), mc_ver=args.mc_ver)
 
         version_name = setup_mc_version(args.mc_ver, args.loader)
         if not version_name:
