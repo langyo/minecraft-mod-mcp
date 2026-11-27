@@ -1240,7 +1240,18 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     time.sleep(1)
 
     info_validator = valid_player_info if can_quick_play else (lambda r: isinstance(r, dict))
-    world_validator = valid_world_info if can_quick_play else (lambda r: isinstance(r, dict))
+    # On quick-play lanes the game enters OUR generated save, so the save
+    # name is known exactly; asserting it - not merely "not a stub" - is
+    # what catches a mapping-era regression reporting "unknown". That exact
+    # bug shipped on production Fabric 1.18-1.21 (the helper knew no
+    # intermediary ids) and sailed through the loose check.
+    if can_quick_play and world_name:
+        world_validator = (lambda r, wn=world_name:
+                           valid_world_info(r) and r.get("world_name") == wn)
+    elif can_quick_play:
+        world_validator = valid_world_info
+    else:
+        world_validator = (lambda r: isinstance(r, dict))
     tests = [
         ("ping", {}, lambda r: r.get("result") == "pong"),
         ("get_player_info", {}, info_validator),
