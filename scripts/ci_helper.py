@@ -1150,24 +1150,24 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     try:
         # Show exactly what will be executed: zero-output deaths leave no
         # other trace on the runner.
+        env["MC_MCP_EXTRA_JVM"] = extra_jvm
+        env["MC_MCP_EXTRA_GAME"] = extra_game
         dry = subprocess.run(
             ["node", launcher, "launch", version_name, "--headless",
              "--memory", "2048",
-             "--extra-jvm", extra_jvm,
-             "--mod-jar", str(mod_jar),
-             *(["--game-args", extra_game] if extra_game else []), "--dry-run"],
+             "--mod-jar", str(mod_jar), "--dry-run"],
             env=env, capture_output=True, text=True, timeout=120,
         )
         plan_lines = ((dry.stdout or "") + (dry.stderr or "")).splitlines()
+        node_version = subprocess.run(["node", "--version"], capture_output=True, text=True).stdout.strip()
+        _log(f"Node: {node_version}")
         _log("Dry-run launch plan (first 14 lines):")
         for line in plan_lines[:14]:
             _log(f"  [plan] {line[:220]}")
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name, "--headless",
              "--memory", "2048",
-             "--extra-jvm", extra_jvm,
-             "--mod-jar", str(mod_jar),
-             *(["--game-args", extra_game] if extra_game else [])],
+             "--mod-jar", str(mod_jar)],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
         )
@@ -1478,12 +1478,12 @@ def main():
         launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
         ensure_mod_token()
         extra_jvm, extra_game, can_quick_play = era_launch_flags(args.mc_ver, args.loader, args.world)
-        game_args = ["--game-args", extra_game] if extra_game else []
+        env["MC_MCP_EXTRA_JVM"] = extra_jvm
+        env["MC_MCP_EXTRA_GAME"] = extra_game
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name,
              "--memory", "2048",
-             *(["--extra-jvm", extra_jvm] if extra_jvm else []),
-             "--mod-jar", str(args.mod_jar), *game_args],
+             "--mod-jar", str(args.mod_jar)],
             env=os.environ.copy(),
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,

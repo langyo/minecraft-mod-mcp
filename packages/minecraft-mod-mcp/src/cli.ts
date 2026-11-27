@@ -210,7 +210,7 @@ Options:
   const extraJvmParts: string[] = [];
   if (config.java_args) extraJvmParts.push(config.java_args);
   if (typeof values["jvm-args"] === "string") extraJvmParts.push(values["jvm-args"]);
-  if (typeof extraJvmFlags === "string") extraJvmParts.push(extraJvmFlags);
+  if (typeof extraJvmFlags === "string" && extraJvmFlags.length > 0) extraJvmParts.push(extraJvmFlags);
 
   const launchConfig: LaunchConfig = {
     versionId,
@@ -229,10 +229,14 @@ Options:
     minMemoryMb: typeof values["min-memory"] === "string"
       ? parseInt(values["min-memory"] as string, 10)
       : config.min_memory_mb,
-    extraJvmArgs: extraJvmParts.length > 0 ? extraJvmParts.join(" ") : undefined,
+    // CI passes free-form jvm/game args through env: the values start with
+    // "-" and argv tokenization has shredded them on some runner setups.
+    extraJvmArgs: extraJvmParts.length > 0
+      ? extraJvmParts.join(" ")
+      : (process.env.MC_MCP_EXTRA_JVM || undefined),
     extraGameArgs: buildExtraGameArgs(
       config.game_args,
-      extraGameArgsRaw || undefined,
+      extraGameArgsRaw || process.env.MC_MCP_EXTRA_GAME || undefined,
       values.server,
       values["server-port"],
       versionArg,
