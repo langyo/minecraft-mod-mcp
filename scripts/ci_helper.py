@@ -1217,7 +1217,20 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         kill_minecraft()
         return results
 
-    time.sleep(5)  # Wait for world load etc
+    # Quick play exists from 1.20; before it there is no non-GUI way into a
+    # world, so on those lanes the game stays on the main menu and the player
+    # and world reads legitimately answer with stubs - assert shape only there.
+    can_quick_play = mc_version_tuple(mc_ver) >= (1, 20)
+
+    if can_quick_play:
+        # The world keeps loading long after the HTTP server answers (spawn
+        # prep on llvmpipe, the Render Pearl renderer on 26.x, and the
+        # offline profile filling in on 1.21.11 all run late); poll until the
+        # player is readable instead of asserting mid-load.
+        entered = wait_for_player(mod_url, timeout_s=120)
+        _log(f"  World entry: {'player present' if entered else 'TIMEOUT - player never appeared'}")
+    else:
+        time.sleep(5)  # main menu only; nothing to wait for
 
     try:
         api_call(mod_url, "enter_control_mode", {})
@@ -1226,10 +1239,6 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
         pass
     time.sleep(1)
 
-    # Quick play exists from 1.20; before it there is no non-GUI way into a
-    # world, so on those lanes the game stays on the main menu and the player
-    # and world reads legitimately answer with stubs - assert shape only there.
-    can_quick_play = mc_version_tuple(mc_ver) >= (1, 20)
     info_validator = valid_player_info if can_quick_play else (lambda r: isinstance(r, dict))
     world_validator = valid_world_info if can_quick_play else (lambda r: isinstance(r, dict))
     tests = [
