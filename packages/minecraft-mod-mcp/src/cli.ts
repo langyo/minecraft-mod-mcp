@@ -166,6 +166,12 @@ Options:
     return;
   }
 
+  // The two free-form flags are extracted BEFORE parseArgs, by literal
+  // next-entry pairing: their values start with "-" ("-Dprop=...",
+  // "--quickPlay..."), and parseArgs has shuffled such values between option
+  // and positional across Node releases, which silently dropped them.
+  const extraJvmFlags = takeAllFlags(args, "--extra-jvm").join(" ");
+  const extraGameArgsRaw = takeAllFlags(args, "--game-args").join(" ");
   const { values, positionals } = parseArgs({
     args,
     options: {
@@ -175,10 +181,6 @@ Options:
       memory: { type: "string", default: String(GAME.defaultMaxMemoryMb) },
       "min-memory": { type: "string" },
       "jvm-args": { type: "string" },
-      // multiple: "--game-args --quickPlaySingleplayer W" must keep every
-      // token; a plain string option truncated the value to its first token
-      // and the world name was silently dropped.
-      "game-args": { type: "string", multiple: true },
       fullscreen: { type: "boolean", default: false },
       width: { type: "string" },
       height: { type: "string" },
@@ -188,19 +190,9 @@ Options:
       "dry-run": { type: "boolean", default: false },
       "mod-jar": { type: "string" },
       headless: { type: "boolean", default: false },
-      // multiple: "--extra-jvm -Da=x -Db=y" would otherwise be shredded by
-      // parseArgs when the value starts with "-" (strict:false treats the
-      // flag as boolean and explodes the value into one-char tokens).
-      "extra-jvm": { type: "string", multiple: true },
     },
     strict: false,
   });
-
-  // --extra-jvm may be passed multiple times (or hold several properties);
-  // normalize to one space-joined string.
-  const extraJvmFlags = Array.isArray(values["extra-jvm"])
-    ? (values["extra-jvm"] as string[]).join(" ")
-    : (values["extra-jvm"] as string | undefined);
 
   const versionArg = positionals[0];
   const loader = (values.loader ?? GAME.defaultLoader) as Loader;
@@ -240,7 +232,7 @@ Options:
     extraJvmArgs: extraJvmParts.length > 0 ? extraJvmParts.join(" ") : undefined,
     extraGameArgs: buildExtraGameArgs(
       config.game_args,
-      gameArgsString(values["game-args"]),
+      extraGameArgsRaw || undefined,
       values.server,
       values["server-port"],
       versionArg,
@@ -1168,6 +1160,25 @@ Client Options:
   await runLaunch(launchArgs);
 }
 
+
+/**
+ * Literal flag extraction, immune to parseArgs tokenization: pair each
+ * occurrence of `name` with the raw next argv entry (even when it starts
+ * with "-") and remove both. Node releases have shuffled dash-prefixed
+ * values between option and positional, which silently dropped "-D..." and
+ * "--quickPlay..." style payloads.
+ */
+function takeAllFlags(argv: string[], name: string): string[] {
+  const taken: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== name) continue;
+    const value = argv[i + 1];
+    argv.splice(i, 2);
+    i--;
+    if (value !== undefined) taken.push(value);
+  }
+  return taken;
+}
 
 function gameArgsString(value: unknown): string | undefined {
   if (Array.isArray(value)) {

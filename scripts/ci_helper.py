@@ -1158,8 +1158,9 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
              *(["--game-args", extra_game] if extra_game else []), "--dry-run"],
             env=env, capture_output=True, text=True, timeout=120,
         )
-        _log("Dry-run launch plan:")
-        for line in ((dry.stdout or "") + (dry.stderr or "")).splitlines()[:14]:
+        plan_lines = ((dry.stdout or "") + (dry.stderr or "")).splitlines()
+        _log("Dry-run launch plan (first 14 lines):")
+        for line in plan_lines[:14]:
             _log(f"  [plan] {line[:220]}")
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name, "--headless",
@@ -1192,6 +1193,11 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     except TimeoutError:
         results["mod_ready"] = {"passed": False, "detail": "HTTP server not found"}
         _dump_game_diagnostics("mod never became ready")
+        # The dry-run plan is the exact command the JVM rejected; dump it in
+        # full (the 14-line preview above hides the Args section).
+        _log("  [plan] full launch command the JVM rejected:")
+        for line in plan_lines:
+            _log(f"  [plan] {line[:300]}")
         kill_minecraft()
         return results
 
