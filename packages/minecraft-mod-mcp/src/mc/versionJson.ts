@@ -258,7 +258,14 @@ export function collectAllArgs(vj: VersionJson): { jvmArgs: string[]; gameArgs: 
     gameArgs.push(...vj.minecraftArguments.split(/\s+/));
   }
 
-  return { jvmArgs, gameArgs };
+  // Mirror-served version jsons occasionally carry a literal "-" as a jvm or
+  // game argument (bmclapi's 1.19.4-forge-45.4.3 copy does); the java launcher
+  // rejects it with "Unrecognized option: -" and the JVM never starts. A bare
+  // dash is never a valid argument, so drop it where it was found.
+  return {
+    jvmArgs: jvmArgs.filter((arg) => arg !== "-"),
+    gameArgs: gameArgs.filter((arg) => arg !== "-"),
+  };
 }
 
 export function shouldApply(rules: Rule[], features?: Record<string, boolean>): boolean {

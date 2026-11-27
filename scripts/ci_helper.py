@@ -1213,7 +1213,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     # Quick play exists from 1.20; before it there is no non-GUI way into a
     # world, so on those lanes the game stays on the main menu and the player
     # and world reads legitimately answer with stubs - assert shape only there.
-    can_quick_play = vtuple >= (1, 20)
+    can_quick_play = mc_version_tuple(mc_ver) >= (1, 20)
     info_validator = valid_player_info if can_quick_play else (lambda r: isinstance(r, dict))
     world_validator = valid_world_info if can_quick_play else (lambda r: isinstance(r, dict))
     tests = [
@@ -1241,7 +1241,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
             results[cmd] = {"passed": False, "detail": str(e)}
             _log(f"  TEST [{cmd}]: ERROR - {e}")
 
-    capture_supported = vtuple < (26, 1, 2)
+    capture_supported = mc_version_tuple(mc_ver) < (26, 1, 2)
     if not capture_supported:
         # 26.x renderers answer /api/screenshot with HTTP 500: the capture
         # path does not know them yet. Record a documented skip so the lane
