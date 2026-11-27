@@ -1027,6 +1027,14 @@ def _dump_game_diagnostics(reason, tail_lines=80):
 
 
 
+def mc_version_tuple(mc_ver):
+    """(major, minor, patch) of a MC version string, (1, 0) on garbage."""
+    try:
+        return tuple(int(x) for x in str(mc_ver).split("."))
+    except ValueError:
+        return (1, 0)
+
+
 def era_launch_flags(mc_ver, loader, world_name=None):
     """Era-appropriate launch flags shared by the smoke and screenshot jobs.
 
@@ -1478,8 +1486,8 @@ def main():
         launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
         ensure_mod_token()
         extra_jvm, extra_game, can_quick_play = era_launch_flags(args.mc_ver, args.loader, args.world)
-        env["MC_MCP_EXTRA_JVM"] = extra_jvm
-        env["MC_MCP_EXTRA_GAME"] = extra_game
+        os.environ["MC_MCP_EXTRA_JVM"] = extra_jvm
+        os.environ["MC_MCP_EXTRA_GAME"] = extra_game
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name,
              "--memory", "2048",
