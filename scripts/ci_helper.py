@@ -1158,7 +1158,14 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     try:
         # Show exactly what will be executed: zero-output deaths leave no
         # other trace on the runner.
-        env["MC_MCP_EXTRA_JVM"] = extra_jvm
+        # JVM flags go through JAVA_TOOL_OPTIONS: the JVM reads it itself, so
+        # they never travel through our own argument assembly (where the
+        # "-D..." strings were being shredded into single characters on the
+        # runners). Game args stay on the env path the plan showed working.
+        if extra_jvm:
+            env["JAVA_TOOL_OPTIONS"] = extra_jvm
+        else:
+            env.pop("JAVA_TOOL_OPTIONS", None)
         env["MC_MCP_EXTRA_GAME"] = extra_game
         dry = subprocess.run(
             ["node", launcher, "launch", version_name, "--headless",
@@ -1486,7 +1493,10 @@ def main():
         launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
         ensure_mod_token()
         extra_jvm, extra_game, can_quick_play = era_launch_flags(args.mc_ver, args.loader, args.world)
-        os.environ["MC_MCP_EXTRA_JVM"] = extra_jvm
+        if extra_jvm:
+            os.environ["JAVA_TOOL_OPTIONS"] = extra_jvm
+        else:
+            os.environ.pop("JAVA_TOOL_OPTIONS", None)
         os.environ["MC_MCP_EXTRA_GAME"] = extra_game
         mc_proc = subprocess.Popen(
             ["node", launcher, "launch", version_name,
