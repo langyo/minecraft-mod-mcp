@@ -1151,8 +1151,7 @@ def run_smoke_test(mc_ver, loader, jdk_ver, mod_jar, headless=True, world_name=N
     # connection"), while LWJGL3-era loads benefit (Forge >= 1.20.5 skips
     # its EarlyDisplay window when AWT is headless). Apply it only to
     # MC >= 1.13.
-    parts, extra_game, can_quick_play = era_launch_flags(mc_ver, loader, world_name)
-    extra_jvm = " ".join(parts)
+    extra_jvm, extra_game, can_quick_play = era_launch_flags(mc_ver, loader, world_name)
 
     launcher = str(Path(__file__).resolve().parent.parent / "packages" / "minecraft-mod-mcp" / "dist" / "cli.js")
     try:
