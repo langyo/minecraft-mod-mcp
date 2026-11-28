@@ -8,6 +8,14 @@ group = "xyz.langyo"
 sourceCompatibility = "8"
 targetCompatibility = "8"
 
+// The build JDK (17 in CI) must resolve signatures against the Java 8 API:
+// -source/-target alone let the newer javac emit the covariant
+// ByteBuffer.rewind() -> ByteBuffer (Java 9+), which crashes the real
+// Java 8 runtime with NoSuchMethodError on the first screenshot.
+tasks.withType(JavaCompile) {
+    options.release = 8
+}
+
 repositories {
     mavenCentral()
     maven {
