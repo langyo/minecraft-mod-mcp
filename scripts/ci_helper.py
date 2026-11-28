@@ -1184,7 +1184,12 @@ def era_launch_flags(mc_ver, loader, world_name=None):
     # Letting FML open its (working, GLFW-based) early window lets Render
     # Pearl adopt that context instead. Older lanes keep the original flags.
     renderpearl = loader in ("forge", "neoforge") and vtuple >= (26, 3)
-    if vtuple >= (1, 13) and not renderpearl:
+    # AWT-headless applies only where it was proven green: the 26.1/26.2
+    # lanes pass with it, while on the 1.x lanes it blanked the captured
+    # framebuffer (1.20.4-forge sampled a single colour in-world with it,
+    # and captured a real frame without it in the previous pipeline) - so
+    # the 1.x lanes launch without it and rely on disableEarlyDisplay.
+    if vtuple >= (26, 1) and not renderpearl:
         parts.append("-Djava.awt.headless=true")
     # Forge >= 1.20.5 and NeoForge >= 20.6 open an early GL window that
     # times out under Xvfb/llvmpipe ("Timed out trying to setup the Game
